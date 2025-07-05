@@ -13,7 +13,7 @@ namespace minire::sdl
     public:
         GlApplication(int width, int height,
                       std::string const & title);
-        virtual ~GlApplication();
+        ~GlApplication() override;
 
         void setVsync(bool enabled) const;
 

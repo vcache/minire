@@ -2,9 +2,21 @@
 
 MiniRe is a miniature rendering library.
 
+It is heavily under construction.
+
 ## Installation
 
 TODO
+
+## Building
+
+```
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+$ ./examples/hello-world/hello-worl 
+```
 
 ## Usage
 

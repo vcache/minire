@@ -2,7 +2,8 @@
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
-#include <minire/opengl.hpp>
+
+#include <opengl.hpp>
 
 namespace minire::sdl
 {
@@ -19,7 +20,7 @@ namespace minire::sdl
         {
             logging::Level level = GL_DEBUG_TYPE_ERROR == type ? logging::Level::kError
                                                                : logging::Level::kDebug;
-            MINIRE_LOG(level, "type = {:#x}, severity = {:#x}, message = {} ",
+            MINIRE_LOG(level, "type = {:#x}, severity = {:#x}\n{} ",
                        type, severity, message);
         }
 

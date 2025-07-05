@@ -169,6 +169,7 @@ namespace minire::sdl
         }
     }
 
+    // TODO: add FPS limiter
     void Application::run()
     {
         utils::FpsCounter fpsCounter(2);

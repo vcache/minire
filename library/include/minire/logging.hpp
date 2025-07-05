@@ -23,6 +23,10 @@ namespace minire::logging
                        int line,
                        char const * function);
 
+    void streamLines(std::ostream & os,
+                     std::string const & text,
+                     size_t pfxLen);
+
     template<typename... FmtArgs>
     void log(Level level,
              char const * file,
@@ -33,9 +37,12 @@ namespace minire::logging
     {
         if (static_cast<int>(getVerbosity()) <= static_cast<int>(level))
         {
-            std::cout << prefix(level, file, line, function)
-                      << fmt::format(fmtFormat, std::forward<FmtArgs>(fmtArgs)...)
-                      << std::endl;
+            std::string pfx = prefix(level, file, line, function);
+            std::string text = fmt::format(fmtFormat, std::forward<FmtArgs>(fmtArgs)...);
+
+            std::cout << pfx;
+            streamLines(std::cout, text, pfx.size());
+            std::cout.flush();
         }
     }
 
