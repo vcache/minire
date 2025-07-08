@@ -80,7 +80,7 @@ namespace minire::gpu::render
                   Cache & cache,
                   bool mipmaps)
     {
-        auto const it = cache.find(id);
+        auto it = cache.find(id);
         if (it == cache.cend())
         {
             auto lease = contentManager.borrow(id);
@@ -88,8 +88,9 @@ namespace minire::gpu::render
             models::Image::Sptr image = lease->as<models::Image::Sptr>();
             MINIRE_INVARIANT(image, "no valid image inside an asset: {}", id);
             auto texture = std::make_shared<Texture>(*image, mipmaps);
-            cache.emplace(id, texture);
-            return texture;
+            auto [newIt, inserted]  = cache.emplace(id, texture);
+            MINIRE_INVARIANT(inserted, "failed to cache a texture");
+            it = newIt;
         }
         return it->second;
     }

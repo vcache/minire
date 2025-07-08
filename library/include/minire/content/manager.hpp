@@ -17,6 +17,16 @@ namespace minire::content
 
     // TODO: cover with tests
 
+    class Reader
+    {
+    public:
+        using Uptr = std::unique_ptr<Reader>;
+
+        virtual ~Reader() = default;
+
+        virtual Asset load(Id const & id) const = 0;
+    };
+
     class Manager
     {
         struct AssetBlock
@@ -33,10 +43,18 @@ namespace minire::content
 
         virtual ~Manager();
 
-        std::unique_ptr<Lease> borrow(Id const &);
+    public:
+        void setReader(Reader::Uptr);
 
-    protected:
-        virtual std::pair<Asset, size_t> load(Id const &) const = 0;
+        template<typename T,
+                 typename... Args>
+        T & setReader(Args && ... args)
+        {
+            _reader = std::make_unique<T>(std::forward<Args>(args)...);
+            return static_cast<T &>(*_reader);
+        }
+
+        std::unique_ptr<Lease> borrow(Id const &);
 
     private:
         void incUsage(Store::iterator it) noexcept;
@@ -46,6 +64,7 @@ namespace minire::content
         void cleanup();
 
     private:
+        Reader::Uptr _reader;
         size_t const _sizeLimit = 0;
         size_t       _sizeCurrent = 0;
         Store        _store;
@@ -118,26 +137,58 @@ namespace minire::content
     };
 }
 
-namespace minire::content
+namespace minire::content::readers
 {
-    class DummyManager : public Manager
-    {
-        std::pair<Asset, size_t> load(Id const & id) const override
-        {
-            MINIRE_THROW("Cannot load asset, due to DummyManager: {}", id);
-        }
-    };
-
-    class FsManager : public Manager
+    class InMemory : public Reader
     {
     public:
-        explicit FsManager(std::string prefix,
-                           size_t sizeLimit = 0);
+        void remove(content::Id const &);
+
+        bool contains(content::Id const &) const;
+
+        void store(content::Id const &, content::Asset);
+
+    public:
+        Asset load(Id const &) const override;
 
     private:
-        std::pair<Asset, size_t> load(Id const &) const override;
+        std::unordered_map<content::Id, content::Asset> _store;
+    };
+}
+
+namespace minire::content::readers
+{
+    class Filesystem : public Reader
+    {
+    public:
+        explicit Filesystem(std::string prefix);
+
+    public:
+        Asset load(Id const &) const override;
 
     private:
         std::string _prefix;
+    };
+}
+
+namespace minire::content::readers
+{
+    class Chained : public Reader
+    {
+    public:
+        Asset load(Id const &) const override;
+
+        Chained & append(Reader::Uptr);
+
+        template<typename T,
+                 typename... Args>
+        Chained & append(Args && ... args)
+        {
+            append(std::make_unique<T>(std::forward<Args>(args)...));
+            return *this;
+        }
+
+    private:
+        std::vector<Reader::Uptr> _readers;
     };
 }

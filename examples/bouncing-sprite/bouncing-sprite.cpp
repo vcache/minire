@@ -8,7 +8,7 @@
 
 namespace
 {
-    static size_t const kMaxCtrlFps = 60;
+    static size_t const kMaxCtrlFps = 120;
     static float const kVelocity = 150.0f;
     static std::string const kSpriteId = "my-sprite";
 
@@ -76,7 +76,8 @@ int main()
     {
         // Initialization
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
-        minire::content::FsManager manager(MINIRE_EXAMPLE_PREFIX);
+        minire::content::Manager manager;
+        manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
         minire::Application application(1280, 720, "Bouncing sprite", manager);
         application.setController<BouncingSprite>(kMaxCtrlFps);
         application.setVsync(true);

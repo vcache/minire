@@ -23,7 +23,7 @@ int main()
     {
         // Initialization
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
-        minire::content::DummyManager manager;
+        minire::content::Manager manager;
         minire::Application application(1280, 720, "Hello world", manager);
         application.setController<DummyController>(kMaxCtrlFps);
 

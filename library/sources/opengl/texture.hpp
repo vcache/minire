@@ -3,6 +3,8 @@
 #include <opengl.hpp>
 #include <minire/models/image.hpp>
 
+#include <minire/logging.hpp> // TODO: [X]
+
 #include <memory>
 
 namespace minire::opengl

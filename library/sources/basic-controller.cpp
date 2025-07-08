@@ -75,7 +75,7 @@ namespace minire
         size_t const minIteration = size_t(1e6 / static_cast<double>(maxFps));
         double absoluteTime = 0; // seconds
         _frameTime = static_cast<double>(minIteration) / 1e6;
-        _frameNum = 0;
+        _frameNum = 1; // 0-th epoch has already happened (see NewEpoch above)
 
         while(_working)
         {

@@ -134,8 +134,8 @@ namespace minire
             end = _activeModels.end();
         while (it != end)
         {
-            scene::Model::Uptr const & model = _models[*it];
-            if (model)
+            if (scene::Model::Uptr const & model = _models[*it];
+                model)
             {
                 bool stillActive = model->lerp(weight, epochNumber);
                 if (!stillActive)
@@ -160,8 +160,8 @@ namespace minire
             end = _activeLights.end();
         while (it != end)
         {
-            scene::PointLight::Uptr const & light = _lights[*it];
-            if (light)
+            if (scene::PointLight::Uptr const & light = _lights[*it];
+                light)
             {
                 bool stillActive = light->lerp(weight, epochNumber);
                 if (!stillActive)
@@ -187,7 +187,7 @@ namespace minire
         scene::ModelRef::List result;
         for(scene::Model::Uptr const & model : _models)
         {
-            assert(model);
+            if (!model) continue;
             bool const selected = 0 != _selectedModelsIds.count(model->id());
             result.emplace_back(model->model(),
                                 model->transform(),

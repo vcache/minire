@@ -27,7 +27,8 @@ find_package(glm REQUIRED)
 add_definitions(-DCMAKE_CURRENT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 # TODO: is it really the best place for such definitions?
-add_definitions(-DGLM_FORCE_CXX17 -DGLM_FORCE_INLINE -DGLM_FORCE_RADIANS)
+# TODO: can't use GLM_FORCE_INLINE because of string_casts
+add_definitions(-DGLM_FORCE_CXX17 -DGLM_FORCE_RADIANS)
 
 # Build the library
 

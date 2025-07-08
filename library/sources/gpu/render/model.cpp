@@ -338,7 +338,7 @@ namespace minire::gpu::render
             assert(lease);
             if (formats::Obj const * obj = lease->tryAs<formats::Obj>())
             {
-                MINIRE_INFO("Loading OBJ-mesh: ", id);;
+                MINIRE_INFO("Loading OBJ-mesh: {}", id);;
                 return utils::createIndexBuffers(*obj, kVertexAttr, kUvAttr, kNormalAttr);
             }
             else
@@ -374,10 +374,10 @@ namespace minire::gpu::render
         , _normals(mapToMapper(textures, sceneModel._normals, 4))
         , _flags(buildFlags()) // NOTE: _must_ be latest
     {
-        MINIRE_INVARIANT(_albedo.kind() != Mapper::Kind::kNone, "albedo required: {}", sceneModel._id);
-        MINIRE_INVARIANT(_albedo.kind() != Mapper::Kind::kFloat, "albedo cannot be float: {}", sceneModel._id);
-        MINIRE_INVARIANT(_normals.kind() != Mapper::Kind::kFloat, "normals cannot be float: {}", sceneModel._id);
-        MINIRE_INVARIANT(_normals.kind() != Mapper::Kind::kVector3, "normals cannot be vec3: {}", sceneModel._id);
+        MINIRE_INVARIANT(_albedo.kind() != Mapper::Kind::kNone, "albedo required: {}", sceneModel._mesh);
+        MINIRE_INVARIANT(_albedo.kind() != Mapper::Kind::kFloat, "albedo cannot be float: {}", sceneModel._mesh);
+        MINIRE_INVARIANT(_normals.kind() != Mapper::Kind::kFloat, "normals cannot be float: {}", sceneModel._mesh);
+        MINIRE_INVARIANT(_normals.kind() != Mapper::Kind::kVector3, "normals cannot be vec3: {}", sceneModel._mesh);
     }
 
     size_t Model::buildFlags() const

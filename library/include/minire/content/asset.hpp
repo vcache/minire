@@ -11,7 +11,8 @@
 
 namespace minire::content
 {
-    using Asset = std::variant<std::string,
+    using Asset = std::variant<std::monostate,
+                               std::string,
                                formats::Bdf::Sptr,
                                formats::Obj, // TODO: why not Sptr?
                                models::Image::Sptr,
@@ -19,4 +20,8 @@ namespace minire::content
                                models::SceneModel>;
 
     std::string demangle(Asset const &);
+
+    size_t sizeOf(Asset const &);
+
+    bool hasData(Asset const &);
 }

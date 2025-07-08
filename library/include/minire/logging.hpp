@@ -1,6 +1,8 @@
 #pragma once
 
-#include <iostream>
+#include <iostream> // for std::cout
+
+#include <minire/logging/formatters.hpp>
 
 #include <fmt/format.h>
 

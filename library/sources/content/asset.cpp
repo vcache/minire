@@ -16,4 +16,15 @@ namespace minire::content
             },
             asset);
     }
+
+    // TODO: implement it
+    size_t sizeOf(Asset const &)
+    {
+        return 0;
+    }
+
+    bool hasData(Asset const & asset)
+    {
+        return !std::holds_alternative<std::monostate>(asset);
+    }
 }

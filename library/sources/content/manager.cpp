@@ -1,6 +1,7 @@
 #include <minire/content/manager.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/formats/obj.hpp>
 #include <minire/formats/png.hpp>
 #include <minire/logging.hpp>
 
@@ -39,6 +40,11 @@ namespace minire::content
         }
     }
 
+    void Manager::setReader(Reader::Uptr reader)
+    {
+        _reader = std::move(reader);
+    }
+
     std::unique_ptr<Lease> Manager::borrow(Id const & id)
     {
         auto it = _store.find(id);
@@ -58,9 +64,12 @@ namespace minire::content
             }
             else
             {
-                auto [asset, size] = load(id);
-                auto result = _store.emplace(id, AssetBlock{std::move(asset), 0, size});
+                MINIRE_INVARIANT(_reader, "can't load an asset, no reader set: {}", id);
+                auto asset = _reader->load(id);
+                MINIRE_INVARIANT(hasData(asset), "failed to load asset: {}", id);
+                auto result = _store.emplace(id, AssetBlock{std::move(asset), 0, sizeOf(asset)});
                 MINIRE_INVARIANT(result.second, "failed to insert an AssetBlock: {}", id);
+
                 it = result.first;
             }
 
@@ -120,19 +129,43 @@ namespace minire::content
     }
 }
 
-namespace minire::content
+namespace minire::content::readers
 {
-    FsManager::FsManager(std::string prefix,
-                         size_t sizeLimit)
-        : Manager(sizeLimit)
-        , _prefix(std::move(prefix))
+    void InMemory::remove(content::Id const & id)
+    {
+        _store.erase(id);
+    }
+
+    bool InMemory::contains(content::Id const & id) const
+    {
+        return _store.contains(id);
+    }
+
+    void InMemory::store(content::Id const & id,
+                         content::Asset asset)
+    {
+        _store[id] = std::move(asset);
+    }
+
+    Asset InMemory::load(Id const & id) const
+    {
+        auto it = _store.find(id);
+        return it != _store.cend() ? it->second
+                                   : Asset(std::monostate());
+    }
+}
+
+namespace minire::content::readers
+{
+    Filesystem::Filesystem(std::string prefix)
+        : _prefix(std::move(prefix))
     {
         MINIRE_INVARIANT(std::filesystem::exists(_prefix),
                          "prefix doesn't exist: {}", _prefix);
-        MINIRE_INFO("FsManager prefix: {}", _prefix);
+        MINIRE_INFO("readers::Filesystem prefix: {}", _prefix);
     }
 
-    std::pair<Asset, size_t> FsManager::load(Id const & id) const
+    Asset Filesystem::load(Id const & id) const
     {
         std::filesystem::path path(_prefix);
         path /= id; // TODO: this is pretty dangerous due possible ".."'s
@@ -142,15 +175,42 @@ namespace minire::content
         
         std::string ext = path.extension();
         boost::algorithm::to_lower(ext);
+
+        MINIRE_INFO("Loading asset: {}", path.string());
         if (".png"  == ext)
         {
             models::Image::Sptr image = formats::loadPng(path);
             MINIRE_INVARIANT(image, "image not loaded: {}", path.string());
-            return std::make_pair(image, 0); // TODO: calc size
+            return image;
+        }
+        else if (".obj"  == ext)
+        {
+            return formats::loadObj(path);
         }
         else
         {
             MINIRE_THROW("Unknown content type (\"{}\"): {}", ext, path.string());
         }
+    }
+}
+
+namespace minire::content::readers
+{
+    Chained & Chained::append(Reader::Uptr reader)
+    {
+        _readers.push_back(std::move(reader));
+        return *this;
+    }
+
+    Asset Chained::load(Id const & id) const
+    {
+        for(Reader::Uptr const & reader : _readers)
+        {
+            assert(reader);
+            Asset asset = reader->load(id);
+            if (hasData(asset))
+                return asset;
+        }
+        return std::monostate();
     }
 }

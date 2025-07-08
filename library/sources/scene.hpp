@@ -59,11 +59,11 @@ namespace minire
         gpu::Render                        & _gpuRender;
 
         // models
-        std::vector<scene::Model::Uptr>      _models;
+        std::vector<scene::Model::Uptr>      _models;   // TODO: why not unordered_map?
         std::unordered_set<size_t>           _activeModels;
 
         // lights
-        std::vector<scene::PointLight::Uptr> _lights;
+        std::vector<scene::PointLight::Uptr> _lights;   // TODO: why not unordered_map?
         std::unordered_set<size_t>           _activeLights;
 
         // miscellaneous

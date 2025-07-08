@@ -190,13 +190,13 @@ namespace minire
     void Application::handle(events::controller::CreateSprite const & e)
     {
         _gpuRender.sprites().create(e._id, e._texture, e._tile, e._position,
-                                     e._visible, e._z);
+                                    e._visible, e._z);
     }
 
     void Application::handle(events::controller::CreateNinePatch const & e)
     {
         _gpuRender.sprites().create(e._id, e._texture, e._tile, e._position,
-                                     e._dimensions, e._visible, e._z);
+                                    e._dimensions, e._visible, e._z);
     }
 
     void Application::handle(events::controller::ResizeNinePatch const & e)
@@ -374,13 +374,12 @@ namespace minire
 
         for(events::Controller const & event: events)
         {
-            std::visit([this](auto const & e){ handle(e); }, event);
+            std::visit([this](auto const & e) { handle(e); }, event);
         }
     }
 
     void Application::onRender()
     {
-
         // notify logic thread about new events
         _applicationEvents.finish();
 

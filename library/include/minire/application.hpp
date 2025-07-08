@@ -114,7 +114,7 @@ namespace minire
         gpu::Render              _gpuRender;
         Scene                    _scene;
         utils::Viewpoint         _viewpoint;
-        LerpableCamera           _camera;
+        LerpableCamera           _camera; // TODO: move it into a Scene
         bool                     _cameraActive = false;
         utils::EpochInterpolator _epochInterpolator;
 

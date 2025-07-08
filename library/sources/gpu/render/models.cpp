@@ -65,7 +65,6 @@ namespace minire::gpu::render
 
             // mark slot as initialized
             item._init = true;
-            
             MINIRE_INFO("Loading model: {}", id);
         }
     }
