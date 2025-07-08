@@ -10,9 +10,8 @@
 #include <minire/events/application/on-key-down.hpp>
 #include <minire/events/application/on-text-input.hpp>
 
-#include <minire/utils/safe-queue.hpp>
-
 #include <variant>
+#include <vector>
 
 namespace minire::events
 {
@@ -26,5 +25,5 @@ namespace minire::events
                                      application::OnKeyDown,
                                      application::OnTextInput>;
 
-    using ApplicationQueue = utils::SafeQueue<Application, false>;
+    using ApplicationQueue = std::vector<Application>;
 }

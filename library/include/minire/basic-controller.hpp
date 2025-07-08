@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 namespace minire
@@ -17,7 +18,7 @@ namespace minire
     public:
         using Uptr = std::unique_ptr<BasicController>;
 
-        explicit BasicController(events::ApplicationQueue const &);
+        BasicController();
 
         virtual ~BasicController();
 
@@ -36,6 +37,9 @@ namespace minire
         {
             return _controllerEvents.swap();
         }
+
+        // NOTE: this call is thread-safe
+        void push(events::ApplicationQueue &&);
 
         void quit();
 
@@ -71,16 +75,18 @@ namespace minire
     private:
         void worker(size_t const maxFps,
                     events::application::OnResize const & initial);
-        void handle(events::ApplicationQueue::Store const &);
+        void handle(events::ApplicationQueue const &);
 
     private:
-        events::ApplicationQueue const & _applicationEvents;
-        events::ControllerQueue          _controllerEvents;
-        std::atomic<bool>                _working;
-        std::atomic<bool>                _quitRequest;
-        std::thread                      _thread;
-        utils::Barrier                   _initBarrier;
-        double                           _frameTime = 0.0;
-        size_t                           _frameNum = 0;
+        std::mutex               _applicationEventsMutex;
+        events::ApplicationQueue _applicationEvents;
+
+        events::ControllerQueue  _controllerEvents;
+        std::atomic<bool>        _working;
+        std::atomic<bool>        _quitRequest;
+        std::thread              _thread;
+        utils::Barrier           _initBarrier;
+        double                   _frameTime = 0.0;
+        size_t                   _frameNum = 0;
     };
 }

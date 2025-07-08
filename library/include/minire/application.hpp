@@ -41,7 +41,7 @@ namespace minire
                           "Controller must be inherited from BasicController");
             MINIRE_INVARIANT(!_controller, "Controller cannot be re-set");
 
-            auto controller = std::make_unique<Controller>(_applicationEvents);
+            auto controller = std::make_unique<Controller>();
             controller->run(events::application::OnResize{width(), height()},
                             std::forward<Args>(args)...);
             _controller = std::move(controller);

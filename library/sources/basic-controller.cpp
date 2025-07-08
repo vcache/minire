@@ -3,14 +3,14 @@
 #include <minire/errors.hpp>
 #include <minire/utils/unow.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <variant>
 
 namespace minire
 {
-    BasicController::BasicController(events::ApplicationQueue const & applicationEvents)
-        : _applicationEvents(applicationEvents)
-        , _working(true)
+    BasicController::BasicController()
+        : _working(true)
         , _quitRequest(false)
     {}
 
@@ -87,7 +87,13 @@ namespace minire
             enqueue<events::controller::NewEpoch>(_frameNum, _frameTime);
 
             // handle input events
-            handle(_applicationEvents.swap());
+            events::ApplicationQueue pendedEvents;
+            {
+                std::lock_guard<std::mutex> lock(_applicationEventsMutex);
+                std::swap(pendedEvents, _applicationEvents);
+            }
+            _applicationEvents.reserve(pendedEvents.size());
+            handle(pendedEvents);
 
             // do a logic step
             step();
@@ -110,7 +116,6 @@ namespace minire
             while (frameBegin + minIteration > utils::uNow())
             {
                 std::this_thread::sleep_for(kSleepDuration);
-                if (_applicationEvents.ready()) break;
             }
 
             // collect frame statistics
@@ -128,12 +133,22 @@ namespace minire
         _controllerEvents.finish();
     }
 
+    void BasicController::push(events::ApplicationQueue && applicationQueue)
+    {
+        std::lock_guard<std::mutex> lock(_applicationEventsMutex);
+        _applicationEvents.reserve(_applicationEvents.size() + applicationQueue.size());
+        std::move(applicationQueue.begin(),
+                  applicationQueue.end(),
+                  std::back_inserter(_applicationEvents));
+        applicationQueue.clear();
+    }
+
     void BasicController::quit()
     {
         _quitRequest = true;
     }
 
-    void BasicController::handle(events::ApplicationQueue::Store const & events)
+    void BasicController::handle(events::ApplicationQueue const & events)
     {
         for(auto const & event: events)
         {

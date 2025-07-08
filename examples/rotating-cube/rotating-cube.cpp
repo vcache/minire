@@ -19,9 +19,8 @@ namespace
         : public minire::BasicController
     {
     public:
-        explicit RotatingCube(minire::events::ApplicationQueue const & applicationQueue)
-            : BasicController(applicationQueue)
-            , _fpsCamera(glm::vec3(10.0f, 5.0f, 10.0f),
+        explicit RotatingCube()
+            : _fpsCamera(glm::vec3(10.0f, 5.0f, 10.0f),
                          glm::vec3(0.0f, 0.0f, -1.0f),
                          glm::vec2(-130.0f, 0.0f))
         {}

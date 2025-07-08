@@ -57,7 +57,7 @@ namespace minire
     template<typename Event, typename... Args>
     void Application::postEvent(Args && ... args)
     {
-        _applicationEvents.push(Event(std::forward<Args>(args)...));
+        _applicationEvents.emplace_back(Event(std::forward<Args>(args)...));
     }
 
     void Application::onKeyUp(::SDL_Keycode key, ::SDL_Scancode code, uint16_t mod)
@@ -381,7 +381,8 @@ namespace minire
     void Application::onRender()
     {
         // notify logic thread about new events
-        _applicationEvents.finish();
+        _controller->push(std::move(_applicationEvents));
+        _applicationEvents.clear();
 
         // fetch and handle events from controller if any
         assert(_controller);
