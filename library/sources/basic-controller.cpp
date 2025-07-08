@@ -1,7 +1,10 @@
 #include <minire/basic-controller.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/logging.hpp>
 #include <minire/utils/unow.hpp>
+
+#include <utils/fps-counter.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -9,8 +12,9 @@
 
 namespace minire
 {
-    BasicController::BasicController()
-        : _working(true)
+    BasicController::BasicController(size_t const maxFps)
+        : _maxFps(maxFps)
+        , _working(true)
         , _quitRequest(false)
     {}
 
@@ -26,15 +30,14 @@ namespace minire
         _thread.join();
     }
     
-    void BasicController::run(events::application::OnResize const & initial,
-                              size_t const maxFps)
+    void BasicController::run(events::application::OnResize const & initial)
     {
         _thread = std::thread(
-            [this, maxFps, &initial]
+            [this, &initial]
             {
                 try
                 {
-                    worker(maxFps, initial);
+                    worker(initial);
                 }
                 catch(Exception const & e)
                 {
@@ -57,8 +60,7 @@ namespace minire
         _initBarrier.wait();
     }
 
-    void BasicController::worker(size_t const maxFps,
-                                 events::application::OnResize const & initial)
+    void BasicController::worker(events::application::OnResize const & initial)
     {
         static const std::chrono::microseconds kSleepDuration(10);
 
@@ -72,11 +74,12 @@ namespace minire
         _initBarrier.notify();
 
         size_t frameBegin = utils::uNow(), frameEnd; // microseconds
-        size_t const minIteration = size_t(1e6 / static_cast<double>(maxFps));
+        size_t const minIteration = size_t(1e6 / static_cast<double>(_maxFps));
         double absoluteTime = 0; // seconds
         _frameTime = static_cast<double>(minIteration) / 1e6;
         _frameNum = 1; // 0-th epoch has already happened (see NewEpoch above)
 
+        utils::FpsCounter fpsCounter(2);
         while(_working)
         {
             // if a reader is too slow, we should wait
@@ -127,6 +130,14 @@ namespace minire
 
             // prepare next frame
             frameBegin = frameEnd;
+
+            // count FPS of a controller
+            if (auto fps = fpsCounter.registerFrame(); fps)
+            {
+                std::string title = fmt::format("[{}  fps, mft = {} ms]",
+                                                fps->first, fps->second);
+                MINIRE_DEBUG("controller FPS: {}", title);
+            }
         }
 
         finish();

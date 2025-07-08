@@ -2,7 +2,8 @@
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
-#include <minire/utils/fps-counter.hpp>
+
+#include <utils/fps-counter.hpp>
 
 #include <SDL2/SDL.h>
 

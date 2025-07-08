@@ -18,13 +18,12 @@ namespace minire
     public:
         using Uptr = std::unique_ptr<BasicController>;
 
-        BasicController();
+        explicit BasicController(size_t const maxFps);
 
         virtual ~BasicController();
 
         // called from application thread (i.e. rendering thread)
-        void run(events::application::OnResize const & initial,
-                 size_t const maxFps);
+        void run(events::application::OnResize const & initial);
 
         void shutdown(); // NOTE: MUST be called from application thread
                          //       just before calling dtor.
@@ -73,11 +72,12 @@ namespace minire
         virtual void postprocess();
 
     private:
-        void worker(size_t const maxFps,
-                    events::application::OnResize const & initial);
+        void worker(events::application::OnResize const & initial);
         void handle(events::ApplicationQueue const &);
 
     private:
+        size_t const             _maxFps = 0;
+
         std::mutex               _applicationEventsMutex;
         events::ApplicationQueue _applicationEvents;
 
