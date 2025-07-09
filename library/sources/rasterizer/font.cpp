@@ -1,4 +1,4 @@
-#include <gpu/render/font.hpp>
+#include <rasterizer/font.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/formats/bdf.hpp>
@@ -7,7 +7,7 @@
 
 #include <cassert>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     Font::Font(formats::Bdf const & bdf)
         : _texture(GL_TEXTURE_2D)

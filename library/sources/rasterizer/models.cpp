@@ -1,4 +1,4 @@
-#include <gpu/render/models.hpp>
+#include <rasterizer/models.hpp>
 
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
@@ -7,7 +7,7 @@
 #include <cassert>
 #include <algorithm>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     // TODO: bucket drawing call to minimize program switch
 

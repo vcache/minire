@@ -1,10 +1,10 @@
-#include <gpu/render/labels.hpp>
+#include <rasterizer/labels.hpp>
 
 #include <minire/errors.hpp>
 
 #include <cassert>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     Labels::Labels(Fonts const & fonts)
         : _fonts(fonts)

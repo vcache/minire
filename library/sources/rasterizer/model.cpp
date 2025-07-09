@@ -1,12 +1,12 @@
-#include <gpu/render/model.hpp>
+#include <rasterizer/model.hpp>
 
 #include <minire/content/asset.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 
-#include <gpu/render/constants.hpp>
-#include <gpu/render/ubo.hpp>
+#include <rasterizer/constants.hpp>
+#include <rasterizer/ubo.hpp>
 #include <opengl/program.hpp>
 #include <opengl/shader.hpp>
 #include <utils/obj-to-index-buffers.hpp>
@@ -22,7 +22,7 @@
 #include <cassert>
 #include <variant>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     static const int kVertexAttr = 0;
     static const int kUvAttr = 1;

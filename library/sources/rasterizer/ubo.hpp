@@ -1,13 +1,13 @@
 #pragma once
 
-#include <gpu/render/ubo/datablock.hpp>
+#include <rasterizer/ubo/datablock.hpp>
 #include <scene/point-light.hpp>
 
 #include <opengl/ubo.hpp>
 
 namespace minire::opengl { class Program; }
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Ubo
     {

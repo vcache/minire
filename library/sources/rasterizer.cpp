@@ -1,4 +1,4 @@
-#include <gpu/render.hpp>
+#include <rasterizer.hpp>
 
 #include <minire/content/manager.hpp>
 #include <opengl.hpp>
@@ -8,17 +8,17 @@
 #include <algorithm>
 #include <cassert>
 
-namespace minire::gpu
+namespace minire
 {
-    Render::Render(content::Manager & contentManager,
-                   content::Ids const & fonstPreload)
+    Rasterizer::Rasterizer(content::Manager & contentManager,
+                           content::Ids const & fontsPreload)
         : _contentManager(contentManager)
         , _ubo()
         , _coordinates(_ubo)
         , _lines(_ubo)
         , _textures(_contentManager)
         , _models(_ubo, _textures, _contentManager)
-        , _fonts(_contentManager, fonstPreload)
+        , _fonts(_contentManager, fontsPreload)
         , _labels(_fonts)
         , _sprites(_textures)
         , _2dProjection(1.0)
@@ -26,12 +26,12 @@ namespace minire::gpu
         // TODO: preload textures for sprites
    }
 
-    void Render::setScreenSize(float w, float h)
+    void Rasterizer::setScreenSize(float w, float h)
     {
         _2dProjection = glm::ortho(0.0f, w, 0.0f, h);
     }
 
-    void Render::draw(utils::Viewpoint const & viewpoint,
+    void Rasterizer::draw(utils::Viewpoint const & viewpoint,
                       Scene const & scene)
     {
         // update and bind UBO
@@ -40,7 +40,7 @@ namespace minire::gpu
             size_t transformVersion = viewpoint.transformVersion();
             _ubo.setViewProjection(transform, transformVersion);
             _ubo.setViewPosition(glm::vec4(viewpoint.position(), 1.0f));
-            _ubo.setLights(scene.cullPointLights(viewpoint, render::Ubo::maxLights()));
+            _ubo.setLights(scene.cullPointLights(viewpoint, rasterizer::Ubo::maxLights()));
             _ubo.bind();
         }
 
@@ -48,8 +48,8 @@ namespace minire::gpu
         draw2d();
     }
 
-    void Render::draw3d(utils::Viewpoint const & viewpoint,
-                        Scene const & scene)
+    void Rasterizer::draw3d(utils::Viewpoint const & viewpoint,
+                            Scene const & scene)
     {
         // setup state for 3d mode
         MINIRE_GL(glEnable, GL_CULL_FACE)
@@ -70,15 +70,15 @@ namespace minire::gpu
         _models.draw(models);
     }
 
-    void Render::draw2d()
+    void Rasterizer::draw2d()
     {
         // disable depth test and blending
         MINIRE_GL(glDisable, GL_DEPTH_TEST);
         MINIRE_GL(glEnable, GL_BLEND);
         MINIRE_GL(glBlendFunc, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        // TODO: dont render parts that will be filled 2d items
-        //       (maybe render 2D first and update Z-buffer to max
+        // TODO: dont Rasterizer parts that will be filled 2d items
+        //       (maybe Rasterizer 2D first and update Z-buffer to max
         //        or use stencil for buffer for 2Ds)
         //      - (that will kill blending for 2Ds)
 
@@ -90,14 +90,14 @@ namespace minire::gpu
 
         // TODO: avoid sorting, use Z-buffer instead
         std::sort(_drawables.begin(), _drawables.end(),
-            [](render::Drawable const * a, render::Drawable const * b)
+            [](rasterizer::Drawable const * a, rasterizer::Drawable const * b)
             {
                 assert(a);
                 assert(b);
                 return a->zOrder() < b->zOrder();
             });
 
-        for(render::Drawable const * drawable : _drawables)
+        for(rasterizer::Drawable const * drawable : _drawables)
         {
             assert(drawable);
             drawable->draw(_2dProjection);

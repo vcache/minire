@@ -1,6 +1,6 @@
-#include <gpu/render/fonts.hpp>
+#include <rasterizer/fonts.hpp>
 
-#include <gpu/render/font.hpp>
+#include <rasterizer/font.hpp>
 
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
@@ -9,7 +9,7 @@
 
 #include <cassert>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     Fonts::Fonts(content::Manager & contentManager,
                  content::Ids const & preload)

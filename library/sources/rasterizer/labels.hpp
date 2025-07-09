@@ -1,14 +1,14 @@
 #pragma once
 
-#include <gpu/render/drawable.hpp>
-#include <gpu/render/label.hpp>
+#include <rasterizer/drawable.hpp>
+#include <rasterizer/label.hpp>
 
 #include <glm/mat4x4.hpp>
 
 #include <memory>
 #include <unordered_map>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Fonts;
 

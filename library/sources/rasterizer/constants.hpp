@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     struct Constants
     {

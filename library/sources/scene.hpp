@@ -10,15 +10,16 @@
 #include <memory>
 #include <unordered_set>
 
-namespace minire::gpu { class Render; }
 namespace minire::utils { class Viewpoint; }
 
 namespace minire
 {
+    class Rasterizer;
+
     class Scene
     {
     public:
-        explicit Scene(gpu::Render &);
+        explicit Scene(Rasterizer &);
 
         ~Scene();
 
@@ -56,7 +57,7 @@ namespace minire
         void lerpLights(float weight, size_t epochNumber);
 
     private:
-        gpu::Render                        & _gpuRender;
+        Rasterizer                         & _rasterizer;
 
         // models
         std::vector<scene::Model::Uptr>      _models;   // TODO: why not unordered_map?

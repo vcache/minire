@@ -1,4 +1,4 @@
-#include <gpu/render/label.hpp>
+#include <rasterizer/label.hpp>
 
 #include <minire/content/asset.hpp>
 #include <minire/content/manager.hpp>
@@ -6,8 +6,8 @@
 #include <minire/logging.hpp>
 #include <minire/utils/rect.hpp>
 
-#include <gpu/render/font.hpp>
-#include <gpu/render/fonts.hpp>
+#include <rasterizer/font.hpp>
+#include <rasterizer/fonts.hpp>
 #include <opengl.hpp>
 #include <opengl/program.hpp>
 #include <opengl/shader.hpp>
@@ -21,7 +21,7 @@
 #include <cmath>
 #include <limits>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     namespace
     {
@@ -158,7 +158,7 @@ namespace minire::gpu::render
         {
             utils::Rect /*const &*/ uv = font.uvRect(symbol.codePoint(), L'?');
 
-            if (true) // TODO: move that into GpuFont::GpuFont
+            if (true) // TODO: move that into rasterizer::Font::Font
             {
                 uv._left += .5f;
                 uv._right += .5f;

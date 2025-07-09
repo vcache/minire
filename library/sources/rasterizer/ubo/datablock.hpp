@@ -10,7 +10,7 @@
 #include <string>
 #include <typeinfo> // for typeid
 
-namespace minire::gpu::render::ubo
+namespace minire::rasterizer::ubo
 {
     /*!
      * To pack data as tight as possible color vectors

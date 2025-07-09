@@ -1,9 +1,9 @@
-#include <gpu/render/sprites.hpp>
+#include <rasterizer/sprites.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/utils/rect.hpp>
 
-#include <gpu/render/textures.hpp>
+#include <rasterizer/textures.hpp>
 #include <opengl.hpp>
 #include <opengl/program.hpp>
 #include <opengl/shader.hpp>
@@ -18,7 +18,7 @@
 #include <variant>
 #include <vector>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     // Sprites::Program //
 

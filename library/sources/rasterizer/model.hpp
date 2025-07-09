@@ -2,7 +2,7 @@
 
 #include <minire/models/scene-model.hpp>
 
-#include <gpu/render/textures.hpp>
+#include <rasterizer/textures.hpp>
 #include <opengl/index-buffers.hpp>
 
 #include <glm/mat4x4.hpp>
@@ -12,7 +12,7 @@
 
 namespace minire::content { class Manager; }
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Ubo;
 

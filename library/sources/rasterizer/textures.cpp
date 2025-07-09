@@ -1,4 +1,4 @@
-#include <gpu/render/textures.hpp>
+#include <rasterizer/textures.hpp>
 
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
@@ -9,7 +9,7 @@
 
 #include <cassert>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     namespace
     {

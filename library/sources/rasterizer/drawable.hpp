@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Drawable
     {

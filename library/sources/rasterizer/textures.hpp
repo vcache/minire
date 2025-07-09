@@ -10,7 +10,7 @@
 namespace minire::content { class Manager; }
 namespace minire::models { struct Image; }
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Textures
     {

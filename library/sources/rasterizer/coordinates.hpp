@@ -2,7 +2,7 @@
 
 #include <memory>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Ubo;
 

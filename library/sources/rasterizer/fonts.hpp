@@ -7,7 +7,7 @@
 
 namespace minire::content { class Manager; }
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Font;
 

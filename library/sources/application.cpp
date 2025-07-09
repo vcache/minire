@@ -5,7 +5,6 @@
 #include <opengl.hpp>
 
 #include <algorithm>
-// TODO: implement an interpolation between a logical frame and a gpu frame
 
 namespace minire
 {
@@ -18,8 +17,8 @@ namespace minire
                              content::Manager & contentManager)
         : sdl::GlApplication(width, height, title)
         , _contentManager(contentManager)
-        , _gpuRender(contentManager)
-        , _scene(_gpuRender)
+        , _rasterizer(contentManager)
+        , _scene(_rasterizer)
     {
         setVsync(true); // TODO: into parameters
 
@@ -156,7 +155,7 @@ namespace minire
         _viewpoint.setProjection(pmat, fWidth, fHeight);
 
         // projection for 2D gui
-        _gpuRender.setScreenSize(fWidth, fHeight);
+        _rasterizer.setScreenSize(fWidth, fHeight);
 
         // send event to controller
         postEvent<events::application::OnResize>(width, height);
@@ -180,39 +179,39 @@ namespace minire
 
     void Application::handle(events::controller::DebugDrawsUpdate const & e)
     {
-        _gpuRender.lines().update(e._linesBuffer);
+        _rasterizer.lines().update(e._linesBuffer);
     }
 
     void Application::handle(events::controller::CreateSprite const & e)
     {
-        _gpuRender.sprites().create(e._id, e._texture, e._tile, e._position,
+        _rasterizer.sprites().create(e._id, e._texture, e._tile, e._position,
                                     e._visible, e._z);
     }
 
     void Application::handle(events::controller::CreateNinePatch const & e)
     {
-        _gpuRender.sprites().create(e._id, e._texture, e._tile, e._position,
+        _rasterizer.sprites().create(e._id, e._texture, e._tile, e._position,
                                     e._dimensions, e._visible, e._z);
     }
 
     void Application::handle(events::controller::ResizeNinePatch const & e)
     {
-        _gpuRender.sprites().resize(e._id, e._dimensions);
+        _rasterizer.sprites().resize(e._id, e._dimensions);
     }
 
     void Application::handle(events::controller::MoveSprite const & e)
     {
-        _gpuRender.sprites().move(e._id, e._position);
+        _rasterizer.sprites().move(e._id, e._position);
     }
 
     void Application::handle(events::controller::VisibleSprite const & e)
     {
-        _gpuRender.sprites().visible(e._id, e._visible);
+        _rasterizer.sprites().visible(e._id, e._visible);
     }
 
     void Application::handle(events::controller::RemoveSprite const & e)
     {
-        _gpuRender.sprites().remove(e._id);
+        _rasterizer.sprites().remove(e._id);
     }
 
     void Application::handle(events::controller::BulkSetSpriteZOrders const & e)
@@ -220,28 +219,28 @@ namespace minire
         for(std::pair<std::string, size_t> const & i : e._items)
         {
             MINIRE_DEBUG("setting Z for sprite \"{}\" to {}", i.first, i.second);
-            _gpuRender.sprites().setZOrder(i.first, i.second);
+            _rasterizer.sprites().setZOrder(i.first, i.second);
         }
     }
 
     void Application::handle(events::controller::CreateLabel const & e)
     {
-        _gpuRender.labels().allocate(e._id, e._z, e._visible);
+        _rasterizer.labels().allocate(e._id, e._z, e._visible);
     }
 
     void Application::handle(events::controller::ResizeLabel const & e)
     {
-        _gpuRender.labels().get(e._id).resize(e._rows, e._cols);
+        _rasterizer.labels().get(e._id).resize(e._rows, e._cols);
     }
 
     void Application::handle(events::controller::MoveLabel const & e)
     {
-        _gpuRender.labels().get(e._id).setPosition(e._x, e._y);
+        _rasterizer.labels().get(e._id).setPosition(e._x, e._y);
     }
 
     void Application::handle(events::controller::SetCharLabel const & e)
     {
-        _gpuRender
+        _rasterizer
             .labels()
             .get(e._id)
             .at(e._row, e._col)
@@ -250,7 +249,7 @@ namespace minire
 
     void Application::handle(events::controller::SetSymbolLabel const & e)
     {
-        _gpuRender
+        _rasterizer
             .labels()
             .get(e._id)
             .at(e._row, e._col) = e._symbol;
@@ -258,7 +257,7 @@ namespace minire
     
     void Application::handle(events::controller::UnsetCharLabel const & e)
     {
-        _gpuRender
+        _rasterizer
             .labels()
             .get(e._id)
             .at(e._row, e._col)
@@ -267,33 +266,33 @@ namespace minire
 
     void Application::handle(events::controller::SetStringLabel const & e)
     {
-        _gpuRender.labels().get(e._id).set(e._row, e._col, e._string);
+        _rasterizer.labels().get(e._id).set(e._row, e._col, e._string);
     }
 
     void Application::handle(events::controller::SetLabelCursor const & e)
     {
-        _gpuRender.labels().get(e._id).setCursor(e._col, e._row);
+        _rasterizer.labels().get(e._id).setCursor(e._col, e._row);
     }
 
     void Application::handle(events::controller::UnsetLabelCursor const & e)
     {
-        _gpuRender.labels().get(e._id).unsetCursor();
+        _rasterizer.labels().get(e._id).unsetCursor();
     }
 
     void Application::handle(events::controller::SetLabelVisible const & e)
     {
-        _gpuRender.labels().get(e._id).setVisible(e._visible);
+        _rasterizer.labels().get(e._id).setVisible(e._visible);
     }
 
     void Application::handle(events::controller::SetLabelFonts const & e)
     {
-        _gpuRender.labels().get(e._id).setFont(e._fontName,
+        _rasterizer.labels().get(e._id).setFont(e._fontName,
                                                _contentManager);
     }
 
     void Application::handle(events::controller::RemoveLabel const & e)
     {
-        _gpuRender.labels().deallocate(e._id);
+        _rasterizer.labels().deallocate(e._id);
     }
 
     void Application::handle(events::controller::BulkSetLabelZOrders const & e)
@@ -301,7 +300,7 @@ namespace minire
         for(std::pair<std::string, size_t> const & i : e._items)
         {
             MINIRE_DEBUG("setting Z for label \"{}\" to {}", i.first, i.second);
-            _gpuRender.labels().get(i.first).setZOrder(i.second);
+            _rasterizer.labels().get(i.first).setZOrder(i.second);
         }
     }
 
@@ -461,7 +460,7 @@ namespace minire
         // draw a frame
         // TODO: maybe skip it if not performLerp ?
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        _gpuRender.draw(_viewpoint, _scene);
+        _rasterizer.draw(_viewpoint, _scene);
         ::SDL_GL_SwapWindow(window());
 
         // calc frame time

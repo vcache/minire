@@ -3,7 +3,7 @@
 #include <minire/content/id.hpp>
 #include <minire/utils/rect.hpp> // for NinePatch
 
-#include <gpu/render/drawable.hpp>
+#include <rasterizer/drawable.hpp>
 
 #include <glm/vec2.hpp>
 
@@ -11,7 +11,7 @@
 #include <memory>
 #include <unordered_map>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Textures;
 

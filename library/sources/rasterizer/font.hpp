@@ -12,7 +12,7 @@
 
 namespace minire::formats { class Bdf; }
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Font
     {

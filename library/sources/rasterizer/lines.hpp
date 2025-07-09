@@ -3,7 +3,7 @@
 #include <vector>
 #include <memory>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Ubo;
 
@@ -21,5 +21,4 @@ namespace minire::gpu::render
 
         std::shared_ptr<Impl> _impl;
     };
-
 }

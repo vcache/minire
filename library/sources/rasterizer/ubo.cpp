@@ -1,4 +1,4 @@
-#include <gpu/render/ubo.hpp>
+#include <rasterizer/ubo.hpp>
 
 #include <opengl.hpp>
 #include <opengl/program.hpp>
@@ -6,7 +6,7 @@
 #include <algorithm> // for std::min
 #include <cassert>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     static const GLuint kUboBindingPoint = 10; // TODO: why the fuck not 0?
 

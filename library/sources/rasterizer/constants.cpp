@@ -1,6 +1,6 @@
-#include <gpu/render/constants.hpp>
+#include <rasterizer/constants.hpp>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     std::string Constants::kPbrKit = R"(
 

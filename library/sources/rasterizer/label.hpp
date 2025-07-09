@@ -6,7 +6,7 @@
 #include <minire/text/text-format.hpp>
 
 #include <utils/grid.hpp>
-#include <gpu/render/drawable.hpp>
+#include <rasterizer/drawable.hpp>
 
 #include <glm/vec2.hpp>
 #include <glm/mat4x4.hpp>
@@ -20,7 +20,7 @@ namespace minire::content { class Manager; }
 
 namespace minire::models { class Font; }
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Fonts;
     class Font;

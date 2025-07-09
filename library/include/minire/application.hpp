@@ -9,7 +9,7 @@
 #include <minire/sdl/gl-application.hpp>
 
 // private headers
-#include <gpu/render.hpp>
+#include <rasterizer.hpp>
 #include <scene.hpp>
 #include <utils/lerpable.hpp>
 #include <utils/viewpoint.hpp>
@@ -108,7 +108,7 @@ namespace minire
         content::Manager          & _contentManager;
 
         // render (view)
-        gpu::Render                 _gpuRender;
+        Rasterizer                  _rasterizer;
         Scene                       _scene;
         utils::Viewpoint            _viewpoint;
         LerpableCamera              _camera; // TODO: move it into a Scene

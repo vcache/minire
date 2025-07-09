@@ -3,7 +3,7 @@
 #include <minire/content/id.hpp>
 #include <minire/utils/aabb.hpp>
 
-#include <gpu/render/model.hpp>
+#include <rasterizer/model.hpp>
 #include <scene/model.hpp>
 
 #include <limits>
@@ -14,7 +14,7 @@
 
 namespace minire::content { class Manager; }
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     class Textures;
     class Ubo;

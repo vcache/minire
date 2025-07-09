@@ -1,6 +1,6 @@
-#include <gpu/render/coordinates.hpp>
+#include <rasterizer/coordinates.hpp>
 
-#include <gpu/render/ubo.hpp>
+#include <rasterizer/ubo.hpp>
 
 #include <opengl.hpp>
 #include <opengl/program.hpp>
@@ -12,7 +12,7 @@
 
 #include <cassert>
 
-namespace minire::gpu::render
+namespace minire::rasterizer
 {
     static std::string VertShader()
     {

@@ -1,6 +1,6 @@
 #include <scene.hpp>
 
-#include <gpu/render.hpp>
+#include <rasterizer.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
@@ -13,8 +13,8 @@
 
 namespace minire
 {
-    Scene::Scene(gpu::Render & gpuRender)
-        : _gpuRender(gpuRender)
+    Scene::Scene(Rasterizer & rasterizer)
+        : _rasterizer(rasterizer)
     {}
 
     Scene::~Scene()
@@ -28,7 +28,7 @@ namespace minire
 
         for(scene::Model::Uptr const & model : _models)
         {
-            if (model) _gpuRender.models().decUse(model->model());
+            if (model) _rasterizer.models().decUse(model->model());
         }
         _activeModels.clear();
         _models.clear();
@@ -42,11 +42,11 @@ namespace minire
         if (_models.size() <= e._id) _models.resize(e._id + 1);
         if (_models[e._id]) MINIRE_THROW("model slot busy: {}", e._id);
 
-        _gpuRender.models().incUse(e._model);
+        _rasterizer.models().incUse(e._model);
         auto model = std::make_unique<scene::Model>(
             e._id,
             e._model,
-            _gpuRender.models().aabb(e._model),
+            _rasterizer.models().aabb(e._model),
             e._position);
         _models[e._id] = std::move(model);
     }
@@ -62,7 +62,7 @@ namespace minire
     void Scene::handle(events::controller::SceneUnmergeModel const & e)
     {
         auto & model = getModel(e._id);
-        _gpuRender.models().decUse(model->model());
+        _rasterizer.models().decUse(model->model());
         model.reset();
         _activeModels.erase(e._id);
 
