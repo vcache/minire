@@ -6,14 +6,11 @@
 #include <minire/events/controller/text-input.hpp>
 #include <minire/events/controller/scene.hpp>
 
-#include <minire/utils/safe-queue.hpp>
-
 #include <variant>
 
 namespace minire::events
 {
     using Controller = std::variant<controller::Quit,
-                                    controller::NewEpoch,
                                     controller::MouseGrab,
                                     controller::DebugDrawsUpdate,
 
@@ -51,6 +48,4 @@ namespace minire::events
                                     controller::SceneUpdateModel,
                                     controller::SceneUpdateLight,
                                     controller::SceneSetSelectedModels>;
-
-    using ControllerQueue = utils::SafeQueue<Controller, true>;
 }

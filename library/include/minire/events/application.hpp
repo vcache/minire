@@ -25,5 +25,6 @@ namespace minire::events
                                      application::OnKeyDown,
                                      application::OnTextInput>;
 
+    // TODO: move this to minire/events/application.hpp
     using ApplicationQueue = std::vector<Application>;
 }

@@ -16,6 +16,17 @@ namespace minire
     class BasicController
     {
     public:
+        // TODO: these should be hidden from public interfaces
+        // TODO: maybe use std::list for faster pop_front() in the Application
+        struct Batch
+        {
+            std::vector<events::Controller> _events;
+            double                          _duration = 0;
+        };
+
+        using BatchQueue = std::vector<Batch>;
+
+    public:
         using Uptr = std::unique_ptr<BasicController>;
 
         explicit BasicController(size_t const maxFps);
@@ -32,14 +43,13 @@ namespace minire
                          //       controller's worker thread is still running
 
     public:
-        auto const & events() const
-        {
-            return _controllerEvents.swap();
-        }
+        // NOTE: this call is thread-safe
+        BatchQueue pull();
 
         // NOTE: this call is thread-safe
         void push(events::ApplicationQueue &&);
 
+        // NOTE: this call is thread-safe
         void quit();
 
     protected:
@@ -47,10 +57,13 @@ namespace minire
                  typename... Args>
         void enqueue(Args && ... args)
         {
-            _controllerEvents.emplace(EventType(std::forward<Args>(args)...));
+            _currentEventsBatch._events.emplace_back(
+                EventType(std::forward<Args>(args)...));
         }
 
-        float frameTime() const { return _frameTime; }
+        double frameTime() const { return _frameTime; }
+
+        double absoluteTime() const { return _absoluteTime; }
 
     protected:
         // called from controller thread
@@ -74,6 +87,7 @@ namespace minire
     private:
         void worker(events::application::OnResize const & initial);
         void handle(events::ApplicationQueue const &);
+        void finishCurrentBatch(double);
 
     private:
         size_t const             _maxFps = 0;
@@ -81,12 +95,15 @@ namespace minire
         std::mutex               _applicationEventsMutex;
         events::ApplicationQueue _applicationEvents;
 
-        events::ControllerQueue  _controllerEvents;
+        std::mutex               _pendedControllerEventsMutex;
+        BatchQueue               _pendedControllerEvents;
+        Batch                    _currentEventsBatch;
+
         std::atomic<bool>        _working;
         std::atomic<bool>        _quitRequest;
         std::thread              _thread;
         utils::Barrier           _initBarrier;
         double                   _frameTime = 0.0;
-        size_t                   _frameNum = 0;
+        double                   _absoluteTime = 0.0; // seconds since begin
     };
 }

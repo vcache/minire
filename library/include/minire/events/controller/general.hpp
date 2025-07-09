@@ -5,12 +5,6 @@
 
 namespace minire::events::controller
 {
-    struct NewEpoch
-    {
-        size_t _epochNumber;
-        double _epochLength;
-    };
-
     struct MouseGrab
     {
         bool _grab;

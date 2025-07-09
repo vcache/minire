@@ -125,6 +125,10 @@ namespace minire
     {
         lerpModels(weight, epochNumber);
         lerpLights(weight, epochNumber);
+        // TODO: lerp sprites
+        // TODO: lerp labels
+        // TODO: lerp lines
+        // TODO: lerp coordinates
         // TODO: lerp camera
     }
 

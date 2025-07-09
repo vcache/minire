@@ -11,7 +11,6 @@
 // private headers
 #include <gpu/render.hpp>
 #include <scene.hpp>
-#include <utils/epoch-interpolator.hpp>
 #include <utils/lerpable.hpp>
 #include <utils/viewpoint.hpp>
 
@@ -63,10 +62,9 @@ namespace minire
         void onFps(size_t fps, double mft) override;
 
     private:
-        void handle(events::ControllerQueue::Store const &);
+        void handle(BasicController::Batch const &);
 
         void handle(events::controller::Quit const &);
-        void handle(events::controller::NewEpoch const &);
         void handle(events::controller::MouseGrab const &);
         void handle(events::controller::DebugDrawsUpdate const &);
         void handle(events::controller::CreateSprite const &);
@@ -107,23 +105,25 @@ namespace minire
     private:
         using LerpableCamera = utils::Lerpable<models::FpsCamera>;
         
-        content::Manager       & _contentManager;
+        content::Manager          & _contentManager;
 
         // render (view)
-        gpu::Render              _gpuRender;
-        Scene                    _scene;
-        utils::Viewpoint         _viewpoint;
-        LerpableCamera           _camera; // TODO: move it into a Scene
-        bool                     _cameraActive = false;
-        utils::EpochInterpolator _epochInterpolator;
+        gpu::Render                 _gpuRender;
+        Scene                       _scene;
+        utils::Viewpoint            _viewpoint;
+        LerpableCamera              _camera; // TODO: move it into a Scene
+        bool                        _cameraActive = false;
 
         // controller (controller)
-        BasicController::Uptr    _controller;
+        BasicController::Uptr       _controller;
+        BasicController::BatchQueue _controllerEvents;
+        double                      _batchPlayed = -1;
+        size_t                      _epochNumber = 0;
 
         // system
-        events::ApplicationQueue _applicationEvents;
-        size_t                   _frame = 0;
-        size_t                   _frameBegin; // microseconds
-        size_t                   _frameEnd;   // microseconds
+        events::ApplicationQueue    _applicationEvents;
+        size_t                      _frame = 0;
+        size_t                      _frameBegin; // microseconds
+        size_t                      _frameEnd;   // microseconds
     };
 }

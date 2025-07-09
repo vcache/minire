@@ -4,6 +4,7 @@
 #include <minire/utils/unow.hpp>
 #include <opengl.hpp>
 
+#include <algorithm>
 // TODO: implement an interpolation between a logical frame and a gpu frame
 
 namespace minire
@@ -169,11 +170,6 @@ namespace minire
     void Application::handle(events::controller::Quit const &)
     {
         MINIRE_THROW("TODO: not implemented");
-    }
-
-    void Application::handle(events::controller::NewEpoch const & e)
-    {
-        _epochInterpolator.newEpoch(e._epochNumber, e._epochLength);
     }
 
     void Application::handle(events::controller::MouseGrab const & e)
@@ -346,13 +342,13 @@ namespace minire
 
     void Application::handle(events::controller::SceneUpdateFpsCamera const & e)
     {
-        _camera.update(_epochInterpolator.epochNumber(), e._fps);
+        _camera.update(_epochNumber, e._fps);
         _cameraActive = true;
     }
 
     void Application::handle(events::controller::SceneUpdateModel const & e)
     {
-        _scene.handle(_epochInterpolator.epochNumber(), e);
+        _scene.handle(_epochNumber, e);
     }
 
     void Application::handle(events::controller::SceneSetSelectedModels const & e)
@@ -362,17 +358,20 @@ namespace minire
 
     void Application::handle(events::controller::SceneUpdateLight const & e)
     {
-        _scene.handle(_epochInterpolator.epochNumber(), e);
+        _scene.handle(_epochNumber, e);
     }
 
-    void Application::handle(events::ControllerQueue::Store const & events)
+    void Application::handle(BasicController::Batch const & batch)
     {
-        if (events.size() > 50)
+#ifndef NDEBUG
+        if (batch._events.size() > 50)
         {
-            MINIRE_DEBUG("Got {} events from controller", events.size());
+            MINIRE_DEBUG("Got {} event inm controller's batch",
+                         batch._events.size());
         }
+#endif
 
-        for(events::Controller const & event: events)
+        for(events::Controller const & event: batch._events)
         {
             std::visit([this](auto const & e) { handle(e); }, event);
         }
@@ -380,29 +379,87 @@ namespace minire
 
     void Application::onRender()
     {
+        assert(_controller);
+
         // notify logic thread about new events
         _controller->push(std::move(_applicationEvents));
         _applicationEvents.clear();
 
         // fetch and handle events from controller if any
-        assert(_controller);
-        handle(_controller->events());
+        BasicController::BatchQueue batchQueue = _controller->pull();
+        std::move(batchQueue.begin(),
+                  batchQueue.end(),
+                  std::back_inserter(_controllerEvents));
 
-        float weight = _epochInterpolator.weight();
-        size_t epoch = _epochInterpolator.epochNumber();
 
-        // lerp camera
-        if (_cameraActive)
+        bool performLerp = false;
+        if (!_controllerEvents.empty())
         {
-            _cameraActive = _camera.lerp(weight, epoch);
-            models::FpsCamera const & camera = _camera.current();
-            _viewpoint.setView(camera.view(), camera.position());
+            if (_batchPlayed < 0)
+            {
+                // very first batch and very slow controller case
+                handle(_controllerEvents[0]);
+                _batchPlayed = 0;
+                performLerp = true;
+            }
+            else if (_batchPlayed < _controllerEvents[0]._duration)
+            {
+                // middle of a batch
+                assert(_batchPlayed >= 0);
+                assert(_controllerEvents[0]._duration != 0);
+                performLerp = true;
+            }
+            else
+            {
+                assert(_batchPlayed >= _controllerEvents[0]._duration);
+
+                // purge currently played batch
+                _batchPlayed -= _controllerEvents[0]._duration;
+                _controllerEvents.erase(_controllerEvents.begin());
+
+                // fast-forward hidden ones (they will be invisible,
+                // but they might containt important events)
+                while(!_controllerEvents.empty() &&
+                      _batchPlayed >= _controllerEvents[0]._duration)
+                {
+                    handle(_controllerEvents[0]);
+                    _batchPlayed -= _controllerEvents[0]._duration;
+                    _controllerEvents.erase(_controllerEvents.begin());
+                }
+
+                _epochNumber++;
+
+                if (_controllerEvents.empty())
+                {
+                    _batchPlayed = -1;
+                }
+                else
+                {
+                    assert(_batchPlayed >= 0);
+                    handle(_controllerEvents[0]);
+                    performLerp = true;
+                }
+            }
         }
 
-        // lerp scene
-        _scene.lerp(weight, epoch);
+        if (performLerp)
+        {
+            double const weight = _batchPlayed / _controllerEvents[0]._duration;
+
+            // lerp camera
+            if (_cameraActive)
+            {
+                _cameraActive = _camera.lerp(weight, _epochNumber);
+                models::FpsCamera const & camera = _camera.current();
+                _viewpoint.setView(camera.view(), camera.position());
+            }
+
+            // lerp scene
+            _scene.lerp(weight, _epochNumber);
+        }
 
         // draw a frame
+        // TODO: maybe skip it if not performLerp ?
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         _gpuRender.draw(_viewpoint, _scene);
         ::SDL_GL_SwapWindow(window());
@@ -414,7 +471,8 @@ namespace minire
         _frameBegin = _frameEnd;
 
         // advance interpolator epoch
-        _epochInterpolator.accumulate(frameTime);
+        assert(frameTime > 0);
+        _batchPlayed += frameTime;
 
         _frame++;
     }

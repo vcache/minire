@@ -62,33 +62,21 @@ namespace minire
 
     void BasicController::worker(events::application::OnResize const & initial)
     {
-        static const std::chrono::microseconds kSleepDuration(10);
-
         MINIRE_INVARIANT(initial._width > 0 && initial._height > 0,
                          "bad initial screen size: {}x{}", initial._width, initial._height);
 
-        enqueue<events::controller::NewEpoch>(0, 0);
         start();
         handle(initial);
-        _controllerEvents.finish();
+        finishCurrentBatch(0.0);
         _initBarrier.notify();
 
         size_t frameBegin = utils::uNow(), frameEnd; // microseconds
-        size_t const minIteration = size_t(1e6 / static_cast<double>(_maxFps));
-        double absoluteTime = 0; // seconds
-        _frameTime = static_cast<double>(minIteration) / 1e6;
-        _frameNum = 1; // 0-th epoch has already happened (see NewEpoch above)
+        size_t const frameQuant = size_t(1e6 / static_cast<double>(_maxFps));
+        _frameTime = static_cast<double>(frameQuant) / 1e6;
 
-        utils::FpsCounter fpsCounter(2);
+        utils::FpsCounter fpsCounter(2); (void) fpsCounter;
         while(_working)
         {
-            // if a reader is too slow, we should wait
-            // until the writing queue to be cleared
-            _controllerEvents.waitWriteReady(); // TODO why?? it break the whole idea of double-buffering
-                                                //      (maybe to avoid controler iterations skips?)
-
-            enqueue<events::controller::NewEpoch>(_frameNum, _frameTime);
-
             // handle input events
             events::ApplicationQueue pendedEvents;
             {
@@ -108,29 +96,35 @@ namespace minire
             {
                 _working = false;
                 enqueue<events::controller::Quit>();
-                _controllerEvents.finish();
+                finishCurrentBatch(_frameTime);
                 continue;
             }
 
-            // signal render thread about logic frame finish
-            _controllerEvents.finish();
-
-            // wait until maxFps reached
-            while (frameBegin + minIteration > utils::uNow())
+            // sleep until frame's quant is done
+            size_t const timeSpent = utils::uNow() - frameBegin;
+            if (timeSpent < frameQuant)
             {
-                std::this_thread::sleep_for(kSleepDuration);
+                size_t const timeLeft = frameQuant - timeSpent;
+                std::this_thread::sleep_for(std::chrono::microseconds(timeLeft));
             }
 
             // collect frame statistics
             frameEnd = utils::uNow();
+            assert(frameBegin <= frameEnd);
             _frameTime = double(frameEnd - frameBegin) / 1e6;
             _frameTime = std::min(1.0, _frameTime); // prevent from going haywire
-            absoluteTime += _frameTime;
-            ++_frameNum;
+            _absoluteTime += _frameTime;
+
+            // signal render thread about logic frame finish
+            // TODO: maybe do this before the sleep? Because otherwise
+            //       it won't start smoothly with very slow controller (like 1 FPS).
+            //       Also, it might decrease latency between a controller and a rasterizer.
+            finishCurrentBatch(_frameTime);
 
             // prepare next frame
             frameBegin = frameEnd;
 
+#ifndef NDEBUG
             // count FPS of a controller
             if (auto fps = fpsCounter.registerFrame(); fps)
             {
@@ -138,10 +132,34 @@ namespace minire
                                                 fps->first, fps->second);
                 MINIRE_DEBUG("controller FPS: {}", title);
             }
+#endif
         }
 
         finish();
-        _controllerEvents.finish();
+
+        finishCurrentBatch(_frameTime);
+    }
+
+    BasicController::BatchQueue BasicController::pull()
+    {
+        BatchQueue result;
+        // TODO this is unsafe: result.reserve(_pendedControllerEvents.size());
+        {
+            std::lock_guard<std::mutex> lock(_pendedControllerEventsMutex);
+            std::swap(result, _pendedControllerEvents);
+        }
+        return result; // TODO: is it reallty moves and don't copy?
+    }
+
+    void BasicController::finishCurrentBatch(double duration)
+    {
+        _currentEventsBatch._duration = duration;
+        {
+            std::lock_guard<std::mutex> lock(_pendedControllerEventsMutex);
+            _pendedControllerEvents.emplace_back(std::move(_currentEventsBatch));
+        }
+        _currentEventsBatch = Batch();
+        // TODO: reserve max() or p99 of known events amount _currentEventsBatch._events.reserve()
     }
 
     void BasicController::push(events::ApplicationQueue && applicationQueue)
