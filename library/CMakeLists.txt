@@ -13,9 +13,6 @@ find_package(OpenGL REQUIRED)
 # Configure SDL
 find_package(SDL2 REQUIRED)
 
-# Configure PNG
-find_package(PNG REQUIRED)
-
 # Configure fmt::format (TODO: remove it after moving to C++20)
 find_package(fmt REQUIRED)
 
@@ -23,12 +20,20 @@ find_package(fmt REQUIRED)
 find_package(glm REQUIRED)
 
 # Setup defines
-
 add_definitions(-DCMAKE_CURRENT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 # TODO: is it really the best place for such definitions?
 # TODO: can't use GLM_FORCE_INLINE because of string_casts
 add_definitions(-DGLM_FORCE_CXX17 -DGLM_FORCE_RADIANS)
+
+add_definitions(
+    -DSTBI_NO_BMP
+    -DSTBI_NO_GIF
+    -DSTBI_NO_HDR
+    -DSTBI_NO_PIC
+    -DSTBI_NO_PNM
+    -DSTBI_NO_PSD
+    -DSTBI_WINDOWS_UTF8)
 
 # Build the library
 
@@ -52,7 +57,6 @@ target_link_libraries(minire
 
     "${SDL2_LIBRARIES}"
     "${OPENGL_LIBRARIES}"
-    "${PNG_LIBRARIES}"
 )
 
 target_compile_features(minire PUBLIC cxx_std_20)
@@ -63,7 +67,6 @@ target_include_directories(minire PUBLIC
     "${CMAKE_SOURCE_DIR}/3rd-party"
     "${SDL2_INCLUDE_DIRS}"
     "${OPENGL_INCLUDE_DIRS}" # TODO: Added in version 3.29.
-    "${PNG_INCLUDE_DIRS}"
     "${Boost_INCLUDE_DIRS}"
 )
 

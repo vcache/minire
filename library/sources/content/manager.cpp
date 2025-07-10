@@ -1,8 +1,8 @@
 #include <minire/content/manager.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/formats/image.hpp>
 #include <minire/formats/obj.hpp>
-#include <minire/formats/png.hpp>
 #include <minire/logging.hpp>
 
 #include <boost/algorithm/string.hpp>
@@ -179,7 +179,7 @@ namespace minire::content::readers
         MINIRE_INFO("Loading asset: {}", path.string());
         if (".png"  == ext)
         {
-            models::Image::Sptr image = formats::loadPng(path);
+            models::Image::Sptr image = formats::loadImage(path);
             MINIRE_INVARIANT(image, "image not loaded: {}", path.string());
             return image;
         }

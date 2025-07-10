@@ -35,10 +35,7 @@ namespace minire::models
         Depth     _depth = Depth::k8;        ///!< \note Size of color component, in bits
         bool      _signed = false;           ///!< \note Signed or not color component
 
-        ~Image()
-        {
-            delete []_data;
-        }
+        virtual ~Image() = 0;
 
         size_t bytesInComponent() const
         {
@@ -82,4 +79,6 @@ namespace minire::models
             return &_data[x * bytesInPixel() + y * bytesInLine()];
         }
     };
+
+    inline Image::~Image() {}
 }
