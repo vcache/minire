@@ -1,6 +1,7 @@
 #include <minire/content/manager.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/formats/gltf.hpp>
 #include <minire/formats/image.hpp>
 #include <minire/formats/obj.hpp>
 #include <minire/logging.hpp>
@@ -177,7 +178,10 @@ namespace minire::content::readers
         boost::algorithm::to_lower(ext);
 
         MINIRE_INFO("Loading asset: {}", path.string());
-        if (".png"  == ext)
+        if (".png"  == ext ||
+            ".jpg" == ext ||
+            ".jpeg" == ext ||
+            ".tga" == ext)
         {
             models::Image::Sptr image = formats::loadImage(path);
             MINIRE_INVARIANT(image, "image not loaded: {}", path.string());
@@ -186,6 +190,15 @@ namespace minire::content::readers
         else if (".obj"  == ext)
         {
             return formats::loadObj(path);
+        }
+        else if (".gltf"  == ext)
+        {
+            // TODO: might not work correctly w/ separated .bin files
+            return formats::loadGltf(path);
+        }
+        else if (".glb"  == ext)
+        {
+            return formats::loadGlb(path);
         }
         else
         {

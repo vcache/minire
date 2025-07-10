@@ -2,6 +2,7 @@
 
 #include <minire/content/id.hpp>
 #include <minire/formats/bdf.hpp>
+#include <minire/formats/gltf.hpp>
 #include <minire/formats/obj.hpp>
 #include <minire/models/font.hpp>
 #include <minire/models/image.hpp>
@@ -15,6 +16,7 @@ namespace minire::content
                                std::string,
                                formats::Bdf::Sptr,
                                formats::Obj, // TODO: why not Sptr?
+                               formats::GltfModelSptr,
                                models::Image::Sptr,
                                models::Font,
                                models::SceneModel>;

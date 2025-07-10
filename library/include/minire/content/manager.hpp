@@ -115,6 +115,13 @@ namespace minire::content
             return std::get_if<T>(&asset);
         }
 
+        template<typename Visitor>
+        constexpr auto visit(Visitor && visitor)
+        {
+            Asset const & asset = operator*();
+            return std::visit(std::forward<Visitor>(visitor), asset);
+        }
+
         ~Lease()
         {
             _manager.decUsage(_asset);
