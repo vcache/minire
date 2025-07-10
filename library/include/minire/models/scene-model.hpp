@@ -17,11 +17,21 @@ namespace minire::models
                                  float,
                                  glm::vec3,
                                  content::Id>;
-        content::Id _mesh;
-        Map         _albedo;
-        Map         _metallic;
-        Map         _roughness;
-        Map         _ao;
-        Map         _normals;
+
+        struct Mesh
+        {
+            using Index = std::variant<std::monostate,
+                                       size_t>;
+
+            content::Id _source;
+            Index       _index; // for example, an index of gLTF's mesh
+        };
+
+        Mesh _mesh;
+        Map  _albedo;
+        Map  _metallic;
+        Map  _roughness;
+        Map  _ao;
+        Map  _normals;
     };
 }

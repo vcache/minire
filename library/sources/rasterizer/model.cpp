@@ -5,10 +5,11 @@
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 
-#include <rasterizer/constants.hpp>
-#include <rasterizer/ubo.hpp>
 #include <opengl/program.hpp>
 #include <opengl/shader.hpp>
+#include <rasterizer/constants.hpp>
+#include <rasterizer/ubo.hpp>
+#include <utils/gltf-to-index-buffers.hpp>
 #include <utils/obj-to-index-buffers.hpp>
 #include <utils/overloaded.hpp>
 
@@ -331,20 +332,25 @@ namespace minire::rasterizer
     namespace
     {
         // TODO: don't reload meshes that is already loaded
-        auto makeBuffers(content::Id const & id,
+        auto makeBuffers(models::SceneModel::Mesh const & mesh,
                          content::Manager & contentManager)
         {
-            auto lease = contentManager.borrow(id);
+            auto lease = contentManager.borrow(mesh._source);
             assert(lease);
-            if (formats::Obj const * obj = lease->tryAs<formats::Obj>())
+            return lease->visit(utils::Overloaded
             {
-                MINIRE_INFO("Loading OBJ-mesh: {}", id);;
-                return utils::createIndexBuffers(*obj, kVertexAttr, kUvAttr, kNormalAttr);
-            }
-            else
-            {
-                MINIRE_THROW("unknown mesh format: \"{}\"", id);
-            }
+                [&mesh](formats::Obj const & obj)
+                {
+                    MINIRE_INFO("Loading OBJ-mesh: {}", mesh._source);;
+                    MINIRE_INVARIANT(std::holds_alternative<std::monostate>(mesh._index),
+                                     "OBJ-mesh cannot have an index");
+                    return utils::createIndexBuffers(obj, kVertexAttr, kUvAttr, kNormalAttr);
+                },
+                [&mesh](auto const &) -> opengl::IndexBuffers
+                {
+                    MINIRE_THROW("unknown mesh format: \"{}\"", mesh._source);
+                }
+            });
         }
     }
 
@@ -361,7 +367,8 @@ namespace minire::rasterizer
         }, map);
     }
 
-    Model::Model(models::SceneModel const & sceneModel,
+    Model::Model(content::Id const & id,
+                 models::SceneModel const & sceneModel,
                  content::Manager & contentManager,
                  Textures const & textures,
                  Ubo const & ubo)
@@ -374,10 +381,10 @@ namespace minire::rasterizer
         , _normals(mapToMapper(textures, sceneModel._normals, 4))
         , _flags(buildFlags()) // NOTE: _must_ be latest
     {
-        MINIRE_INVARIANT(_albedo.kind() != Mapper::Kind::kNone, "albedo required: {}", sceneModel._mesh);
-        MINIRE_INVARIANT(_albedo.kind() != Mapper::Kind::kFloat, "albedo cannot be float: {}", sceneModel._mesh);
-        MINIRE_INVARIANT(_normals.kind() != Mapper::Kind::kFloat, "normals cannot be float: {}", sceneModel._mesh);
-        MINIRE_INVARIANT(_normals.kind() != Mapper::Kind::kVector3, "normals cannot be vec3: {}", sceneModel._mesh);
+        MINIRE_INVARIANT(_albedo.kind() != Mapper::Kind::kNone, "albedo required: {}", id);
+        MINIRE_INVARIANT(_albedo.kind() != Mapper::Kind::kFloat, "albedo cannot be float: {}", id);
+        MINIRE_INVARIANT(_normals.kind() != Mapper::Kind::kFloat, "normals cannot be float: {}", id);
+        MINIRE_INVARIANT(_normals.kind() != Mapper::Kind::kVector3, "normals cannot be vec3: {}", id);
     }
 
     size_t Model::buildFlags() const

@@ -30,7 +30,8 @@ namespace minire::rasterizer
     public:
         using Uptr = std::unique_ptr<Model>;
 
-        explicit Model(models::SceneModel const & sceneModel,
+        explicit Model(content::Id const & id,
+                       models::SceneModel const & sceneModel,
                        content::Manager & contentManager, 
                        Textures const &,
                        Ubo const &);

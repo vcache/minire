@@ -51,7 +51,7 @@ namespace minire::rasterizer
             auto lease = _contentManager.borrow(id);
             assert(lease);
             models::SceneModel const & sceneModel = lease->as<models::SceneModel>();
-            item._model = std::make_unique<Model>(sceneModel, _contentManager,
+            item._model = std::make_unique<Model>(id, sceneModel, _contentManager,
                                                   _textures, _ubo);
             item._programKey = item._model->flags();
 

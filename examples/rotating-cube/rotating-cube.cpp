@@ -146,7 +146,7 @@ int main(int argc, char ** argv)
             using MapType = minire::models::SceneModel::Map;
             inMemReader->store("cube-model", minire::models::SceneModel
             {
-                ._mesh = "cube.obj",
+                ._mesh = minire::models::SceneModel::Mesh{"cube.obj", std::monostate()},
                 ._albedo = [&arguments]
                 {
                     // TODO: I don't know why is this shit must be wrapper into a lambda,
