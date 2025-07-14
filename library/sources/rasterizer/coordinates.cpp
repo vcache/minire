@@ -71,7 +71,7 @@ namespace minire::rasterizer
                 std::make_shared<opengl::Shader>(GL_VERTEX_SHADER, VertShader()),
                 std::make_shared<opengl::Shader>(GL_FRAGMENT_SHADER, kFragShader)})
             , _vao(std::make_shared<opengl::VAO>())
-            , _vbo(_vao)
+            , _vbo(_vao, GL_ARRAY_BUFFER)
             , _bznkLengthUniform(_program.getUniformLocation("bznkLength"))
         {
             _vbo.bufferData(sizeof(kVbo), kVbo, GL_STATIC_DRAW);

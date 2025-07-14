@@ -19,6 +19,7 @@ namespace
         size_t _maxCtrlFps;
         float  _velocity;
         bool   _useTexture;
+        bool   _useGltf;
         bool   _showHelp;
     };
 
@@ -29,6 +30,7 @@ namespace
         static constexpr char const * kMaxCtrlFps = "max-ctrl-fps";
         static constexpr char const * kVelocity = "velocity";
         static constexpr char const * kUseTexture = "use-texture";
+        static constexpr char const * kUseGltf = "use-gltf";
         static constexpr char const * kHelp = "help";
 
     public:
@@ -47,6 +49,9 @@ namespace
                 (kUseTexture,
                     po::value<bool>()->default_value(false),
                     "should a box be painted by a texture")
+                (kUseGltf,
+                    po::value<bool>()->default_value(false),
+                    "should read a mesh from the GLTF file")
                 (kHelp,
                     "print this message");
 
@@ -60,6 +65,7 @@ namespace
             _result._maxCtrlFps = vm[kMaxCtrlFps].as<size_t>();
             _result._velocity = vm[kVelocity].as<float>();
             _result._useTexture = vm[kUseTexture].as<bool>();
+            _result._useGltf = vm[kUseGltf].as<bool>();
             _result._showHelp = vm.count(kHelp) != 0;
         }
 
@@ -146,7 +152,8 @@ int main(int argc, char ** argv)
             using MapType = minire::models::SceneModel::Map;
             inMemReader->store("cube-model", minire::models::SceneModel
             {
-                ._mesh = minire::models::SceneModel::Mesh{"cube.obj", std::monostate()},
+                ._mesh = arguments._useGltf ? minire::models::SceneModel::Mesh{"cube.gltf", 0ULL}
+                                            : minire::models::SceneModel::Mesh{"cube.obj", std::monostate()},
                 ._albedo = [&arguments]
                 {
                     // TODO: I don't know why is this shit must be wrapper into a lambda,

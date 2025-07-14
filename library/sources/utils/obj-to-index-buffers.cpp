@@ -100,11 +100,18 @@ namespace minire::utils
                      static_cast<float>(hits) / static_cast<float>(elements.size()) * 100.0f);
 
         // Create the  buffers
-        opengl::IndexBuffers result(elements.size(), aabb);
+        opengl::IndexBuffers result;
+        result._elementsCount = elements.size();
+        result._aabb = aabb;
+        result._drawMode = GL_TRIANGLES;
+        result._elementsType = GL_UNSIGNED_INT;
 
         // load EBO and VBO
-        result._ebo.bufferData(elements.bytesCount(), elements.bytesPointer(), GL_STATIC_DRAW);
-        result._vbo.bufferData(attribs.size() * sizeof(float), attribs.data(), GL_STATIC_DRAW);
+        opengl::VBO & ebo = result.createVbo(0, GL_ELEMENT_ARRAY_BUFFER);
+        ebo.bufferData(elements.bytesCount(), elements.bytesPointer(), GL_STATIC_DRAW);
+
+        opengl::VBO & vbo = result.createVbo(1, GL_ARRAY_BUFFER);
+        vbo.bufferData(attribs.size() * sizeof(float), attribs.data(), GL_STATIC_DRAW);
 
         size_t pointer = 0;
         size_t const bstride = stride * sizeof(float);

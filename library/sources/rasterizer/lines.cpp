@@ -82,14 +82,14 @@ namespace minire::rasterizer
             if (!_vao)
             {
                 _vao = std::make_shared<opengl::VAO>();
-                _vbo = std::make_shared<opengl::VBO>(_vao);
+                _vbo = std::make_shared<opengl::VBO>(_vao, GL_ARRAY_BUFFER);
                 _vbo->bufferData(bytes, buffer.data(), GL_DYNAMIC_DRAW);
                 reSetVaoPointers();
             }
             else if (_vbo->size() < static_cast<GLsizeiptr>(bytes))
             {
                 assert(_vao);
-                _vbo = std::make_shared<opengl::VBO>(_vao);
+                _vbo = std::make_shared<opengl::VBO>(_vao, GL_ARRAY_BUFFER);
                 _vbo->bufferData(bytes, buffer.data(), GL_DYNAMIC_DRAW);
                 reSetVaoPointers();
             }

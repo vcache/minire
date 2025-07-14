@@ -16,10 +16,9 @@ namespace minire::opengl
         using Sptr = std::shared_ptr<VBO>;
 
         /*
-         * \note Ctor will bind buffer as a (guarantee) side effect
+         * \note Ctor will bind the buffer as a side effect
          */
-        explicit VBO(VAO::Sptr const & vao,
-                     GLenum target = GL_ARRAY_BUFFER)
+        explicit VBO(VAO::Sptr const & vao, GLenum target)
             : _vboId(0)
             , _vao(vao)
             , _target(target)
@@ -68,10 +67,12 @@ namespace minire::opengl
         VBO(VBO && other)
             : _vboId(other._vboId)
             , _vao(other._vao)
+            , _target(other._target)
             , _size(other._size)
         {
             other._vboId = 0;
             other._vao = nullptr;
+            other._target = 0;
             other._size = 0;
         }
 
@@ -80,6 +81,7 @@ namespace minire::opengl
             VBO tmp(std::move(other));
             std::swap(_vboId, tmp._vboId);
             std::swap(_vao, tmp._vao);
+            std::swap(_target, tmp._target);
             std::swap(_size, tmp._size);
             return *this;
         }
@@ -115,6 +117,8 @@ namespace minire::opengl
         }
 
         GLuint id() const { return _vboId; }
+
+        GLenum target() const { return _target; }
 
     private:
         GLuint     _vboId;

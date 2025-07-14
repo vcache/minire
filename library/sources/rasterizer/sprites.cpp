@@ -342,7 +342,7 @@ namespace minire::rasterizer
             , _visible(visible)
             , _program(program)
             , _vao(std::make_shared<opengl::VAO>())
-            , _vbo(_vao)
+            , _vbo(_vao, GL_ARRAY_BUFFER)
             , _invalidated(true)
         {
             MINIRE_INVARIANT(_texture, "sprite created w/o a texture");

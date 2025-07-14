@@ -319,7 +319,7 @@ namespace minire::rasterizer
 
         Buffer()
             : _vao(std::make_shared<opengl::VAO>())
-            , _vbo(_vao)
+            , _vbo(_vao, GL_ARRAY_BUFFER)
         {
             size_t const stride = sizeof(Vertex);
             size_t pointer = 0;
