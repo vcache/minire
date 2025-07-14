@@ -1,12 +1,12 @@
 #pragma once
 
-#include <opengl/index-buffers.hpp>
+#include <opengl/vertex-buffer.hpp>
 
 namespace minire::formats { struct Obj; }
 
 namespace minire::utils
 {
-    opengl::IndexBuffers createIndexBuffers(formats::Obj const &,
+    opengl::VertexBuffer createVertexBuffer(formats::Obj const &,
                                             int vtxAttribIndex,
                                             int uvAttribIndx,
                                             int normAttrib);

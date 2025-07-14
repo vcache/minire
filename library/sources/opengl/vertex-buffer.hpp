@@ -12,9 +12,7 @@
 namespace minire::opengl
 {
     // TODO: this code is a mess, refact it!
-    // TODO: rename to Drawable
-    //
-    struct IndexBuffers
+    struct VertexBuffer
     {
         // TODO: why not a std::bitset?
         static constexpr size_t kHaveNormals  = (1 << 0);
@@ -32,12 +30,12 @@ namespace minire::opengl
         GLenum            _drawMode = GL_TRIANGLES;
 
     public:
-        IndexBuffers()
+        VertexBuffer()
             : _vao(std::make_shared<opengl::VAO>())
         {}
 
     public:
-        IndexBuffers(IndexBuffers &&) = default;
+        VertexBuffer(VertexBuffer &&) = default;
 
         opengl::VBO & createVbo(size_t index, GLenum target)
         {
@@ -69,7 +67,7 @@ namespace minire::opengl
         }
 
     private:
-        IndexBuffers(IndexBuffers const &) = delete;
-        IndexBuffers& operator=(IndexBuffers const &) = delete;
+        VertexBuffer(VertexBuffer const &) = delete;
+        VertexBuffer& operator=(VertexBuffer const &) = delete;
     };
 }

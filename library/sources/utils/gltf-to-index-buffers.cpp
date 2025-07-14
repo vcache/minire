@@ -124,7 +124,7 @@ namespace minire::utils
         createVbo(::tinygltf::Model const & model,
                   size_t const accessorIndex,
                   GLenum const target,
-                  opengl::IndexBuffers & result)
+                  opengl::VertexBuffer & result)
         {
             ::tinygltf::Accessor const & accessor = getAccessor(accessorIndex, model);
 
@@ -163,14 +163,14 @@ namespace minire::utils
     //       default MikkTSpace algorithms with the specified vertex positions, normals, and texture
     //       coordinates associated with the normal texture.
     // TODO: don't load texture automatically, since they might be controller via content::Manger
-    opengl::IndexBuffers createIndexBuffers(::tinygltf::Model const & model,
+    opengl::VertexBuffer createVertexBuffer(::tinygltf::Model const & model,
                                             size_t const meshIndex,
                                             int vtxAttribIndex,
                                             int uvAttribIndx,
                                             int normAttrib,
                                             int tangentAttrib)
     {
-        opengl::IndexBuffers result;
+        opengl::VertexBuffer result;
 
         // fetch the mesh
 
@@ -210,9 +210,9 @@ namespace minire::utils
         for(auto const & [accessorName, attribIndex, flag] :
             std::initializer_list<std::tuple<std::string const &, int, size_t>> {
                 {kPosition, vtxAttribIndex, 0},
-                {kTexCoord0, uvAttribIndx, opengl::IndexBuffers::kHaveUvs},
-                {kNormal, normAttrib, opengl::IndexBuffers::kHaveNormals},
-                {kTangent, tangentAttrib, opengl::IndexBuffers::kHaveTangents}
+                {kTexCoord0, uvAttribIndx, opengl::VertexBuffer::kHaveUvs},
+                {kNormal, normAttrib, opengl::VertexBuffer::kHaveNormals},
+                {kTangent, tangentAttrib, opengl::VertexBuffer::kHaveTangents}
             })
         {
             size_t const accessorIndex = requireAttr(mesh, primitive, accessorName);

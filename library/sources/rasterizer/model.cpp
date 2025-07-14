@@ -344,7 +344,7 @@ namespace minire::rasterizer
                     MINIRE_INFO("Loading OBJ-mesh: {}", mesh._source);;
                     MINIRE_INVARIANT(std::holds_alternative<std::monostate>(mesh._index),
                                      "OBJ-mesh cannot have an index");
-                    return utils::createIndexBuffers(obj, kVertexAttr, kUvAttr, kNormalAttr);
+                    return utils::createVertexBuffer(obj, kVertexAttr, kUvAttr, kNormalAttr);
                 },
                 [&mesh](formats::GltfModelSptr const & gltf)
                 {
@@ -352,10 +352,10 @@ namespace minire::rasterizer
                     MINIRE_INFO("Loading gLTF model: {}", mesh._source);;
                     MINIRE_INVARIANT(std::holds_alternative<size_t>(mesh._index),
                                      "gLTF-mesh must have an index");
-                    return utils::createIndexBuffers(*gltf, std::get<size_t>(mesh._index),
+                    return utils::createVertexBuffer(*gltf, std::get<size_t>(mesh._index),
                                                      kVertexAttr, kUvAttr, kNormalAttr, kTangentAttr);
                 },
-                [&mesh](auto const &) -> opengl::IndexBuffers
+                [&mesh](auto const &) -> opengl::VertexBuffer
                 {
                     MINIRE_THROW("unknown mesh format: \"{}\"", mesh._source);
                 }

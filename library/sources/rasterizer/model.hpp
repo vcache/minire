@@ -3,7 +3,7 @@
 #include <minire/models/scene-model.hpp>
 
 #include <rasterizer/textures.hpp>
-#include <opengl/index-buffers.hpp>
+#include <opengl/vertex-buffer.hpp>
 
 #include <glm/mat4x4.hpp>
 
@@ -92,7 +92,7 @@ namespace minire::rasterizer
 
     private:
         Ubo const &           _ubo;
-        opengl::IndexBuffers  _buffers;
+        opengl::VertexBuffer  _buffers;
 
         Mapper                _albedo;
         Mapper                _metallic;

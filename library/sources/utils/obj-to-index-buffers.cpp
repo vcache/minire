@@ -37,7 +37,7 @@ namespace minire::utils
         }
     }
 
-    opengl::IndexBuffers createIndexBuffers(formats::Obj const & mesh,
+    opengl::VertexBuffer createVertexBuffer(formats::Obj const & mesh,
                                             int vtxAttribIndex,
                                             int uvAttribIndx,
                                             int normAttrib)
@@ -96,11 +96,11 @@ namespace minire::utils
             allocCache.emplace(faceKey, index);
         }
 
-        MINIRE_DEBUG("OBJ to IndexBuffers cache hit rate: {}%",
+        MINIRE_DEBUG("OBJ to VertexBuffer cache hit rate: {}%",
                      static_cast<float>(hits) / static_cast<float>(elements.size()) * 100.0f);
 
         // Create the  buffers
-        opengl::IndexBuffers result;
+        opengl::VertexBuffer result;
         result._elementsCount = elements.size();
         result._aabb = aabb;
         result._drawMode = GL_TRIANGLES;
@@ -126,7 +126,7 @@ namespace minire::utils
             result._vao->enableAttrib(uvAttribIndx);
             result._vao->attribPointer(uvAttribIndx, 2, GL_FLOAT, GL_FALSE, bstride, pointer);
             pointer += (2 * sizeof(float));
-            result._flags |= opengl::IndexBuffers::kHaveUvs;
+            result._flags |= opengl::VertexBuffer::kHaveUvs;
         }
 
         if (mesh.haveNormals())
@@ -134,7 +134,7 @@ namespace minire::utils
             result._vao->enableAttrib(normAttrib);
             result._vao->attribPointer(normAttrib, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
             pointer += (3 * sizeof(float)); // TODO: useless
-            result._flags |= opengl::IndexBuffers::kHaveNormals;
+            result._flags |= opengl::VertexBuffer::kHaveNormals;
         }
 
         return result;
