@@ -157,16 +157,9 @@ int main(int argc, char ** argv)
                                             : minire::models::SceneModel::Mesh{"cube.obj", std::monostate()},
                 ._material = std::make_shared<minire::models::PbrMaterial>
                 (
-                    /* albedo */ [&arguments]
-                    {
-                        // TODO: I don't know why is this shit must be wrapper into a lambda,
-                        //       but without it _albedo.index() == 255 when kUseTexture == false.
-                        //       Must some bug in compiler or stl or whatever.
-                        // TODO: Is "uv-color.png" a license-safe one??
-                        return arguments._useTexture
+                    /* albedo */ arguments._useTexture
                             ? MapType(std::in_place_type<minire::content::Id>, "uv-color.png")
-                            : MapType(std::in_place_type<glm::vec3>, 1.0, 0.0, 0.0);
-                    }(),
+                            : MapType(std::in_place_type<glm::vec3>, 1.0, 0.0, 0.0),
                     /* metallic */ 0.5f,
                     /* roughnesss */ 0.6f,
                     /* ao */ 1.0f,
