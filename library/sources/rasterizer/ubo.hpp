@@ -16,7 +16,7 @@ namespace minire::rasterizer
 
         void bind();
 
-        void bindBufferRange(opengl::Program &) const;
+        void bindBufferRange(opengl::Program const &) const;
 
         static std::string interfaceBlock();
 

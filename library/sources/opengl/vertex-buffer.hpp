@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minire/errors.hpp>
+#include <minire/models/mesh-features.hpp>
 #include <minire/utils/aabb.hpp>
 
 #include <opengl.hpp>
@@ -14,18 +15,12 @@ namespace minire::opengl
     // TODO: this code is a mess, refact it!
     struct VertexBuffer
     {
-        // TODO: why not a std::bitset?
-        static constexpr size_t kHaveNormals  = (1 << 0);
-        static constexpr size_t kHaveTangents = (1 << 1);
-        static constexpr size_t kHaveUvs      = (1 << 2);
-
         using VboMap = std::unordered_map<size_t, opengl::VBO>;
 
         opengl::VAO::Sptr _vao;
         VboMap            _vboMap;
         size_t            _elementsCount = 0;
         GLenum            _elementsType = 0;
-        size_t            _flags = 0;
         utils::Aabb       _aabb;
         GLenum            _drawMode = GL_TRIANGLES;
 
@@ -47,14 +42,6 @@ namespace minire::opengl
             }
             return it->second;
         }
-
-        auto flags() const { return _flags; }
-
-        bool hasUvs() const { return _flags & kHaveUvs; }
-
-        bool hasNormals() const { return _flags & kHaveNormals; }
-
-        bool hasTangents() const { return _flags & kHaveTangents; }
 
         void bindVao() const { assert(_vao); _vao->bind(); }
 

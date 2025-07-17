@@ -138,4 +138,119 @@ namespace minire::rasterizer
         // PBR KIT END //
 
     )";
+
+    std::string Constants::kPbrVertShader = R"(
+        #version 330 core
+
+        layout(location = 0) in vec3 bznkVertex;
+
+        {% if kHasUvs %}
+        layout(location = 1) in vec2 bznkUv;
+        out vec2 bznkFragUv;
+        {% endif %}
+
+        {% if kHasNormals %}
+        layout(location = 2) in vec3 bznkNormal;
+        out vec3 bznkFragNormal;
+        {% endif %}
+
+        {% if kHasTangents %}
+        layout(location = 3) in vec3 bznkTangent;
+        out mat3 bznkTbn;
+        {% endif %}
+
+        out vec4 bznkWorldPos;
+
+        uniform mat4 bznkModel;
+
+        {{ kUboDatablock }}
+
+        void main()
+        {
+            bznkWorldPos = bznkModel * vec4(bznkVertex, 1.0);
+            gl_Position = _viewProjection * bznkWorldPos;
+
+            {% if kHasUvs %}
+            bznkFragUv = bznkUv;
+            {% endif %}
+
+            {% if kHasNormals %}
+            vec3 N = normalize(vec3(bznkModel * vec4(bznkNormal, 0.0)));
+            bznkFragNormal = N;
+            {% endif %}
+
+            {% if kHasTangents %}
+            vec3 T = normalize(vec3(bznkModel * vec4(bznkTangent, 0.0)));
+            T = normalize(T - dot(T, N) * N);
+            vec3 B = cross(N, T);
+            bznkTbn = mat3(T, B, N);
+            {% endif %}
+        }
+    )";
+
+    std::string Constants::kPbrFragShader = R"(
+        #version 330 core
+
+        // output //
+
+        out vec3 bznkOutColor;
+
+        // input //
+
+        {% if kHasUvs %}
+        in vec2 bznkFragUv;
+        {% endif %}
+
+        {% if kHasNormals %}
+        in vec3 bznkFragNormal;
+        {% endif %}
+
+        {% if kHasTangents %}
+        in mat3 bznkTbn;
+        {% endif %}
+
+        in vec4 bznkWorldPos;
+
+        // uniforms //
+
+        {{ kUboDatablock }}
+
+        {{ mkUniformDef(kAlbedoUniformType, "bznkAlbedo") }}
+        {{ mkUniformDef(kMetallicUniformType, "bznkMetallic") }}
+        {{ mkUniformDef(kRoughnessUniformType, "bznkRoughness") }}
+        {{ mkUniformDef(kAoUniformType, "bznkAo") }}
+        {{ mkUniformDef(kNormalsUniformType, "bznkNormals") }}
+
+        uniform float bznkColorFactor = 1.0;
+
+        // routines //
+
+        {% include "shaders/pbr-kit.incl" %}
+
+        // entry pony //
+
+        void main()
+        {
+            vec3 albedo = {{ mkValueSampler(kAlbedoUniformType, "bznkAlbedo", 0) }};
+            float metallic = {{ mkValueSampler(kMetallicUniformType, "bznkMetallic", 1) }};
+            float roughness = {{ mkValueSampler(kRoughnessUniformType, "bznkRoughness", 1) }};
+            float ao = {{ mkValueSampler(kAoUniformType, "bznkAo", 1) }};
+
+            {% if kHasNormalsUniform and kHasTangents %}
+            vec3 normal = normalMapping(
+                bznkTbn,
+                {{ mkValueSampler(kNormalsUniformType, "bznkNormals", 2) }});
+            {% else %}
+            vec3 normal = bznkFragNormal;
+            {% endif %}
+
+            bznkOutColor = pbrFragColor(albedo,
+                                        metallic,
+                                        roughness,
+                                        ao,
+                                        normal);
+
+            bznkOutColor *= bznkColorFactor;
+        }
+    )";
 }

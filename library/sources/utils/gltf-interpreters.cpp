@@ -1,6 +1,6 @@
 // TODO: this whole file is a mess, should refactor it
 
-#include <utils/gltf-to-index-buffers.hpp>
+#include <utils/gltf-interpreters.hpp>
 
 #include <minire/errors.hpp>
 
@@ -152,6 +152,27 @@ namespace minire::utils
         }
     }
 
+    models::MeshFeatures getMeshFeatures(::tinygltf::Model const & model,
+                                         size_t const meshIndex)
+    {
+        // fetch the mesh
+
+        MINIRE_INVARIANT(meshIndex < model.meshes.size(),
+                         "mesh doesn't exist: {} >= {}", meshIndex, model.meshes.size());
+        ::tinygltf::Mesh const & mesh = model.meshes[meshIndex];
+
+        // fetch a primitive
+
+        MINIRE_INVARIANT(mesh.primitives.size() == 1,
+                         "multiple primitives are not supported: {}",
+                         mesh.name);
+        ::tinygltf::Primitive const & primitive = mesh.primitives[0];
+
+        return models::MeshFeatures(primitive.attributes.contains(kTexCoord0),
+                                    primitive.attributes.contains(kNormal),
+                                    primitive.attributes.contains(kTangent));
+    }
+
     // TODO: support sparse buffers
     // TODO: support multiple primitives
     // TODO: see glDrawArrays, glDrawRangeElements, glMultiDrawElements, or glMultiDrawArrays
@@ -207,14 +228,16 @@ namespace minire::utils
 
         // Vertex buffer and attributes
 
-        for(auto const & [accessorName, attribIndex, flag] :
-            std::initializer_list<std::tuple<std::string const &, int, size_t>> {
-                {kPosition, vtxAttribIndex, 0},
-                {kTexCoord0, uvAttribIndx, opengl::VertexBuffer::kHaveUvs},
-                {kNormal, normAttrib, opengl::VertexBuffer::kHaveNormals},
-                {kTangent, tangentAttrib, opengl::VertexBuffer::kHaveTangents}
+        for(auto const & [accessorName, attribIndex] :
+            std::initializer_list<std::tuple<std::string const &, int>> {
+                {kPosition, vtxAttribIndex},
+                {kTexCoord0, uvAttribIndx},
+                {kNormal, normAttrib},
+                {kTangent, tangentAttrib}
             })
         {
+            if (attribIndex == -1) continue;
+
             size_t const accessorIndex = requireAttr(mesh, primitive, accessorName);
             auto const & [accessor, bufferView] = createVbo(model, accessorIndex, GL_ARRAY_BUFFER, result);
 
@@ -229,7 +252,6 @@ namespace minire::utils
                                        gltfComponentTypeToGlType(accessor.componentType),
                                        accessor.normalized ? GL_TRUE : GL_FALSE,
                                        bufferView.byteStride, accessor.byteOffset);
-            result._flags |= flag;
         }
 
         result._drawMode = gltfModeToGlMode(primitive.mode);

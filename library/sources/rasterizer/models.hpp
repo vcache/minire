@@ -16,14 +16,14 @@ namespace minire::content { class Manager; }
 
 namespace minire::rasterizer
 {
-    class Textures;
+    class Materials;
     class Ubo;
 
     class Models
     {
     public:
         explicit Models(Ubo const &,
-                        Textures const &,
+                        Materials const &,
                         content::Manager &);
 
         void draw(scene::ModelRef::List &) const;
@@ -39,16 +39,9 @@ namespace minire::rasterizer
         void unload(content::Id const &);
 
     private:
-        using ProgramKey = size_t;
-        using Programs = std::unordered_map<ProgramKey,
-                                            Model::Program::Sptr>;
-
-        static constexpr ProgramKey kEmptyProgramKey = std::numeric_limits<ProgramKey>::max();
-
         struct StoreItem
         {
             Model::Uptr _model;
-            ProgramKey  _programKey = kEmptyProgramKey; // TODO: move this into Program class
             int         _usage = 0;
             bool        _init = false;
         };
@@ -57,8 +50,7 @@ namespace minire::rasterizer
 
         content::Manager & _contentManager;
         Ubo const &        _ubo;
-        Textures const &   _textures;
+        Materials const &  _materials;
         Store              _store;
-        Programs           _programs;
     };
 }

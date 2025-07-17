@@ -6,6 +6,7 @@
 #include <rasterizer/label.hpp>
 #include <rasterizer/labels.hpp>
 #include <rasterizer/lines.hpp>
+#include <rasterizer/materials.hpp>
 #include <rasterizer/models.hpp>
 #include <rasterizer/sprites.hpp>
 #include <rasterizer/textures.hpp>
@@ -42,16 +43,18 @@ namespace minire
         void draw2d();
 
     private:
-        content::Manager       &   _contentManager;
+        content::Manager             & _contentManager;
 
-        rasterizer::Ubo            _ubo;
-        rasterizer::Coordinates    _coordinates;
-        rasterizer::Lines          _lines;
-        rasterizer::Textures       _textures;
-        rasterizer::Models         _models;
-        rasterizer::Fonts          _fonts;
-        rasterizer::Labels         _labels;
-        rasterizer::Sprites        _sprites;
+        // NOTE: the order of these is ridiculously vital (see ctor)
+        rasterizer::Ubo                _ubo;
+        rasterizer::Coordinates        _coordinates;
+        rasterizer::Lines              _lines;
+        rasterizer::Textures           _textures;
+        rasterizer::Materials          _materials;
+        rasterizer::Models             _models;
+        rasterizer::Fonts              _fonts;
+        rasterizer::Labels             _labels;
+        rasterizer::Sprites            _sprites;
 
         glm::mat4                      _2dProjection;
         rasterizer::Drawable::PtrsList _drawables;

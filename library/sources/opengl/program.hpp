@@ -3,6 +3,11 @@
 #include <opengl.hpp>
 #include <opengl/shader.hpp>
 
+#include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/gtc/type_ptr.hpp> // for gln::value_ptr
+
+#include <cassert>
 #include <vector>
 #include <memory>
 
@@ -10,12 +15,20 @@ namespace minire::opengl
 {
     class Program
     {
+        Program(Program const &) = delete;
+        Program & operator=(Program const &) = delete;
+
     public:
         using Sptr = std::shared_ptr<Program>;
 
         explicit Program(std::vector<Shader::Sptr>);
         ~Program();
 
+        Program(Program &&);
+
+        Program & operator=(Program &&);
+
+    public:
         void use() const
         {
             MINIRE_GL(glUseProgram, _id);
@@ -47,12 +60,34 @@ namespace minire::opengl
 
         bool isUsing() const { return _id == _used; }
 
-        template<class T>
-        void setUniformValue(GLint, T);
+    public:
+        void setUniform(GLint location, GLint value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniform1i, location, value);
+        }
+
+        void setUniform(GLint location, float value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniform1f, location, value);
+        }
+
+        void setUniform(GLint location, glm::vec3 const & value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniform3f, location, value.x, value.y, value.z);
+        }
+
+        void setUniform(GLint location, glm::mat4 const & value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniformMatrix4fv, location, 1, GL_FALSE, glm::value_ptr(value));
+        }
 
     private:
         std::vector<Shader::Sptr> _shaders;
-        GLuint                    _id;
+        GLuint                    _id = 0;
 
         static GLuint             _used;
 

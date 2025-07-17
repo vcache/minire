@@ -2,6 +2,7 @@
 
 #include <minire/errors.hpp>
 
+#include <algorithm>
 #include <vector>
 
 namespace minire::opengl
@@ -71,6 +72,22 @@ namespace minire::opengl
         {
             ::glDeleteProgram(_id);
         }
+    }
+
+    Program::Program(Program && other)
+        : _shaders(std::move(other._shaders))
+        , _id(other._id)
+    {
+        other._shaders = {};
+        other._id = 0;
+    }
+
+    Program & Program::operator=(Program && other)
+    {
+        Program tmp(std::move(other));
+        std::swap(other._shaders, _shaders);
+        std::swap(other._id, _id);
+        return *this;
     }
 
     std::string Program::getInfoLog() const

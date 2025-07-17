@@ -1,4 +1,4 @@
-#include <utils/obj-to-index-buffers.hpp>
+#include <utils/obj-interpreters.hpp>
 
 #include <minire/formats/obj.hpp>
 #include <minire/logging.hpp>
@@ -35,6 +35,11 @@ namespace minire::utils
             if (mesh.haveNormals()) result += 3;
             return result;
         }
+    }
+
+    models::MeshFeatures getMeshFeatures(formats::Obj const & obj)
+    {
+        return models::MeshFeatures(obj.haveUvs(), obj.haveNormals(), false);
     }
 
     opengl::VertexBuffer createVertexBuffer(formats::Obj const & mesh,
@@ -123,18 +128,22 @@ namespace minire::utils
 
         if (mesh.haveUvs())
         {
-            result._vao->enableAttrib(uvAttribIndx);
-            result._vao->attribPointer(uvAttribIndx, 2, GL_FLOAT, GL_FALSE, bstride, pointer);
+            if (uvAttribIndx != -1)
+            {
+                result._vao->enableAttrib(uvAttribIndx);
+                result._vao->attribPointer(uvAttribIndx, 2, GL_FLOAT, GL_FALSE, bstride, pointer);
+            }
             pointer += (2 * sizeof(float));
-            result._flags |= opengl::VertexBuffer::kHaveUvs;
         }
 
         if (mesh.haveNormals())
         {
-            result._vao->enableAttrib(normAttrib);
-            result._vao->attribPointer(normAttrib, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
+            if (normAttrib != -1)
+            {
+                result._vao->enableAttrib(normAttrib);
+                result._vao->attribPointer(normAttrib, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
+            }
             pointer += (3 * sizeof(float)); // TODO: useless
-            result._flags |= opengl::VertexBuffer::kHaveNormals;
         }
 
         return result;

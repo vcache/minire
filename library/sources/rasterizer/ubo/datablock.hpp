@@ -50,7 +50,8 @@ namespace minire::rasterizer::ubo
                      utils::demangle<T>());
     }
 
-    template<> inline std::string makeInterfaceBlock<PointLight>()
+    template<>
+    inline std::string makeInterfaceBlock<PointLight>()
     {
         return R"(
         struct BznkPointLight
@@ -62,7 +63,8 @@ namespace minire::rasterizer::ubo
         )";
     }
 
-    template<> inline std::string makeInterfaceBlock<Datablock>()
+    template<>
+    inline std::string makeInterfaceBlock<Datablock>()
     {
         const std::string kMaxLights = std::to_string(Datablock::kMaxLights);
         return makeInterfaceBlock<PointLight>() +

@@ -1,6 +1,9 @@
 #include <rasterizer.hpp>
 
 #include <minire/content/manager.hpp>
+#include <minire/models/pbr-material.hpp>
+
+#include <rasterizer/materials/pbr.hpp>
 #include <opengl.hpp>
 
 #include <glm/gtx/transform.hpp>
@@ -17,13 +20,17 @@ namespace minire
         , _coordinates(_ubo)
         , _lines(_ubo)
         , _textures(_contentManager)
-        , _models(_ubo, _textures, _contentManager)
+        , _materials()
+        , _models(_ubo, _materials, _contentManager)
         , _fonts(_contentManager, fontsPreload)
         , _labels(_fonts)
         , _sprites(_textures)
         , _2dProjection(1.0)
     {
         // TODO: preload textures for sprites
+
+        _materials.add(models::PbrMaterial::kMaterialKind,
+                       std::make_unique<rasterizer::materials::PbrFactory>(_textures));
    }
 
     void Rasterizer::setScreenSize(float w, float h)

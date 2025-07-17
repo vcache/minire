@@ -12,11 +12,11 @@ namespace minire::rasterizer
     // TODO: bucket drawing call to minimize program switch
 
     Models::Models(Ubo const & ubo,
-                   Textures const & textures,
+                   Materials const & materials,
                    content::Manager & contentManager)
         : _contentManager(contentManager)
         , _ubo(ubo)
-        , _textures(textures)
+        , _materials(materials)
     {}
 
     void Models::incUse(content::Id const & id)
@@ -52,16 +52,7 @@ namespace minire::rasterizer
             assert(lease);
             models::SceneModel const & sceneModel = lease->as<models::SceneModel>();
             item._model = std::make_unique<Model>(id, sceneModel, _contentManager,
-                                                  _textures, _ubo);
-            item._programKey = item._model->flags();
-
-            // ensure there is a program for a model
-            if (_programs.cend() == _programs.find(item._programKey))
-            {
-                _programs.emplace(item._programKey,
-                                  item._model->makeProgram());
-                MINIRE_INFO("Loading model program: {}", item._programKey);
-            }
+                                                  _materials, _ubo);
 
             // mark slot as initialized
             item._init = true;
@@ -90,43 +81,17 @@ namespace minire::rasterizer
 
     void Models::draw(scene::ModelRef::List & entities) const
     {
-        // sort entities by render program (to avoid frequent program switch)
-        // TODO TODO TODO: avoid sorting, just store a Model inside Program's block
-        std::sort(entities.begin(), entities.end(),
-            [this](scene::ModelRef const & a,
-                   scene::ModelRef const & b)
-            {
-                auto const & ai = _store.at(a._model);
-                auto const & bi = _store.at(b._model);
+        // TODO: group models by a material signature (to avoid frequent program switch)
 
-                assert(ai._init);
-                assert(bi._init);
-
-                return ai._programKey < bi._programKey;
-            });
-
-        // render entities
-        ProgramKey current = kEmptyProgramKey;
-        Model::Program::Sptr currentPtr;
         for(scene::ModelRef const & entity : entities)
         {
             StoreItem const & modelData = _store.at(entity._model);
 
             assert(modelData._model);
-            assert(modelData._programKey != kEmptyProgramKey);
             assert(modelData._init);
-
-            if (current != modelData._programKey)
-            {
-                current = modelData._programKey;
-                currentPtr = _programs.at(current);
-                assert(currentPtr);
-                
-                currentPtr->use();
-            }
-
             assert(entity._transform);
-            modelData._model->draw(*currentPtr, *entity._transform, entity._colorFactor);
+
+            modelData._model->draw(*entity._transform, entity._colorFactor);
         }
     }
 }

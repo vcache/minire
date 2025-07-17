@@ -28,7 +28,7 @@ namespace minire::rasterizer
         }
     }
 
-    void Ubo::bindBufferRange(opengl::Program & program) const
+    void Ubo::bindBufferRange(opengl::Program const & program) const
     {
         // TODO: harcoded "BznkDatablock"
         // TODO: "10" binding harcoded
