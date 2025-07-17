@@ -13,6 +13,7 @@
 namespace minire::opengl
 {
     // TODO: this code is a mess, refact it!
+    // TODO: maybe rename it? Like Brush or Drawable
     struct VertexBuffer
     {
         using VboMap = std::unordered_map<size_t, opengl::VBO>;

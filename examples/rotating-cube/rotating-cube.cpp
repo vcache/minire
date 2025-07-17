@@ -153,9 +153,9 @@ int main(int argc, char ** argv)
             using MapType = minire::models::TextureMap;
             inMemReader->store("cube-model", minire::models::SceneModel
             {
-                ._mesh = arguments._useGltf ? minire::models::SceneModel::Mesh{"cube.gltf", 0ULL}
-                                            : minire::models::SceneModel::Mesh{"cube.obj", std::monostate()},
-                ._material = std::make_shared<minire::models::PbrMaterial>
+                ._source = arguments._useGltf ? "cube.gltf" : "cube.obj",
+                ._meshIndex = arguments._useGltf ? 0 : minire::models::SceneModel::kNoIndex,
+                ._defaultMaterial = std::make_shared<minire::models::PbrMaterial>
                 (
                     /* albedo */ arguments._useTexture
                             ? MapType(std::in_place_type<minire::content::Id>, "uv-color.png")

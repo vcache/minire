@@ -21,25 +21,25 @@ namespace minire::rasterizer
                                                 Materials const & materials,
                                                 Ubo const & ubo)
     {
-        auto const & mesh = sceneModel._mesh;
-        auto const & material = sceneModel._material;
+        size_t const meshIndex = sceneModel._meshIndex;
+        auto const & defaultMaterial = sceneModel._defaultMaterial;
+        MINIRE_INVARIANT(defaultMaterial, "material not specified: {}", id); // TODO: shouldn't be mandatory
 
-        MINIRE_INVARIANT(material, "material not specified: {}", id);
-
-        MINIRE_INFO("Loading a model: {}", mesh._source);
-        auto lease = contentManager.borrow(mesh._source);
+        MINIRE_INFO("Loading a model: {}", sceneModel._source);
+        auto lease = contentManager.borrow(sceneModel._source);
         assert(lease);
 
         return lease->visit(utils::Overloaded
         {
-            [&id, &mesh, &material, &materials, &ubo](formats::Obj const & obj)
+            [&id, meshIndex, &defaultMaterial, &materials, &ubo]
+            (formats::Obj const & obj)
             {
-                MINIRE_INVARIANT(std::holds_alternative<std::monostate>(mesh._index),
+                MINIRE_INVARIANT(meshIndex == models::SceneModel::kNoIndex,
                                  "OBJ-mesh cannot have an index: {}", id);
 
                 models::MeshFeatures meshFeatures = utils::getMeshFeatures(obj);
-                auto matProgram = materials.build(*material, meshFeatures, ubo);
-                auto matInstance = materials.instantiate(*material, meshFeatures);
+                auto matProgram = materials.build(*defaultMaterial, meshFeatures, ubo);
+                auto matInstance = materials.instantiate(*defaultMaterial, meshFeatures);
 
                 MINIRE_INVARIANT(matProgram, "no material program for {}", id);
                 MINIRE_INVARIANT(matInstance, "no material instance for {}", id);
@@ -55,23 +55,23 @@ namespace minire::rasterizer
                                                    std::move(matInstance),
                                                    std::move(vertexBuffer));
             },
-            [&id, &mesh, &material, &materials, &ubo](formats::GltfModelSptr const & gltf)
+            [&id, meshIndex, &defaultMaterial, &materials, &ubo]
+            (formats::GltfModelSptr const & gltf)
             {
                 MINIRE_INVARIANT(gltf, "gltf pointer is empty: {}", id);
-                MINIRE_INVARIANT(std::holds_alternative<size_t>(mesh._index),
+                MINIRE_INVARIANT(meshIndex != models::SceneModel::kNoIndex,
                                  "gLTF-mesh must have an index: {}", id);
 
-                models::MeshFeatures meshFeatures = utils::getMeshFeatures(
-                    *gltf, std::get<size_t>(mesh._index));
-                auto matProgram = materials.build(*material, meshFeatures, ubo);
-                auto matInstance = materials.instantiate(*material, meshFeatures);
+                models::MeshFeatures meshFeatures = utils::getMeshFeatures(*gltf, meshIndex);
+                auto matProgram = materials.build(*defaultMaterial, meshFeatures, ubo);
+                auto matInstance = materials.instantiate(*defaultMaterial, meshFeatures);
 
                 MINIRE_INVARIANT(matProgram, "no material program for {}", id);
                 MINIRE_INVARIANT(matInstance, "no material instance for {}", id);
 
                 material::Program::Locations const & locations = matProgram->locations();
                 opengl::VertexBuffer vertexBuffer = utils::createVertexBuffer(
-                    *gltf, std::get<size_t>(mesh._index),
+                    *gltf, meshIndex,
                     locations._vertexAttribute,
                     locations._uvAttribute,
                     locations._normalAttribute,
