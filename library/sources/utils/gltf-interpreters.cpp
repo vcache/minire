@@ -2,10 +2,18 @@
 
 #include <utils/gltf-interpreters.hpp>
 
+#include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
+#include <minire/models/image.hpp>
+#include <minire/models/pbr-material.hpp>
+#include <minire/models/sampler.hpp>
+
+#include <utils/uuid.hpp>
 
 #include <initializer_list>
 #include <tuple>
+
+// TODO: set "LoadImageDataOption::preserve_channels" to avoid unnecessary components loading
 
 namespace minire::utils
 {
@@ -48,6 +56,60 @@ namespace minire::utils
                 default: MINIRE_THROW("gltf componentType isn't supported: {}", componentType);
             }
         }
+
+        class RawImage : public models::Image
+        {
+            // Should extend lifetime of a Model since _data
+            // points to the internal buffer of the Model.
+            std::shared_ptr<::tinygltf::Model const> _model;
+
+        public:
+            explicit RawImage(::tinygltf::Image const & image,
+                              std::shared_ptr<::tinygltf::Model> const & model)
+                : _model(model)
+            {
+                MINIRE_INVARIANT(image.width > 0 && image.height > 0,
+                                 "bad gLTF image size: {}x{}, {}",
+                                 image.width, image.height, image.name);
+
+                _width = image.width;
+                _height = image.height;
+
+                switch(image.component)
+                {
+                    // grey
+                    case 1:
+                        _format = Format::kGrayscale;
+                        break;
+
+                    case 2: // grey, alpha
+                        MINIRE_THROW("unsupported channels count: {}", image.component);
+
+                    case 3: // red, green, blue
+                        _format = Format::kRGB;
+                        break;
+
+                    case 4: // red, green, blue, alpha
+                        _format = Format::kRGBA;
+                        break;
+
+                    default:
+                        MINIRE_THROW("unexpected component count: {}", image.component);
+                }
+
+                MINIRE_INVARIANT(image.bits == 8, "unsupported bits for image: {}, {}",
+                                 image.bits, image.name);
+                _depth = Depth::k8;
+
+                MINIRE_INVARIANT(image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE,
+                                 "unexpected pixel_type: {}, {}", image.pixel_type, image.name);
+                _signed = false;
+
+                // have to do a const_cast, but should be safe since,
+                // not modifying operations will be performed
+                _data = const_cast<uint8_t *>(image.image.data());
+            }
+        };
 
         size_t requireAttr(::tinygltf::Mesh const & mesh,
                            ::tinygltf::Primitive const & primitive,
@@ -150,6 +212,62 @@ namespace minire::utils
                            GL_STATIC_DRAW);
             return {accessor, bufferView};
         }
+
+        void setupSampler(::tinygltf::Model const & model,
+                          ::tinygltf::Texture const & texture,
+                          models::Sampler & out)
+        {
+            if (texture.sampler >= 0)
+            {
+                size_t const samplerIndex = static_cast<size_t>(texture.sampler);
+                MINIRE_INVARIANT(samplerIndex < model.samplers.size(),
+                                 "bad sampler index: {} >= {}, {}",
+                                 samplerIndex, model.samplers.size(), texture.name);
+                ::tinygltf::Sampler const & sampler = model.samplers[samplerIndex];
+
+                if (sampler.minFilter != -1) out._minFilter = sampler.minFilter;
+                if (sampler.magFilter != -1) out._magFilter = sampler.magFilter;
+                if (sampler.wrapS != -1) out._wrapS = sampler.wrapS;
+                if (sampler.wrapT != -1) out._wrapT = sampler.wrapT;
+            }
+        }
+
+        std::pair<content::Id, ::tinygltf::Texture const *>
+        fetchTexture(std::shared_ptr<::tinygltf::Model> const & model,
+                     int index, int texCoord,
+                     content::Manager & contentManager,
+                     GltfMaterial::Leases & leases)
+        {
+            if (index >= 0)
+            {
+                assert(model);
+
+                size_t const textureIndex = static_cast<size_t>(index);
+                MINIRE_INVARIANT(texCoord == 0, "multiple TEXCOORD's isn't supported");
+                MINIRE_INVARIANT(textureIndex < model->textures.size(),
+                                 "bad texture index: {} >= {}",
+                                 textureIndex, model->textures.size());
+
+                ::tinygltf::Texture const & texture = model->textures[textureIndex];
+                MINIRE_INVARIANT(texture.source >= 0, "no source of a texture: {}", texture.name);
+                size_t const imageIndex = static_cast<size_t>(texture.source);
+                MINIRE_INVARIANT(imageIndex < model->images.size(),
+                                 "bad source index: {} >= {}, {}",
+                                 imageIndex, model->images.size(), texture.name);
+
+                ::tinygltf::Image const & image = model->images[imageIndex];
+                MINIRE_INVARIANT(!image.as_is, "Image of {} isn't preloaded: {}",
+                                 texture.name, image.name);
+
+                std::shared_ptr<models::Image> rawImage = std::make_shared<RawImage>(image, model);
+                std::string imageId = fmt::format("__minire_gltf_image_{}", newUuid());
+                auto lease = contentManager.upload(imageId, std::move(rawImage));
+                leases.emplace_back(std::move(lease));
+
+                return std::make_pair(imageId, &texture);
+            }
+            return std::make_pair(content::Id(), nullptr);
+        }
     }
 
     models::MeshFeatures getMeshFeatures(::tinygltf::Model const & model,
@@ -171,6 +289,141 @@ namespace minire::utils
         return models::MeshFeatures(primitive.attributes.contains(kTexCoord0),
                                     primitive.attributes.contains(kNormal),
                                     primitive.attributes.contains(kTangent));
+    }
+
+    GltfMaterial createMaterialModel(std::shared_ptr<::tinygltf::Model> const & model,
+                                     size_t const meshIndex,
+                                     content::Manager & contentManager)
+    {
+        assert(model);
+
+        // fetch the mesh
+
+        MINIRE_INVARIANT(meshIndex < model->meshes.size(),
+                         "mesh doesn't exist: {} >= {}", meshIndex, model->meshes.size());
+        ::tinygltf::Mesh const & mesh = model->meshes[meshIndex];
+
+        // fetch a primitive
+
+        MINIRE_INVARIANT(mesh.primitives.size() == 1,
+                         "multiple primitives are not supported: {}",
+                         mesh.name);
+        ::tinygltf::Primitive const & primitive = mesh.primitives[0];
+
+        // fetch a material
+
+        if (primitive.material < 0) return {};
+
+        size_t const materialIndex = static_cast<size_t>(primitive.material);
+        MINIRE_INVARIANT(materialIndex < model->materials.size(),
+                         "material index overflow: {} >= {}",
+                         materialIndex, model->materials.size());
+        ::tinygltf::Material const & material = model->materials[materialIndex];
+
+        MINIRE_INVARIANT(material.alphaMode == "OPAQUE",
+                         "unsupported alphaMode: \"{}\"", material.alphaMode);
+        // NOTE: alphaCutoff is ignored
+        MINIRE_INVARIANT(!material.doubleSided, "Double sided materials aren't supported");
+        MINIRE_INVARIANT(material.lods.empty(), "MSFT_lod isn't supported");
+
+        /*
+        TODO:
+            The base color texture MUST contain 8-bit values encoded with the sRGB opto-electronic
+            transfer function so RGB values MUST be decoded to real linear values before they are
+            used for any computations. To achieve correct filtering, the transfer function SHOULD
+            be decoded before performing linear interpolation.
+        */
+
+        /*
+        TODO:
+            In addition to the material properties, if a primitive specifies a vertex color using
+            the attribute semantic property COLOR_0, then this value acts as an additional linear
+            multiplier to base color.
+        */
+
+        models::PbrMaterial result;
+        GltfMaterial::Leases leases;
+
+        ::tinygltf::PbrMetallicRoughness const & pbrMr = material.pbrMetallicRoughness;
+        MINIRE_INVARIANT(pbrMr.baseColorFactor.size() == 3,
+                         "bad baseColorFactor = {}", pbrMr.baseColorFactor.size());
+        result._albedoFactor = glm::vec3{pbrMr.baseColorFactor[0],
+                                         pbrMr.baseColorFactor[1],
+                                         pbrMr.baseColorFactor[2]};
+
+        if (auto [contentId, texture] = fetchTexture(
+                model, pbrMr.baseColorTexture.index,
+                pbrMr.baseColorTexture.texCoord,
+                contentManager, leases);
+            texture)
+        {
+            assert(!contentId.empty());
+            result._albedoTexture = contentId;
+            setupSampler(*model, *texture, result._albedoSampler);
+        }
+
+        result._metallicFactor = pbrMr.metallicFactor;
+        result._roughnessFactor = pbrMr.roughnessFactor;
+
+        if (auto [contentId, texture] = fetchTexture(
+                model, pbrMr.metallicRoughnessTexture.index,
+                pbrMr.metallicRoughnessTexture.texCoord,
+                contentManager, leases);
+            texture)
+        {
+            assert(!contentId.empty());
+            result._metallicTexture = contentId;
+            result._roughnessTexture = contentId;
+            setupSampler(*model, *texture, result._metallicSampler);
+            setupSampler(*model, *texture, result._roughnessSampler);
+        }
+
+        if (auto [contentId, texture] = fetchTexture(
+                model, material.normalTexture.index,
+                material.normalTexture.texCoord,
+                contentManager, leases);
+            texture)
+        {
+            assert(!contentId.empty());
+            result._normalTexture = contentId;
+            setupSampler(*model, *texture, result._normalSampler);
+            result._normalScale = material.normalTexture.scale;
+        }
+
+        if (auto [contentId, texture] = fetchTexture(
+                model, material.occlusionTexture.index,
+                material.occlusionTexture.texCoord,
+                contentManager, leases);
+            texture)
+        {
+            assert(!contentId.empty());
+            result._aoTexture = contentId;
+            setupSampler(*model, *texture, result._aoSampler);
+            result._aoStrength = material.occlusionTexture.strength;
+        }
+
+        MINIRE_INVARIANT(material.emissiveFactor.size() == 3,
+                         "bad emissiveFactor = {}", material.emissiveFactor.size());
+        result._emissiveFactor = glm::vec3(material.emissiveFactor[0],
+                                           material.emissiveFactor[1],
+                                           material.emissiveFactor[2]);
+
+        if (auto [contentId, texture] = fetchTexture(
+                model, material.emissiveTexture.index,
+                material.emissiveTexture.texCoord,
+                contentManager, leases);
+            texture)
+        {
+            assert(!contentId.empty());
+            result._emissiveTexture = contentId;
+            setupSampler(*model, *texture, result._emissiveSampler);
+        }
+
+        return GltfMaterial
+        {
+            std::make_unique<models::PbrMaterial>(std::move(result)),
+            std::move(leases),
+        };
     }
 
     // TODO: support sparse buffers
@@ -228,13 +481,11 @@ namespace minire::utils
 
         // Vertex buffer and attributes
 
-        for(auto const & [accessorName, attribIndex] :
-            std::initializer_list<std::tuple<std::string const &, int>> {
-                {kPosition, vtxAttribIndex},
-                {kTexCoord0, uvAttribIndx},
-                {kNormal, normAttrib},
-                {kTangent, tangentAttrib}
-            })
+        using Attribs = std::initializer_list<std::tuple<std::string const &, int>>;
+        for(auto const & [accessorName, attribIndex] : Attribs {{kPosition, vtxAttribIndex},
+                                                                {kTexCoord0, uvAttribIndx},
+                                                                {kNormal, normAttrib},
+                                                                {kTangent, tangentAttrib}})
         {
             if (attribIndex == -1) continue;
 

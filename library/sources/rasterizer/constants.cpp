@@ -2,15 +2,17 @@
 
 namespace minire::rasterizer
 {
+    // NOTE: these shaders are based on https://learnopengl.com/
+
     std::string Constants::kPbrKit = R"(
 
         // PBR KIT BEGIN //
 
         const float PI = 3.14159265359;
 
-        vec3 normalMapping(mat3 tbn, vec3 normal)
+        vec3 normalMapping(mat3 tbn, vec3 normal, float scale)
         {
-            normal = normalize(normal * 2.0 - 1.0);   
+            normal = normalize((normal * 2.0 - 1.0) * vec3(scale, scale, 1.0));
             return normalize(tbn * normal);
         }
 
@@ -57,8 +59,8 @@ namespace minire::rasterizer
         vec3 pbrFragColor(const vec3 albedo,
                           const float metallic,
                           const float roughness,
-                          const float ao,
-                          const vec3 normal)
+                          const vec3 normal,
+                          const float ao)
         {
             // TODO: normal mapping
 
@@ -142,20 +144,20 @@ namespace minire::rasterizer
     std::string Constants::kPbrVertShader = R"(
         #version 330 core
 
-        layout(location = 0) in vec3 bznkVertex;
+        in vec3 bznkVertex;
 
         {% if kHasUvs %}
-        layout(location = 1) in vec2 bznkUv;
+        in vec2 bznkUv;
         out vec2 bznkFragUv;
         {% endif %}
 
         {% if kHasNormals %}
-        layout(location = 2) in vec3 bznkNormal;
+        in vec3 bznkNormal;
         out vec3 bznkFragNormal;
         {% endif %}
 
         {% if kHasTangents %}
-        layout(location = 3) in vec3 bznkTangent;
+        in vec3 bznkTangent;
         out mat3 bznkTbn;
         {% endif %}
 
@@ -215,11 +217,36 @@ namespace minire::rasterizer
 
         {{ kUboDatablock }}
 
-        {{ mkUniformDef(kAlbedoUniformType, "bznkAlbedo") }}
-        {{ mkUniformDef(kMetallicUniformType, "bznkMetallic") }}
-        {{ mkUniformDef(kRoughnessUniformType, "bznkRoughness") }}
-        {{ mkUniformDef(kAoUniformType, "bznkAo") }}
-        {{ mkUniformDef(kNormalsUniformType, "bznkNormals") }}
+        uniform vec3 bznkAlbedoFactor = vec3(1.0, 1.0, 1.0);
+        {% if kHasAlbedoTexture %}
+        uniform sampler2D bznkAlbedoTexture;
+        {% endif %}
+
+        uniform float bznkMetallicFactor = 1.0;
+        {% if kHasMetallicTexture %}
+        uniform sampler2D bznkMetallicTexture;
+        {% endif %}
+
+        uniform float bznkRoughnessFactor = 1.0;
+        {% if kHasRoughnessTexture %}
+        uniform sampler2D bznkRoughnessTexture;
+        {% endif %}
+
+        {% if kHasNormalTexture %}
+        uniform sampler2D bznkNormalTexture;
+        uniform float bznkNormalScale = 1.0;
+        {% endif %}
+
+        {% if kHasAoTexture %}
+        uniform sampler2D bznkAoTexture;
+        {% endif %}
+        uniform float bznkAoStrength = 1.0;
+
+        {% if kHasEmissiveTexture %}
+        uniform sampler2D bznkEmissiveTexture;
+        {% endif %}
+
+        uniform vec3 bznkEmissiveFactor = vec3(0.0, 0.0, 0.0);
 
         uniform float bznkColorFactor = 1.0;
 
@@ -231,25 +258,48 @@ namespace minire::rasterizer
 
         void main()
         {
-            vec3 albedo = {{ mkValueSampler(kAlbedoUniformType, "bznkAlbedo", 0) }};
-            float metallic = {{ mkValueSampler(kMetallicUniformType, "bznkMetallic", 1) }};
-            float roughness = {{ mkValueSampler(kRoughnessUniformType, "bznkRoughness", 1) }};
-            float ao = {{ mkValueSampler(kAoUniformType, "bznkAo", 1) }};
+            vec3 albedo = bznkAlbedoFactor;
+            {% if kHasAlbedoTexture %}
+            albedo *= pow(texture(bznkAlbedoTexture, bznkFragUv).rgb, vec3(2.2));
+            {% endif %}
 
-            {% if kHasNormalsUniform and kHasTangents %}
+            float metallic = bznkMetallicFactor;
+            {% if kHasMetallicTexture %}
+            metallic *= texture(bznkMetallicTexture, bznkFragUv).{{ kMetallicTexComp }};
+            {% endif %}
+
+            float roughness = bznkRoughnessFactor;
+            {% if kHasRoughnessTexture %}
+            roughness *= texture(bznkRoughnessTexture, bznkFragUv).{{ kRoughnessTexComp }};
+            {% endif %}
+
+            {% if kHasNormalTexture and kHasTangents %}
             vec3 normal = normalMapping(
                 bznkTbn,
-                {{ mkValueSampler(kNormalsUniformType, "bznkNormals", 2) }});
+                texture(bznkNormalTexture, bznkFragUv).rgb,
+                bznkNormalScale);
             {% else %}
             vec3 normal = bznkFragNormal;
+            {% endif %}
+
+            {% if kHasAoTexture %}
+            flaot sampledAo = texture(bznkAoTexture, bznkFragUv).{{ kAoTexComp }};
+            float ao = (1.0 + bznkAoStrength * (sampledAo - 1.0);
+            {% else %}
+            float ao = bznkAoStrength;
+            {% endif %}
+
+            vec3 emissiveFactor = bznkEmissiveFactor;
+            {% if kHasEmissiveTexture %}
+            emissiveFactor *= texture(bznkEmissiveTexture, bznkFragUv).rgb;
             {% endif %}
 
             bznkOutColor = pbrFragColor(albedo,
                                         metallic,
                                         roughness,
-                                        ao,
-                                        normal);
-
+                                        normal,
+                                        ao);
+            bznkOutColor += emissiveFactor;
             bznkOutColor *= bznkColorFactor;
         }
     )";

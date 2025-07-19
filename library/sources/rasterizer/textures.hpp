@@ -1,8 +1,11 @@
 #pragma once
 
 #include <minire/content/id.hpp>
+#include <minire/models/sampler.hpp>
 
 #include <opengl/texture.hpp>
+
+#include <boost/container_hash/hash.hpp> // for hash_combine
 
 #include <memory>
 #include <unordered_map>
@@ -31,6 +34,7 @@ namespace minire::rasterizer
 
             // NOTE: dont' use it directly (who knows what could happen!)
             explicit Texture(models::Image const &,
+                             models::Sampler const &,
                              bool mipmaps);
 
             void bind() const { _texture.bind(); }
@@ -48,20 +52,61 @@ namespace minire::rasterizer
         };
 
     public:
-        explicit Textures(content::Manager &);
+        explicit Textures(content::Manager & contentManager)
+            : _contentManager(contentManager)
+        {}
 
         // use this both for preload and for getting ptr
-        Texture::Sptr get(content::Id const &) const;
+        Texture::Sptr get(content::Id const & id,
+                          models::Sampler const & sampler = {}) const
+        {
+            return get(_contentManager, id, sampler, _cache, true);
+        }
 
-        Texture::Sptr getNoMipmap(content::Id const &) const;
+        Texture::Sptr get(content::MaybeId const & id,
+                          models::Sampler const & sampler = {}) const
+        {
+            return id ? get(*id, sampler) : Texture::Sptr();
+        }
+
+        Texture::Sptr getNoMipmap(content::Id const & id,
+                                  models::Sampler const & sampler = {}) const
+        {
+            return get(_contentManager, id, sampler, _cacheNoMipmap, false);
+        }
+
+        Texture::Sptr getNoMipmap(content::MaybeId const & id,
+                                  models::Sampler const & sampler = {}) const
+        {
+            return id ? get(*id, sampler) : Texture::Sptr();
+        }
 
     private:
-        using Cache = std::unordered_map<content::Id, Texture::Sptr>;
+        using Key = std::pair<content::Id, models::Sampler>;
+
+        struct KeyHash
+        {
+            bool operator()(Key const & key) const
+            {
+                size_t result = 0x786435AB37C0E1EEULL;
+                boost::hash_combine(result, std::hash<content::Id>{}(key.first));
+                boost::hash_combine(result, std::hash<int>{}(key.second._minFilter));
+                boost::hash_combine(result, std::hash<int>{}(key.second._magFilter));
+                boost::hash_combine(result, std::hash<int>{}(key.second._wrapS));
+                boost::hash_combine(result, std::hash<int>{}(key.second._wrapT));
+                return result;
+            }
+        };
+
+        using Cache = std::unordered_map<Key, Texture::Sptr, KeyHash>;
 
         static Texture::Sptr get(content::Manager &,
                                  content::Id const &,
+                                 models::Sampler const &,
                                  Cache &,
                                  bool mipmaps);
+
+        // TODO: move mipmap into Sampler and merge _cache w/ _cacheNoMipmap
 
     private:
         content::Manager       & _contentManager;

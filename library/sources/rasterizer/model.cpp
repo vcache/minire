@@ -23,7 +23,6 @@ namespace minire::rasterizer
     {
         size_t const meshIndex = sceneModel._meshIndex;
         auto const & defaultMaterial = sceneModel._defaultMaterial;
-        MINIRE_INVARIANT(defaultMaterial, "material not specified: {}", id); // TODO: shouldn't be mandatory
 
         MINIRE_INFO("Loading a model: {}", sceneModel._source);
         auto lease = contentManager.borrow(sceneModel._source);
@@ -34,10 +33,11 @@ namespace minire::rasterizer
             [&id, meshIndex, &defaultMaterial, &materials, &ubo]
             (formats::Obj const & obj)
             {
+                MINIRE_INVARIANT(defaultMaterial, "material not specified: {}", id);
                 MINIRE_INVARIANT(meshIndex == models::SceneModel::kNoIndex,
                                  "OBJ-mesh cannot have an index: {}", id);
-
                 models::MeshFeatures meshFeatures = utils::getMeshFeatures(obj);
+
                 auto matProgram = materials.build(*defaultMaterial, meshFeatures, ubo);
                 auto matInstance = materials.instantiate(*defaultMaterial, meshFeatures);
 
@@ -55,7 +55,7 @@ namespace minire::rasterizer
                                                    std::move(matInstance),
                                                    std::move(vertexBuffer));
             },
-            [&id, meshIndex, &defaultMaterial, &materials, &ubo]
+            [&id, meshIndex, &defaultMaterial, &materials, &ubo, &contentManager]
             (formats::GltfModelSptr const & gltf)
             {
                 MINIRE_INVARIANT(gltf, "gltf pointer is empty: {}", id);
@@ -63,8 +63,18 @@ namespace minire::rasterizer
                                  "gLTF-mesh must have an index: {}", id);
 
                 models::MeshFeatures meshFeatures = utils::getMeshFeatures(*gltf, meshIndex);
-                auto matProgram = materials.build(*defaultMaterial, meshFeatures, ubo);
-                auto matInstance = materials.instantiate(*defaultMaterial, meshFeatures);
+                utils::GltfMaterial gltfMaterial = utils::createMaterialModel(gltf, meshIndex,
+                                                                              contentManager);
+
+                MINIRE_INVARIANT(gltfMaterial._materialModel || defaultMaterial,
+                                 "no material specified: {}", id);
+                material::Model const & effectiveMaterial =
+                    gltfMaterial._materialModel ? *gltfMaterial._materialModel
+                                                : *defaultMaterial;
+
+                auto matProgram = materials.build(effectiveMaterial, meshFeatures, ubo);
+                auto matInstance = materials.instantiate(effectiveMaterial, meshFeatures);
+                gltfMaterial._textureLeases.clear(); // Not needed after the instantiate()
 
                 MINIRE_INVARIANT(matProgram, "no material program for {}", id);
                 MINIRE_INVARIANT(matInstance, "no material instance for {}", id);

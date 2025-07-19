@@ -149,22 +149,25 @@ int main(int argc, char ** argv)
         minire::content::Manager manager;
         {
             auto inMemReader = std::make_unique<minire::content::readers::InMemory>();
-
-            using MapType = minire::models::TextureMap;
             inMemReader->store("cube-model", minire::models::SceneModel
             {
                 ._source = arguments._useGltf ? "cube.gltf" : "cube.obj",
                 ._meshIndex = arguments._useGltf ? 0 : minire::models::SceneModel::kNoIndex,
-                ._defaultMaterial = std::make_shared<minire::models::PbrMaterial>
-                (
-                    /* albedo */ arguments._useTexture
-                            ? MapType(std::in_place_type<minire::content::Id>, "uv-color.png")
-                            : MapType(std::in_place_type<glm::vec3>, 1.0, 0.0, 0.0),
-                    /* metallic */ 0.5f,
-                    /* roughnesss */ 0.6f,
-                    /* ao */ 1.0f,
-                    /* normals */ std::monostate()
-                )
+                ._defaultMaterial = [&arguments]
+                {
+                    auto result = std::make_shared<minire::models::PbrMaterial>();
+                    if (arguments._useTexture)
+                    {
+                        result->_albedoTexture =  "uv-color.png";
+                    }
+                    else
+                    {
+                        result->_albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f);
+                    }
+                    result->_metallicFactor = 0.5f;
+                    result->_roughnessFactor = 0.6f;
+                    return result;
+                }(),
             });
 
             manager.setReader<minire::content::readers::Chained>()

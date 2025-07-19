@@ -56,6 +56,10 @@ namespace minire::content
 
         std::unique_ptr<Lease> borrow(Id const &);
 
+    public:
+        // TODO: add "shadow" flag into a Store key to avoid Id's namespace cluttering
+        std::unique_ptr<Lease> upload(Id const &, Asset);
+
     private:
         void incUsage(Store::iterator it) noexcept;
 
@@ -146,6 +150,12 @@ namespace minire::content
 
 namespace minire::content::readers
 {
+    /**
+     * NOTE: Note a difference with a Manager::upload():
+     *       an InMemory store is a persistent store while
+     *       assets uploaded through the Manager::upload()
+     *       might be garbage collected and purged.
+     * */
     class InMemory : public Reader
     {
     public:
@@ -162,6 +172,8 @@ namespace minire::content::readers
         std::unordered_map<content::Id, content::Asset> _store;
     };
 }
+
+// TODO: class Generator: public Reader
 
 namespace minire::content::readers
 {

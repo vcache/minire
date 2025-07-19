@@ -10,7 +10,6 @@
 
 #include <optional>
 #include <utility>
-#include <variant>
 
 namespace minire::rasterizer::materials
 {
@@ -20,24 +19,33 @@ namespace minire::rasterizer::materials
         explicit PbrInstance(models::PbrMaterial const &,
                              Textures const & textures);
 
-        using UniformData = std::variant<std::monostate,
-                                         float,
-                                         glm::vec3,
-                                         Textures::Texture::Sptr>;
+        static void setUniform(float, opengl::Program const &,
+                               GLint location);
 
-        static UniformData makeUniform(Textures const & textures,
-                                       models::TextureMap const & textureMap);
+        static void setUniform(glm::vec3 const &, opengl::Program const &,
+                               GLint location);
 
-        static GLint setUniform(UniformData const &,
-                                opengl::Program const &,
-                                GLint location,
-                                GLint texUnit);
+        static GLint setUniform(Textures::Texture::Sptr const & uniformData,
+                                opengl::Program const & glProgram,
+                                GLint location, GLint texUnit);
 
-        UniformData _albedo;
-        UniformData _metallic;
-        UniformData _roughness;
-        UniformData _ao;
-        UniformData _normals;
+        glm::vec3               _albedoFactor;
+        Textures::Texture::Sptr _albedoTexture;
+
+        float                   _metallicFactor;
+        Textures::Texture::Sptr _metallicTexture;
+
+        float                   _roughnessFactor;
+        Textures::Texture::Sptr _roughnessTexture;
+
+        Textures::Texture::Sptr _normalTexture;
+        float                   _normalScale;
+
+        Textures::Texture::Sptr _aoTexture;
+        float                   _aoStrength;
+
+        Textures::Texture::Sptr _emissiveTexture;
+        glm::vec3               _emissiveFactor;
 
         friend class PbrProgram;
         friend class PbrFactory;
@@ -63,16 +71,30 @@ namespace minire::rasterizer::materials
     private:
         opengl::Program _program;
 
-        GLint _albedoUniformLocation = -1;
-        GLint _metallicUniformLocation = -1;
-        GLint _roughnessUniformLocation = -1;
-        GLint _aoUniformLocation = -1;
-        GLint _normalsUniformLocation = -1;
+        // Uniform locations
 
-        GLint _positionAttrLocation = -1;
-        GLint _uvAttrLocation = -1;
-        GLint _normalAttrLocation = -1;
-        GLint _tangentAttrLocation = -1;
+        GLint _albedoFactor = -1;
+        GLint _albedoTexture = -1;
+
+        GLint _metallicFactor = -1;
+        GLint _metallicTexture = -1;
+
+        GLint _roughnessFactor = -1;
+        GLint _roughnessTexture = -1;
+
+        GLint _normalTexture = -1;
+        GLint _normalScale = -1;
+
+        GLint _aoTexture = -1;
+        GLint _aoStrength = -1;
+
+        GLint _emissiveTexture = -1;
+        GLint _emissiveFactor = -1;
+
+        GLint _positionAttribute = -1;
+        GLint _uvAttribute = -1;
+        GLint _normalAttribute = -1;
+        GLint _tangentAttribute = -1;
 
         GLint _modelUniformLocation = -1;
         GLint _colorFactorUniformLocation = -1;
@@ -94,8 +116,6 @@ namespace minire::rasterizer::materials
 
         std::string signature(material::Model const &,
                               models::MeshFeatures const &) const override;
-    private:
-        static std::string signature(models::TextureMap const & textureMap);
 
     private:
         Textures const & _textures;

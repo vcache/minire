@@ -88,6 +88,13 @@ namespace minire::content
         return std::unique_ptr<Lease>(new Lease(it, *this));
     }
 
+    std::unique_ptr<Lease> Manager::upload(Id const & id, Asset asset)
+    {
+        auto [it, inserted] = _store.emplace(id, AssetBlock{std::move(asset), 0, sizeOf(asset)});
+        MINIRE_INVARIANT(inserted, "failed to upload raw asset: {}", id);
+        return std::unique_ptr<Lease>(new Lease(it, *this));
+    }
+
     void Manager::cleanup()
     {
         if (0 == _sizeLimit) return;

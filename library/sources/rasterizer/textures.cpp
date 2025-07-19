@@ -21,6 +21,7 @@ namespace minire::rasterizer
     }
 
     Textures::Texture::Texture(models::Image const & image,
+                               models::Sampler const & sampler,
                                bool const mipmaps)
         : _texture(GL_TEXTURE_2D) // TODO: maybe GL_TEXTURE_2D_ARRAY will be more efficient
     {
@@ -52,46 +53,34 @@ namespace minire::rasterizer
         }
 
         // texture parameters
-        _texture.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        _texture.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        _texture.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        _texture.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-
-    Textures::Textures(content::Manager & contentManager)
-        : _contentManager(contentManager)
-    {}
-
-    Textures::Texture::Sptr
-    Textures::get(content::Id const & id) const
-    {
-        return get(_contentManager, id, _cache, true);
-    }
-
-    Textures::Texture::Sptr
-    Textures::getNoMipmap(content::Id const & id) const
-    {
-        return get(_contentManager, id, _cacheNoMipmap, false);
+        _texture.parameteri(GL_TEXTURE_MIN_FILTER, sampler._minFilter);
+        _texture.parameteri(GL_TEXTURE_MAG_FILTER, sampler._magFilter);
+        _texture.parameteri(GL_TEXTURE_WRAP_S, sampler._wrapS);
+        _texture.parameteri(GL_TEXTURE_WRAP_T, sampler._wrapT);
     }
 
     Textures::Texture::Sptr
     Textures::get(content::Manager & contentManager,
                   content::Id const & id,
+                  models::Sampler const & sampler,
                   Cache & cache,
                   bool mipmaps)
     {
-        auto it = cache.find(id);
+        Key key(id, sampler);
+
+        auto it = cache.find(key);
         if (it == cache.cend())
         {
             auto lease = contentManager.borrow(id);
             assert(lease);
             models::Image::Sptr image = lease->as<models::Image::Sptr>();
             MINIRE_INVARIANT(image, "no valid image inside an asset: {}", id);
-            auto texture = std::make_shared<Texture>(*image, mipmaps);
-            auto [newIt, inserted]  = cache.emplace(id, texture);
+            auto texture = std::make_shared<Texture>(*image, sampler, mipmaps);
+            auto [newIt, inserted]  = cache.emplace(key, texture);
             MINIRE_INVARIANT(inserted, "failed to cache a texture");
             it = newIt;
         }
+
         return it->second;
     }
 }
