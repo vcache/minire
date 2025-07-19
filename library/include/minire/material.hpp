@@ -10,6 +10,11 @@
 namespace minire::opengl { class Program; }
 namespace minire::models { class MeshFeatures; };
 
+// TODO: this abstraction is pretty shitty actually,
+//       because it cannot be implemented w/o access
+//       to opengl/vulkan low level calls (or their wrappers).
+//       So, this abstraction is pretty initial and will be altered.
+
 namespace minire::material
 {
     /**
@@ -87,7 +92,10 @@ namespace minire::material
         virtual ~Factory() = default;
 
         virtual Program::Sptr build(Model const &, models::MeshFeatures const &) const = 0;
+
+        // TODO: why not Sptr?
         virtual Instance::Uptr instantiate(Model const &, models::MeshFeatures const &) const = 0;
+
         virtual std::string signature(Model const &, models::MeshFeatures const &) const = 0;
     };
 }

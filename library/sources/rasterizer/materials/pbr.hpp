@@ -64,12 +64,15 @@ namespace minire::rasterizer::materials
 
     public:
         // TODO: make this guy private (but keep compatibility with std::make_shared)
-        explicit PbrProgram(opengl::Program && program)
-            :  _program(std::move(program))
+        explicit PbrProgram(opengl::Program && program,
+                            std::string signature)
+            : _program(std::move(program))
+            , _signature(signature)
         {}
 
     private:
-        opengl::Program _program;
+        opengl::Program   _program;
+        std::string const _signature;
 
         // Uniform locations
 

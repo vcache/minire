@@ -2,10 +2,9 @@
 
 #include <minire/content/id.hpp>
 #include <minire/models/sampler.hpp>
+#include <minire/utils/std-pair-hash.hpp>
 
 #include <opengl/texture.hpp>
-
-#include <boost/container_hash/hash.hpp> // for hash_combine
 
 #include <memory>
 #include <unordered_map>
@@ -83,22 +82,7 @@ namespace minire::rasterizer
 
     private:
         using Key = std::pair<content::Id, models::Sampler>;
-
-        struct KeyHash
-        {
-            bool operator()(Key const & key) const
-            {
-                size_t result = 0x786435AB37C0E1EEULL;
-                boost::hash_combine(result, std::hash<content::Id>{}(key.first));
-                boost::hash_combine(result, std::hash<int>{}(key.second._minFilter));
-                boost::hash_combine(result, std::hash<int>{}(key.second._magFilter));
-                boost::hash_combine(result, std::hash<int>{}(key.second._wrapS));
-                boost::hash_combine(result, std::hash<int>{}(key.second._wrapT));
-                return result;
-            }
-        };
-
-        using Cache = std::unordered_map<Key, Texture::Sptr, KeyHash>;
+        using Cache = std::unordered_map<Key, Texture::Sptr>;
 
         static Texture::Sptr get(content::Manager &,
                                  content::Id const &,

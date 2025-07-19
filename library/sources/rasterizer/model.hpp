@@ -38,40 +38,29 @@ namespace minire::rasterizer
         utils::Aabb const & aabb() const { return _aabb; }
 
     private:
-        struct Primitive
+        struct Material
         {
-            using Uptr = std::unique_ptr<Primitive>;
-
             material::Program::Sptr  _matProgram;
             material::Instance::Uptr _matInstance;
-            opengl::VertexBuffer     _buffers;
+            std::vector<size_t>      _primitives;
+        };
 
-            explicit Primitive(material::Program::Sptr && matProgram,
-                               material::Instance::Uptr && matInstance,
-                               opengl::VertexBuffer && buffers)
-                : _matProgram(std::move(matProgram))
-                , _matInstance(std::move(matInstance))
-                , _buffers(std::move(buffers))
-            {}
+        struct Primitive
+        {
+            opengl::VertexBuffer _buffer;
         };
 
     private:
-        static Primitive::Uptr loadPrimitive(content::Id const & id,
-                                             models::SceneModel const & sceneModel,
-                                             content::Manager & contentManager,
-                                             Materials const & materials,
-                                             Ubo const & ubo);
-
-        static std::vector<Primitive::Uptr>
-        loadPrimitives(content::Id const & id,
-                       models::SceneModel const & sceneModel,
-                       content::Manager & contentManager,
-                       Materials const & materials,
-                       Ubo const & ubo);
+        void loadPrimitives(content::Id const & id,
+                            models::SceneModel const & sceneModel,
+                            content::Manager & contentManager,
+                            Materials const & materials,
+                            Ubo const & ubo);
 
     private:
-        std::vector<Primitive::Uptr> _primitives;
-        utils::Aabb const            _aabb;
+        std::vector<Material>  _materials;
+        std::vector<Primitive> _primitives;
+        utils::Aabb            _aabb;
 
         friend class Models;
     };

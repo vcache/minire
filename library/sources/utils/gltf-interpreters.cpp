@@ -10,6 +10,7 @@
 
 #include <utils/uuid.hpp>
 
+#include <algorithm>
 #include <initializer_list>
 #include <tuple>
 
@@ -232,11 +233,19 @@ namespace minire::utils
             }
         }
 
+        struct MaterialData
+        {
+            using Leases = std::vector<std::unique_ptr<content::Lease>>;
+
+            material::Model::Uptr _materialModel;
+            Leases                _textureLeases;
+        };
+
         std::pair<content::Id, ::tinygltf::Texture const *>
         fetchTexture(std::shared_ptr<::tinygltf::Model> const & model,
                      int index, int texCoord,
                      content::Manager & contentManager,
-                     GltfMaterial::Leases & leases)
+                     MaterialData::Leases & leases)
         {
             if (index >= 0)
             {
@@ -268,32 +277,195 @@ namespace minire::utils
             }
             return std::make_pair(content::Id(), nullptr);
         }
+
+        MaterialData createMaterialModel(std::shared_ptr<::tinygltf::Model> const & model,
+                                         ::tinygltf::Material const & material,
+                                         content::Manager & contentManager)
+        {
+            assert(model);
+
+            MINIRE_INVARIANT(material.alphaMode == "OPAQUE",
+                             "unsupported alphaMode: \"{}\"", material.alphaMode);
+            // NOTE: alphaCutoff is ignored
+            MINIRE_INVARIANT(!material.doubleSided, "Double sided materials aren't supported");
+            MINIRE_INVARIANT(material.lods.empty(), "MSFT_lod isn't supported");
+
+            /*
+            TODO:
+                The base color texture MUST contain 8-bit values encoded with the sRGB opto-electronic
+                transfer function so RGB values MUST be decoded to real linear values before they are
+                used for any computations. To achieve correct filtering, the transfer function SHOULD
+                be decoded before performing linear interpolation.
+            */
+
+            /*
+            TODO:
+                In addition to the material properties, if a primitive specifies a vertex color using
+                the attribute semantic property COLOR_0, then this value acts as an additional linear
+                multiplier to base color.
+            */
+
+            models::PbrMaterial result;
+            MaterialData::Leases leases;
+
+            ::tinygltf::PbrMetallicRoughness const & pbrMr = material.pbrMetallicRoughness;
+            MINIRE_INVARIANT(pbrMr.baseColorFactor.size() == 3,
+                             "bad baseColorFactor = {}", pbrMr.baseColorFactor.size());
+            result._albedoFactor = glm::vec3{pbrMr.baseColorFactor[0],
+                                             pbrMr.baseColorFactor[1],
+                                             pbrMr.baseColorFactor[2]};
+
+            if (auto [contentId, texture] = fetchTexture(
+                    model, pbrMr.baseColorTexture.index,
+                    pbrMr.baseColorTexture.texCoord,
+                    contentManager, leases);
+                texture)
+            {
+                assert(!contentId.empty());
+                result._albedoTexture = contentId;
+                setupSampler(*model, *texture, result._albedoSampler);
+            }
+
+            result._metallicFactor = pbrMr.metallicFactor;
+            result._roughnessFactor = pbrMr.roughnessFactor;
+
+            if (auto [contentId, texture] = fetchTexture(
+                    model, pbrMr.metallicRoughnessTexture.index,
+                    pbrMr.metallicRoughnessTexture.texCoord,
+                    contentManager, leases);
+                texture)
+            {
+                assert(!contentId.empty());
+                result._metallicTexture = contentId;
+                result._roughnessTexture = contentId;
+                setupSampler(*model, *texture, result._metallicSampler);
+                setupSampler(*model, *texture, result._roughnessSampler);
+            }
+
+            if (auto [contentId, texture] = fetchTexture(
+                    model, material.normalTexture.index,
+                    material.normalTexture.texCoord,
+                    contentManager, leases);
+                texture)
+            {
+                assert(!contentId.empty());
+                result._normalTexture = contentId;
+                setupSampler(*model, *texture, result._normalSampler);
+                result._normalScale = material.normalTexture.scale;
+            }
+
+            if (auto [contentId, texture] = fetchTexture(
+                    model, material.occlusionTexture.index,
+                    material.occlusionTexture.texCoord,
+                    contentManager, leases);
+                texture)
+            {
+                assert(!contentId.empty());
+                result._aoTexture = contentId;
+                setupSampler(*model, *texture, result._aoSampler);
+                result._aoStrength = material.occlusionTexture.strength;
+            }
+
+            MINIRE_INVARIANT(material.emissiveFactor.size() == 3,
+                             "bad emissiveFactor = {}", material.emissiveFactor.size());
+            result._emissiveFactor = glm::vec3(material.emissiveFactor[0],
+                                               material.emissiveFactor[1],
+                                               material.emissiveFactor[2]);
+
+            if (auto [contentId, texture] = fetchTexture(
+                    model, material.emissiveTexture.index,
+                    material.emissiveTexture.texCoord,
+                    contentManager, leases);
+                texture)
+            {
+                assert(!contentId.empty());
+                result._emissiveTexture = contentId;
+                setupSampler(*model, *texture, result._emissiveSampler);
+            }
+
+            return MaterialData
+            {
+                std::make_unique<models::PbrMaterial>(std::move(result)),
+                std::move(leases),
+            };
+        }
+
+        // TODO: support sparse buffers
+        // TODO: see glDrawArrays, glDrawRangeElements, glMultiDrawElements, or glMultiDrawArrays
+        //       for cases w/o indeces and multiple primitives
+        // TODO: Client implementations SHOULD support at least two texture coordinate sets, ...
+        // TODO: When normals are not specified, client implementations MUST calculate flat normals and
+        //       the provided tangents (if present) MUST be ignored.
+        // TODO: When tangents are not specified, client implementations SHOULD calculate tangents using
+        //       default MikkTSpace algorithms with the specified vertex positions, normals, and texture
+        //       coordinates associated with the normal texture.
+        // TODO: don't load texture automatically, since they might be controller via content::Manger
+        opengl::VertexBuffer createVertexBuffer(::tinygltf::Model const & model,
+                                                ::tinygltf::Mesh const & mesh,
+                                                ::tinygltf::Primitive const & primitive,
+                                                int vtxAttribIndex,
+                                                int uvAttribIndx,
+                                                int normAttrib,
+                                                int tangentAttrib)
+        {
+            opengl::VertexBuffer result;
+
+            // Elements buffer
+
+            {
+                // TODO: When indices property is not defined, the number of vertex indices to render is
+                //       defined by count of attribute accessors
+                MINIRE_INVARIANT(primitive.indices >= 0, "indices are not specified: {}", mesh.name);
+                auto const & [accessor, _] = createVbo(model, static_cast<size_t>(primitive.indices),
+                                                       GL_ELEMENT_ARRAY_BUFFER, result);
+
+                MINIRE_INVARIANT(TINYGLTF_TYPE_SCALAR == accessor.type,
+                                 "indices are not scalar: {}, {}", accessor.type, mesh.name);
+
+                MINIRE_INVARIANT(0 == accessor.byteOffset,
+                                 "byteOffset of indices's accessor isn't zero: {}, {}",
+                                 accessor.byteOffset, mesh.name);
+
+                result._elementsCount = accessor.count;
+                result._elementsType = gltfComponentTypeToGlType(accessor.componentType);
+            }
+
+            // Vertex buffer and attributes
+
+            using Attribs = std::initializer_list<std::tuple<std::string const &, int>>;
+            for(auto const & [accessorName, attribIndex] : Attribs {{kPosition, vtxAttribIndex},
+                                                                    {kTexCoord0, uvAttribIndx},
+                                                                    {kNormal, normAttrib},
+                                                                    {kTangent, tangentAttrib}})
+            {
+                if (attribIndex == -1) continue;
+
+                size_t const accessorIndex = requireAttr(mesh, primitive, accessorName);
+                auto const & [accessor, bufferView] = createVbo(model, accessorIndex, GL_ARRAY_BUFFER, result);
+
+                if (accessorName == kPosition)
+                {
+                    result._aabb = calcAabb(accessor, mesh.name);
+                }
+
+                result._vao->enableAttrib(attribIndex);
+                result._vao->attribPointer(attribIndex,
+                                           ::tinygltf::GetNumComponentsInType(accessor.type),
+                                           gltfComponentTypeToGlType(accessor.componentType),
+                                           accessor.normalized ? GL_TRUE : GL_FALSE,
+                                           bufferView.byteStride, accessor.byteOffset);
+            }
+
+            result._drawMode = gltfModeToGlMode(primitive.mode);
+
+            return result;
+        }
     }
 
-    models::MeshFeatures getMeshFeatures(::tinygltf::Model const & model,
-                                         size_t const meshIndex)
-    {
-        // fetch the mesh
+    // Publicly visible functions
 
-        MINIRE_INVARIANT(meshIndex < model.meshes.size(),
-                         "mesh doesn't exist: {} >= {}", meshIndex, model.meshes.size());
-        ::tinygltf::Mesh const & mesh = model.meshes[meshIndex];
-
-        // fetch a primitive
-
-        MINIRE_INVARIANT(mesh.primitives.size() == 1,
-                         "multiple primitives are not supported: {}",
-                         mesh.name);
-        ::tinygltf::Primitive const & primitive = mesh.primitives[0];
-
-        return models::MeshFeatures(primitive.attributes.contains(kTexCoord0),
-                                    primitive.attributes.contains(kNormal),
-                                    primitive.attributes.contains(kTangent));
-    }
-
-    GltfMaterial createMaterialModel(std::shared_ptr<::tinygltf::Model> const & model,
-                                     size_t const meshIndex,
-                                     content::Manager & contentManager)
+    GltfMeshFeatures prefetchGltfFeatures(std::shared_ptr<::tinygltf::Model> const & model,
+                                         size_t const meshIndex, content::Manager & contentManager)
     {
         assert(model);
 
@@ -303,209 +475,75 @@ namespace minire::utils
                          "mesh doesn't exist: {} >= {}", meshIndex, model->meshes.size());
         ::tinygltf::Mesh const & mesh = model->meshes[meshIndex];
 
-        // fetch a primitive
+        // init resulting structure
 
-        MINIRE_INVARIANT(mesh.primitives.size() == 1,
-                         "multiple primitives are not supported: {}",
-                         mesh.name);
-        ::tinygltf::Primitive const & primitive = mesh.primitives[0];
+        GltfMeshFeatures result;
+        result._materialModels.resize(model->materials.size());
+        result._primitives.reserve(mesh.primitives.size());
+        result._textureLeases.reserve(model->materials.size() * 6);
 
-        // fetch a material
+        // iterate primitives
 
-        if (primitive.material < 0) return {};
-
-        size_t const materialIndex = static_cast<size_t>(primitive.material);
-        MINIRE_INVARIANT(materialIndex < model->materials.size(),
-                         "material index overflow: {} >= {}",
-                         materialIndex, model->materials.size());
-        ::tinygltf::Material const & material = model->materials[materialIndex];
-
-        MINIRE_INVARIANT(material.alphaMode == "OPAQUE",
-                         "unsupported alphaMode: \"{}\"", material.alphaMode);
-        // NOTE: alphaCutoff is ignored
-        MINIRE_INVARIANT(!material.doubleSided, "Double sided materials aren't supported");
-        MINIRE_INVARIANT(material.lods.empty(), "MSFT_lod isn't supported");
-
-        /*
-        TODO:
-            The base color texture MUST contain 8-bit values encoded with the sRGB opto-electronic
-            transfer function so RGB values MUST be decoded to real linear values before they are
-            used for any computations. To achieve correct filtering, the transfer function SHOULD
-            be decoded before performing linear interpolation.
-        */
-
-        /*
-        TODO:
-            In addition to the material properties, if a primitive specifies a vertex color using
-            the attribute semantic property COLOR_0, then this value acts as an additional linear
-            multiplier to base color.
-        */
-
-        models::PbrMaterial result;
-        GltfMaterial::Leases leases;
-
-        ::tinygltf::PbrMetallicRoughness const & pbrMr = material.pbrMetallicRoughness;
-        MINIRE_INVARIANT(pbrMr.baseColorFactor.size() == 3,
-                         "bad baseColorFactor = {}", pbrMr.baseColorFactor.size());
-        result._albedoFactor = glm::vec3{pbrMr.baseColorFactor[0],
-                                         pbrMr.baseColorFactor[1],
-                                         pbrMr.baseColorFactor[2]};
-
-        if (auto [contentId, texture] = fetchTexture(
-                model, pbrMr.baseColorTexture.index,
-                pbrMr.baseColorTexture.texCoord,
-                contentManager, leases);
-            texture)
+        for(size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
         {
-            assert(!contentId.empty());
-            result._albedoTexture = contentId;
-            setupSampler(*model, *texture, result._albedoSampler);
+            ::tinygltf::Primitive const & primitive = mesh.primitives[primitiveIndex];
+
+            models::MeshFeatures meshFeatures(primitive.attributes.contains(kTexCoord0),
+                                              primitive.attributes.contains(kNormal),
+                                              primitive.attributes.contains(kTangent));
+
+            bool const hasMaterial = primitive.material >= 0;
+            size_t materialIndex = hasMaterial ? static_cast<size_t>(primitive.material)
+                                               : GltfMeshFeatures::kNoIndex;
+            result._primitives.emplace_back(GltfMeshFeatures::Primitive{meshFeatures, materialIndex});
+
+            MINIRE_INVARIANT(!hasMaterial || materialIndex < result._materialModels.size(),
+                             "bad material index: {} >= {}",
+                             materialIndex, result._materialModels.size());
+            assert(result._materialModels.size() == model->materials.size());
+            if (hasMaterial && !result._materialModels[materialIndex])
+            {
+                ::tinygltf::Material const & material = model->materials[materialIndex];
+                MaterialData materialData = createMaterialModel(model, material, contentManager);
+                result._materialModels[materialIndex] = std::move(materialData._materialModel);
+                std::move(materialData._textureLeases.begin(),
+                          materialData._textureLeases.end(),
+                          std::back_inserter(result._textureLeases));
+            }
         }
 
-        result._metallicFactor = pbrMr.metallicFactor;
-        result._roughnessFactor = pbrMr.roughnessFactor;
-
-        if (auto [contentId, texture] = fetchTexture(
-                model, pbrMr.metallicRoughnessTexture.index,
-                pbrMr.metallicRoughnessTexture.texCoord,
-                contentManager, leases);
-            texture)
-        {
-            assert(!contentId.empty());
-            result._metallicTexture = contentId;
-            result._roughnessTexture = contentId;
-            setupSampler(*model, *texture, result._metallicSampler);
-            setupSampler(*model, *texture, result._roughnessSampler);
-        }
-
-        if (auto [contentId, texture] = fetchTexture(
-                model, material.normalTexture.index,
-                material.normalTexture.texCoord,
-                contentManager, leases);
-            texture)
-        {
-            assert(!contentId.empty());
-            result._normalTexture = contentId;
-            setupSampler(*model, *texture, result._normalSampler);
-            result._normalScale = material.normalTexture.scale;
-        }
-
-        if (auto [contentId, texture] = fetchTexture(
-                model, material.occlusionTexture.index,
-                material.occlusionTexture.texCoord,
-                contentManager, leases);
-            texture)
-        {
-            assert(!contentId.empty());
-            result._aoTexture = contentId;
-            setupSampler(*model, *texture, result._aoSampler);
-            result._aoStrength = material.occlusionTexture.strength;
-        }
-
-        MINIRE_INVARIANT(material.emissiveFactor.size() == 3,
-                         "bad emissiveFactor = {}", material.emissiveFactor.size());
-        result._emissiveFactor = glm::vec3(material.emissiveFactor[0],
-                                           material.emissiveFactor[1],
-                                           material.emissiveFactor[2]);
-
-        if (auto [contentId, texture] = fetchTexture(
-                model, material.emissiveTexture.index,
-                material.emissiveTexture.texCoord,
-                contentManager, leases);
-            texture)
-        {
-            assert(!contentId.empty());
-            result._emissiveTexture = contentId;
-            setupSampler(*model, *texture, result._emissiveSampler);
-        }
-
-        return GltfMaterial
-        {
-            std::make_unique<models::PbrMaterial>(std::move(result)),
-            std::move(leases),
-        };
+        return result;
     }
 
-    // TODO: support sparse buffers
-    // TODO: support multiple primitives
-    // TODO: see glDrawArrays, glDrawRangeElements, glMultiDrawElements, or glMultiDrawArrays
-    //       for cases w/o indeces and multiple primitives
-    // TODO: Client implementations SHOULD support at least two texture coordinate sets, ...
-    // TODO: When normals are not specified, client implementations MUST calculate flat normals and
-    //       the provided tangents (if present) MUST be ignored.
-    // TODO: When tangents are not specified, client implementations SHOULD calculate tangents using
-    //       default MikkTSpace algorithms with the specified vertex positions, normals, and texture
-    //       coordinates associated with the normal texture.
-    // TODO: don't load texture automatically, since they might be controller via content::Manger
-    opengl::VertexBuffer createVertexBuffer(::tinygltf::Model const & model,
-                                            size_t const meshIndex,
-                                            int vtxAttribIndex,
-                                            int uvAttribIndx,
-                                            int normAttrib,
-                                            int tangentAttrib)
+    std::vector<opengl::VertexBuffer>
+    createVertexBuffers(::tinygltf::Model const & model,
+                        size_t const meshIndex,
+                        std::vector<material::Program::Locations> const & locationsForPrims)
     {
-        opengl::VertexBuffer result;
-
         // fetch the mesh
 
         MINIRE_INVARIANT(meshIndex < model.meshes.size(),
                          "mesh doesn't exist: {} >= {}", meshIndex, model.meshes.size());
         ::tinygltf::Mesh const & mesh = model.meshes[meshIndex];
 
-        // fetch a primitive
+        // initialize the result
 
-        MINIRE_INVARIANT(mesh.primitives.size() == 1,
-                         "multiple primitives are not supported: {}",
-                         mesh.name);
-        ::tinygltf::Primitive const & primitive = mesh.primitives[0];
+        std::vector<opengl::VertexBuffer> result;
+        result.reserve(mesh.primitives.size());
+        assert(locationsForPrims.size() == mesh.primitives.size());
 
-        // Elements buffer
+        // iterate primitives
 
+        for(size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
         {
-            // TODO: When indices property is not defined, the number of vertex indices to render is
-            //       defined by count of attribute accessors
-            MINIRE_INVARIANT(primitive.indices >= 0, "indices are not specified: {}", mesh.name);
-            auto const & [accessor, _] = createVbo(model, static_cast<size_t>(primitive.indices),
-                                                   GL_ELEMENT_ARRAY_BUFFER, result);
-
-            MINIRE_INVARIANT(TINYGLTF_TYPE_SCALAR == accessor.type,
-                             "indices are not scalar: {}, {}", accessor.type, mesh.name);
-
-            MINIRE_INVARIANT(0 == accessor.byteOffset,
-                             "byteOffset of indices's accessor isn't zero: {}, {}",
-                             accessor.byteOffset, mesh.name);
-
-            result._elementsCount = accessor.count;
-            result._elementsType = gltfComponentTypeToGlType(accessor.componentType);
+            ::tinygltf::Primitive const & primitive = mesh.primitives[primitiveIndex];
+            material::Program::Locations const & locations = locationsForPrims[primitiveIndex];
+            result.emplace_back(createVertexBuffer(model, mesh, primitive,
+                                                   locations._vertexAttribute,
+                                                   locations._uvAttribute,
+                                                   locations._normalAttribute,
+                                                   locations._tangentAttribute));
         }
-
-        // Vertex buffer and attributes
-
-        using Attribs = std::initializer_list<std::tuple<std::string const &, int>>;
-        for(auto const & [accessorName, attribIndex] : Attribs {{kPosition, vtxAttribIndex},
-                                                                {kTexCoord0, uvAttribIndx},
-                                                                {kNormal, normAttrib},
-                                                                {kTangent, tangentAttrib}})
-        {
-            if (attribIndex == -1) continue;
-
-            size_t const accessorIndex = requireAttr(mesh, primitive, accessorName);
-            auto const & [accessor, bufferView] = createVbo(model, accessorIndex, GL_ARRAY_BUFFER, result);
-
-            if (accessorName == kPosition)
-            {
-                result._aabb = calcAabb(accessor, mesh.name);
-            }
-
-            result._vao->enableAttrib(attribIndex);
-            result._vao->attribPointer(attribIndex,
-                                       ::tinygltf::GetNumComponentsInType(accessor.type),
-                                       gltfComponentTypeToGlType(accessor.componentType),
-                                       accessor.normalized ? GL_TRUE : GL_FALSE,
-                                       bufferView.byteStride, accessor.byteOffset);
-        }
-
-        result._drawMode = gltfModeToGlMode(primitive.mode);
 
         return result;
     }

@@ -27,6 +27,7 @@ namespace minire::utils
             , _max(max)
         {}
 
+    public:
         glm::vec3 const & min() const { return _min; }
 
         glm::vec3 const & max() const { return _max; }

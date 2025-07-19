@@ -32,6 +32,29 @@ namespace minire::rasterizer::materials
             MINIRE_THROW("unexpected texture component: {}",
                          static_cast<int>(textureComponent));
         }
+
+        std::string pbrSignature(models::PbrMaterial const & pbrModel,
+                                 models::MeshFeatures const & features)
+        {
+            std::string result = models::PbrMaterial::kMaterialKind + "/";
+
+            result += features.hasUv() ? "UV/" : "";
+            result += features.hasNormal() ? "N/" : "";
+            result += features.hasTangent() ? "T/" : "";
+
+            result += pbrModel._albedoTexture ? "A:TF/" : "A:F/";
+            result += pbrModel._metallicTexture ? fmt::format("M:T{}F/", static_cast<int>(pbrModel._metallicTextureComponent))
+                                                : std::string("M:F/");
+            result += pbrModel._roughnessTexture ? fmt::format("R:T{}F/", static_cast<int>(pbrModel._roughnessTextureComonent))
+                                                 : std::string("R:F/");
+            result += pbrModel._normalTexture ? "N:T/" : "N:0/";
+            result += pbrModel._aoTexture ? fmt::format("O:T{}/", static_cast<int>(pbrModel._aoTextureComonent))
+                                          : std::string("O:0/");
+            result += pbrModel._emissiveTexture ? "E:T/" : "E:0/";
+
+            result += "!";
+            return result;
+        }
     }
 
     // PbrInstance //
@@ -188,7 +211,8 @@ namespace minire::rasterizer::materials
 
         // Collect uniforms, attribs locations and build the result
 
-        auto result = std::make_shared<PbrProgram>(std::move(program));
+        auto result = std::make_shared<PbrProgram>(std::move(program),
+                                                   pbrSignature(pbrModel, features));
 
         result->_albedoFactor = result->_program.getUniformLocation("bznkAlbedoFactor");
         result->_albedoTexture = result->_program.getUniformLocation("bznkAlbedoTexture");
@@ -230,6 +254,8 @@ namespace minire::rasterizer::materials
         // TODO: maybe it could be static cast?
         auto pbrModel = dynamic_cast<models::PbrMaterial const &>(model);
 
+        // TODO: store a singature in PbrInstance and valide it in debug mode
+
         // NOTE: have to call "operator new()" due to private ctor
         return std::unique_ptr<PbrInstance>(new PbrInstance(pbrModel, _textures));
     }
@@ -237,26 +263,7 @@ namespace minire::rasterizer::materials
     std::string PbrFactory::signature(material::Model const & model,
                                       models::MeshFeatures const & features) const
     {
-        // TODO: maybe it could be static cast?
-        auto pbrModel = dynamic_cast<models::PbrMaterial const &>(model);
-
-        std::string result = models::PbrMaterial::kMaterialKind + "/";
-
-        result += features.hasUv() ? "UV/" : "";
-        result += features.hasNormal() ? "N/" : "";
-        result += features.hasTangent() ? "T/" : "";
-
-        result += pbrModel._albedoTexture ? "A:TF/" : "A:F/";
-        result += pbrModel._metallicTexture ? fmt::format("M:T{}F/", static_cast<int>(pbrModel._metallicTextureComponent))
-                                            : std::string("M:F/");
-        result += pbrModel._roughnessTexture ? fmt::format("R:T{}F/", static_cast<int>(pbrModel._roughnessTextureComonent))
-                                             : std::string("R:F/");
-        result += pbrModel._normalTexture ? "N:T/" : "N:0/";
-        result += pbrModel._aoTexture ? fmt::format("O:T{}/", static_cast<int>(pbrModel._aoTextureComonent))
-                                      : std::string("O:0/");
-        result += pbrModel._emissiveTexture ? "E:T/" : "E:0/";
-
-        result += "!";
-        return result;
+        return pbrSignature(dynamic_cast<models::PbrMaterial const &>(model),
+                            features);
     }
 }

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional> // For std::hash
+
+#include <boost/container_hash/hash.hpp> // for hash_combine
+
 namespace minire::models
 {
     struct Sampler
@@ -17,6 +21,23 @@ namespace minire::models
                 && _magFilter == o._magFilter
                 && _wrapS == o._wrapS
                 && _wrapT == o._wrapT;
+        }
+    };
+}
+
+namespace std
+{
+    template<>
+    struct hash<::minire::models::Sampler>
+    {
+        size_t operator()(::minire::models::Sampler const & sampler) const
+        {
+            size_t result = 0x984AB3010DE4AB71ULL;
+            boost::hash_combine(result, std::hash<int>{}(sampler._minFilter));
+            boost::hash_combine(result, std::hash<int>{}(sampler._magFilter));
+            boost::hash_combine(result, std::hash<int>{}(sampler._wrapS));
+            boost::hash_combine(result, std::hash<int>{}(sampler._wrapT));
+            return result;
         }
     };
 }
