@@ -151,10 +151,8 @@ namespace minire::rasterizer
         out vec2 bznkFragUv;
         {% endif %}
 
-        {% if kHasNormals %}
         in vec3 bznkNormal;
         out vec3 bznkFragNormal;
-        {% endif %}
 
         {% if kHasTangents %}
         in vec3 bznkTangent;
@@ -176,10 +174,8 @@ namespace minire::rasterizer
             bznkFragUv = bznkUv;
             {% endif %}
 
-            {% if kHasNormals %}
             vec3 N = normalize(vec3(bznkModel * vec4(bznkNormal, 0.0)));
             bznkFragNormal = N;
-            {% endif %}
 
             {% if kHasTangents %}
             vec3 T = normalize(vec3(bznkModel * vec4(bznkTangent, 0.0)));
@@ -203,9 +199,7 @@ namespace minire::rasterizer
         in vec2 bznkFragUv;
         {% endif %}
 
-        {% if kHasNormals %}
         in vec3 bznkFragNormal;
-        {% endif %}
 
         {% if kHasTangents %}
         in mat3 bznkTbn;

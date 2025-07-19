@@ -170,10 +170,21 @@ namespace minire::rasterizer::materials
 
         // Prepare template parameters
 
+        MINIRE_INVARIANT(features.hasNormal(),
+                         "can't render models without normals");
+
+        MINIRE_INVARIANT(!pbrModel._normalTexture.has_value() || features.hasTangent(),
+                         "normal textures cannot be used without tangents");
+
+        if (features.hasTangent() && !pbrModel._normalTexture.has_value())
+        {
+            MINIRE_WARNING("a model has tangents while has no normal texture, "
+                           "which is a waste of memory");
+        }
+
         nlohmann::json vars
         {
             {"kHasUvs",              features.hasUv()},
-            {"kHasNormals",          features.hasNormal()},
             {"kHasTangents",         features.hasTangent()},
 
             {"kHasAlbedoTexture",    pbrModel._albedoTexture.has_value()},

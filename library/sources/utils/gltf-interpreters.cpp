@@ -16,6 +16,10 @@
 
 // TODO: set "LoadImageDataOption::preserve_channels" to avoid unnecessary components loading
 
+// TODO: (from spec) When tangents are not specified, client implementations SHOULD calculate
+//       tangents using default MikkTSpace algorithms with the specified vertex positions,
+//       normals, and texture coordinates associated with the normal texture.
+
 namespace minire::utils
 {
     namespace
@@ -25,7 +29,9 @@ namespace minire::utils
         constexpr static std::string kNormal = "NORMAL";
         constexpr static std::string kTangent = "TANGENT";
         constexpr static std::string kTexCoord0 = "TEXCOORD_0";
-        // TODO: TEXCOORD_n, COLOR_n, JOINTS_n, and WEIGHTS_n.
+        constexpr static std::string kTexCoord1 = "TEXCOORD_1";
+        constexpr static std::string kColor0 = "COLOR_0";
+        // TODO: JOINTS_n, and WEIGHTS_n.
 
         GLenum gltfModeToGlMode(int gltfMode)
         {
@@ -292,14 +298,6 @@ namespace minire::utils
 
             /*
             TODO:
-                The base color texture MUST contain 8-bit values encoded with the sRGB opto-electronic
-                transfer function so RGB values MUST be decoded to real linear values before they are
-                used for any computations. To achieve correct filtering, the transfer function SHOULD
-                be decoded before performing linear interpolation.
-            */
-
-            /*
-            TODO:
                 In addition to the material properties, if a primitive specifies a vertex color using
                 the attribute semantic property COLOR_0, then this value acts as an additional linear
                 multiplier to base color.
@@ -309,7 +307,7 @@ namespace minire::utils
             MaterialData::Leases leases;
 
             ::tinygltf::PbrMetallicRoughness const & pbrMr = material.pbrMetallicRoughness;
-            MINIRE_INVARIANT(pbrMr.baseColorFactor.size() == 3,
+            MINIRE_INVARIANT(pbrMr.baseColorFactor.size() >= 3,
                              "bad baseColorFactor = {}", pbrMr.baseColorFactor.size());
             result._albedoFactor = glm::vec3{pbrMr.baseColorFactor[0],
                                              pbrMr.baseColorFactor[1],
@@ -366,7 +364,7 @@ namespace minire::utils
                 result._aoStrength = material.occlusionTexture.strength;
             }
 
-            MINIRE_INVARIANT(material.emissiveFactor.size() == 3,
+            MINIRE_INVARIANT(material.emissiveFactor.size() >= 3,
                              "bad emissiveFactor = {}", material.emissiveFactor.size());
             result._emissiveFactor = glm::vec3(material.emissiveFactor[0],
                                                material.emissiveFactor[1],
@@ -390,15 +388,9 @@ namespace minire::utils
             };
         }
 
-        // TODO: support sparse buffers
         // TODO: see glDrawArrays, glDrawRangeElements, glMultiDrawElements, or glMultiDrawArrays
         //       for cases w/o indeces and multiple primitives
         // TODO: Client implementations SHOULD support at least two texture coordinate sets, ...
-        // TODO: When normals are not specified, client implementations MUST calculate flat normals and
-        //       the provided tangents (if present) MUST be ignored.
-        // TODO: When tangents are not specified, client implementations SHOULD calculate tangents using
-        //       default MikkTSpace algorithms with the specified vertex positions, normals, and texture
-        //       coordinates associated with the normal texture.
         // TODO: don't load texture automatically, since they might be controller via content::Manger
         opengl::VertexBuffer createVertexBuffer(::tinygltf::Model const & model,
                                                 ::tinygltf::Mesh const & mesh,
@@ -442,6 +434,9 @@ namespace minire::utils
 
                 size_t const accessorIndex = requireAttr(mesh, primitive, accessorName);
                 auto const & [accessor, bufferView] = createVbo(model, accessorIndex, GL_ARRAY_BUFFER, result);
+
+                MINIRE_INVARIANT(accessor.sparse.count == 0 && !accessor.sparse.isSparse,
+                                "sparse accessors aren't yet supported");
 
                 if (accessorName == kPosition)
                 {
@@ -487,6 +482,17 @@ namespace minire::utils
         for(size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
         {
             ::tinygltf::Primitive const & primitive = mesh.primitives[primitiveIndex];
+
+            // TODO: (from a gLTF spec) When normals are not specified, client implementations MUST
+            //       calculate flat normals and the provided tangents (if present) MUST be ignored.
+            MINIRE_INVARIANT(primitive.attributes.contains(kNormal),
+                             "Meshes without normals are not yet supported.");
+
+            MINIRE_INVARIANT(!primitive.attributes.contains(kTexCoord1),
+                             "the support of TEXCOORD_1 and more isn't yet implemented");
+
+            MINIRE_INVARIANT(!primitive.attributes.contains(kColor0),
+                             "the support of COLOR_* attributes aren't yet implemented");
 
             models::MeshFeatures meshFeatures(primitive.attributes.contains(kTexCoord0),
                                               primitive.attributes.contains(kNormal),

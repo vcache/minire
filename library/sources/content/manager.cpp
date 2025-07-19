@@ -201,6 +201,7 @@ namespace minire::content::readers
         else if (".gltf"  == ext)
         {
             // TODO: might not work correctly w/ separated .bin files
+            //       Implement "::tinygltf::FsCallbacks" into the Manager
             return formats::loadGltf(path);
         }
         else if (".glb"  == ext)
