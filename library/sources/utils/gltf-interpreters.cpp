@@ -193,7 +193,8 @@ namespace minire::utils
         createVbo(::tinygltf::Model const & model,
                   size_t const accessorIndex,
                   GLenum const target,
-                  opengl::VertexBuffer & result)
+                  opengl::VertexBuffer & result,
+                  bool const addAccessorOffset)
         {
             ::tinygltf::Accessor const & accessor = getAccessor(accessorIndex, model);
 
@@ -215,7 +216,8 @@ namespace minire::utils
             //static_assert(sizeof(typename ::tinygltf::Buffer::data::value_type) == 1,
             //              "data vector's size isn't equal 1 byte");
             vbo.bufferData(bufferView.byteLength,
-                           buffer.data.data() + bufferView.byteOffset,
+                           buffer.data.data() + bufferView.byteOffset +
+                                (addAccessorOffset ? accessor.byteOffset : 0),
                            GL_STATIC_DRAW);
             return {accessor, bufferView};
         }
@@ -409,14 +411,10 @@ namespace minire::utils
                 //       defined by count of attribute accessors
                 MINIRE_INVARIANT(primitive.indices >= 0, "indices are not specified: {}", mesh.name);
                 auto const & [accessor, _] = createVbo(model, static_cast<size_t>(primitive.indices),
-                                                       GL_ELEMENT_ARRAY_BUFFER, result);
+                                                       GL_ELEMENT_ARRAY_BUFFER, result, true);
 
                 MINIRE_INVARIANT(TINYGLTF_TYPE_SCALAR == accessor.type,
                                  "indices are not scalar: {}, {}", accessor.type, mesh.name);
-
-                MINIRE_INVARIANT(0 == accessor.byteOffset,
-                                 "byteOffset of indices's accessor isn't zero: {}, {}",
-                                 accessor.byteOffset, mesh.name);
 
                 result._elementsCount = accessor.count;
                 result._elementsType = gltfComponentTypeToGlType(accessor.componentType);
@@ -433,7 +431,7 @@ namespace minire::utils
                 if (attribIndex == -1) continue;
 
                 size_t const accessorIndex = requireAttr(mesh, primitive, accessorName);
-                auto const & [accessor, bufferView] = createVbo(model, accessorIndex, GL_ARRAY_BUFFER, result);
+                auto const & [accessor, bufferView] = createVbo(model, accessorIndex, GL_ARRAY_BUFFER, result, false);
 
                 MINIRE_INVARIANT(accessor.sparse.count == 0 && !accessor.sparse.isSparse,
                                 "sparse accessors aren't yet supported");

@@ -277,8 +277,8 @@ namespace minire::rasterizer
             {% endif %}
 
             {% if kHasAoTexture %}
-            flaot sampledAo = texture(bznkAoTexture, bznkFragUv).{{ kAoTexComp }};
-            float ao = (1.0 + bznkAoStrength * (sampledAo - 1.0);
+            float sampledAo = texture(bznkAoTexture, bznkFragUv).{{ kAoTexComp }};
+            float ao = (1.0 + bznkAoStrength * (sampledAo - 1.0));
             {% else %}
             float ao = bznkAoStrength;
             {% endif %}
