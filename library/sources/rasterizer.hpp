@@ -7,7 +7,7 @@
 #include <rasterizer/labels.hpp>
 #include <rasterizer/lines.hpp>
 #include <rasterizer/materials.hpp>
-#include <rasterizer/models.hpp>
+#include <rasterizer/meshes.hpp>
 #include <rasterizer/sprites.hpp>
 #include <rasterizer/textures.hpp>
 #include <rasterizer/ubo.hpp>
@@ -34,7 +34,7 @@ namespace minire
     public:
         rasterizer::Labels & labels() { return _labels; }
         rasterizer::Sprites & sprites() { return _sprites; }
-        rasterizer::Models & models() { return _models; }
+        rasterizer::Meshes & meshes() { return _meshes; }
         rasterizer::Lines & lines() { return _lines; }
 
     private:
@@ -51,7 +51,7 @@ namespace minire
         rasterizer::Lines              _lines;
         rasterizer::Textures           _textures;
         rasterizer::Materials          _materials;
-        rasterizer::Models             _models;
+        rasterizer::Meshes             _meshes;
         rasterizer::Fonts              _fonts;
         rasterizer::Labels             _labels;
         rasterizer::Sprites            _sprites;

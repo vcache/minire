@@ -21,7 +21,7 @@ namespace minire
         , _lines(_ubo)
         , _textures(_contentManager)
         , _materials()
-        , _models(_ubo, _materials, _contentManager)
+        , _meshes(_ubo, _materials, _contentManager)
         , _fonts(_contentManager, fontsPreload)
         , _labels(_fonts)
         , _sprites(_textures)
@@ -74,7 +74,7 @@ namespace minire
 
         // draw entries
         scene::ModelRef::List models = scene.cullModels(viewpoint);
-        _models.draw(models);
+        _meshes.draw(models);
     }
 
     void Rasterizer::draw2d()

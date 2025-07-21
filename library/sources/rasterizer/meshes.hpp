@@ -3,7 +3,7 @@
 #include <minire/content/id.hpp>
 #include <minire/utils/aabb.hpp>
 
-#include <rasterizer/model.hpp>
+#include <rasterizer/mesh.hpp>
 #include <scene/model.hpp>
 
 #include <limits>
@@ -19,10 +19,10 @@ namespace minire::rasterizer
     class Materials;
     class Ubo;
 
-    class Models
+    class Meshes
     {
     public:
-        explicit Models(Ubo const &,
+        explicit Meshes(Ubo const &,
                         Materials const &,
                         content::Manager &);
 
@@ -41,9 +41,9 @@ namespace minire::rasterizer
     private:
         struct StoreItem
         {
-            Model::Uptr _model;
-            int         _usage = 0;
-            bool        _init = false;
+            Mesh::Uptr _model;
+            int        _usage = 0;
+            bool       _init = false;
         };
 
         using Store = std::unordered_map<content::Id, StoreItem>;

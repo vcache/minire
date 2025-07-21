@@ -20,16 +20,16 @@ namespace minire::rasterizer
     class Materials;
     class Ubo;
 
-    class Model final
+    class Mesh final
     {
     public:
-        using Uptr = std::unique_ptr<Model>;
+        using Uptr = std::unique_ptr<Mesh>;
 
-        explicit Model(content::Id const & id,
-                       models::SceneModel const &,
-                       content::Manager &,
-                       Materials const &,
-                       Ubo const &);
+        explicit Mesh(content::Id const & id,
+                      models::SceneModel const &,
+                      content::Manager &,
+                      Materials const &,
+                      Ubo const &);
 
         // assuming that caller will "use" gl's program!
         void draw(glm::mat4 const &,
@@ -62,6 +62,6 @@ namespace minire::rasterizer
         std::vector<Primitive> _primitives;
         utils::Aabb            _aabb;
 
-        friend class Models;
+        friend class Meshes;
     };
 }

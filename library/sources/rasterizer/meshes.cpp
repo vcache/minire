@@ -1,4 +1,4 @@
-#include <rasterizer/models.hpp>
+#include <rasterizer/meshes.hpp>
 
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
@@ -11,7 +11,7 @@ namespace minire::rasterizer
 {
     // TODO: bucket drawing call to minimize program switch
 
-    Models::Models(Ubo const & ubo,
+    Meshes::Meshes(Ubo const & ubo,
                    Materials const & materials,
                    content::Manager & contentManager)
         : _contentManager(contentManager)
@@ -19,13 +19,13 @@ namespace minire::rasterizer
         , _materials(materials)
     {}
 
-    void Models::incUse(content::Id const & id)
+    void Meshes::incUse(content::Id const & id)
     {
         load(id);
         ++_store[id]._usage;
     }
     
-    void Models::decUse(content::Id const & id)
+    void Meshes::decUse(content::Id const & id)
     {
         if (!_store[id]._init)
         {
@@ -40,7 +40,7 @@ namespace minire::rasterizer
         }
     }
 
-    void Models::load(content::Id const & id)
+    void Meshes::load(content::Id const & id)
     {
         // find store item
         auto & item = _store[id];
@@ -51,8 +51,8 @@ namespace minire::rasterizer
             auto lease = _contentManager.borrow(id);
             assert(lease);
             models::SceneModel const & sceneModel = lease->as<models::SceneModel>();
-            item._model = std::make_unique<Model>(id, sceneModel, _contentManager,
-                                                  _materials, _ubo);
+            item._model = std::make_unique<Mesh>(id, sceneModel, _contentManager,
+                                                 _materials, _ubo);
 
             // mark slot as initialized
             item._init = true;
@@ -60,7 +60,7 @@ namespace minire::rasterizer
         }
     }
 
-    void Models::unload(content::Id const & id)
+    void Meshes::unload(content::Id const & id)
     {
         if (_store[id]._init)
         {
@@ -68,7 +68,7 @@ namespace minire::rasterizer
         }
     }
 
-    utils::Aabb const & Models::aabb(content::Id const & id) const
+    utils::Aabb const & Meshes::aabb(content::Id const & id) const
     {
         auto const & it = _store.find(id);
         if (it == _store.cend() || !it->second._init)
@@ -79,7 +79,7 @@ namespace minire::rasterizer
         return it->second._model->aabb();
     }
 
-    void Models::draw(scene::ModelRef::List & entities) const
+    void Meshes::draw(scene::ModelRef::List & entities) const
     {
         // TODO: group models by a material signature (to avoid frequent program switch)
 

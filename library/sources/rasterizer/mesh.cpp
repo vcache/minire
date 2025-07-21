@@ -1,4 +1,4 @@
-#include <rasterizer/model.hpp>
+#include <rasterizer/mesh.hpp>
 
 #include <minire/content/asset.hpp>
 #include <minire/content/manager.hpp>
@@ -16,7 +16,7 @@
 
 namespace minire::rasterizer
 {
-    void Model::loadPrimitives(content::Id const & id,
+    void Mesh::loadPrimitives(content::Id const & id,
                                models::SceneModel const & sceneModel,
                                content::Manager & contentManager,
                                Materials const & materials,
@@ -25,7 +25,7 @@ namespace minire::rasterizer
         size_t const meshIndex = sceneModel._meshIndex;
         auto const & defaultMaterial = sceneModel._defaultMaterial;
 
-        MINIRE_INFO("Loading a model: {}", sceneModel._source);
+        MINIRE_INFO("Loading a mesh from source: {}", sceneModel._source);
         auto lease = contentManager.borrow(sceneModel._source);
         assert(lease);
 
@@ -135,17 +135,17 @@ namespace minire::rasterizer
         });
     }
 
-    Model::Model(content::Id const & id,
-                 models::SceneModel const & sceneModel,
-                 content::Manager & contentManager,
-                 Materials const & materials,
-                 Ubo const & ubo)
+    Mesh::Mesh(content::Id const & id,
+               models::SceneModel const & sceneModel,
+               content::Manager & contentManager,
+               Materials const & materials,
+               Ubo const & ubo)
     {
         loadPrimitives(id, sceneModel, contentManager, materials, ubo);
     }
 
-    void Model::draw(glm::mat4 const & modelTransform,
-                     float const colorFactor) const
+    void Mesh::draw(glm::mat4 const & modelTransform,
+                    float const colorFactor) const
     {
         for(Material const & material : _materials)
         {
