@@ -175,6 +175,7 @@ namespace minire
 
             // TODO: rename Transformation -> Transform
 
+            Scene                & _scene;
             LerpableTransformation _localTransformation;
             glm::vec3              _globalPosition;
             glm::mat4              _globalTransformation;
@@ -185,7 +186,10 @@ namespace minire
             bool                   _childActivated = false;
             bool                   _hasGlobalTransform = false;
 
-            Node(models::Transformation, Wptr parent, bool visible);
+            Node(Scene & scene, models::Transformation,
+                 Wptr parent, bool visible);
+
+            ~Node();
 
             bool lerp(float weight, size_t epochNumber);
         };
@@ -216,5 +220,8 @@ namespace minire
         scene::Viewpoint _viewpoint;
 mutable PointLightLeaves _pointLightLeaves;
 mutable MeshLeaves       _meshLeaves;
+        size_t           _nodesEstimate = 0;
+
+        friend class Node;
     };
 }

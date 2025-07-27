@@ -18,12 +18,24 @@ namespace minire
 {
     // Node //
 
-    Scene::Node::Node(models::Transformation transformation,
-                 Wptr parent, bool visible)
-        : _localTransformation(transformation)
+    Scene::Node::Node(Scene & scene, models::Transformation transformation,
+                      Wptr parent, bool visible)
+        : _scene(scene)
+        , _localTransformation(transformation)
         , _parent(parent)
         , _visible(visible)
-    {}
+    {
+        ++_scene._nodesEstimate;
+    }
+
+    Scene::Node::~Node()
+    {
+        assert(_scene._nodesEstimate != 0);
+        if (_scene._nodesEstimate != 0)
+        {
+            --_scene._nodesEstimate;
+        }
+    }
 
     bool Scene::Node::lerp(float weight, size_t epochNumber)
     {
@@ -40,7 +52,7 @@ namespace minire
 
     void Scene::handle(events::controller::SceneReset const &)
     {
-        _root = std::make_shared<Node>(models::Transformation{},
+        _root = std::make_shared<Node>(*this, models::Transformation{},
                                        Node::Wptr(), true);
     }
 
@@ -97,7 +109,7 @@ namespace minire
         Node::Sptr parent = find<Node::Sptr>(e._parent);
         assert(parent);
         auto [_, inserted] = parent->_children.emplace(
-            e._id, std::make_shared<Node>(std::move(e._origin), parent, e._visible));
+            e._id, std::make_shared<Node>(*this, std::move(e._origin), parent, e._visible));
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
     }
     
@@ -322,7 +334,7 @@ namespace minire
     {
         assert(_root);
         std::vector<Node::Sptr> queue{_root};
-        // TODO: reserve estimate for Nodes count
+        queue.reserve(_nodesEstimate);
         while(!queue.empty())
         {
             Node::Sptr node = queue.back();
@@ -378,7 +390,7 @@ namespace minire
 
         assert(_root);
         std::vector<Node::Sptr> queue{_root};
-        // TODO: reserve estimate for Nodes count
+        queue.reserve(_nodesEstimate);
         while (!queue.empty())
         {
             Node::Sptr node = queue.back();
