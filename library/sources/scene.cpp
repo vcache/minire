@@ -193,7 +193,6 @@ namespace minire
             item);
 
         // TODO: drop lerp target when switching false -> true
-        // TODO: mark as active this and their parent
     }
 
     void Scene::handle(events::controller::SceneSetTransform const & e,
@@ -382,7 +381,6 @@ namespace minire
 
     // TODO: don't lerp invisible nodes
     // TODO: don't lerp culled-out nodes
-    // TODO: maybe do a lazy re-calc global transforms?
     void Scene::updateGlobalTransforms()
     {
         static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
