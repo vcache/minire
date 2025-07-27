@@ -1,6 +1,6 @@
 #pragma once
 
-#include <minire/models/transformation.hpp>
+#include <minire/models/transform.hpp>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -25,7 +25,7 @@ namespace minire::grips
             , _distance(distance)
         {}
 
-        void evaluate(models::Transformation & output)
+        void evaluate(models::Transform & output)
         {
             static const glm::vec3 kUp(0.0f, 1.0f, 0.0f);
 

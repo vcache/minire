@@ -7,7 +7,7 @@
 #include <minire/models/camera.hpp>
 #include <minire/models/mesh.hpp>
 #include <minire/models/point-light.hpp>
-#include <minire/models/transformation.hpp>
+#include <minire/models/transform.hpp>
 
 #include <scene.hpp>
 #include <utils/uuid.hpp>
@@ -180,42 +180,42 @@ namespace minire::scene
 
             // create a node itself
 
-            models::Transformation transformation;
+            models::Transform transform;
 
             if (node.matrix.empty())
             {
-                assert(transformation._rotation == glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+                assert(transform._rotation == glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
                 if (!node.rotation.empty())
                 {
                     MINIRE_INVARIANT(node.rotation.size() == 4,
                                      "expected 4 components of rotation, but got {}: {}",
                                      node.rotation.size(), e._source);
-                    transformation._rotation = glm::quat(node.rotation[3],  // w
-                                                         node.rotation[0],  // x
-                                                         node.rotation[1],  // y
-                                                         node.rotation[2]); // z
+                    transform._rotation = glm::quat(node.rotation[3],  // w
+                                                    node.rotation[0],  // x
+                                                    node.rotation[1],  // y
+                                                    node.rotation[2]); // z
                 }
 
-                assert(transformation._scale == glm::vec3(1.0f));
+                assert(transform._scale == glm::vec3(1.0f));
                 if (!node.scale.empty())
                 {
                     MINIRE_INVARIANT(node.scale.size() == 3,
                                      "expected 3 components of scale, but got {}: {}",
                                      node.scale.size(), e._source);
-                    transformation._scale = glm::vec3(node.scale[0],    // x
-                                                      node.scale[1],    // y
-                                                      node.scale[2]);   // z
+                    transform._scale = glm::vec3(node.scale[0],    // x
+                                                 node.scale[1],    // y
+                                                 node.scale[2]);   // z
                 }
 
-                assert(transformation._translation == glm::vec3(0.0f));
+                assert(transform._translation == glm::vec3(0.0f));
                 if (!node.translation.empty())
                 {
                     MINIRE_INVARIANT(node.translation.size() == 3,
                                      "expected 3 components of translation, but got {}: {}",
                                      node.translation.size(), e._source);
-                    transformation._translation = glm::vec3(node.translation[0],    // x
-                                                            node.translation[1],    // y
-                                                            node.translation[2]);   // z
+                    transform._translation = glm::vec3(node.translation[0],    // x
+                                                       node.translation[1],    // y
+                                                       node.translation[2]);   // z
                 }
             }
             else
@@ -224,14 +224,14 @@ namespace minire::scene
                                  "expected 16 components of transform matrix, but got {}: {}",
                                  node.matrix.size(), e._source);
                 // a column-major order is both in glTF and GLM
-                transformation.loadFromMatrix(glm::make_mat4x4(node.matrix.data()));
+                transform.loadFromMatrix(glm::make_mat4x4(node.matrix.data()));
             }
 
             events::controller::SceneNewNode newNode
             {
                 ._id = node.name.empty() ? utils::newUuid() : node.name,
                 ._parent = e._parent,
-                ._origin = transformation,
+                ._origin = transform,
                 ._visible = e._visible,
             };
             scene.handle(newNode);

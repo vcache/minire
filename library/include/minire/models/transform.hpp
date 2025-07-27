@@ -9,22 +9,22 @@
 
 namespace minire::models
 {
-    struct Transformation
+    struct Transform
     {
         glm::vec3 _translation;
         glm::quat _rotation;
         glm::vec3 _scale;
 
-        explicit Transformation(glm::vec3 const & translation = glm::vec3(0.0f),
-                                glm::quat const & rotation = glm::quat_identity<float, glm::defaultp>(),
-                                glm::vec3 const & scale = glm::vec3(1.0f))
+        explicit Transform(glm::vec3 const & translation = glm::vec3(0.0f),
+                           glm::quat const & rotation = glm::quat_identity<float, glm::defaultp>(),
+                           glm::vec3 const & scale = glm::vec3(1.0f))
             : _translation(translation)
             , _rotation(rotation)
             , _scale(scale)
         {}
 
-        void lerp(Transformation const & prev,
-                  Transformation const & last,
+        void lerp(Transform const & prev,
+                  Transform const & last,
                   float const weight)
         {
             // TODO: shouldn't lerp components that isn't changed

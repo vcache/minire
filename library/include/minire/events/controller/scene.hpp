@@ -5,7 +5,7 @@
 #include <minire/models/camera.hpp>
 #include <minire/models/mesh.hpp>
 #include <minire/models/point-light.hpp>
-#include <minire/models/transformation.hpp>
+#include <minire/models/transform.hpp>
 
 #include <string>
 #include <vector>
@@ -34,10 +34,10 @@ namespace minire::events::controller
 
     struct SceneNewNode
     {
-        std::string            _id;
-        ScenePath              _parent;
-        models::Transformation _origin;
-        bool                   _visible;
+        std::string       _id;
+        ScenePath         _parent;
+        models::Transform _origin;
+        bool              _visible;
     };
 
     namespace impl
@@ -78,7 +78,7 @@ namespace minire::events::controller
 
     using SceneSetParent = impl::SceneItemModifier<ScenePath>;
     using SceneSetVisibility = impl::SceneItemModifier<bool>;   // TODO: recursive version
-    using SceneSetTransformation = impl::SceneItemModifier<models::Transformation>;
+    using SceneSetTransform = impl::SceneItemModifier<models::Transform>;
     using SceneSetPointLight = impl::SceneItemModifier<models::PointLight>;
     using SceneSetPerspectiveCamera = impl::SceneItemModifier<models::PerspectiveCamera>;
     using SceneSetOrthographicCamera = impl::SceneItemModifier<models::OrthographicCamera>;

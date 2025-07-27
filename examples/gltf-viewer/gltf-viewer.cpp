@@ -8,7 +8,7 @@
 #include <minire/models/mesh.hpp>
 #include <minire/models/pbr-material.hpp>
 #include <minire/models/point-light.hpp>
-#include <minire/models/transformation.hpp>
+#include <minire/models/transform.hpp>
 
 #include <boost/program_options.hpp>
 
@@ -127,10 +127,10 @@ namespace
             enqueue<SceneNewPerspectiveCamera>("cam", ScenePath{"cam-node"}, camera, true);
             enqueue<SceneActivateCamera>(ScenePath{"cam-node", "cam"});
 
-            enqueue<SceneNewNode>("light-node", ScenePath(), Transformation(glm::vec3(2.0f,  2.0f, 2.0f)), true);
+            enqueue<SceneNewNode>("light-node", ScenePath(), Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
             enqueue<SceneNewPointLight>("bulb", ScenePath{"light-node"}, PointLight(glm::vec4(1, 1, 1, 500), 2), true);
 
-            enqueue<SceneNewNode>("target-node", ScenePath(), minire::models::Transformation(), true);
+            enqueue<SceneNewNode>("target-node", ScenePath(), minire::models::Transform(), true);
             if (_arguments._scene != kNoIndex)
             {
                 enqueue<SceneNewFromSource>(ScenePath{"target-node"},
@@ -189,7 +189,7 @@ namespace
                 _dollyGrip.updateAngles(0.01f * static_cast<float>(event._relX),
                                                0.01f * static_cast<float>(event._relY));
                 _dollyGrip.evaluate(_cameraTransform);
-                enqueue<SceneSetTransformation>(ScenePath{"cam-node"}, _cameraTransform);
+                enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
             }
         }
 
@@ -199,13 +199,13 @@ namespace
 
             _dollyGrip.updateDistance(-0.5f * event._dy);
             _dollyGrip.evaluate(_cameraTransform);
-            enqueue<SceneSetTransformation>(ScenePath{"cam-node"}, _cameraTransform);
+            enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
         }
 
     private:
-        Arguments const &              _arguments;
-        minire::models::Transformation _cameraTransform;
-        minire::grips::Orbiting        _dollyGrip;
+        Arguments const &         _arguments;
+        minire::models::Transform _cameraTransform;
+        minire::grips::Orbiting   _dollyGrip;
     };
 }
 

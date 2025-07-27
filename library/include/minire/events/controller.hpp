@@ -50,7 +50,7 @@ namespace minire::events
                                     controller::SceneNewOrthographicCamera,
                                     controller::SceneSetParent,
                                     controller::SceneSetVisibility,
-                                    controller::SceneSetTransformation,
+                                    controller::SceneSetTransform,
                                     controller::SceneSetPointLight,
                                     controller::SceneSetPerspectiveCamera,
                                     controller::SceneSetOrthographicCamera>;

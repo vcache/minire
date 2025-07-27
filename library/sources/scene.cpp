@@ -18,10 +18,10 @@ namespace minire
 {
     // Node //
 
-    Scene::Node::Node(Scene & scene, models::Transformation transformation,
+    Scene::Node::Node(Scene & scene, models::Transform transform,
                       Wptr parent, bool visible)
         : _scene(scene)
-        , _localTransformation(transformation)
+        , _localTransform(transform)
         , _parent(parent)
         , _visible(visible)
     {
@@ -39,7 +39,7 @@ namespace minire
 
     bool Scene::Node::lerp(float weight, size_t epochNumber)
     {
-        return _localTransformation.lerp(weight, epochNumber);
+        return _localTransform.lerp(weight, epochNumber);
     }
 
     // Scene //
@@ -52,7 +52,7 @@ namespace minire
 
     void Scene::handle(events::controller::SceneReset const &)
     {
-        _root = std::make_shared<Node>(*this, models::Transformation{},
+        _root = std::make_shared<Node>(*this, models::Transform{},
                                        Node::Wptr(), true);
     }
 
@@ -196,12 +196,12 @@ namespace minire
         // TODO: mark as active this and their parent
     }
 
-    void Scene::handle(events::controller::SceneSetTransformation const & e,
+    void Scene::handle(events::controller::SceneSetTransform const & e,
                        size_t epochNumber)
     {
         auto node = find<Node::Sptr>(e._item);
         assert(node);
-        node->_localTransformation.update(epochNumber, e._attribute);
+        node->_localTransform.update(epochNumber, e._attribute);
         activate(*node);
     }
     
@@ -400,16 +400,16 @@ namespace minire
 
             if (!node->_hasGlobalTransform)
             {
-                models::Transformation const & localTransform = node->_localTransformation.current();
+                models::Transform const & localTransform = node->_localTransform.current();
                 glm::mat4 localTransformMatrix = glm::translate(localTransform._translation) *
                                                  glm::toMat4(localTransform._rotation) *
                                                  glm::scale(localTransform._scale);
                 Node::Sptr parent = node->_parent.lock();
                 assert(!parent || parent->_hasGlobalTransform);
-                glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransformation
+                glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransform
                                                                  : kIdentityMatrix;
-                node->_globalTransformation = parentGlobalTransform * localTransformMatrix;
-                node->_globalPosition = node->_globalTransformation * kOrigin; // will drop "w"
+                node->_globalTransform = parentGlobalTransform * localTransformMatrix;
+                node->_globalPosition = node->_globalTransform * kOrigin; // will drop "w"
                 node->_hasGlobalTransform = true;
             }
 
@@ -442,7 +442,7 @@ namespace minire
                     MINIRE_INVARIANT(parent->_hasGlobalTransform,
                                      "an active camera's node has no global transform");
                     // TODO: don't update if transform didn't change
-                    _viewpoint.setTransform(parent->_globalTransformation,
+                    _viewpoint.setTransform(parent->_globalTransform,
                                             parent->_globalPosition);
 
                     // TODO: don't update unless camera or its parameters changed

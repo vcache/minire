@@ -1,7 +1,7 @@
 #pragma once
 
 #include <minire/models/camera.hpp>
-#include <minire/models/transformation.hpp>
+#include <minire/models/transform.hpp>
 
 #include <glm/vec3.hpp>
 #include <glm/gtx/transform.hpp>

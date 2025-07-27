@@ -7,7 +7,7 @@
 #include <minire/models/mesh.hpp>
 #include <minire/models/pbr-material.hpp>
 #include <minire/models/point-light.hpp>
-#include <minire/models/transformation.hpp>
+#include <minire/models/transform.hpp>
 
 #include <boost/program_options.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -92,9 +92,9 @@ namespace
         : public minire::BasicController
     {
     private:
-        minire::models::Transformation cameraTransform(float dist = 5.0f)
+        minire::models::Transform cameraTransform(float dist = 5.0f)
         {
-            minire::models::Transformation result(glm::vec3(dist, dist, dist));
+            minire::models::Transform result(glm::vec3(dist, dist, dist));
             result._rotation = glm::rotate(result._rotation,
                                            glm::radians(45.0f),
                                            glm::vec3(0, 1, 0));
@@ -128,7 +128,7 @@ namespace
             enqueue<SceneNewPerspectiveCamera>("cam", ScenePath{"cam-node"}, camera, true);
             enqueue<SceneActivateCamera>(ScenePath{"cam-node", "cam"});
 
-            enqueue<SceneNewNode>("light-node", ScenePath(), Transformation(glm::vec3(2.0f,  2.0f, 2.0f)), true);
+            enqueue<SceneNewNode>("light-node", ScenePath(), Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
             enqueue<SceneNewPointLight>("bulb", ScenePath{"light-node"}, PointLight(glm::vec4(1, 1, 1, 500), 2), true);
 
             enqueue<SceneNewNode>("cube-node", ScenePath(), _cubeTransform, true);
@@ -164,12 +164,12 @@ namespace
             _cubeTransform._rotation = glm::rotate(_cubeTransform._rotation,
                                                    delta * _arguments._velocity,
                                                    glm::vec3{0, 1, 0});
-            enqueue<SceneSetTransformation>(ScenePath{"cube-node"}, _cubeTransform);
+            enqueue<SceneSetTransform>(ScenePath{"cube-node"}, _cubeTransform);
         }
 
     private:
-        Arguments const &              _arguments;
-        minire::models::Transformation _cubeTransform;
+        Arguments const &         _arguments;
+        minire::models::Transform _cubeTransform;
     };
 }
 

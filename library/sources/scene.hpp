@@ -4,7 +4,7 @@
 #include <minire/content/path.hpp>
 #include <minire/errors.hpp>
 #include <minire/events/controller/scene.hpp>
-#include <minire/models/transformation.hpp>
+#include <minire/models/transform.hpp>
 
 #include <scene/viewpoint.hpp>
 #include <utils/lerpable.hpp>
@@ -37,7 +37,7 @@ namespace minire
         void handle(events::controller::SceneNewOrthographicCamera const &);
         void handle(events::controller::SceneSetParent const &);
         void handle(events::controller::SceneSetVisibility const &);
-        void handle(events::controller::SceneSetTransformation const &, size_t epochNumber);
+        void handle(events::controller::SceneSetTransform const &, size_t epochNumber);
         void handle(events::controller::SceneSetPointLight const &, size_t epochNumber);
         void handle(events::controller::SceneSetPerspectiveCamera const &, size_t epochNumber);
         void handle(events::controller::SceneSetOrthographicCamera const &, size_t epochNumber);
@@ -66,7 +66,7 @@ namespace minire
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
                         assert(parent->_hasGlobalTransform);
                         assert(mesh->_meshToken);
-                        callable(*mesh->_meshToken, parent->_globalTransformation);
+                        callable(*mesh->_meshToken, parent->_globalTransform);
                     }
 
                     ++it;
@@ -171,22 +171,20 @@ namespace minire
                                        OrthographicCameraLeaf::Sptr>;
 
             using ChildrenMap = std::unordered_map<std::string, Child>;
-            using LerpableTransformation = utils::Lerpable<models::Transformation>;
+            using LerpableTransform = utils::Lerpable<models::Transform>;
 
-            // TODO: rename Transformation -> Transform
+            Scene           & _scene;
+            LerpableTransform _localTransform;
+            glm::vec3         _globalPosition;
+            glm::mat4         _globalTransform;
+            Wptr              _parent;
+            ChildrenMap       _children;
+            bool              _visible = true;
+            bool              _activated = false; // for _localTransform
+            bool              _childActivated = false;
+            bool              _hasGlobalTransform = false;
 
-            Scene                & _scene;
-            LerpableTransformation _localTransformation;
-            glm::vec3              _globalPosition;
-            glm::mat4              _globalTransformation;
-            Wptr                   _parent;
-            ChildrenMap            _children;
-            bool                   _visible = true;
-            bool                   _activated = false; // for _localTransformation
-            bool                   _childActivated = false;
-            bool                   _hasGlobalTransform = false;
-
-            Node(Scene & scene, models::Transformation,
+            Node(Scene & scene, models::Transform,
                  Wptr parent, bool visible);
 
             ~Node();

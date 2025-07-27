@@ -332,7 +332,7 @@ namespace minire
         _scene.handle(e);
     }
 
-    void Application::handle(events::controller::SceneSetTransformation const & e)
+    void Application::handle(events::controller::SceneSetTransform const & e)
     {
         _scene.handle(e, _epochNumber);
     }
