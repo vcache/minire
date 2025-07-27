@@ -1,8 +1,8 @@
 #pragma once
 
+#include <minire/content/path.hpp>
 #include <minire/material.hpp>
 #include <minire/models/mesh-features.hpp>
-#include <minire/models/scene-model.hpp>
 #include <minire/utils/aabb.hpp>
 
 #include <opengl/vertex-buffer.hpp>
@@ -25,8 +25,8 @@ namespace minire::rasterizer
     public:
         using Uptr = std::unique_ptr<Mesh>;
 
-        explicit Mesh(content::Id const & id,
-                      models::SceneModel const &,
+        explicit Mesh(content::Path const & source,
+                      material::Model::Sptr const & defaultMaterial,
                       content::Manager &,
                       Materials const &,
                       Ubo const &);
@@ -51,8 +51,8 @@ namespace minire::rasterizer
         };
 
     private:
-        void loadPrimitives(content::Id const & id,
-                            models::SceneModel const & sceneModel,
+        void loadPrimitives(content::Path const & source,
+                            material::Model::Sptr const & defaultMaterial,
                             content::Manager & contentManager,
                             Materials const & materials,
                             Ubo const & ubo);

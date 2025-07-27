@@ -1,9 +1,10 @@
 #pragma once
 
 #include <rasterizer/ubo/datablock.hpp>
-#include <scene/point-light.hpp>
 
 #include <opengl/ubo.hpp>
+
+namespace minire { class Scene; }
 
 namespace minire::opengl { class Program; }
 
@@ -27,7 +28,7 @@ namespace minire::rasterizer
 
         void setViewPosition(glm::vec4 const &);
 
-        void setLights(scene::PointLightRef::List const &);
+        void setLights(Scene const &);
 
     private:
         using GlUbo = opengl::UBO<ubo::Datablock>;

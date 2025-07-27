@@ -3,13 +3,16 @@
 #include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
-#include <minire/models/fps-camera.hpp>
+#include <minire/models/camera.hpp>
+#include <minire/models/mesh.hpp>
 #include <minire/models/pbr-material.hpp>
 #include <minire/models/point-light.hpp>
-#include <minire/models/scene-model.hpp>
+#include <minire/models/transformation.hpp>
 
 #include <boost/program_options.hpp>
+#include <glm/gtc/quaternion.hpp>
 
+#include <cmath>
 #include <cstdlib> // for EXIT_SUCCESS
 #include <iostream>
 
@@ -88,26 +91,69 @@ namespace
     class RotatingCube
         : public minire::BasicController
     {
+    private:
+        minire::models::Transformation cameraTransform(float dist = 5.0f)
+        {
+            minire::models::Transformation result(glm::vec3(dist, dist, dist));
+            result._rotation = glm::rotate(result._rotation,
+                                           glm::radians(45.0f),
+                                           glm::vec3(0, 1, 0));
+            // see Rectangular cuboid side (an angle between side's diagonal and main diagonal)
+            float const innerAngle =
+                std::asin(std::sqrt(2.0*dist) / std::sqrt(3.0*dist)) * 180.0 / M_PI;
+            result._rotation = glm::rotate(result._rotation,
+                                           -glm::radians(180.0f - (90.0f + innerAngle)),
+                                           glm::vec3(1, 0, 0));
+            return result;
+        }
+
     public:
         explicit RotatingCube(Arguments const & arguments)
             : BasicController(arguments._maxCtrlFps)
             , _arguments(arguments)
-            , _fpsCamera(glm::vec3(10.0f, 5.0f, 10.0f),
-                         glm::vec3(0.0f, 0.0f, -1.0f),
-                         glm::vec2(-130.0f, 0.0f))
         {}
 
-        // TODO: maybe use KeyCoder
         void start() override
         {
+            using namespace minire::content;
             using namespace minire::events::controller;
             using namespace minire::models;
 
-            enqueue<SceneUpdateFpsCamera>(_fpsCamera);
-            enqueue<SceneEmergeModel>(0, "cube-model", _cubePosition);
-            enqueue<SceneEmergePointLight>(
-                0, PointLight(glm::vec3(2.0f,  2.0f, 2.0f),
-                              glm::vec4(1, 1, 1, 500), 2));
+            minire::models::PerspectiveCamera camera{._yFov = glm::radians(45.0f),
+                                                     ._zNear = 0.001f,
+                                                     ._zFar = 1000.0f,
+                                                     ._aspectRatio = std::nullopt};
+
+            enqueue<SceneNewNode>("cam-node", ScenePath(), cameraTransform(5.0f), true);
+            enqueue<SceneNewPerspectiveCamera>("cam", ScenePath{"cam-node"}, camera, true);
+            enqueue<SceneActivateCamera>(ScenePath{"cam-node", "cam"});
+
+            enqueue<SceneNewNode>("light-node", ScenePath(), Transformation(glm::vec3(2.0f,  2.0f, 2.0f)), true);
+            enqueue<SceneNewPointLight>("bulb", ScenePath{"light-node"}, PointLight(glm::vec4(1, 1, 1, 500), 2), true);
+
+            enqueue<SceneNewNode>("cube-node", ScenePath(), _cubeTransform, true);
+            enqueue<SceneNewMesh>("cube", ScenePath{"cube-node"},
+                Mesh
+                {
+                    ._source = _arguments._useGltf ? mkPath("cube.gltf", path::Special::kMeshes, path::Index(0))
+                                                   : mkPath("cube.obj"),
+                    ._defaultMaterial = [this]
+                    {
+                        auto result = std::make_shared<PbrMaterial>();
+                        if (_arguments._useTexture)
+                        {
+                            result->_albedoTexture =  "uv-color.png";
+                        }
+                        else
+                        {
+                            result->_albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f);
+                        }
+                        result->_metallicFactor = 0.5f;
+                        result->_roughnessFactor = 0.6f;
+                        return result;
+                    }()
+                },
+                true);
         }
 
         void step() override
@@ -115,17 +161,15 @@ namespace
             using namespace minire::events::controller;
 
             float const delta = frameTime();
-            _cubePosition._rotation = glm::rotate(_cubePosition._rotation,
-                                                  delta * _arguments._velocity,
-                                                  glm::vec3{0, 1, 0});
-
-            enqueue<SceneUpdateModel>(0, _cubePosition);
+            _cubeTransform._rotation = glm::rotate(_cubeTransform._rotation,
+                                                   delta * _arguments._velocity,
+                                                   glm::vec3{0, 1, 0});
+            enqueue<SceneSetTransformation>(ScenePath{"cube-node"}, _cubeTransform);
         }
 
     private:
-        Arguments const &             _arguments;
-        minire::models::FpsCamera     _fpsCamera;
-        minire::models::ModelPosition _cubePosition;
+        Arguments const &              _arguments;
+        minire::models::Transformation _cubeTransform;
     };
 }
 
@@ -147,33 +191,7 @@ int main(int argc, char ** argv)
 
         // Setup content manager
         minire::content::Manager manager;
-        {
-            auto inMemReader = std::make_unique<minire::content::readers::InMemory>();
-            inMemReader->store("cube-model", minire::models::SceneModel
-            {
-                ._source = arguments._useGltf ? "cube.gltf" : "cube.obj",
-                ._meshIndex = arguments._useGltf ? 0 : minire::models::SceneModel::kNoIndex,
-                ._defaultMaterial = [&arguments]
-                {
-                    auto result = std::make_shared<minire::models::PbrMaterial>();
-                    if (arguments._useTexture)
-                    {
-                        result->_albedoTexture =  "uv-color.png";
-                    }
-                    else
-                    {
-                        result->_albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f);
-                    }
-                    result->_metallicFactor = 0.5f;
-                    result->_roughnessFactor = 0.6f;
-                    return result;
-                }(),
-            });
-
-            manager.setReader<minire::content::readers::Chained>()
-                .append(std::move(inMemReader))
-                .append<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-        }
+        manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
 
         // Create and run the Application and its Controller
         minire::Application application(1280, 720, "Rotating cube", manager);

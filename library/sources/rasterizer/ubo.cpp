@@ -2,8 +2,8 @@
 
 #include <opengl.hpp>
 #include <opengl/program.hpp>
+#include <scene.hpp>
 
-#include <algorithm> // for std::min
 #include <cassert>
 
 namespace minire::rasterizer
@@ -65,21 +65,20 @@ namespace minire::rasterizer
     }
 
     // TODO: try to minimize changes (esp. when nothing changed)
-    void Ubo::setLights(scene::PointLightRef::List const & pointLights)
+    void Ubo::setLights(Scene const & scene)
     {
-        assert(pointLights.size() <= maxLights());
-
-        _datablock._lightsCount = std::min(pointLights.size(),
-                                           maxLights());
-        for(size_t i(0); i < _datablock._lightsCount; ++i)
-        {
-            auto const & src = pointLights[i];
-            auto & dst = _datablock._pointLights[i];
-
-            dst._position = src.get()._origin;
-            dst._color = src.get()._color;
-            dst._attenuation = src.get()._attenuation;
-        }
+        _datablock._lightsCount = scene.cullPointLights(
+            maxLights(),
+            [this](size_t index,
+                   glm::vec3 const & position,
+                   glm::vec4 const & color,
+                   glm::vec4 const & attenuation)
+            {
+                auto & dst = _datablock._pointLights[index];
+                dst._position = glm::vec4(position, 1.0);
+                dst._color = color;
+                dst._attenuation = attenuation;
+            });
 
         _invalidated = true; // TODO: do only when changed
     }

@@ -2,15 +2,17 @@
 
 #include <minire/logging.hpp>
 #include <minire/utils/unow.hpp>
+
 #include <opengl.hpp>
+#include <scene/gltf-instantiator.hpp>
 
 #include <algorithm>
 
 namespace minire
 {
-    // TODO: move them into parameters
-    static const float kNear = 0.1f;
-    static const float kFar = 100.0f;
+    // TODO: read them from Camera
+    static const float kNear = 0.001f;
+    static const float kFar = 1000.0f;
 
     Application::Application(int width, int height,
                              std::string const & title,
@@ -109,50 +111,11 @@ namespace minire
     {
         MINIRE_GL(glViewport, 0, 0, width, height);
 
-        constexpr int kMode = 0;    // TODO: why so hardcoded?
-
         float const fWidth = static_cast<float>(width);
         float const fHeight = static_cast<float>(height);
 
-        // TODO: zoom in/out by changin FOV
-
-        glm::mat4 pmat;
-        switch(kMode)
-        {
-            case 0:
-                pmat = glm::perspective(
-                    glm::radians(45.0f), fWidth / fHeight, kNear, kFar);
-                break;
-            
-            case 1:
-                pmat = glm::perspectiveFov(
-                    glm::radians(120.0f), fWidth, fHeight, kNear, kFar);
-                break;
-            
-            case 2: {
-                float const ratio = fWidth / fHeight;
-                float const scale = 10.0f;
-                pmat = glm::ortho(-scale, scale,
-                                  -scale * ratio, scale * ratio,
-                                  kNear, kFar);
-                break;
-            }
-
-            case 3: {
-                //pmat = glm::ortho(0.0f, fWidth, 0.0f, fHeight, kNear, kFar);
-                float const scale = .01f;
-                pmat = glm::ortho(-fWidth/2 * scale,
-                                  fWidth/2 * scale,
-                                  -fHeight/2 * scale,
-                                  fHeight/2 * scale,
-                                  kNear, kFar);
-                break;
-            }
-
-            default: MINIRE_THROW("bad projection mode: {}", kMode);
-        }
-
-        _viewpoint.setProjection(pmat, fWidth, fHeight);
+        // required for a Projection matrix
+        _scene.setViewport(width, height);
 
         // projection for 2D gui
         _rasterizer.setScreenSize(fWidth, fHeight);
@@ -319,59 +282,89 @@ namespace minire
         _scene.handle(e);
     }
 
-    void Application::handle(events::controller::SceneEmergeModel const & e)
+    void Application::handle(events::controller::SceneDispose const & e)
     {
         _scene.handle(e);
     }
 
-    void Application::handle(events::controller::SceneEmergePointLight const & e)
+    void Application::handle(events::controller::SceneActivateCamera const & e)
     {
         _scene.handle(e);
     }
 
-    void Application::handle(events::controller::SceneUnmergeModel const & e)
+    void Application::handle(events::controller::SceneNewNode const & e)
     {
         _scene.handle(e);
     }
 
-    void Application::handle(events::controller::SceneUnmergePointLight const & e)
+    void Application::handle(events::controller::SceneNewFromSource const & e)
+    {
+        scene::instantiateGltf(_scene, e, _contentManager);
+    }
+
+    void Application::handle(events::controller::SceneNewMesh const & e)
     {
         _scene.handle(e);
     }
 
-    void Application::handle(events::controller::SceneUpdateFpsCamera const & e)
-    {
-        _camera.update(_epochNumber, e._fps);
-        _cameraActive = true;
-    }
-
-    void Application::handle(events::controller::SceneUpdateModel const & e)
-    {
-        _scene.handle(_epochNumber, e);
-    }
-
-    void Application::handle(events::controller::SceneSetSelectedModels const & e)
+    void Application::handle(events::controller::SceneNewPointLight const & e)
     {
         _scene.handle(e);
     }
 
-    void Application::handle(events::controller::SceneUpdateLight const & e)
+    void Application::handle(events::controller::SceneNewPerspectiveCamera const & e)
     {
-        _scene.handle(_epochNumber, e);
+        _scene.handle(e);
+    }
+
+    void Application::handle(events::controller::SceneNewOrthographicCamera const & e)
+    {
+        _scene.handle(e);
+    }
+
+    void Application::handle(events::controller::SceneSetParent const & e)
+    {
+        _scene.handle(e);
+    }
+
+    void Application::handle(events::controller::SceneSetVisibility const & e)
+    {
+        _scene.handle(e);
+    }
+
+    void Application::handle(events::controller::SceneSetTransformation const & e)
+    {
+        _scene.handle(e, _epochNumber);
+    }
+
+    void Application::handle(events::controller::SceneSetPointLight const & e)
+    {
+        _scene.handle(e, _epochNumber);
+    }
+
+    void Application::handle(events::controller::SceneSetPerspectiveCamera const & e)
+    {
+        _scene.handle(e, _epochNumber);
+    }
+
+    void Application::handle(events::controller::SceneSetOrthographicCamera const & e)
+    {
+        _scene.handle(e, _epochNumber);
     }
 
     void Application::handle(BasicController::Batch const & batch)
     {
-#ifndef NDEBUG
+#       ifndef NDEBUG
         if (batch._events.size() > 50)
         {
             MINIRE_DEBUG("Got {} event inm controller's batch",
                          batch._events.size());
         }
-#endif
+#       endif
 
         for(events::Controller const & event: batch._events)
         {
+            // TODO: it might throw
             std::visit([this](auto const & e) { handle(e); }, event);
         }
     }
@@ -444,23 +437,13 @@ namespace minire
         if (performLerp)
         {
             double const weight = _batchPlayed / _controllerEvents[0]._duration;
-
-            // lerp camera
-            if (_cameraActive)
-            {
-                _cameraActive = _camera.lerp(weight, _epochNumber);
-                models::FpsCamera const & camera = _camera.current();
-                _viewpoint.setView(camera.view(), camera.position());
-            }
-
-            // lerp scene
             _scene.lerp(weight, _epochNumber);
         }
 
         // draw a frame
         // TODO: maybe skip it if not performLerp ?
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        _rasterizer.draw(_viewpoint, _scene);
+        _rasterizer.draw(_scene);
         ::SDL_GL_SwapWindow(window());
 
         // calc frame time

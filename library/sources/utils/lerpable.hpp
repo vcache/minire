@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <memory>
 
@@ -17,8 +18,11 @@ namespace minire::utils
             , _epochNumber(0)
         {}
 
+        // TODO: don't lerp (just set _current to primary) when there is too big
+        //       difference between epochs or switching from invisble to visible
         bool lerp(float weight, size_t epochNumber)
         {
+            assert(epochNumber >= _epochNumber);
             if (epochNumber == _epochNumber + 1)
             {
                 _current = _items[_primary];
@@ -54,7 +58,9 @@ namespace minire::utils
 
         T const & current() const { return _current; }
 
-        using Uptr = std::unique_ptr<Lerpable<T>>;
+        using Sptr = std::shared_ptr<Lerpable<T>>;
+        using Wptr = std::weak_ptr<Lerpable<T>>;
+        using ElementType = T;
 
     private:
         T                _current;

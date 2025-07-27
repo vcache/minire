@@ -54,6 +54,7 @@ namespace minire::content
             return static_cast<T &>(*_reader);
         }
 
+        // TODO: maybe it should be const?
         std::unique_ptr<Lease> borrow(Id const &);
 
     public:

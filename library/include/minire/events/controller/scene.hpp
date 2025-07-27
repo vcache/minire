@@ -1,69 +1,85 @@
 #pragma once
 
 #include <minire/content/id.hpp>
-#include <minire/models/fps-camera.hpp>
-#include <minire/models/model-position.hpp>
+#include <minire/content/path.hpp>
+#include <minire/models/camera.hpp>
+#include <minire/models/mesh.hpp>
 #include <minire/models/point-light.hpp>
+#include <minire/models/transformation.hpp>
 
-#include <glm/vec4.hpp>
+#include <string>
+#include <vector>
 
-#include <unordered_set>
-
+// TODO: these are more "commands" than "events"
 namespace minire::events::controller
 {
-    // Cleaners
+    // Generic scene control
 
-    struct SceneReset
-    {};
+    // TODO: move it into some common area
+    using ScenePath = std::vector<std::string>;
 
-    // Ctors
+    struct SceneReset {};
 
-    struct SceneEmergeModel
+    struct SceneDispose
     {
-        size_t                _id;
-        content::Id           _model;
-        models::ModelPosition _position;
+        ScenePath _item;    // a node or a leaf
     };
 
-    struct SceneEmergePointLight
+    struct SceneActivateCamera
     {
-        size_t             _id;
-        models::PointLight _light;
+        ScenePath _item;    // a node or a leaf
     };
 
-    // Dtors
+    // Nodes and items builders
 
-    struct SceneUnmergeModel
+    struct SceneNewNode
     {
-        size_t _id;
+        std::string            _id;
+        ScenePath              _parent;
+        models::Transformation _origin;
+        bool                   _visible;
     };
 
-    struct SceneUnmergePointLight
+    namespace impl
     {
-        size_t _id;
+        template<typename T>
+        struct SceneNewLeaf
+        {
+            std::string _id;
+            ScenePath   _parent;
+            T           _data;
+            bool        _visible;
+        };
+    }
+
+    using SceneNewMesh = impl::SceneNewLeaf<models::Mesh>;
+    using SceneNewPointLight = impl::SceneNewLeaf<models::PointLight>;
+    using SceneNewPerspectiveCamera = impl::SceneNewLeaf<models::PerspectiveCamera>;
+    using SceneNewOrthographicCamera = impl::SceneNewLeaf<models::OrthographicCamera>;
+
+    struct SceneNewFromSource
+    {
+        ScenePath     _parent;
+        content::Path _source;
+        bool          _visible;
     };
 
-    // Mutators
+    // Attribute modifiers
 
-    struct SceneUpdateFpsCamera
+    namespace impl
     {
-        models::FpsCamera _fps;
-    };
+        template<typename T>
+        struct SceneItemModifier
+        {
+            ScenePath _item;
+            T         _attribute;
+        };
+    }
 
-    struct SceneUpdateModel
-    {
-        size_t                _id;
-        models::ModelPosition _position;
-    };
-
-    struct SceneUpdateLight
-    {
-        size_t             _id;
-        models::PointLight _light;
-    };
-
-    struct SceneSetSelectedModels
-    {
-        std::unordered_set<size_t> _ids;
-    };
+    using SceneSetParent = impl::SceneItemModifier<ScenePath>;
+    using SceneSetVisibility = impl::SceneItemModifier<bool>;   // TODO: recursive version
+    using SceneSetTransformation = impl::SceneItemModifier<models::Transformation>;
+    using SceneSetPointLight = impl::SceneItemModifier<models::PointLight>;
+    using SceneSetPerspectiveCamera = impl::SceneItemModifier<models::PerspectiveCamera>;
+    using SceneSetOrthographicCamera = impl::SceneItemModifier<models::OrthographicCamera>;
 }

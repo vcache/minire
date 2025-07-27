@@ -5,14 +5,11 @@
 #include <minire/errors.hpp>
 #include <minire/events/application.hpp>
 #include <minire/events/controller.hpp>
-#include <minire/models/fps-camera.hpp>
 #include <minire/sdl/gl-application.hpp>
 
 // private headers
 #include <rasterizer.hpp>
 #include <scene.hpp>
-#include <utils/lerpable.hpp>
-#include <utils/viewpoint.hpp>
 
 // STLs
 #include <memory>
@@ -90,29 +87,30 @@ namespace minire
         void handle(events::controller::StartTextInput const &);
         void handle(events::controller::StopTextInput const &);
         void handle(events::controller::SceneReset const &);
-        void handle(events::controller::SceneEmergeModel const &);
-        void handle(events::controller::SceneEmergePointLight const &);
-        void handle(events::controller::SceneUnmergeModel const &);
-        void handle(events::controller::SceneUnmergePointLight const &);
-        void handle(events::controller::SceneUpdateFpsCamera const &);
-        void handle(events::controller::SceneUpdateModel const &);
-        void handle(events::controller::SceneSetSelectedModels const &);
-        void handle(events::controller::SceneUpdateLight const &);
+        void handle(events::controller::SceneDispose const &);
+        void handle(events::controller::SceneActivateCamera const &);
+        void handle(events::controller::SceneNewNode const &);
+        void handle(events::controller::SceneNewFromSource const &);
+        void handle(events::controller::SceneNewMesh const &);
+        void handle(events::controller::SceneNewPointLight const &);
+        void handle(events::controller::SceneNewPerspectiveCamera const &);
+        void handle(events::controller::SceneNewOrthographicCamera const &);
+        void handle(events::controller::SceneSetParent const &);
+        void handle(events::controller::SceneSetVisibility const &);
+        void handle(events::controller::SceneSetTransformation const &);
+        void handle(events::controller::SceneSetPointLight const &);
+        void handle(events::controller::SceneSetPerspectiveCamera const &);
+        void handle(events::controller::SceneSetOrthographicCamera const &);
 
         template<typename Event, typename... Args>
         void postEvent(Args && ...);
 
     private:
-        using LerpableCamera = utils::Lerpable<models::FpsCamera>;
-        
         content::Manager          & _contentManager;
 
         // render (view)
         Rasterizer                  _rasterizer;
         Scene                       _scene;
-        utils::Viewpoint            _viewpoint;
-        LerpableCamera              _camera; // TODO: move it into a Scene
-        bool                        _cameraActive = false;
 
         // controller (controller)
         BasicController::Uptr       _controller;

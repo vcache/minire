@@ -16,36 +16,38 @@
 
 namespace minire::rasterizer
 {
-    void Mesh::loadPrimitives(content::Id const & id,
-                               models::SceneModel const & sceneModel,
-                               content::Manager & contentManager,
-                               Materials const & materials,
-                               Ubo const & ubo)
+    void Mesh::loadPrimitives(content::Path const & source,
+                              material::Model::Sptr const & defaultMaterial,
+                              content::Manager & contentManager,
+                              Materials const & materials,
+                              Ubo const & ubo)
     {
-        size_t const meshIndex = sceneModel._meshIndex;
-        auto const & defaultMaterial = sceneModel._defaultMaterial;
+        MINIRE_INFO("Loading a mesh from source: {}", source);
 
-        MINIRE_INFO("Loading a mesh from source: {}", sceneModel._source);
-        auto lease = contentManager.borrow(sceneModel._source);
+        MINIRE_INVARIANT(!source.empty(), "source path is empty");
+        MINIRE_INVARIANT(std::holds_alternative<content::Id>(source[0]),
+                         "source's path doesn't start from Id");
+
+        auto lease = contentManager.borrow(std::get<content::Id>(source[0]));
         assert(lease);
 
         _aabb = utils::Aabb();
 
         return lease->visit(utils::Overloaded
         {
-            [this, &id, meshIndex, &defaultMaterial, &materials, &ubo]
+            [this, &source, &defaultMaterial, &materials, &ubo]
             (formats::Obj const & obj)
             {
-                MINIRE_INVARIANT(defaultMaterial, "material not specified: {}", id);
-                MINIRE_INVARIANT(meshIndex == models::SceneModel::kNoIndex,
-                                 "OBJ-mesh cannot have an index: {}", id);
+                MINIRE_INVARIANT(defaultMaterial, "no default material found (required for OBJ): {}", source);
+                MINIRE_INVARIANT(source.size() == 1, "too many path component for OBJ: {}", source.size());
+
                 models::MeshFeatures meshFeatures = utils::getMeshFeatures(obj);
 
                 auto matProgram = materials.build(*defaultMaterial, meshFeatures, ubo);
                 auto matInstance = materials.instantiate(*defaultMaterial, meshFeatures);
 
-                MINIRE_INVARIANT(matProgram, "no material program for {}", id);
-                MINIRE_INVARIANT(matInstance, "no material instance for {}", id);
+                MINIRE_INVARIANT(matProgram, "no material program for {}", source);
+                MINIRE_INVARIANT(matInstance, "no material instance for {}", source);
 
                 material::Program::Locations const & locations = matProgram->locations();
                 opengl::VertexBuffer vertexBuffer = utils::createVertexBuffer(
@@ -60,12 +62,17 @@ namespace minire::rasterizer
                 _materials.emplace_back(Material{std::move(matProgram), std::move(matInstance), {0}});
             },
 
-            [this, &id, meshIndex, &defaultMaterial, &materials, &ubo, &contentManager]
+            [this, &source, &defaultMaterial, &materials, &ubo, &contentManager]
             (formats::GltfModelSptr const & gltf)
             {
-                MINIRE_INVARIANT(gltf, "gltf pointer is empty: {}", id);
-                MINIRE_INVARIANT(meshIndex != models::SceneModel::kNoIndex,
-                                 "gLTF-mesh must have an index: {}", id);
+                MINIRE_INVARIANT(gltf, "gltf pointer is empty: {}", source);
+                MINIRE_INVARIANT(source.size() == 3, "too few gLTF mesh path components: {}", source.size());
+                MINIRE_INVARIANT(std::holds_alternative<content::path::Special>(source[1]) &&
+                                 std::get<content::path::Special>(source[1]) == content::path::Special::kMeshes,
+                                 "source path doesn't point to a meshes store: {}", source);
+                MINIRE_INVARIANT(std::holds_alternative<content::path::Index>(source[2]),
+                                 "source path indexes mesh not by a number: {}", source);
+                size_t const meshIndex = std::get<content::path::Index>(source[2]);
 
                 auto prefetched = utils::prefetchGltfFeatures(gltf, meshIndex, contentManager);
 
@@ -85,11 +92,11 @@ namespace minire::rasterizer
                     {
                         // a new combination found, should build a new material
                         bool const useDefault = primitive._materialModel == utils::GltfMeshFeatures::kNoIndex;
-                        MINIRE_INVARIANT(!useDefault || defaultMaterial,"no default material specified: {}", id);
+                        MINIRE_INVARIANT(!useDefault || defaultMaterial,"no default material specified: {}", source);
 
                         assert(useDefault || primitive._materialModel < prefetched._materialModels.size());
                         MINIRE_INVARIANT(useDefault || prefetched._materialModels[primitive._materialModel],
-                                         "no builtin material loaded, {}", id);
+                                         "no builtin material loaded, {}", source);
 
                         material::Model const & effectiveMaterial =
                             useDefault ? *defaultMaterial
@@ -98,12 +105,12 @@ namespace minire::rasterizer
                         auto matProgram = materials.build(effectiveMaterial, primitive._meshFeatures, ubo);
                         auto matInstance = materials.instantiate(effectiveMaterial, primitive._meshFeatures);
 
-                        MINIRE_INVARIANT(matProgram, "no material program for {}", id);
-                        MINIRE_INVARIANT(matInstance, "no material instance for {}", id);
+                        MINIRE_INVARIANT(matProgram, "no material program for {}", source);
+                        MINIRE_INVARIANT(matInstance, "no material instance for {}", source);
 
                         Material newMaterial{std::move(matProgram), std::move(matInstance), {}};
                         auto [newIt, inserted] = materialsMap.emplace(key, std::move(newMaterial));
-                        MINIRE_INVARIANT(inserted, "failed to insert a new material+feature pair: {}", id);
+                        MINIRE_INVARIANT(inserted, "failed to insert a new material+feature pair: {}", source);
                         it = newIt;
                     }
                     assert(it != materialsMap.cend());
@@ -128,20 +135,20 @@ namespace minire::rasterizer
                 }
             },
 
-            [&id](auto const &)
+            [&source](auto const &)
             {
-                MINIRE_THROW("unknown mesh format: {}", id);
+                MINIRE_THROW("unknown mesh format: {}", source);
             }
         });
     }
 
-    Mesh::Mesh(content::Id const & id,
-               models::SceneModel const & sceneModel,
+    Mesh::Mesh(content::Path const & source,
+               material::Model::Sptr const & defaultMaterial,
                content::Manager & contentManager,
                Materials const & materials,
                Ubo const & ubo)
     {
-        loadPrimitives(id, sceneModel, contentManager, materials, ubo);
+        loadPrimitives(source, defaultMaterial, contentManager, materials, ubo);
     }
 
     void Mesh::draw(glm::mat4 const & modelTransform,

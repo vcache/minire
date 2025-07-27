@@ -40,12 +40,18 @@ namespace minire::events
                                     controller::StopTextInput,
 
                                     controller::SceneReset,
-                                    controller::SceneEmergeModel,
-                                    controller::SceneEmergePointLight,
-                                    controller::SceneUnmergeModel,
-                                    controller::SceneUnmergePointLight,
-                                    controller::SceneUpdateFpsCamera,
-                                    controller::SceneUpdateModel,
-                                    controller::SceneUpdateLight,
-                                    controller::SceneSetSelectedModels>;
+                                    controller::SceneDispose,
+                                    controller::SceneActivateCamera,
+                                    controller::SceneNewNode,
+                                    controller::SceneNewFromSource,
+                                    controller::SceneNewMesh,
+                                    controller::SceneNewPointLight,
+                                    controller::SceneNewPerspectiveCamera,
+                                    controller::SceneNewOrthographicCamera,
+                                    controller::SceneSetParent,
+                                    controller::SceneSetVisibility,
+                                    controller::SceneSetTransformation,
+                                    controller::SceneSetPointLight,
+                                    controller::SceneSetPerspectiveCamera,
+                                    controller::SceneSetOrthographicCamera>;
 }

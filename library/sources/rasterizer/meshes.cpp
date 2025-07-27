@@ -4,12 +4,21 @@
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 
+#include <scene.hpp>
+
 #include <cassert>
 #include <algorithm>
 
 namespace minire::rasterizer
 {
     // TODO: bucket drawing call to minimize program switch
+
+    class MeshToken
+    {
+        Mesh::Uptr _mesh;
+
+        friend class Meshes;
+    };
 
     Meshes::Meshes(Ubo const & ubo,
                    Materials const & materials,
@@ -19,79 +28,51 @@ namespace minire::rasterizer
         , _materials(materials)
     {}
 
-    void Meshes::incUse(content::Id const & id)
+    std::shared_ptr<MeshToken> Meshes::getMesh(content::Path const & source,
+                                               material::Model::Sptr const & defaultMaterial)
     {
-        load(id);
-        ++_store[id]._usage;
-    }
-    
-    void Meshes::decUse(content::Id const & id)
-    {
-        if (!_store[id]._init)
+        Key key(source, defaultMaterial);
+
+        if (auto it = _store.find(key);
+            it != _store.cend())
         {
-            MINIRE_THROW("cannot decrease usage for non-loaded model: {}", id);
+            if (auto token = it->second.lock(); token)
+            {
+                return token;
+            }
+            else
+            {
+                _store.erase(it);
+            }
         }
 
-        --_store[id]._usage;
-        assert(_store[id]._usage >= 0);
-        if (0 == _store[id]._usage)
-        {
-            unload(id);
-        }
+        auto token = load(source, defaultMaterial);
+        auto [_, inserted] = _store.emplace(key, token);
+        MINIRE_INVARIANT(inserted, "failed to store MeshToken into a store: {}", source);
+        return token;
     }
 
-    void Meshes::load(content::Id const & id)
+    std::shared_ptr<MeshToken> Meshes::load(content::Path const & source,
+                                            material::Model::Sptr const & defaultMaterial)
     {
-        // find store item
-        auto & item = _store[id];
-
-        if (!item._init)
-        {
-            // load a model itself
-            auto lease = _contentManager.borrow(id);
-            assert(lease);
-            models::SceneModel const & sceneModel = lease->as<models::SceneModel>();
-            item._model = std::make_unique<Mesh>(id, sceneModel, _contentManager,
-                                                 _materials, _ubo);
-
-            // mark slot as initialized
-            item._init = true;
-            MINIRE_INFO("Loading model: {}", id);
-        }
+        std::shared_ptr<MeshToken> result = std::make_shared<MeshToken>();
+        result->_mesh = std::make_unique<Mesh>(source, defaultMaterial,
+                                               _contentManager, _materials, _ubo);
+        MINIRE_INFO("Loading model: {}, {}", source, defaultMaterial ? "(default material)"
+                                                                     : "(no default material)");
+        return result;
     }
 
-    void Meshes::unload(content::Id const & id)
-    {
-        if (_store[id]._init)
-        {
-            MINIRE_ERROR("unloading not implemented");
-        }
-    }
-
-    utils::Aabb const & Meshes::aabb(content::Id const & id) const
-    {
-        auto const & it = _store.find(id);
-        if (it == _store.cend() || !it->second._init)
-        {
-            MINIRE_THROW("model {} is not loaded", id);
-        }
-        assert(it->second._model);
-        return it->second._model->aabb();
-    }
-
-    void Meshes::draw(scene::ModelRef::List & entities) const
+    void Meshes::draw(Scene const & scene) const
     {
         // TODO: group models by a material signature (to avoid frequent program switch)
-
-        for(scene::ModelRef const & entity : entities)
-        {
-            StoreItem const & modelData = _store.at(entity._model);
-
-            assert(modelData._model);
-            assert(modelData._init);
-            assert(entity._transform);
-
-            modelData._model->draw(*entity._transform, entity._colorFactor);
-        }
+        scene.cullModels(
+            [](MeshToken const & meshToken,
+               glm::mat4 const & transform)
+            {
+                assert(meshToken._mesh);
+                meshToken._mesh->draw(transform, 1.0f /* TODO: wtf is a colorFactor? */);
+            }
+        );
     }
 }

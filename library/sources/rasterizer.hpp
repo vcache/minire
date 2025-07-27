@@ -11,8 +11,6 @@
 #include <rasterizer/sprites.hpp>
 #include <rasterizer/textures.hpp>
 #include <rasterizer/ubo.hpp>
-#include <scene.hpp>
-#include <utils/viewpoint.hpp>
 
 #include <glm/mat4x4.hpp>
 
@@ -20,14 +18,15 @@ namespace minire::content { class Manager; }
 
 namespace minire
 {
+    class Scene;
+
     class Rasterizer
     {
     public:
         explicit Rasterizer(content::Manager &,
                             content::Ids const & fontsPreload = {});
 
-        void draw(utils::Viewpoint const &,
-                  Scene const & scene);
+        void draw(Scene const & scene);
 
         void setScreenSize(float w, float h);
 
@@ -38,8 +37,7 @@ namespace minire
         rasterizer::Lines & lines() { return _lines; }
 
     private:
-        void draw3d(utils::Viewpoint const & viewpoint,
-                    Scene const & scene);
+        void draw3d(Scene const & scene);
         void draw2d();
 
     private:

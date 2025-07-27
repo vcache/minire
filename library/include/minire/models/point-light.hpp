@@ -23,23 +23,18 @@ namespace minire::models
 
     struct PointLight
     {
-        glm::vec4 _origin;
         glm::vec4 _color; // rgb + w is intesity
         glm::vec4 _attenuation;
 
-        PointLight(glm::vec3 const & origin,
-                   glm::vec4 const & color,
+        PointLight(glm::vec4 const & color,
                    glm::vec3 const & attenuation)
-            : _origin(origin, 1.0f)
-            , _color(color)
+            : _color(color)
             , _attenuation(attenuation, 0.0f)
         {}
 
-        PointLight(glm::vec3 const & origin,
-                   glm::vec4 const & color,
+        PointLight(glm::vec4 const & color,
                    float range)
-            : _origin(origin, 1.0f)
-            , _color(color)
+            : _color(color)
             , _attenuation(attFromRange(range), 0.0f)
         {}
 
@@ -52,7 +47,6 @@ namespace minire::models
                   PointLight const & last,
                   float const weight)
         {
-            _origin      = glm::mix(prev._origin,      last._origin,      weight);
             _color       = glm::mix(prev._color,       last._color,       weight);
             _attenuation = glm::mix(prev._attenuation, last._attenuation, weight);
         }

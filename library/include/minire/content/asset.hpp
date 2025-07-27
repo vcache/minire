@@ -6,7 +6,6 @@
 #include <minire/formats/obj.hpp>
 #include <minire/models/font.hpp>
 #include <minire/models/image.hpp>
-#include <minire/models/scene-model.hpp>
 
 #include <variant>
 
@@ -18,8 +17,7 @@ namespace minire::content
                                formats::Obj, // TODO: why not Sptr?
                                formats::GltfModelSptr,
                                models::Image::Sptr,
-                               models::Font,
-                               models::SceneModel>;
+                               models::Font>;
 
     std::string demangle(Asset const &);
 

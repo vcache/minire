@@ -1,23 +1,23 @@
 #pragma once
 
-#include <minire/content/id.hpp>
+#include <minire/content/path.hpp>
+#include <minire/material.hpp>
 #include <minire/utils/aabb.hpp>
+#include <minire/utils/std-pair-hash.hpp>
 
 #include <rasterizer/mesh.hpp>
-#include <scene/model.hpp>
 
-#include <limits>
 #include <memory>
-#include <string>
 #include <unordered_map>
-#include <vector>
 
+namespace minire { class Scene; }
 namespace minire::content { class Manager; }
 
 namespace minire::rasterizer
 {
     class Materials;
     class Ubo;
+    class MeshToken;
 
     class Meshes
     {
@@ -26,27 +26,18 @@ namespace minire::rasterizer
                         Materials const &,
                         content::Manager &);
 
-        void draw(scene::ModelRef::List &) const;
+        void draw(Scene const &) const;
 
-        void incUse(content::Id const &); // will also load()
-
-        void decUse(content::Id const &); // will also unload()
-
-        utils::Aabb const & aabb(content::Id const &) const;
+        std::shared_ptr<MeshToken> getMesh(content::Path const & source,
+                                           material::Model::Sptr const & defaultMaterial = {});
 
     private:
-        void load(content::Id const &);
-        void unload(content::Id const &);
+        std::shared_ptr<MeshToken> load(content::Path const & source,
+                                        material::Model::Sptr const & defaultMaterial);
 
     private:
-        struct StoreItem
-        {
-            Mesh::Uptr _model;
-            int        _usage = 0;
-            bool       _init = false;
-        };
-
-        using Store = std::unordered_map<content::Id, StoreItem>;
+        using Key = std::pair<content::Path, material::Model::Sptr>;
+        using Store = std::unordered_map<Key, std::weak_ptr<MeshToken>>;
 
         content::Manager & _contentManager;
         Ubo const &        _ubo;

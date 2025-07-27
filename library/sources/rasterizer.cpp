@@ -3,8 +3,9 @@
 #include <minire/content/manager.hpp>
 #include <minire/models/pbr-material.hpp>
 
-#include <rasterizer/materials/pbr.hpp>
 #include <opengl.hpp>
+#include <rasterizer/materials/pbr.hpp>
+#include <scene.hpp>
 
 #include <glm/gtx/transform.hpp>
 
@@ -38,25 +39,25 @@ namespace minire
         _2dProjection = glm::ortho(0.0f, w, 0.0f, h);
     }
 
-    void Rasterizer::draw(utils::Viewpoint const & viewpoint,
-                      Scene const & scene)
+    void Rasterizer::draw(Scene const & scene)
     {
-        // update and bind UBO
+        // 3D part
+        if (scene::Viewpoint const & viewpoint = scene.viewpoint();
+            viewpoint.hasCamera())
         {
-            glm::mat4 const & transform = viewpoint.transform();
-            size_t transformVersion = viewpoint.transformVersion();
-            _ubo.setViewProjection(transform, transformVersion);
+            auto const & [mvp, revision] = viewpoint.mvp();
+            _ubo.setViewProjection(mvp, revision);
             _ubo.setViewPosition(glm::vec4(viewpoint.position(), 1.0f));
-            _ubo.setLights(scene.cullPointLights(viewpoint, rasterizer::Ubo::maxLights()));
+            _ubo.setLights(scene);
             _ubo.bind();
+            draw3d(scene);
         }
 
-        draw3d(viewpoint, scene);
+        // 2D layer
         draw2d();
     }
 
-    void Rasterizer::draw3d(utils::Viewpoint const & viewpoint,
-                            Scene const & scene)
+    void Rasterizer::draw3d(Scene const & scene)
     {
         // setup state for 3d mode
         MINIRE_GL(glEnable, GL_CULL_FACE)
@@ -73,8 +74,7 @@ namespace minire
         _lines.draw();
 
         // draw entries
-        scene::ModelRef::List models = scene.cullModels(viewpoint);
-        _meshes.draw(models);
+        _meshes.draw(scene);
     }
 
     void Rasterizer::draw2d()

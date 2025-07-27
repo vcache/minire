@@ -1,6 +1,6 @@
 #include <minire/utils/geometry.hpp>
 
-#include <utils/viewpoint.hpp>
+#include <scene/viewpoint.hpp>
 
 #include <fmt/format.h>
 #include <glm/common.hpp>
@@ -35,8 +35,9 @@ namespace minire::utils
             && intersects(a.min().z, a.max().z, b.min().z, b.max().z);
     }
 
+#if 0
     Ray pixelToWorldRay(glm::vec2 const & windowXy,
-                        Viewpoint const & viewpoint)
+                        scene::Viewpoint const & viewpoint)
     {
         glm::vec4 const & viewport = viewpoint.window();
 
@@ -142,4 +143,5 @@ namespace minire::utils
 
         return result;
     }
+#endif
 }
