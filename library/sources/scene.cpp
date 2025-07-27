@@ -50,12 +50,10 @@ namespace minire
         {
             handle(events::controller::SceneReset{});
         }
-        else if (auto [parent, iterator] = find<ChildIterator>(e._item);
-                 parent)
-        {
-            assert(iterator != parent->_children.cend());
-            parent->_children.erase(iterator);
-        }
+
+        auto [parent, iterator] = find<ChildIterator>(e._item);
+        assert(parent && iterator != parent->_children.cend());
+        parent->_children.erase(iterator);
     }
 
     void Scene::handle(events::controller::SceneActivateCamera const & e)
@@ -149,44 +147,38 @@ namespace minire
     {
         // Find an item's iterator and its parent
         // (it must exists unless event._item points to the _root)
-        if (auto [oldParent, oldIterator] = find<ChildIterator>(e._item);
-            oldParent)
+        auto [oldParent, oldIterator] = find<ChildIterator>(e._item);
+        assert(oldParent && oldIterator != oldParent->_children.cend());
+
+        // Find a new parent and insert element to a new parent's children
+        Node::Sptr newParent = find<Node::Sptr>(e._attribute);
+        assert(newParent);
+        auto [newIt, inserted] = newParent->_children.emplace(oldIterator->first,
+                                                              oldIterator->second);
+        MINIRE_INVARIANT(inserted, "failed to insert {} into new parent: {}",
+                         e._item, e._attribute);
+
+        // Reset _parent for the element
+        std::visit(utils::Overloaded
         {
-            assert(oldIterator != oldParent->_children.cend());
-
-            // Find a new parent and insert element to a new parent's children
-            Node::Sptr newParent = find<Node::Sptr>(e._attribute);
-            assert(newParent);
-            auto [newIt, inserted] = newParent->_children.emplace(oldIterator->first,
-                                                                  oldIterator->second);
-            MINIRE_INVARIANT(inserted, "failed to insert {} into new parent: {}",
-                             e._item, e._attribute);
-
-            // Reset _parent for the element
-            std::visit(utils::Overloaded
+            [&oldParent, &newParent](auto & child)
             {
-                [](std::monostate) { MINIRE_THROW("monostate in the _children"); },
-                [&oldParent, &newParent](auto & child)
-                {
-                    assert(child);
-                    assert(child->_parent.lock() == oldParent);
-                    child->_parent = newParent;
-                }
-            }, newIt->second);
+                assert(child);
+                assert(child->_parent.lock() == oldParent);
+                child->_parent = newParent;
+            }
+        }, newIt->second);
 
-            // Erase the element from an old parent
-            oldParent->_children.erase(oldIterator);
-        }
+        // Erase the element from an old parent
+        oldParent->_children.erase(oldIterator);
     }
     
     void Scene::handle(events::controller::SceneSetVisibility const & e)
     {
         Node::Child item = find<Node::Child>(e._item);
-        std::visit(utils::Overloaded
-        {
-            [](std::monostate)              { MINIRE_THROW("monostate inside _item"); },
+        std::visit(
             [v = e._attribute](auto & item) { assert(item); item->_visible = v; },
-        }, item);
+            item);
 
         // TODO: drop lerp target when switching false -> true
         // TODO: mark as active this and their parent
@@ -229,7 +221,6 @@ namespace minire
     }
 
     // TODO: cover with tests
-    // TODO: maybe throw an error if the path wasn't found
     // - empty
     // - "node"
     // - "leaf"
@@ -270,16 +261,15 @@ namespace minire
                 else
                 {
                     // no such path element found
-                    return {};
+                    MINIRE_THROW("no such scene element: {}", path);
                 }
             }
             else
             {
                 // some leaf is alredy met, the path continues
-                return {};
+                MINIRE_THROW("no such scene element: {}", path);
             }
         }
-        assert(!std::holds_alternative<std::monostate>(current));
 
         if constexpr(std::is_same_v<T, Node::Sptr> ||
                      std::is_same_v<T, PointLightLeaf::Sptr> ||
@@ -295,6 +285,11 @@ namespace minire
         else if constexpr(!std::is_same_v<T, ChildIterator>)
         {
             result = current;
+        }
+
+        if constexpr (std::is_same_v<T, Node::Child>)
+        {
+            assert(std::visit([](auto const & i){ return i.operator bool(); }, result));
         }
 
         return result;
@@ -348,7 +343,6 @@ namespace minire
                 {
                     node->_childActivated |= std::visit(utils::Overloaded
                     {
-                        [](std::monostate) -> bool { MINIRE_THROW("monostate in _children"); },
                         [&queue](Node::Sptr & child) -> bool
                         {
                             assert(child);

@@ -164,8 +164,7 @@ namespace minire
             using Sptr = std::shared_ptr<Node>;
             using Wptr = std::weak_ptr<Node>;
 
-            using Child = std::variant<std::monostate, // TODO: maybe delete it? What the purpose?
-                                       Node::Sptr,
+            using Child = std::variant<Node::Sptr,
                                        MeshLeaf::Sptr,
                                        PointLightLeaf::Sptr,
                                        PerspectiveCameraLeaf::Sptr,
@@ -200,7 +199,8 @@ namespace minire
         using MeshLeaves = std::vector<MeshLeaf::Wptr>;
         using ChildIterator = std::pair<Node::Sptr, Node::ChildrenMap::iterator>;
 
-        // NOTE: empty path points to the _root
+        // NOTE: empty path points to the _root,
+        // Will throw if path incorrect, otherwise result guranteed to correct.
         template<typename T>
         T find(events::controller::ScenePath const &);
 
