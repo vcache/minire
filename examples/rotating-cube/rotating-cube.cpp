@@ -159,6 +159,7 @@ namespace
         void step() override
         {
             using namespace minire::events::controller;
+            using namespace minire::models;
 
             float const delta = frameTime();
             _cubeTransform._rotation = glm::rotate(_cubeTransform._rotation,

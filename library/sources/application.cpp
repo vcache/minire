@@ -352,6 +352,21 @@ namespace minire
         _scene.handle(e, _epochNumber);
     }
 
+    void Application::handle(events::controller::SceneNewAnimationSet const & e)
+    {
+        _scene.handle(e);
+    }
+
+    void Application::handle(events::controller::ScenePlayAnimation const & e)
+    {
+        _scene.handle(e);
+    }
+
+    void Application::handle(events::controller::SceneStopAnimation const & e)
+    {
+        _scene.handle(e);
+    }
+
     void Application::handle(BasicController::Batch const & batch)
     {
 #       ifndef NDEBUG
@@ -374,8 +389,10 @@ namespace minire
         assert(_controller);
 
         // notify logic thread about new events
+        size_t const pendedEvents = _applicationEvents.size(); // TODO: reserve max or p99
         _controller->push(std::move(_applicationEvents));
-        _applicationEvents.clear();
+        _applicationEvents = {};
+        _applicationEvents.reserve(pendedEvents);
 
         // fetch and handle events from controller if any
         BasicController::BatchQueue batchQueue = _controller->pull();
@@ -383,8 +400,8 @@ namespace minire
                   batchQueue.end(),
                   std::back_inserter(_controllerEvents));
 
-
         bool performLerp = false;
+        bool newEpochStarted = false;
         if (!_controllerEvents.empty())
         {
             if (_batchPlayed < 0)
@@ -420,6 +437,7 @@ namespace minire
                 }
 
                 _epochNumber++;
+                newEpochStarted = true;
 
                 if (_controllerEvents.empty())
                 {
@@ -432,6 +450,12 @@ namespace minire
                     performLerp = true;
                 }
             }
+        }
+
+        if (newEpochStarted)
+        {
+            performLerp |= _scene.advanceAnimations(_animationGap, _epochNumber);
+            _animationGap = 0;
         }
 
         if (performLerp)
@@ -455,6 +479,7 @@ namespace minire
         // advance interpolator epoch
         assert(frameTime > 0);
         _batchPlayed += frameTime;
+        _animationGap += frameTime;
 
         _frame++;
     }

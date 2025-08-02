@@ -101,6 +101,9 @@ namespace minire
         void handle(events::controller::SceneSetPointLight const &);
         void handle(events::controller::SceneSetPerspectiveCamera const &);
         void handle(events::controller::SceneSetOrthographicCamera const &);
+        void handle(events::controller::SceneNewAnimationSet const &);
+        void handle(events::controller::ScenePlayAnimation const &);
+        void handle(events::controller::SceneStopAnimation const &);
 
         template<typename Event, typename... Args>
         void postEvent(Args && ...);
@@ -123,5 +126,6 @@ namespace minire
         size_t                      _frame = 0;
         size_t                      _frameBegin; // microseconds
         size_t                      _frameEnd;   // microseconds
+        double                      _animationGap = 0; // seconds
     };
 }

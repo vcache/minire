@@ -4,8 +4,10 @@
 #include <minire/content/path.hpp>
 #include <minire/errors.hpp>
 #include <minire/events/controller/scene.hpp>
+#include <minire/models/scene-path.hpp>
 #include <minire/models/transform.hpp>
 
+#include <scene/animations.hpp>
 #include <scene/viewpoint.hpp>
 #include <utils/lerpable.hpp>
 
@@ -41,6 +43,9 @@ namespace minire
         void handle(events::controller::SceneSetPointLight const &, size_t epochNumber);
         void handle(events::controller::SceneSetPerspectiveCamera const &, size_t epochNumber);
         void handle(events::controller::SceneSetOrthographicCamera const &, size_t epochNumber);
+        void handle(events::controller::SceneNewAnimationSet const &);
+        void handle(events::controller::ScenePlayAnimation const &);
+        void handle(events::controller::SceneStopAnimation const &);
 
     public:
         void setViewport(size_t width, size_t height);
@@ -48,6 +53,8 @@ namespace minire
         scene::Viewpoint const & viewpoint() const { return _viewpoint; }
 
         void lerp(float weight, size_t epochNumber);
+
+        bool advanceAnimations(float delta /* seconds */, size_t epochNumber);
 
     public:
         template<typename Callable>
@@ -159,6 +166,39 @@ namespace minire
         using PerspectiveCameraLeaf = Leaf<utils::Lerpable<models::PerspectiveCamera>>;
         using OrthographicCameraLeaf = Leaf<utils::Lerpable<models::OrthographicCamera>>;
 
+        struct AnimationTrack
+        {
+            std::weak_ptr<Node>            _target;
+            scene::KeyframeAnimation::Sptr _animation;
+        };
+
+        // NOTE: will guarantee that each _target appears only once
+        using AnimationTracks = std::vector<AnimationTrack>;
+        using AnimationTracksSptr = std::shared_ptr<AnimationTracks>;
+
+        using AnimationSet = std::unordered_map<models::AnimationId,
+                                                AnimationTracksSptr>;
+        struct ActiveAnimation
+        {
+            using Uptr = std::unique_ptr<ActiveAnimation>;
+            using Sequencer = utils::Sequencer<float>;
+
+            struct SequencerSet
+            {
+                Sequencer::CSptr _translation;
+                Sequencer::CSptr _rotation;
+                Sequencer::CSptr _scale;
+            };
+
+            AnimationTracksSptr          _animationTracks;
+            std::vector<SequencerSet>    _animationSequencers;
+            std::vector<Sequencer::Sptr> _uniqueSequencers;
+
+            ActiveAnimation(AnimationTracksSptr const &,
+                            size_t const repeats,
+                            float const speedScale);
+        };
+
         struct Node
         {
             using Sptr = std::shared_ptr<Node>;
@@ -173,16 +213,19 @@ namespace minire
             using ChildrenMap = std::unordered_map<std::string, Child>;
             using LerpableTransform = utils::Lerpable<models::Transform>;
 
-            Scene           & _scene;
-            LerpableTransform _localTransform;
-            glm::vec3         _globalPosition;
-            glm::mat4         _globalTransform;
-            Wptr              _parent;
-            ChildrenMap       _children;
-            bool              _visible = true;
-            bool              _activated = false; // for _localTransform
-            bool              _childActivated = false;
-            bool              _hasGlobalTransform = false;
+            Scene                 & _scene;
+            LerpableTransform       _localTransform;
+            glm::vec3               _globalPosition;
+            glm::mat4               _globalTransform;
+            Wptr                    _parent;
+            ChildrenMap             _children;
+            AnimationSet            _animationSet;
+            ActiveAnimation::Uptr   _activeAnimation;
+            bool                    _visible = true;
+            bool                    _activated = false; // for _localTransform
+            bool                    _childActivated = false;
+            bool                    _hasActiveChildrenAnimation = false;
+            bool                    _hasGlobalTransform = false;
 
             Node(Scene & scene, models::Transform,
                  Wptr parent, bool visible);
@@ -204,21 +247,25 @@ namespace minire
         // NOTE: empty path points to the _root,
         // Will throw if path incorrect, otherwise result guranteed to correct.
         template<typename T>
-        T find(events::controller::ScenePath const &);
+        T find(models::ScenePath const &);
 
         template<typename T>
         void activate(T &);
 
         void activateParents(Node::Sptr);
 
+        void activeChildrenAnimation(Node::Sptr);
+        void deactiveChildrenAnimation(Node::Sptr);
+
     private:
         Rasterizer     & _rasterizer;
         Node::Sptr       _root;
         ActiveCamera     _activeCamera;
         scene::Viewpoint _viewpoint;
+        size_t           _nodesEstimate = 1;
+
 mutable PointLightLeaves _pointLightLeaves;
 mutable MeshLeaves       _meshLeaves;
-        size_t           _nodesEstimate = 0;
 
         friend class Node;
     };

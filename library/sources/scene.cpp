@@ -11,6 +11,7 @@
 #include <glm/gtx/transform.hpp>
 #include <fmt/ranges.h>
 
+#include <algorithm>
 #include <cassert>
 #include <vector>
 
@@ -40,6 +41,59 @@ namespace minire
     bool Scene::Node::lerp(float weight, size_t epochNumber)
     {
         return _localTransform.lerp(weight, epochNumber);
+    }
+
+    // ActiveAnimation //
+
+    Scene::ActiveAnimation::ActiveAnimation(AnimationTracksSptr const & animationTracks,
+                                            size_t const repeats,
+                                            float const speedScale)
+        : _animationTracks(animationTracks)
+    {
+        auto getOrMakeSequencer = [this, repeats, speedScale]
+                                  (Sequencer::Timeline const & timeline)
+        {
+            auto it = std::find_if(_uniqueSequencers.cbegin(),
+                                   _uniqueSequencers.cend(),
+                                   [&timeline](Sequencer::Sptr const & i)
+                                   {
+                                        assert(i);
+                                        return i->timeline() == timeline;
+                                   });
+            if (it != _uniqueSequencers.cend())
+            {
+                return *it;
+            }
+            auto newSequencer = std::make_shared<Sequencer>(timeline, repeats, speedScale);
+            _uniqueSequencers.emplace_back(newSequencer);
+            return newSequencer;
+        };
+
+        assert(_animationTracks);
+        _animationSequencers.reserve(_animationTracks->size());
+        for(AnimationTrack const & animationTrack : *_animationTracks)
+        {
+            assert(animationTrack._animation);
+            scene::KeyframeAnimation const & anim = *animationTrack._animation;
+
+            _animationSequencers.emplace_back(SequencerSet{});
+            SequencerSet & sequencerSet = _animationSequencers.back();
+
+            if (anim._translation)
+            {
+                sequencerSet._translation = getOrMakeSequencer(anim._translation->inputs());
+            }
+            if (anim._rotation)
+            {
+                sequencerSet._rotation = getOrMakeSequencer(anim._rotation->inputs());
+            }
+            if (anim._scale)
+            {
+                sequencerSet._scale = getOrMakeSequencer(anim._scale->inputs());
+            }
+        }
+
+        assert(_animationTracks->size() == _animationSequencers.size());
     }
 
     // Scene //
@@ -231,6 +285,79 @@ namespace minire
         activate(*orthographicCamera);
     }
 
+    void Scene::handle(events::controller::SceneNewAnimationSet const & e)
+    {
+        Node::Sptr containerNode = find<Node::Sptr>(e._containerNode);
+        assert(containerNode);
+
+        // drop any current active animation
+        if (containerNode->_activeAnimation)
+        {
+            containerNode->_activeAnimation.reset();
+            deactiveChildrenAnimation(containerNode->_parent.lock());
+        }
+
+        // transform animation set from abstract (model) into a concrete one
+        AnimationSet newAnimationSet;
+        newAnimationSet.reserve(e._animationSet.size());
+        for(auto const & [animationId, animationTracks] : e._animationSet)
+        {
+            AnimationTracksSptr animationTracksSptr = std::make_shared<AnimationTracks>();
+            animationTracksSptr->reserve(animationTracks.size());
+            for(auto const & [targetScenePath, keyframeAnimation] : animationTracks)
+            {
+                Node::Sptr targetNode = find<Node::Sptr>(models::concat(e._containerNode, targetScenePath));
+                assert(targetNode);
+                animationTracksSptr->emplace_back(AnimationTrack
+                {
+                    ._target = targetNode,
+                    ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
+                });
+            }
+            newAnimationSet.emplace(animationId, animationTracksSptr);
+        }
+
+        containerNode->_animationSet = std::move(newAnimationSet);
+
+        /*
+            PLAN 2:
+                - add an AnimationSet (Animations tokes, Channels mapping, Sequencer) into a Node
+                    - Anims will be targeted only to the underlying Nodes (children)
+                - preload node's animations (AnimationSet) at glTF instantiator (w/ optional flag)
+                - SceneAnimationPlay will be targeter by a node w/ AnimationSet
+                    - exluclusive for now, but in future may be added
+                      several Sequencers w/ Mixers and Transitions
+                - Maybe add ShortCut (size_t)
+                - Only Duplication instancing mode
+                - Spare buffers?
+        */
+    }
+
+    void Scene::handle(events::controller::ScenePlayAnimation const & e)
+    {
+        Node::Sptr node = find<Node::Sptr>(e._containerNode);
+        assert(node);
+        auto it = node->_animationSet.find(e._animationId);
+        MINIRE_INVARIANT(it != node->_animationSet.cend(),
+                         "no such animation: {}", e._animationId);
+
+        assert(it->second);
+        node->_activeAnimation = std::make_unique<ActiveAnimation>(
+            it->second, e._repeats, e._speedScale);
+        activeChildrenAnimation(node->_parent.lock());
+    }
+
+    void Scene::handle(events::controller::SceneStopAnimation const & e)
+    {
+        Node::Sptr node = find<Node::Sptr>(e._containerNode);
+        assert(node);
+        if (node->_activeAnimation)
+        {
+            node->_activeAnimation.reset();
+            deactiveChildrenAnimation(node->_parent.lock());
+        }
+    }
+
     // TODO: cover with tests
     // - empty
     // - "node"
@@ -241,7 +368,7 @@ namespace minire
     // - "node"/"not-exist"
     // - "leaf"/"anything"
     template<typename T>
-    T Scene::find(events::controller::ScenePath const & path)
+    T Scene::find(models::ScenePath const & path)
     {
         static_assert(std::is_same_v<T, Node::Child> ||
                       std::is_same_v<T, Node::Sptr> ||
@@ -325,6 +452,151 @@ namespace minire
             parent->_childActivated = true;
             parent = parent->_parent.lock();
         }
+    }
+
+    void Scene::activeChildrenAnimation(Node::Sptr parent)
+    {
+        while(parent && !parent->_hasActiveChildrenAnimation)
+        {
+            parent->_hasActiveChildrenAnimation = true;
+            parent = parent->_parent.lock();
+        }
+    }
+
+    void Scene::deactiveChildrenAnimation(Node::Sptr parent)
+    {
+        while(parent && parent->_hasActiveChildrenAnimation)
+        {
+            parent->_hasActiveChildrenAnimation = std::any_of(
+                parent->_children.cbegin(), parent->_children.cend(),
+                [](auto const & pair)
+                {
+                    return std::visit(utils::Overloaded
+                    {
+                        [](Node::Sptr const & i) { return i->_activeAnimation.operator bool(); },
+                        [](auto const &) { return false; },
+                    }, pair.second);
+                });
+            parent = parent->_parent.lock();
+        }
+    }
+
+    // TODO: don't animate invisible nodes
+    // TODO: don't animate culled-out nodes
+    bool Scene::advanceAnimations(float delta /* seconds */, size_t epochNumber)
+    {
+        assert(_root);
+        std::vector<Node::Sptr> queue{_root};
+        queue.reserve(_nodesEstimate);
+
+        bool updated = false;
+        while(!queue.empty())
+        {
+            Node::Sptr node = queue.back();
+            queue.pop_back();
+
+            assert(node);
+
+            if (node->_activeAnimation)
+            {
+                ActiveAnimation & activeAnimation = *node->_activeAnimation;
+
+                // advance all sequencers (that aren't done)
+                for(auto sequencer : activeAnimation._uniqueSequencers)
+                {
+                    assert(sequencer);
+                    if (!sequencer->isDone())
+                    {
+                        sequencer->advance(delta);
+                    }
+                }
+
+                // update transformation
+                assert(activeAnimation._animationTracks);
+                assert(activeAnimation._animationSequencers.size() == activeAnimation._animationTracks->size());
+
+                for(size_t i = 0; i < activeAnimation._animationTracks->size(); ++i)
+                {
+                    AnimationTrack const & animationTrack = (*activeAnimation._animationTracks)[i];
+                    ActiveAnimation::SequencerSet const & sequencerSet = activeAnimation._animationSequencers[i];
+
+                    Node::Sptr targetNode = animationTrack._target.lock();
+                    if (!targetNode) continue;
+
+                    assert(animationTrack._animation);
+                    scene::KeyframeAnimation const & anim = *animationTrack._animation;
+                    models::Transform current = targetNode->_localTransform.current();
+
+                    bool hasTrack = false;
+                    if (anim._translation && sequencerSet._translation &&
+                        !sequencerSet._translation->isDone())
+                    {
+                        current._translation = sequencerSet._translation->current(*anim._translation);
+                        hasTrack |= true;
+                    }
+
+                    if (anim._rotation && sequencerSet._rotation &&
+                        !sequencerSet._rotation->isDone())
+                    {
+                        current._rotation = sequencerSet._rotation->current(*anim._rotation);
+                        hasTrack |= true;
+                    }
+
+                    if (anim._scale && sequencerSet._scale &&
+                        !sequencerSet._scale->isDone())
+                    {
+                        current._scale = sequencerSet._scale->current(*anim._scale);
+                        hasTrack |= true;
+                    }
+
+                    if (hasTrack)
+                    {
+                        targetNode->_localTransform.update(epochNumber, current);
+                        activate(*targetNode);
+                        updated |= true;
+                    }
+                }
+
+                // maybe deactive (if all sequencers are done)
+                bool hasNonDoneSequencer = std::any_of(
+                    activeAnimation._uniqueSequencers.cbegin(),
+                    activeAnimation._uniqueSequencers.cend(),
+                    [](ActiveAnimation::Sequencer::Sptr const & sequencer)
+                    {
+                        assert(sequencer);
+                        return !sequencer->isDone();
+                    });
+                if (hasNonDoneSequencer)
+                {
+                    activeChildrenAnimation(node->_parent.lock());
+                }
+                else
+                {
+                    node->_activeAnimation.reset();
+                    deactiveChildrenAnimation(node->_parent.lock());
+                }
+            }
+
+            if (node->_hasActiveChildrenAnimation)
+            {
+                for(auto & [_, child] : node->_children)
+                {
+                    if (auto * nodePtr = std::get_if<Node::Sptr>(&child);
+                        nodePtr)
+                    {
+                        Node::Sptr node = *nodePtr;
+                        assert(node);
+                        if (node->_hasActiveChildrenAnimation ||
+                            node->_activeAnimation.operator bool())
+                        {
+                            queue.emplace_back(node);
+                        }
+                    }
+                }
+            }
+        }
+
+        return updated;
     }
 
     // TODO: don't lerp invisible nodes

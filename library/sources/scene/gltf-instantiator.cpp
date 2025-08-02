@@ -4,18 +4,27 @@
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
+#include <minire/models/animations.hpp>
 #include <minire/models/camera.hpp>
+#include <minire/models/interpolation.hpp>
 #include <minire/models/mesh.hpp>
 #include <minire/models/point-light.hpp>
 #include <minire/models/transform.hpp>
 
 #include <scene.hpp>
+#include <utils/gltf-buffer-reader.hpp>
 #include <utils/uuid.hpp>
 
 #include <fmt/ranges.h>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <algorithm>
+#include <memory>
+#include <type_traits>
+#include <unordered_map>
 #include <unordered_set>
+#include <variant>
+#include <vector>
 
 // TODO: why _visible flag is propagated recursively? Is this behaviour sane?
 
@@ -23,13 +32,48 @@ namespace minire::scene
 {
     namespace
     {
-        // TODO: move it somewhere into a common area
-        events::controller::ScenePath concat(events::controller::ScenePath const & prefix,
-                                             std::string suffix)
+        struct Context
         {
-            auto result = prefix;
-            result.emplace_back(suffix);
-            return result;
+            using BufferData = std::variant<
+                std::shared_ptr<std::vector<float> const>,
+                std::shared_ptr<std::vector<glm::vec3> const>,
+                std::shared_ptr<std::vector<glm::quat> const>
+            >;
+
+            using NodeIndexToScenePath = std::unordered_map<size_t /* node index */,
+                                                            models::ScenePath>;
+            using BufferDataCache = std::unordered_map<size_t /* accessor index */,
+                                                       BufferData>;
+
+            NodeIndexToScenePath _nodeIndexToScenePath;
+            BufferDataCache      _bufferDataCache;
+        };
+
+        models::Interpolation readInterpolation(std::string const & in)
+        {
+            if (in == "STEP") return models::Interpolation::kStep;
+            if (in == "LINEAR") return models::Interpolation::kLinear;
+            if (in == "CUBICSPLINE") return models::Interpolation::kCubic;
+
+            MINIRE_THROW("unexpected interpolation type: \"{}\"", in);
+        }
+
+        template<typename T>
+        std::shared_ptr<std::vector<T> const> readAccessor(int accessorIndex,
+                                                           ::tinygltf::Model const & model,
+                                                           Context & context)
+        {
+            auto it = context._bufferDataCache.find(accessorIndex);
+            if (it == context._bufferDataCache.cend())
+            {
+                std::shared_ptr<std::vector<T> const> data = utils::readAccessor<T>(
+                    accessorIndex, model);
+                auto [newIt, inserted] = context._bufferDataCache.emplace(accessorIndex, data);
+                MINIRE_INVARIANT(inserted, "broken _bufferDataCache");
+                it = newIt;
+
+            }
+            return std::get<std::shared_ptr<std::vector<T> const>>(it->second);
         }
 
         void instantiateGltfCamera(Scene & scene,
@@ -159,13 +203,10 @@ namespace minire::scene
                                  events::controller::SceneNewFromSource const & e,
                                  ::tinygltf::Model const & model,
                                  size_t const nodeIndex,
-                                 std::unordered_set<size_t> stopList = {})
+                                 bool loadAnimations,
+                                 Context & context)
         {
             //  check preconditions
-
-            MINIRE_INVARIANT(!stopList.contains(nodeIndex),
-                             "Node's loop detected: {}", stopList);
-            stopList.emplace(nodeIndex);
 
             MINIRE_INVARIANT(nodeIndex < model.nodes.size(),
                              "bad node index ({} >= {}): {}",
@@ -235,12 +276,15 @@ namespace minire::scene
                 ._visible = e._visible,
             };
             scene.handle(newNode);
+            auto [_, inserted] = context._nodeIndexToScenePath.emplace(
+                nodeIndex, models::concat(newNode._parent, newNode._id));
+            MINIRE_INVARIANT(inserted, "broken nodes network ({})", nodeIndex);
 
             // fill it with leafs
 
             events::controller::SceneNewFromSource subSource
             {
-                ._parent = concat(newNode._parent, newNode._id),
+                ._parent = models::concat(newNode._parent, newNode._id),
                 ._source = e._source,
                 ._visible = e._visible,
             };
@@ -270,14 +314,120 @@ namespace minire::scene
                 MINIRE_INVARIANT(subNodeIndex >= 0, "bad sub-node index ({}): {}",
                                  subNodeIndex, e._source);
                 instantiateGltfNode(scene, subSource, model,
-                                    static_cast<size_t>(subNodeIndex));
+                                    static_cast<size_t>(subNodeIndex),
+                                    false, context);
+            }
+
+            // maybe setup animations
+
+            if (loadAnimations)
+            {
+                // collect animations to be loaded
+                std::vector<size_t> animationIndeces;
+                animationIndeces.reserve(model.animations.size());
+                for(size_t animationIndex = 0;
+                    animationIndex < model.animations.size();
+                    ++animationIndex)
+                {
+                    ::tinygltf::Animation const & animation = model.animations[animationIndex];
+                    for (::tinygltf::AnimationChannel const & channel : animation.channels)
+                    {
+                        if (channel.target_node >= 0 &&
+                            context._nodeIndexToScenePath.contains(channel.target_node))
+                        {
+                            animationIndeces.emplace_back(animationIndex);
+                            break;
+                        }
+                    }
+                }
+
+                // load the animations
+                models::AnimationSet animationSet;
+                animationSet.reserve(animationIndeces.size());
+                for(size_t animationIndex : animationIndeces)
+                {
+                    assert(animationIndex < model.animations.size());
+                    ::tinygltf::Animation const & animation = model.animations[animationIndex];
+
+                    models::AnimationTracks animationTracks;
+                    animationTracks.reserve(animation.channels.size());
+                    for(::tinygltf::AnimationChannel const & channel : animation.channels)
+                    {
+                        // fetch target node
+                        MINIRE_INVARIANT(channel.target_node >= 0, "bad target_node: {}, {}",
+                                         channel.target_node, animation.name);
+
+                        // fetch target node's ScenePath
+                        auto scenePathIt = context._nodeIndexToScenePath.find(channel.target_node);
+                        MINIRE_INVARIANT(scenePathIt != context._nodeIndexToScenePath.cend(),
+                                         "no ScenePath mapping for {}: {}",
+                                         channel.target_node, animation.name);
+                        models::ScenePath scenePath = models::cutPrefix(scenePathIt->second, subSource._parent);
+
+                        // fetch AnimationSampler
+                        MINIRE_INVARIANT(channel.sampler >= 0, "bad animation sampler: {}, {}",
+                                         channel.sampler, animation.name);
+                        size_t const samplerIndex = static_cast<size_t>(channel.sampler);
+                        MINIRE_INVARIANT(samplerIndex < animation.samplers.size(),
+                                         "bad animation sampler: {} >= {}, {}",
+                                         samplerIndex, animation.samplers.size(), animation.name);
+                        ::tinygltf::AnimationSampler const & animationSampler = animation.samplers[samplerIndex];
+
+                        // build animation tracks
+                        models::KeyframeAnimation & keyframeAnimation = animationTracks[scenePath];
+                        using TimelineType = models::KeyframeAnimation::Timeline::element_type::value_type;
+                        keyframeAnimation._timeline = readAccessor<TimelineType>(animationSampler.input, model, context);
+
+                        if (channel.target_path == "translation")
+                        {
+                            MINIRE_INVARIANT(!keyframeAnimation._translation,
+                                             "multiple animation channels for a target node isn't supported: {}",
+                                             animation.name);
+                            using T = models::KeyframeAnimation::TranslationTrack::value_type::ValueType;
+                            keyframeAnimation._translation.emplace(readAccessor<T>(animationSampler.output, model, context),
+                                                                   readInterpolation(animationSampler.interpolation));
+                        }
+                        else if (channel.target_path == "rotation")
+                        {
+                            MINIRE_INVARIANT(!keyframeAnimation._rotation,
+                                             "multiple animation channels for a target node isn't supported: {}",
+                                             animation.name);
+                            using T = models::KeyframeAnimation::RotationTrack::value_type::ValueType;
+                            keyframeAnimation._rotation.emplace(readAccessor<T>(animationSampler.output, model, context),
+                                                                readInterpolation(animationSampler.interpolation));
+                        }
+                        else if (channel.target_path == "scale")
+                        {
+                            MINIRE_INVARIANT(!keyframeAnimation._scale,
+                                             "multiple animation channels for a target node isn't supported: {}",
+                                             animation.name);
+                            using T = models::KeyframeAnimation::ScaleTrack::value_type::ValueType;
+                            keyframeAnimation._scale.emplace(readAccessor<T>(animationSampler.output, model, context),
+                                                             readInterpolation(animationSampler.interpolation));
+                        }
+                        // TODO: support "pointer"
+                        else
+                        {
+                            MINIRE_THROW("unknown animation channel target_path: \"{}\", {}",
+                                         channel.target_path, animation.name);
+                        }
+                    }
+
+                    animationSet.emplace(animation.name.empty() ? utils::newUuid() : animation.name,
+                                         std::move(animationTracks));
+                }
+
+                // upload animations
+                scene.handle(events::controller::SceneNewAnimationSet{
+                    subSource._parent, std::move(animationSet)});
             }
         }
 
         void instantiateGltfScene(Scene & scene,
                                   events::controller::SceneNewFromSource const & e,
                                   ::tinygltf::Model const & model,
-                                  size_t const sceneIndex)
+                                  size_t const sceneIndex,
+                                  Context & context)
         {
             MINIRE_INVARIANT(sceneIndex < model.scenes.size(),
                              "bad scene index ({} >= {}): {}",
@@ -293,7 +443,7 @@ namespace minire::scene
             for(int nodeIndex : gltfScene.nodes)
             {
                 MINIRE_INVARIANT(nodeIndex >= 0, "bad node index ({}): {}", nodeIndex, e._source);
-                instantiateGltfNode(scene, e, model, static_cast<size_t>(nodeIndex));
+                instantiateGltfNode(scene, e, model, static_cast<size_t>(nodeIndex), true, context);
             }
         }
     }
@@ -317,13 +467,14 @@ namespace minire::scene
 
         // Build scene graph from a requested part of a glTF file
 
+        Context context;
         if (path.size() == 1)
         {
             // only name of file specified => load default scene
             MINIRE_INVARIANT(gltf->defaultScene >= 0, "no default scene ({}): {}",
                              gltf->defaultScene, path);
             size_t const defaultScene = static_cast<size_t>(gltf->defaultScene);
-            instantiateGltfScene(scene, e, *gltf, defaultScene);
+            instantiateGltfScene(scene, e, *gltf, defaultScene, context);
         }
         else
         {
@@ -355,11 +506,11 @@ namespace minire::scene
                     break;
 
                 case content::path::Special::kNodes:
-                    instantiateGltfNode(scene, e, *gltf, index);
+                    instantiateGltfNode(scene, e, *gltf, index, true, context);
                     break;
 
                 case content::path::Special::kScenes:
-                    instantiateGltfScene(scene, e, *gltf, index);
+                    instantiateGltfScene(scene, e, *gltf, index, context);
                     break;
             }
         }

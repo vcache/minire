@@ -10,6 +10,7 @@
 #include <minire/models/point-light.hpp>
 #include <minire/models/transform.hpp>
 
+#include <boost/algorithm/string.hpp> // for split
 #include <boost/program_options.hpp>
 
 #include <cstdlib> // for EXIT_SUCCESS
@@ -26,6 +27,10 @@ namespace
         size_t      _scene = kNoIndex;
         size_t      _node = kNoIndex;
         size_t      _mesh = kNoIndex;
+        std::string _animationSceneNode;
+        std::string _animationName;
+        size_t      _animationRepeats = -1;
+        float       _animationScale = 1.0f;
         bool        _setDefaultMaterial = false;
         bool        _showHelp = false;
     };
@@ -38,6 +43,10 @@ namespace
         static constexpr char const * kScene = "scene";
         static constexpr char const * kNode = "node";
         static constexpr char const * kMesh = "mesh";
+        static constexpr char const * kAnimationSceneNode = "animation-scene-node";
+        static constexpr char const * kAnimationName = "animation-name";
+        static constexpr char const * kAnimationRepeats = "animation-repeats";
+        static constexpr char const * kAnimationScale = "animation-scale";
         static constexpr char const * kSetDefaultMaterial = "set-default-material";
         static constexpr char const * kHelp = "help";
 
@@ -61,6 +70,18 @@ namespace
                 (kMesh,
                     po::value<size_t>()->default_value(kNoIndex),
                     "a mesh index to inspect")
+                (kAnimationSceneNode,
+                    po::value<std::string>()->default_value(""),
+                    "a scene node where an animation to be found")
+                (kAnimationName,
+                    po::value<std::string>()->default_value(""),
+                    "a animation to play")
+                (kAnimationRepeats,
+                    po::value<size_t>()->default_value(1),
+                    "animation repeats (-1 for infinite loop)")
+                (kAnimationScale,
+                    po::value<float>()->default_value(1.0),
+                    "a time scale factor for an animation")
                 (kSetDefaultMaterial,
                     po::value<bool>()->default_value(false),
                     "set default material for material-less meshes")
@@ -82,6 +103,10 @@ namespace
             _result._scene = vm[kScene].as<size_t>();
             _result._node = vm[kNode].as<size_t>();
             _result._mesh = vm[kMesh].as<size_t>();
+            _result._animationSceneNode = vm[kAnimationSceneNode].as<std::string>();
+            _result._animationName = vm[kAnimationName].as<std::string>();
+            _result._animationRepeats = vm[kAnimationRepeats].as<size_t>();
+            _result._animationScale = vm[kAnimationScale].as<float>();
             _result._setDefaultMaterial = vm[kSetDefaultMaterial].as<bool>();
             _result._showHelp = vm.count(kHelp) != 0;
         }
@@ -176,11 +201,22 @@ namespace
                                             mkPath(_arguments._filename),
                                             true);
             }
+
+            if (!_arguments._animationName.empty())
+            {
+                minire::models::ScenePath containerNode;
+                boost::split(containerNode, _arguments._animationSceneNode, boost::is_any_of("/"));
+                enqueue<ScenePlayAnimation>(_arguments._animationName,
+                                            containerNode,
+                                            _arguments._animationRepeats,
+                                            _arguments._animationScale);
+            }
         }
 
         void handle(minire::events::application::OnMouseMove const & event) override
         {
             using namespace minire::events::controller;
+            using namespace minire::models;
 
             // TODO: add panning
 
@@ -196,6 +232,7 @@ namespace
         void handle(minire::events::application::OnMouseWheel const & event) override
         {
             using namespace minire::events::controller;
+            using namespace minire::models;
 
             _dollyGrip.updateDistance(-0.5f * event._dy);
             _dollyGrip.evaluate(_cameraTransform);

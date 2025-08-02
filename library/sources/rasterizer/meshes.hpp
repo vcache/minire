@@ -19,6 +19,7 @@ namespace minire::rasterizer
     class Ubo;
     class MeshToken;
 
+    // TODO: resource should be controller by content::Manager
     class Meshes
     {
     public:

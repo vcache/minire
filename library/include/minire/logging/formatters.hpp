@@ -13,7 +13,8 @@ namespace minire::logging
     constexpr bool kIsGlmFormattable = std::is_same_v<T, ::glm::vec2>
                                     || std::is_same_v<T, ::glm::vec3>
                                     || std::is_same_v<T, ::glm::vec4>
-                                    || std::is_same_v<T, ::glm::mat4>;
+                                    || std::is_same_v<T, ::glm::mat4>
+                                    || std::is_same_v<T, ::glm::quat>;
 }
 
 template <typename T>
