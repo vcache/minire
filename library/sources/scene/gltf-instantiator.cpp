@@ -10,9 +10,11 @@
 #include <minire/models/mesh.hpp>
 #include <minire/models/point-light.hpp>
 #include <minire/models/transform.hpp>
+#include <minire/utils/demangle.hpp>
 
 #include <scene.hpp>
 #include <utils/gltf-buffer-reader.hpp>
+#include <utils/overloaded.hpp>
 #include <utils/uuid.hpp>
 
 #include <fmt/ranges.h>
@@ -76,14 +78,44 @@ namespace minire::scene
             return std::get<std::shared_ptr<std::vector<T> const>>(it->second);
         }
 
+        template<typename T>
+        size_t getElementIndex(content::path::Component const & sceneId,
+                               std::vector<T> const & container,
+                               char const * kind)
+        {
+            return std::visit(utils::Overloaded
+                {
+                    [&container, kind](content::path::Index index) -> size_t
+                    {
+                        MINIRE_INVARIANT(index < container.size(),
+                             "bad {} index ({} >= {})",
+                             kind, index, container.size());
+                        return index;
+                    },
+                    [&container, kind](content::Id const & name) -> size_t
+                    {
+                        for(size_t i = 0; i < container.size(); ++i)
+                        {
+                            if (container[i].name == name)
+                                return i;
+                        }
+                        MINIRE_THROW("no such {}: \"{}\"", kind, name);
+                    },
+                    [](auto const & v) -> size_t
+                    {
+                        using U = std::decay_t<decltype(v)>;
+                        MINIRE_THROW("unexpected path component type (not a string or size_t): {}",
+                                     utils::demangle<U>());
+                    }
+                }, sceneId);
+        }
+
         void instantiateGltfCamera(Scene & scene,
                                    events::controller::SceneNewFromSource const & e,
                                    ::tinygltf::Model const & model,
-                                   size_t const cameraIndex)
+                                   content::path::Component const & cameraId)
         {
-            MINIRE_INVARIANT(cameraIndex < model.cameras.size(),
-                             "bad camera index ({} >= {}): {}",
-                             cameraIndex, model.cameras.size(), e._source);
+            size_t const cameraIndex = getElementIndex(cameraId, model.cameras, "camera");
             ::tinygltf::Camera const & camera = model.cameras[cameraIndex];
 
             if (camera.type == "perspective")
@@ -138,11 +170,9 @@ namespace minire::scene
         void instantiateGltfMesh(Scene & scene,
                                  events::controller::SceneNewFromSource const & e,
                                  ::tinygltf::Model const & model,
-                                 size_t const meshIndex)
+                                 content::path::Component const & meshId)
         {
-            MINIRE_INVARIANT(meshIndex < model.meshes.size(),
-                             "bad mesh index ({} >= {}): {}",
-                             meshIndex, model.meshes.size(), e._source);
+            size_t const meshIndex = getElementIndex(meshId, model.meshes, "mesh");
             ::tinygltf::Mesh const & mesh = model.meshes[meshIndex];
             scene.handle(events::controller::SceneNewMesh
             {
@@ -152,7 +182,7 @@ namespace minire::scene
                 {
                     ._source = content::mkPath(e._source[0],
                                                content::path::Special::kMeshes,
-                                               content::path::Index(meshIndex)),
+                                               meshId),
                     ._defaultMaterial = {},
                 },
                 ._visible = e._visible,
@@ -164,11 +194,9 @@ namespace minire::scene
         void instantiateGltfLight(Scene & scene,
                                   events::controller::SceneNewFromSource const & e,
                                   ::tinygltf::Model const & model,
-                                  size_t const lightIndex)
+                                  content::path::Component const & lightId)
         {
-            MINIRE_INVARIANT(lightIndex < model.lights.size(),
-                             "bad light index ({} >= {}): {}",
-                             lightIndex, model.lights.size(), e._source);
+            size_t const lightIndex = getElementIndex(lightId, model.lights, "camera");
             ::tinygltf::Light const & light = model.lights[lightIndex];
 
             if (light.type == "point")
@@ -202,15 +230,12 @@ namespace minire::scene
         void instantiateGltfNode(Scene & scene,
                                  events::controller::SceneNewFromSource const & e,
                                  ::tinygltf::Model const & model,
-                                 size_t const nodeIndex,
+                                 content::path::Component const & nodeId,
                                  bool loadAnimations,
                                  Context & context)
         {
             //  check preconditions
-
-            MINIRE_INVARIANT(nodeIndex < model.nodes.size(),
-                             "bad node index ({} >= {}): {}",
-                             nodeIndex, model.nodes.size(), e._source);
+            size_t const nodeIndex = getElementIndex(nodeId, model.nodes, "node");
             ::tinygltf::Node const & node = model.nodes[nodeIndex];
 
             MINIRE_INVARIANT(node.lods.empty(), "MSFT_lod isn't supported: {}", e._source);
@@ -426,12 +451,10 @@ namespace minire::scene
         void instantiateGltfScene(Scene & scene,
                                   events::controller::SceneNewFromSource const & e,
                                   ::tinygltf::Model const & model,
-                                  size_t const sceneIndex,
+                                  content::path::Component const & sceneId,
                                   Context & context)
         {
-            MINIRE_INVARIANT(sceneIndex < model.scenes.size(),
-                             "bad scene index ({} >= {}): {}",
-                             sceneIndex, model.scenes.size(), e._source);
+            size_t const sceneIndex = getElementIndex(sceneId, model.scenes, "scene");
             ::tinygltf::Scene const & gltfScene = model.scenes[sceneIndex];
 
             if (!gltfScene.audioEmitters.empty())
@@ -486,34 +509,28 @@ namespace minire::scene
                              "unexpected second component type: {}", path);
             content::path::Special const collection = std::get<content::path::Special>(path[1]);
 
-            // fetch a index of the instantiating element
-            MINIRE_INVARIANT(std::holds_alternative<content::path::Index>(path[2]),
-                             "unexpected third component type: {}", path);
-            size_t const index = std::get<content::path::Index>(path[2]);
-
             switch(collection)
             {
                 case content::path::Special::kCameras:
-                    instantiateGltfCamera(scene, e, *gltf, index);
+                    instantiateGltfCamera(scene, e, *gltf, path[2]);
                     break;
 
                 case content::path::Special::kLights:
-                    instantiateGltfLight(scene, e, *gltf, index);
+                    instantiateGltfLight(scene, e, *gltf, path[2]);
                     break;
 
                 case content::path::Special::kMeshes:
-                    instantiateGltfMesh(scene, e, *gltf, index);
+                    instantiateGltfMesh(scene, e, *gltf, path[2]);
                     break;
 
                 case content::path::Special::kNodes:
-                    instantiateGltfNode(scene, e, *gltf, index, true, context);
+                    instantiateGltfNode(scene, e, *gltf, path[2], true, context);
                     break;
 
                 case content::path::Special::kScenes:
-                    instantiateGltfScene(scene, e, *gltf, index, context);
+                    instantiateGltfScene(scene, e, *gltf, path[2], context);
                     break;
             }
         }
-
     }
 }

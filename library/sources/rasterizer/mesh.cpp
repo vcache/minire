@@ -65,14 +65,34 @@ namespace minire::rasterizer
             [this, &source, &defaultMaterial, &materials, &ubo, &contentManager]
             (formats::GltfModelSptr const & gltf)
             {
+                // Check preconditions
                 MINIRE_INVARIANT(gltf, "gltf pointer is empty: {}", source);
                 MINIRE_INVARIANT(source.size() == 3, "too few gLTF mesh path components: {}", source.size());
                 MINIRE_INVARIANT(std::holds_alternative<content::path::Special>(source[1]) &&
                                  std::get<content::path::Special>(source[1]) == content::path::Special::kMeshes,
                                  "source path doesn't point to a meshes store: {}", source);
+
                 MINIRE_INVARIANT(std::holds_alternative<content::path::Index>(source[2]),
                                  "source path indexes mesh not by a number: {}", source);
-                size_t const meshIndex = std::get<content::path::Index>(source[2]);
+
+                // Fetch mesh index
+                size_t const meshIndex = std::visit(utils::Overloaded
+                    {
+                        [](content::path::Index index) -> size_t { return index; },
+                        [&gltf](content::Id const & name) -> size_t
+                        {
+                            for(size_t i = 0; i < gltf->meshes.size(); ++i)
+                            {
+                                if (gltf->meshes[i].name == name)
+                                    return i;
+                            }
+                            MINIRE_THROW("no such mesh: \"{}\"", name);
+                        },
+                        [](auto const &) -> size_t
+                        {
+                            MINIRE_THROW("unknown kind of mesh id (not a name or index)");
+                        }
+                    }, source[2]);
 
                 auto prefetched = utils::prefetchGltfFeatures(gltf, meshIndex, contentManager);
 
