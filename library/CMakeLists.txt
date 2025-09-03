@@ -62,12 +62,12 @@ target_link_libraries(minire
 target_compile_features(minire PUBLIC cxx_std_20)
 
 target_include_directories(minire PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/sources"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../3rd-party"
     "${SDL2_INCLUDE_DIRS}"
     "${OPENGL_INCLUDE_DIRS}" # TODO: Added in version 3.29.
     "${Boost_INCLUDE_DIRS}"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources"
 )
 
 target_compile_options(minire

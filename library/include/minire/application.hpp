@@ -7,10 +7,6 @@
 #include <minire/events/controller.hpp>
 #include <minire/sdl/gl-application.hpp>
 
-// private headers
-#include <rasterizer.hpp>
-#include <scene.hpp>
-
 // STLs
 #include <memory>
 #include <string>
@@ -21,6 +17,9 @@ namespace minire::content { class Manager; }
 
 namespace minire
 {
+    class Rasterizer;
+    class Scene;
+
     class Application : public sdl::GlApplication
     {
     public:
@@ -112,8 +111,8 @@ namespace minire
         content::Manager          & _contentManager;
 
         // render (view)
-        Rasterizer                  _rasterizer;
-        Scene                       _scene;
+        std::unique_ptr<Rasterizer> _rasterizer;
+        std::unique_ptr<Scene>      _scene;
 
         // controller (controller)
         BasicController::Uptr       _controller;

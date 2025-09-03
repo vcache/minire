@@ -4,6 +4,8 @@
 #include <minire/utils/unow.hpp>
 
 #include <opengl.hpp>
+#include <rasterizer.hpp>
+#include <scene.hpp>
 #include <scene/gltf-instantiator.hpp>
 
 #include <algorithm>
@@ -19,8 +21,8 @@ namespace minire
                              content::Manager & contentManager)
         : sdl::GlApplication(width, height, title)
         , _contentManager(contentManager)
-        , _rasterizer(contentManager)
-        , _scene(_rasterizer)
+        , _rasterizer(std::make_unique<Rasterizer>(contentManager))
+        , _scene(std::make_unique<Scene>(*_rasterizer))
     {
         setVsync(true); // TODO: into parameters
 
@@ -115,10 +117,10 @@ namespace minire
         float const fHeight = static_cast<float>(height);
 
         // required for a Projection matrix
-        _scene.setViewport(width, height);
+        _scene->setViewport(width, height);
 
         // projection for 2D gui
-        _rasterizer.setScreenSize(fWidth, fHeight);
+        _rasterizer->setScreenSize(fWidth, fHeight);
 
         // send event to controller
         postEvent<events::application::OnResize>(width, height);
@@ -142,39 +144,39 @@ namespace minire
 
     void Application::handle(events::controller::DebugDrawsUpdate const & e)
     {
-        _rasterizer.lines().update(e._linesBuffer);
+        _rasterizer->lines().update(e._linesBuffer);
     }
 
     void Application::handle(events::controller::CreateSprite const & e)
     {
-        _rasterizer.sprites().create(e._id, e._texture, e._tile, e._position,
-                                    e._visible, e._z);
+        _rasterizer->sprites().create(e._id, e._texture, e._tile, e._position,
+                                      e._visible, e._z);
     }
 
     void Application::handle(events::controller::CreateNinePatch const & e)
     {
-        _rasterizer.sprites().create(e._id, e._texture, e._tile, e._position,
-                                    e._dimensions, e._visible, e._z);
+        _rasterizer->sprites().create(e._id, e._texture, e._tile, e._position,
+                                      e._dimensions, e._visible, e._z);
     }
 
     void Application::handle(events::controller::ResizeNinePatch const & e)
     {
-        _rasterizer.sprites().resize(e._id, e._dimensions);
+        _rasterizer->sprites().resize(e._id, e._dimensions);
     }
 
     void Application::handle(events::controller::MoveSprite const & e)
     {
-        _rasterizer.sprites().move(e._id, e._position);
+        _rasterizer->sprites().move(e._id, e._position);
     }
 
     void Application::handle(events::controller::VisibleSprite const & e)
     {
-        _rasterizer.sprites().visible(e._id, e._visible);
+        _rasterizer->sprites().visible(e._id, e._visible);
     }
 
     void Application::handle(events::controller::RemoveSprite const & e)
     {
-        _rasterizer.sprites().remove(e._id);
+        _rasterizer->sprites().remove(e._id);
     }
 
     void Application::handle(events::controller::BulkSetSpriteZOrders const & e)
@@ -182,29 +184,29 @@ namespace minire
         for(std::pair<std::string, size_t> const & i : e._items)
         {
             MINIRE_DEBUG("setting Z for sprite \"{}\" to {}", i.first, i.second);
-            _rasterizer.sprites().setZOrder(i.first, i.second);
+            _rasterizer->sprites().setZOrder(i.first, i.second);
         }
     }
 
     void Application::handle(events::controller::CreateLabel const & e)
     {
-        _rasterizer.labels().allocate(e._id, e._z, e._visible);
+        _rasterizer->labels().allocate(e._id, e._z, e._visible);
     }
 
     void Application::handle(events::controller::ResizeLabel const & e)
     {
-        _rasterizer.labels().get(e._id).resize(e._rows, e._cols);
+        _rasterizer->labels().get(e._id).resize(e._rows, e._cols);
     }
 
     void Application::handle(events::controller::MoveLabel const & e)
     {
-        _rasterizer.labels().get(e._id).setPosition(e._x, e._y);
+        _rasterizer->labels().get(e._id).setPosition(e._x, e._y);
     }
 
     void Application::handle(events::controller::SetCharLabel const & e)
     {
-        _rasterizer
-            .labels()
+        _rasterizer->
+             labels()
             .get(e._id)
             .at(e._row, e._col)
             .set(e._format, e._char);
@@ -212,16 +214,16 @@ namespace minire
 
     void Application::handle(events::controller::SetSymbolLabel const & e)
     {
-        _rasterizer
-            .labels()
+        _rasterizer->
+             labels()
             .get(e._id)
             .at(e._row, e._col) = e._symbol;
     }
     
     void Application::handle(events::controller::UnsetCharLabel const & e)
     {
-        _rasterizer
-            .labels()
+        _rasterizer->
+             labels()
             .get(e._id)
             .at(e._row, e._col)
             .unset();
@@ -229,33 +231,33 @@ namespace minire
 
     void Application::handle(events::controller::SetStringLabel const & e)
     {
-        _rasterizer.labels().get(e._id).set(e._row, e._col, e._string);
+        _rasterizer->labels().get(e._id).set(e._row, e._col, e._string);
     }
 
     void Application::handle(events::controller::SetLabelCursor const & e)
     {
-        _rasterizer.labels().get(e._id).setCursor(e._col, e._row);
+        _rasterizer->labels().get(e._id).setCursor(e._col, e._row);
     }
 
     void Application::handle(events::controller::UnsetLabelCursor const & e)
     {
-        _rasterizer.labels().get(e._id).unsetCursor();
+        _rasterizer->labels().get(e._id).unsetCursor();
     }
 
     void Application::handle(events::controller::SetLabelVisible const & e)
     {
-        _rasterizer.labels().get(e._id).setVisible(e._visible);
+        _rasterizer->labels().get(e._id).setVisible(e._visible);
     }
 
     void Application::handle(events::controller::SetLabelFonts const & e)
     {
-        _rasterizer.labels().get(e._id).setFont(e._fontName,
-                                               _contentManager);
+        _rasterizer->labels().get(e._id).setFont(e._fontName,
+                                                 _contentManager);
     }
 
     void Application::handle(events::controller::RemoveLabel const & e)
     {
-        _rasterizer.labels().deallocate(e._id);
+        _rasterizer->labels().deallocate(e._id);
     }
 
     void Application::handle(events::controller::BulkSetLabelZOrders const & e)
@@ -263,7 +265,7 @@ namespace minire
         for(std::pair<std::string, size_t> const & i : e._items)
         {
             MINIRE_DEBUG("setting Z for label \"{}\" to {}", i.first, i.second);
-            _rasterizer.labels().get(i.first).setZOrder(i.second);
+            _rasterizer->labels().get(i.first).setZOrder(i.second);
         }
     }
 
@@ -279,92 +281,92 @@ namespace minire
 
     void Application::handle(events::controller::SceneReset const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneDispose const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneActivateCamera const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneNewNode const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneNewFromSource const & e)
     {
-        scene::instantiateGltf(_scene, e, _contentManager);
+        scene::instantiateGltf(*_scene, e, _contentManager);
     }
 
     void Application::handle(events::controller::SceneNewMesh const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneNewPointLight const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneNewPerspectiveCamera const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneNewOrthographicCamera const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneSetParent const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneSetVisibility const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneSetTransform const & e)
     {
-        _scene.handle(e, _epochNumber);
+        _scene->handle(e, _epochNumber);
     }
 
     void Application::handle(events::controller::SceneSetPointLight const & e)
     {
-        _scene.handle(e, _epochNumber);
+        _scene->handle(e, _epochNumber);
     }
 
     void Application::handle(events::controller::SceneSetPerspectiveCamera const & e)
     {
-        _scene.handle(e, _epochNumber);
+        _scene->handle(e, _epochNumber);
     }
 
     void Application::handle(events::controller::SceneSetOrthographicCamera const & e)
     {
-        _scene.handle(e, _epochNumber);
+        _scene->handle(e, _epochNumber);
     }
 
     void Application::handle(events::controller::SceneNewAnimationSet const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::ScenePlayAnimation const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(events::controller::SceneStopAnimation const & e)
     {
-        _scene.handle(e);
+        _scene->handle(e);
     }
 
     void Application::handle(BasicController::Batch const & batch)
@@ -454,20 +456,20 @@ namespace minire
 
         if (newEpochStarted)
         {
-            performLerp |= _scene.advanceAnimations(_animationGap, _epochNumber);
+            performLerp |= _scene->advanceAnimations(_animationGap, _epochNumber);
             _animationGap = 0;
         }
 
         if (performLerp)
         {
             double const weight = _batchPlayed / _controllerEvents[0]._duration;
-            _scene.lerp(weight, _epochNumber);
+            _scene->lerp(weight, _epochNumber);
         }
 
         // draw a frame
         // TODO: maybe skip it if not performLerp ?
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        _rasterizer.draw(_scene);
+        _rasterizer->draw(*_scene);
         ::SDL_GL_SwapWindow(window());
 
         // calc frame time
