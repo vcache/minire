@@ -20,9 +20,11 @@ namespace minire::grips
     class Orbiting
     {
     public:
-        Orbiting(glm::vec3 target, float distance)
+        Orbiting(glm::vec3 target, float distance, float thetha = 0, float phi = 0)
             : _target(target)
             , _distance(distance)
+            , _thetha(thetha)
+            , _phi(phi)
         {}
 
         void evaluate(models::Transform & output)
