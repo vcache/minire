@@ -668,6 +668,7 @@ namespace minire
 
             assert(node);
 
+            bool dropChildTrans = false;
             if (!node->_hasGlobalTransform)
             {
                 models::Transform const & localTransform = node->_localTransform.current();
@@ -681,15 +682,21 @@ namespace minire
                 node->_globalTransform = parentGlobalTransform * localTransformMatrix;
                 node->_globalPosition = node->_globalTransform * kOrigin; // will drop "w"
                 node->_hasGlobalTransform = true;
+                dropChildTrans = true;
             }
 
+            // TODO: don't need do it for all children, maybe use 3-state flag:
+            //  - green: has global trans and so as all children
+            //  - yellow: has global trans, but some children may not (update bottom-up)
+            //  - red: no global trans, have to recalc as for all children
             for(auto & [_, child] : node->_children)
             {
                 std::visit(utils::Overloaded
                 {
-                    [&queue](Node::Sptr & node)
+                    [&queue, dropChildTrans](Node::Sptr & node)
                     {
                         assert(node);
+                        if (dropChildTrans) node->_hasGlobalTransform = false;
                         queue.push_back(node);
                     },
                     [](auto &) {},
