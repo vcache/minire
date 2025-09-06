@@ -128,7 +128,7 @@ namespace minire
             // count FPS of a controller
             if (auto fps = fpsCounter.registerFrame(); fps)
             {
-                std::string title = fmt::format("[{}  fps, mft = {} ms]",
+                std::string title = fmt::format("[{}  fps, mft = {:.4f} ms]",
                                                 fps->first, fps->second);
                 MINIRE_DEBUG("controller FPS: {}", title);
             }

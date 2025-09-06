@@ -3,6 +3,7 @@
 #include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/grips/orbiting.hpp>
+#include <minire/grips/screen-space-panning.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/camera.hpp>
 #include <minire/models/mesh.hpp>
@@ -215,8 +216,6 @@ namespace
             }
         }
 
-        // TODO: camera's fov/zoom and screen resolution should be taken into account
-        //       to provide unform panning movement (i.e. the pixel under a cursor must remain the same)
         void handle(minire::events::application::OnMouseMove const & event) override
         {
             using namespace minire::events::controller;
@@ -231,14 +230,9 @@ namespace
             }
             else if (event._right && _panning)
             {
-                glm::vec2 const screenPos{static_cast<float>(event._absX),
-                                          static_cast<float>(event._absY)};
-                glm::vec2 const screenDelta = screenPos - _panning->_begin;
-
-                glm::mat4 const matrix = _cameraTransform.matrix();
-                _panning->_offset = 0.01f * (glm::vec3(matrix[0]) * (-screenDelta.x) +
-                                             glm::vec3(matrix[1])* (screenDelta.y));
-                _dollyGrip.target() = _target + _panning->_offset;
+                _dollyGrip.target() = _panning.update(event._absX, event._absY,
+                                                      _cameraTransform.matrix(),
+                                                      _target);
                 updated = true;
             }
 
@@ -253,12 +247,7 @@ namespace
         {
             if (e._mouseButton == minire::models::MouseButton::kRight)
             {
-                _panning = Panning
-                {
-                    ._begin = glm::vec2(static_cast<float>(e._x),
-                                        static_cast<float>(e._y)),
-                    ._offset = glm::vec3(0.0f)
-                };
+                _panning.start(e._x, e._y);
             }
         }
 
@@ -266,8 +255,7 @@ namespace
         {
             if (_panning)
             {
-                _target += _panning->_offset;
-                _panning.reset();
+                _panning.finish(_target);
             }
         }
 
@@ -282,17 +270,11 @@ namespace
         }
 
     private:
-        struct Panning
-        {
-            glm::vec2 _begin; // screen space
-            glm::vec3 _offset;
-        };
-
-        Arguments const &         _arguments;
-        minire::models::Transform _cameraTransform;
-        glm::vec3                 _target;
-        minire::grips::Orbiting   _dollyGrip;
-        std::optional<Panning>    _panning;
+        Arguments const &                 _arguments;
+        minire::models::Transform         _cameraTransform;
+        glm::vec3                         _target;
+        minire::grips::Orbiting           _dollyGrip;
+        minire::grips::ScreenSpacePanning _panning;
     };
 }
 
