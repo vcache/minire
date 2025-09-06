@@ -15,7 +15,6 @@ namespace minire::grips
 {
     // TODO: screen resoution to sensitivity
     // TODO: limits & sensevity
-    // TODO: add panning
     // TODO: helpers for events::application::* processing and active camera
     class Orbiting
     {
@@ -35,6 +34,8 @@ namespace minire::grips
             output._translation.y = _distance * std::sin(_phi);
             output._translation.z = _distance * std::sin(_thetha) * std::cos(_phi);
 
+            output._translation += _target;
+
             glm::mat4 transform = glm::lookAt(output._translation, _target, kUp);
             output._rotation = glm::toQuat(glm::inverse(transform));
         }
@@ -50,14 +51,18 @@ namespace minire::grips
             _thetha += dThetha;
             _phi += dPhi;
 
-            _phi = glm::clamp<float>(_phi, -M_PI/2.0f + std::numeric_limits<float>::epsilon(),
-                                            M_PI/2.0f - std::numeric_limits<float>::epsilon());
+            constexpr float const kEpsilon = std::numeric_limits<float>::epsilon();
+            _phi = glm::clamp<float>(_phi, -M_PI/2.0f + kEpsilon, M_PI/2.0f - kEpsilon);
         }
+
+        glm::vec3 & target() { return _target; }
+
+        glm::vec3 const & target() const { return _target; }
 
     private:
         glm::vec3 _target;
         float     _distance;
-        float     _thetha = 0;
-        float     _phi = 0;
+        float     _thetha;
+        float     _phi;
     };
 }

@@ -38,6 +38,14 @@ namespace minire::scene
 
         void setCamera(models::OrthographicCamera const &);
 
+        size_t width() const { return _vpWidth; }
+
+        size_t height() const { return _vpHeight; }
+
+        glm::mat4 const & view() const { return _view; }
+
+        glm::mat4 const & projection() const { return _projection; }
+
     private:
         bool isSame(models::PerspectiveCamera const &) const;
         bool isSame(models::OrthographicCamera const &) const;

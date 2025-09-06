@@ -5,6 +5,7 @@
 #include <minire/errors.hpp>
 #include <minire/events/application.hpp>
 #include <minire/events/controller.hpp>
+#include <minire/models/scene-queries.hpp>
 #include <minire/sdl/gl-application.hpp>
 
 // STLs
@@ -37,7 +38,7 @@ namespace minire
             MINIRE_INVARIANT(!_controller, "Controller cannot be re-set");
 
             auto controller = std::make_unique<Controller>(std::forward<Args>(args)...);
-            controller->run(events::application::OnResize{width(), height()});
+            controller->run(events::application::OnResize(width(), height(), models::SceneTraits()));
             _controller = std::move(controller);
             return static_cast<Controller &>(*_controller);
         }
@@ -103,9 +104,15 @@ namespace minire
         void handle(events::controller::SceneNewAnimationSet const &);
         void handle(events::controller::ScenePlayAnimation const &);
         void handle(events::controller::SceneStopAnimation const &);
+        void handle(events::controller::SceneSetQuery const &);
+        void handle(events::controller::SceneUnsetQuery const &);
 
         template<typename Event, typename... Args>
         void postEvent(Args && ...);
+
+        models::SceneTraits makeSceneTraits(models::QueryEventFilter const) const;
+        models::QueryFlags const & queryFlags(models::QueryEventFilter const) const;
+        models::QueryFlags & queryFlags(models::QueryEventFilter const);
 
     private:
         content::Manager          & _contentManager;
@@ -126,5 +133,20 @@ namespace minire
         size_t                      _frameBegin; // microseconds
         size_t                      _frameEnd;   // microseconds
         double                      _animationGap = 0; // seconds
+
+        // scene queries
+        models::QueryFlags          _onFpsQueryFlags;
+        models::QueryFlags          _onResizeQueryFlags;
+        models::QueryFlags          _onMouseWheelQueryFlags;
+        models::QueryFlags          _onMouseMoveQueryFlags;
+        models::QueryFlags          _onMouseDownQueryFlags;
+        models::QueryFlags          _onMouseUpQueryFlags;
+        models::QueryFlags          _onKeyUpQueryFlags;
+        models::QueryFlags          _onKeyDownQueryFlags;
+        models::QueryFlags          _onTextInputQueryFlags;
+
+        // state
+        size_t                      _mouseX = 0;
+        size_t                      _mouseY = 0;
     };
 }

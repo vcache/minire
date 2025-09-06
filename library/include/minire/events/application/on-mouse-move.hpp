@@ -1,9 +1,13 @@
 #pragma once
 
+#include <minire/events/application/base.hpp>
+
 namespace minire::events::application
 {
-    struct OnMouseMove
+    struct OnMouseMove : public Base
     {
+        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnMouseMove;
+
         int  _absX;
         int  _absY;
         int  _relX;
@@ -14,6 +18,7 @@ namespace minire::events::application
         bool _x1;
         bool _x2;
 
+        template<typename... BaseArgs>
         OnMouseMove(int  absX,
                     int  absY,
                     int  relX,
@@ -22,8 +27,10 @@ namespace minire::events::application
                     bool middle,
                     bool right,
                     bool x1,
-                    bool x2)
-            : _absX(absX)
+                    bool x2,
+                    BaseArgs && ... baseArgs)
+            : Base(std::forward<BaseArgs>(baseArgs)...)
+            , _absX(absX)
             , _absY(absY)
             , _relX(relX)
             , _relY(relY)

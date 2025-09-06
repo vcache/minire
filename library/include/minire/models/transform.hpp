@@ -5,6 +5,7 @@
 #include <glm/common.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/transform.hpp>
 #include <glm/vec3.hpp>
 
 namespace minire::models
@@ -48,6 +49,13 @@ namespace minire::models
 #           if GLM_VERSION < 999
             _rotation = glm::conjugate(_rotation);
 #           endif
+        }
+
+        glm::mat4 matrix() const
+        {
+            return glm::translate(_translation) *
+                   glm::toMat4(_rotation) *
+                   glm::scale(_scale);
         }
     };
 }

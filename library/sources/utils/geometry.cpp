@@ -35,30 +35,33 @@ namespace minire::utils
             && intersects(a.min().z, a.max().z, b.min().z, b.max().z);
     }
 
-#if 0
     Ray pixelToWorldRay(glm::vec2 const & windowXy,
                         scene::Viewpoint const & viewpoint)
     {
-        glm::vec4 const & viewport = viewpoint.window();
+        glm::vec4 const viewport{0.0f, 0.0f, viewpoint.width(), viewpoint.height()};
 
         glm::vec3 win(windowXy.x,
                       viewport.w - windowXy.y,
                       0.0f);
 
-        glm::vec3 const v0 = glm::unProject(win,
+        glm::vec3 const v0 = glm::unProject(win, // near
                                             viewpoint.view(),
                                             viewpoint.projection(),
                                             viewport);
         win.z = 1.0f;
-        glm::vec3 const v1 = glm::unProject(win,
+        glm::vec3 const v1 = glm::unProject(win, // far
                                             viewpoint.view(),
                                             viewpoint.projection(),
                                             viewport);
 
-        return Ray{viewpoint.position(),
-                   glm::normalize(v1 - v0)};
+        return Ray
+        {
+            ._origin = v0, // TODO: why viewpoint.position() ??
+            ._direction = glm::normalize(v1 - v0)
+        };
     }
 
+#if 0
     std::optional<glm::vec3> intersectXZ(Ray const & ray)
     {
         static const glm::vec3 kPlaneNormal(0, 1, 0);

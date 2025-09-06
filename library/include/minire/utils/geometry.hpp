@@ -6,24 +6,27 @@
 #include <glm/vec3.hpp>
 
 #include <algorithm>
+#include <memory>
 #include <optional>
+
+namespace minire::scene { class Viewpoint; }
 
 namespace minire::utils
 {
-    class Viewpoint;
-
     struct Ray
     {
         glm::vec3 _origin = glm::vec3(0, 0, 0);
         glm::vec3 _direction = glm::vec3(0, 0, 0);
+
+        using Uptr = std::unique_ptr<Ray>;
     };
 
     bool isIntersects(Aabb const &, Aabb const &);
     bool isIntersectsXZ(Aabb const &, Aabb const &);
 
     Ray pixelToWorldRay(glm::vec2 const &,
-                        Viewpoint const &);
-
+                        scene::Viewpoint const &);
+#if 0
     std::optional<glm::vec3> intersectXZ(Ray const &);
 
     struct GroundHit
@@ -46,4 +49,5 @@ namespace minire::utils
     GroundHit intersectXZBoundary(Viewpoint const & viewpoint,
                                   glm::vec2 const & lowerBound,
                                   glm::vec2 const & upperBound);
+#endif
 }

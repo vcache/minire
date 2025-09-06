@@ -1,14 +1,21 @@
 #pragma once
 
+#include <minire/events/application/base.hpp>
+
 namespace minire::events::application
 {
-    struct OnMouseWheel
+    struct OnMouseWheel : public Base
     {
+        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnMouseWheel;
+
         int _dx;
         int _dy;
 
-        OnMouseWheel(int dx, int dy)
-            : _dx(dx)
+        template<typename... BaseArgs>
+        OnMouseWheel(int dx, int dy,
+                     BaseArgs && ... baseArgs)
+            : Base(std::forward<BaseArgs>(baseArgs)...)
+            , _dx(dx)
             , _dy(dy)
         {}
     };   

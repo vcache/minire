@@ -16,6 +16,7 @@
 #include <cstdlib> // for EXIT_SUCCESS
 #include <iostream>
 #include <limits>
+#include <optional>
 
 namespace
 {
@@ -133,7 +134,8 @@ namespace
         explicit GltfViewer(Arguments const & arguments)
             : BasicController(60)
             , _arguments(arguments)
-            , _dollyGrip(glm::vec3(0, 0, 0), 10)
+            , _target(0.0f, 0.0f, 0.0f)
+            , _dollyGrip(_target, 10)
         {}
 
         void start() override
@@ -213,19 +215,59 @@ namespace
             }
         }
 
+        // TODO: camera's fov/zoom and screen resolution should be taken into account
+        //       to provide unform panning movement (i.e. the pixel under a cursor must remain the same)
         void handle(minire::events::application::OnMouseMove const & event) override
         {
             using namespace minire::events::controller;
             using namespace minire::models;
 
-            // TODO: add panning
-
+            bool updated = false;
             if (event._left)
             {
                 _dollyGrip.updateAngles(0.01f * static_cast<float>(event._relX),
-                                               0.01f * static_cast<float>(event._relY));
+                                        0.01f * static_cast<float>(event._relY));
+                updated = true;
+            }
+            else if (event._right && _panning)
+            {
+                glm::vec2 const screenPos{static_cast<float>(event._absX),
+                                          static_cast<float>(event._absY)};
+                glm::vec2 const screenDelta = screenPos - _panning->_begin;
+
+                glm::mat4 const matrix = _cameraTransform.matrix();
+                _panning->_offset = 0.01f * (glm::vec3(matrix[0]) * (-screenDelta.x) +
+                                             glm::vec3(matrix[1])* (screenDelta.y));
+                _dollyGrip.target() = _target + _panning->_offset;
+                updated = true;
+            }
+
+            if (updated)
+            {
                 _dollyGrip.evaluate(_cameraTransform);
                 enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
+            }
+        }
+
+        void handle(minire::events::application::OnMouseDown const & e) override
+        {
+            if (e._mouseButton == minire::models::MouseButton::kRight)
+            {
+                _panning = Panning
+                {
+                    ._begin = glm::vec2(static_cast<float>(e._x),
+                                        static_cast<float>(e._y)),
+                    ._offset = glm::vec3(0.0f)
+                };
+            }
+        }
+
+        void handle(minire::events::application::OnMouseUp const &) override
+        {
+            if (_panning)
+            {
+                _target += _panning->_offset;
+                _panning.reset();
             }
         }
 
@@ -240,9 +282,17 @@ namespace
         }
 
     private:
+        struct Panning
+        {
+            glm::vec2 _begin; // screen space
+            glm::vec3 _offset;
+        };
+
         Arguments const &         _arguments;
         minire::models::Transform _cameraTransform;
+        glm::vec3                 _target;
         minire::grips::Orbiting   _dollyGrip;
+        std::optional<Panning>    _panning;
     };
 }
 

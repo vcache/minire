@@ -8,7 +8,6 @@
 #include <minire/utils/geometry.hpp>
 #include <utils/overloaded.hpp>
 
-#include <glm/gtx/transform.hpp>
 #include <fmt/ranges.h>
 
 #include <algorithm>
@@ -672,9 +671,7 @@ namespace minire
             if (!node->_hasGlobalTransform)
             {
                 models::Transform const & localTransform = node->_localTransform.current();
-                glm::mat4 localTransformMatrix = glm::translate(localTransform._translation) *
-                                                 glm::toMat4(localTransform._rotation) *
-                                                 glm::scale(localTransform._scale);
+                glm::mat4 localTransformMatrix = localTransform.matrix();
                 Node::Sptr parent = node->_parent.lock();
                 assert(!parent || parent->_hasGlobalTransform);
                 glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransform

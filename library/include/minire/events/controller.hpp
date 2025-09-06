@@ -56,5 +56,7 @@ namespace minire::events
                                     controller::SceneSetOrthographicCamera,
                                     controller::SceneNewAnimationSet,
                                     controller::ScenePlayAnimation,
-                                    controller::SceneStopAnimation>;
+                                    controller::SceneStopAnimation,
+                                    controller::SceneSetQuery,
+                                    controller::SceneUnsetQuery>;
 }
