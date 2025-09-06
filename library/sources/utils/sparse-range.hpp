@@ -32,7 +32,7 @@ namespace minire::utils
 
             sort();
 
-            T begin;
+            T begin = T();
             int nesting = 0;
             for(Item const & i : _items)
             {
