@@ -517,13 +517,12 @@ namespace minire
         // notify logic thread about new events
         size_t const pendedEvents = _applicationEvents.size(); // TODO: reserve max or p99
         _controller->push(std::move(_applicationEvents));
-        _applicationEvents.clear();
+        _applicationEvents = events::ApplicationQueue();
         _applicationEvents.reserve(pendedEvents);
 
         // fetch and handle events from controller if any
         BasicController::BatchQueue batchQueue = _controller->pull();
-        std::move(batchQueue.begin(),
-                  batchQueue.end(),
+        std::move(batchQueue.begin(), batchQueue.end(),
                   std::back_inserter(_controllerEvents));
 
         bool performLerp = false;
