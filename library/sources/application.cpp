@@ -2,6 +2,7 @@
 
 #include <minire/logging.hpp>
 #include <minire/utils/geometry.hpp>
+#include <minire/utils/ray-caster.hpp>
 #include <minire/utils/unow.hpp>
 
 #include <opengl.hpp>
@@ -140,6 +141,23 @@ namespace minire
     void Application::onFps(size_t fps, double mft)
     {
         postEvent<events::application::OnFps>(fps, mft, _frame);
+    }
+
+    void Application::maybeIssueRayCaster()
+    {
+        assert(_scene);
+        if (_rayCasterEnabled)
+        {
+            scene::Viewpoint const & vp = _scene->viewpoint();
+            if (size_t const vpRevision = vp.revision();
+                _rayCasterRevision < vpRevision)
+            {
+                auto rayCaster = std::make_unique<utils::RayCaster>(
+                    vp.width(), vp.height(), vp.view(), vp.projection());
+                postEvent<events::application::OnRayCaster>(std::move(rayCaster));
+                _rayCasterRevision = vpRevision;
+            }
+        }
     }
 
     models::SceneTraits
@@ -467,6 +485,11 @@ namespace minire
         queryFlags(e._eventFilter).unset(e._queryKind);
     }
 
+    void Application::handle(events::controller::SetRayCaster const & e)
+    {
+        _rayCasterEnabled = e._enabled;
+    }
+
     void Application::handle(BasicController::Batch const & batch)
     {
 #       ifndef NDEBUG
@@ -488,10 +511,13 @@ namespace minire
     {
         assert(_controller);
 
+        // maybe issue a ray caster
+        maybeIssueRayCaster();
+
         // notify logic thread about new events
         size_t const pendedEvents = _applicationEvents.size(); // TODO: reserve max or p99
         _controller->push(std::move(_applicationEvents));
-        _applicationEvents = {};
+        _applicationEvents.clear();
         _applicationEvents.reserve(pendedEvents);
 
         // fetch and handle events from controller if any

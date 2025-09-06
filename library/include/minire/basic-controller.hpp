@@ -81,6 +81,7 @@ namespace minire
         virtual void handle(events::application::OnKeyUp const &);
         virtual void handle(events::application::OnKeyDown const &);
         virtual void handle(events::application::OnTextInput const &);
+        virtual void handle(events::application::OnRayCaster const &);
 
         virtual void postprocess();
 

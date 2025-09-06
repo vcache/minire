@@ -106,6 +106,7 @@ namespace minire
         void handle(events::controller::SceneStopAnimation const &);
         void handle(events::controller::SceneSetQuery const &);
         void handle(events::controller::SceneUnsetQuery const &);
+        void handle(events::controller::SetRayCaster const &);
 
         template<typename Event, typename... Args>
         void postEvent(Args && ...);
@@ -113,6 +114,8 @@ namespace minire
         models::SceneTraits makeSceneTraits(models::QueryEventFilter const) const;
         models::QueryFlags const & queryFlags(models::QueryEventFilter const) const;
         models::QueryFlags & queryFlags(models::QueryEventFilter const);
+
+        void maybeIssueRayCaster();
 
     private:
         content::Manager          & _contentManager;
@@ -144,6 +147,8 @@ namespace minire
         models::QueryFlags          _onKeyUpQueryFlags;
         models::QueryFlags          _onKeyDownQueryFlags;
         models::QueryFlags          _onTextInputQueryFlags;
+        bool                        _rayCasterEnabled = false;
+        size_t                      _rayCasterRevision = 0;
 
         // state
         size_t                      _mouseX = 0;

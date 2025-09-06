@@ -210,4 +210,6 @@ namespace minire
     void BasicController::handle(events::application::OnKeyDown const &) {}
 
     void BasicController::handle(events::application::OnTextInput const &) {}
+
+    void BasicController::handle(events::application::OnRayCaster const &) {}
 }

@@ -716,10 +716,12 @@ namespace minire
                     MINIRE_INVARIANT(parent->_hasGlobalTransform,
                                      "an active camera's node has no global transform");
                     // TODO: don't update if transform didn't change
+                    //       (to avoid expensive change checks inside setTransform)
                     _viewpoint.setTransform(parent->_globalTransform,
                                             parent->_globalPosition);
 
                     // TODO: don't update unless camera or its parameters changed
+                    //       (to avoid expensive change checks inside setCamera)
                     _viewpoint.setCamera(camera->current());
                 }
                 else

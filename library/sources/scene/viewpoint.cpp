@@ -27,9 +27,13 @@ namespace minire::scene
     void Viewpoint::setTransform(glm::mat4 const & view,
                                  glm::vec3 const & position)
     {
-        _position = position;
-        _view = glm::inverse(view);
-        invalidate();
+        glm::mat4 inverseView = glm::inverse(view);
+        if (_position != position || inverseView != _view)
+        {
+            _position = position;
+            _view = inverseView;
+            invalidate();
+        }
     }
 
     void Viewpoint::unsetCamera()

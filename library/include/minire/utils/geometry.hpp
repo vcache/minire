@@ -6,7 +6,6 @@
 #include <glm/vec3.hpp>
 
 #include <algorithm>
-#include <optional>
 
 namespace minire::scene { class Viewpoint; }
 

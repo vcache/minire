@@ -9,6 +9,7 @@
 #include <minire/events/application/on-key-up.hpp>
 #include <minire/events/application/on-key-down.hpp>
 #include <minire/events/application/on-text-input.hpp>
+#include <minire/events/application/on-ray-caster.hpp>
 
 #include <variant>
 #include <vector>
@@ -23,7 +24,8 @@ namespace minire::events
                                      application::OnMouseUp,
                                      application::OnKeyUp,
                                      application::OnKeyDown,
-                                     application::OnTextInput>;
+                                     application::OnTextInput,
+                                     application::OnRayCaster>;
 
     // TODO: move this to minire/events/application.hpp
     using ApplicationQueue = std::vector<Application>;

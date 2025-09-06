@@ -46,6 +46,8 @@ namespace minire::scene
 
         glm::mat4 const & projection() const { return _projection; }
 
+        size_t revision() const { revalidate(); return _revision; }
+
     private:
         bool isSame(models::PerspectiveCamera const &) const;
         bool isSame(models::OrthographicCamera const &) const;

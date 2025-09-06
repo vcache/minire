@@ -126,4 +126,9 @@ namespace minire::events::controller
         models::QueryEventFilter _eventFilter;
         models::QueryKind        _queryKind;
     };
+
+    struct SetRayCaster
+    {
+        bool _enabled;
+    };
 }
