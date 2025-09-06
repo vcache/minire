@@ -135,8 +135,12 @@ namespace
         explicit GltfViewer(Arguments const & arguments)
             : BasicController(60)
             , _arguments(arguments)
+            , _camera{._yFov = glm::radians(45.0f),
+                      ._zNear = 0.001f,
+                      ._zFar = 1000.0f,
+                      ._aspectRatio = std::nullopt}
             , _target(0.0f, 0.0f, 0.0f)
-            , _dollyGrip(_target, 10)
+            , _orbiting(_target, 10)
         {}
 
         void start() override
@@ -145,14 +149,9 @@ namespace
             using namespace minire::events::controller;
             using namespace minire::models;
 
-            minire::models::PerspectiveCamera camera{._yFov = glm::radians(45.0f),
-                                                     ._zNear = 0.001f,
-                                                     ._zFar = 1000.0f,
-                                                     ._aspectRatio = std::nullopt};
-
-            _dollyGrip.evaluate(_cameraTransform);
+            _orbiting.evaluate(_cameraTransform);
             enqueue<SceneNewNode>("cam-node", ScenePath(), _cameraTransform, true);
-            enqueue<SceneNewPerspectiveCamera>("cam", ScenePath{"cam-node"}, camera, true);
+            enqueue<SceneNewPerspectiveCamera>("cam", ScenePath{"cam-node"}, _camera, true);
             enqueue<SceneActivateCamera>(ScenePath{"cam-node", "cam"});
 
             enqueue<SceneNewNode>("light-node", ScenePath(), Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
@@ -224,21 +223,22 @@ namespace
             bool updated = false;
             if (event._left)
             {
-                _dollyGrip.updateAngles(0.01f * static_cast<float>(event._relX),
-                                        0.01f * static_cast<float>(event._relY));
+                _orbiting.updateAngles(0.01f * static_cast<float>(event._relX),
+                                       0.01f * static_cast<float>(event._relY));
                 updated = true;
             }
             else if (event._right && _panning)
             {
-                _dollyGrip.target() = _panning.update(event._absX, event._absY,
-                                                      _cameraTransform.matrix(),
-                                                      _target);
+                _orbiting.target() = _panning.update(event._absX, event._absY,
+                                                     _cameraTransform.matrix(),
+                                                     _target, _camera, _windowSize,
+                                                     _cameraTransform._translation);
                 updated = true;
             }
 
             if (updated)
             {
-                _dollyGrip.evaluate(_cameraTransform);
+                _orbiting.evaluate(_cameraTransform);
                 enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
             }
         }
@@ -264,17 +264,25 @@ namespace
             using namespace minire::events::controller;
             using namespace minire::models;
 
-            _dollyGrip.updateDistance(-0.5f * event._dy);
-            _dollyGrip.evaluate(_cameraTransform);
+            _orbiting.updateDistance(-0.5f * event._dy);
+            _orbiting.evaluate(_cameraTransform);
             enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
         }
 
+        void handle(minire::events::application::OnResize const & e) override
+        {
+            _windowSize.x = static_cast<float>(e._width);
+            _windowSize.y = static_cast<float>(e._height);
+        }
+
     private:
-        Arguments const &            _arguments;
-        minire::models::Transform    _cameraTransform;
-        glm::vec3                    _target;
-        minire::grips::Orbiting      _dollyGrip;
-        minire::grips::Panning<true> _panning;
+        Arguments const &                       _arguments;
+        minire::models::PerspectiveCamera const _camera;
+        minire::models::Transform               _cameraTransform;
+        glm::vec3                               _target;
+        minire::grips::Orbiting                 _orbiting;
+        minire::grips::Panning<false>           _panning;
+        glm::vec2                               _windowSize;
     };
 }
 
