@@ -61,6 +61,9 @@ target_link_libraries(minire
 
 target_compile_features(minire PUBLIC cxx_std_20)
 
+# TODO: make 3rd-party optional (take em' from the system or
+#       from a common build dir (when used as a submodule))
+
 target_include_directories(minire PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../3rd-party"

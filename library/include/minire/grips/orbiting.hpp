@@ -9,22 +9,32 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
+#include <cassert>
 #include <cmath>
 
 namespace minire::grips
 {
     // TODO: screen resoution to sensitivity
-    // TODO: limits & sensevity
     // TODO: helpers for events::application::* processing and active camera
     class Orbiting
     {
+        constexpr float static kEpsilon = std::numeric_limits<float>::epsilon();
+        constexpr glm::vec2 static kPhyHardLimit = glm::vec2(-M_PI/2.0f + kEpsilon,
+                                                              M_PI/2.0f - kEpsilon);
+
     public:
-        Orbiting(glm::vec3 target, float distance, float thetha = 0, float phi = 0)
+        Orbiting(glm::vec3 target, float distance,
+                 float thetha = 0, float phi = 0,
+                 glm::vec2 phiMinMax = kPhyHardLimit)
             : _target(target)
             , _distance(distance)
             , _thetha(thetha)
             , _phi(phi)
-        {}
+            , _phiMinMax(std::max(phiMinMax[0], kPhyHardLimit[0]),
+                         std::min(phiMinMax[1], kPhyHardLimit[1]))
+        {
+            assert(_phiMinMax[0] <= _phiMinMax[1]);
+        }
 
         void evaluate(models::Transform & output)
         {
@@ -51,8 +61,7 @@ namespace minire::grips
             _thetha += dThetha;
             _phi += dPhi;
 
-            constexpr float const kEpsilon = std::numeric_limits<float>::epsilon();
-            _phi = glm::clamp<float>(_phi, -M_PI/2.0f + kEpsilon, M_PI/2.0f - kEpsilon);
+            _phi = glm::clamp<float>(_phi, _phiMinMax[0], _phiMinMax[1]);
         }
 
         glm::vec3 & target() { return _target; }
@@ -60,9 +69,10 @@ namespace minire::grips
         glm::vec3 const & target() const { return _target; }
 
     private:
-        glm::vec3 _target;
-        float     _distance;
-        float     _thetha;
-        float     _phi;
+        glm::vec3       _target;
+        float           _distance;
+        float           _thetha;
+        float           _phi;
+        glm::vec2 const _phiMinMax;
     };
 }
