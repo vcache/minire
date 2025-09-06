@@ -57,7 +57,5 @@ namespace minire::events
                                     controller::SceneNewAnimationSet,
                                     controller::ScenePlayAnimation,
                                     controller::SceneStopAnimation,
-                                    controller::SceneSetQuery,
-                                    controller::SceneUnsetQuery,
                                     controller::SetRayCaster>;
 }

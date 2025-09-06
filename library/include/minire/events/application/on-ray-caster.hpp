@@ -9,9 +9,6 @@ namespace minire::events::application
 {
     struct OnRayCaster : public Base
     {
-        // TODO: remove it ==============>
-        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnFps;
- 
         utils::RayCaster::Uptr _rayCaster;
  
         template<typename... BaseArgs>

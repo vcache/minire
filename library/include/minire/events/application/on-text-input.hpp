@@ -8,8 +8,6 @@ namespace minire::events::application
 {
     struct OnTextInput : public Base
     {
-        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnTextInput;
-
         std::string _text; // utf-8
 
         template<typename... BaseArgs>

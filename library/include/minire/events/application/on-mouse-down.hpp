@@ -7,8 +7,6 @@ namespace minire::events::application
 {
     struct OnMouseDown : public Base
     {
-        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnMouseDown;
-
         int                 _x;
         int                 _y;
         models::MouseButton _mouseButton;

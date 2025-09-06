@@ -65,9 +65,7 @@ namespace minire
     template<typename Event, typename... Args>
     void Application::postEvent(Args && ... args)
     {
-        models::SceneTraits sceneTraits = makeSceneTraits(Event::kQueueEventFilter);
-        _applicationEvents.emplace_back(Event(std::forward<Args>(args)...,
-                                              std::move(sceneTraits)));
+        _applicationEvents.emplace_back(Event(std::forward<Args>(args)...));
     }
 
     void Application::onKeyUp(::SDL_Keycode key, ::SDL_Scancode code, uint16_t mod)
@@ -158,83 +156,6 @@ namespace minire
                 _rayCasterRevision = vpRevision;
             }
         }
-    }
-
-    models::SceneTraits
-    Application::makeSceneTraits(models::QueryEventFilter const eventFilter) const
-    {
-        models::QueryFlags const & flags = queryFlags(eventFilter);
-        models::SceneTraits result;
-
-        if (flags.none())
-            return result;
-
-        assert(_scene);
-        scene::Viewpoint const & vp = _scene->viewpoint();
-
-        if (vp.hasCamera())
-        {
-            if (flags.test(models::QueryKind::kRayLeftTop))
-            {
-                result._rayLeftTop = utils::pixelToWorldRay(glm::vec2{0, 0}, vp);
-            }
-
-            if (flags.test(models::QueryKind::kRayRightTop))
-            {
-                result._rayRightTop = utils::pixelToWorldRay(glm::vec2{vp.width() - 1, 0}, vp);
-            }
-
-            if (flags.test(models::QueryKind::kRayLeftBottom))
-            {
-                result._rayLeftBottom = utils::pixelToWorldRay(glm::vec2{0, vp.height() - 1}, vp);
-            }
-
-            if (flags.test(models::QueryKind::kRayRightBottom))
-            {
-                result._rayRightBottom = utils::pixelToWorldRay(glm::vec2{vp.width() - 1, vp.height() - 1}, vp);
-            }
-
-            if (flags.test(models::QueryKind::kRayCenter))
-            {
-                result._rayCenter = utils::pixelToWorldRay(glm::vec2{vp.width() / 2, vp.height() / 2}, vp);
-            }
-
-            if (flags.test(models::QueryKind::kRayCursor))
-            {
-                result._rayCursor = utils::pixelToWorldRay(glm::vec2{_mouseX, _mouseY}, vp);
-            }
-        }
-
-        return result;
-    }
-
-    models::QueryFlags const &
-    Application::queryFlags(models::QueryEventFilter const eventFilter) const
-    {
-        switch(eventFilter)
-        {
-            using namespace models;
-
-            case QueryEventFilter::kOnFps:        return _onFpsQueryFlags;
-            case QueryEventFilter::kOnResize:     return _onResizeQueryFlags;
-            case QueryEventFilter::kOnMouseWheel: return _onMouseWheelQueryFlags;
-            case QueryEventFilter::kOnMouseMove:  return _onMouseMoveQueryFlags;
-            case QueryEventFilter::kOnMouseDown:  return _onMouseDownQueryFlags;
-            case QueryEventFilter::kOnMouseUp:    return _onMouseUpQueryFlags;
-            case QueryEventFilter::kOnKeyUp:      return _onKeyUpQueryFlags;
-            case QueryEventFilter::kOnKeyDown:    return _onKeyDownQueryFlags;
-            case QueryEventFilter::kOnTextInput:  return _onTextInputQueryFlags;
-        }
-
-        MINIRE_THROW("unknown scene query filter kind: {}",
-                     static_cast<int>(eventFilter));
-    }
-
-    models::QueryFlags &
-    Application::queryFlags(models::QueryEventFilter const eventFilter)
-    {
-        return const_cast<models::QueryFlags &>(
-            static_cast<Application const *>(this)->queryFlags(eventFilter));
     }
 
     void Application::handle(events::controller::Quit const &)
@@ -473,16 +394,6 @@ namespace minire
     void Application::handle(events::controller::SceneStopAnimation const & e)
     {
         _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneSetQuery const & e)
-    {
-        queryFlags(e._eventFilter).set(e._queryKind);
-    }
-
-    void Application::handle(events::controller::SceneUnsetQuery const & e)
-    {
-        queryFlags(e._eventFilter).unset(e._queryKind);
     }
 
     void Application::handle(events::controller::SetRayCaster const & e)

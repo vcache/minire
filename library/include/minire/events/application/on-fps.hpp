@@ -11,8 +11,6 @@ namespace minire::events::application
      * */
     struct OnFps : public Base
     {
-        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnFps;
-
         size_t _fps;        // Frames per second
         double _mft;        // Mean frame time
         size_t _frame;      // Current frame number

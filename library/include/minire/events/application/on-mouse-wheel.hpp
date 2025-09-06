@@ -6,8 +6,6 @@ namespace minire::events::application
 {
     struct OnMouseWheel : public Base
     {
-        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnMouseWheel;
-
         int _dx;
         int _dy;
 

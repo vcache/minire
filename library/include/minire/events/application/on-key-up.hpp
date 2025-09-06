@@ -11,8 +11,6 @@ namespace minire::events::application
 {
     struct OnKeyUp : public Base
     {
-        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnKeyUp;
-
         ::SDL_Keycode  _key;
         ::SDL_Scancode _code;
         uint16_t       _mod;

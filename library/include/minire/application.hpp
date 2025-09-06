@@ -5,7 +5,6 @@
 #include <minire/errors.hpp>
 #include <minire/events/application.hpp>
 #include <minire/events/controller.hpp>
-#include <minire/models/scene-queries.hpp>
 #include <minire/sdl/gl-application.hpp>
 
 // STLs
@@ -38,7 +37,7 @@ namespace minire
             MINIRE_INVARIANT(!_controller, "Controller cannot be re-set");
 
             auto controller = std::make_unique<Controller>(std::forward<Args>(args)...);
-            controller->run(events::application::OnResize(width(), height(), models::SceneTraits()));
+            controller->run(events::application::OnResize(width(), height()));
             _controller = std::move(controller);
             return static_cast<Controller &>(*_controller);
         }
@@ -104,16 +103,10 @@ namespace minire
         void handle(events::controller::SceneNewAnimationSet const &);
         void handle(events::controller::ScenePlayAnimation const &);
         void handle(events::controller::SceneStopAnimation const &);
-        void handle(events::controller::SceneSetQuery const &);
-        void handle(events::controller::SceneUnsetQuery const &);
         void handle(events::controller::SetRayCaster const &);
 
         template<typename Event, typename... Args>
         void postEvent(Args && ...);
-
-        models::SceneTraits makeSceneTraits(models::QueryEventFilter const) const;
-        models::QueryFlags const & queryFlags(models::QueryEventFilter const) const;
-        models::QueryFlags & queryFlags(models::QueryEventFilter const);
 
         void maybeIssueRayCaster();
 
@@ -138,15 +131,6 @@ namespace minire
         double                      _animationGap = 0; // seconds
 
         // scene queries
-        models::QueryFlags          _onFpsQueryFlags;
-        models::QueryFlags          _onResizeQueryFlags;
-        models::QueryFlags          _onMouseWheelQueryFlags;
-        models::QueryFlags          _onMouseMoveQueryFlags;
-        models::QueryFlags          _onMouseDownQueryFlags;
-        models::QueryFlags          _onMouseUpQueryFlags;
-        models::QueryFlags          _onKeyUpQueryFlags;
-        models::QueryFlags          _onKeyDownQueryFlags;
-        models::QueryFlags          _onTextInputQueryFlags;
         bool                        _rayCasterEnabled = false;
         size_t                      _rayCasterRevision = 0;
 

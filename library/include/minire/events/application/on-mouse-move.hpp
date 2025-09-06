@@ -6,8 +6,6 @@ namespace minire::events::application
 {
     struct OnMouseMove : public Base
     {
-        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnMouseMove;
-
         int  _absX;
         int  _absY;
         int  _relX;

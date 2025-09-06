@@ -7,7 +7,6 @@
 #include <minire/models/mesh.hpp>
 #include <minire/models/point-light.hpp>
 #include <minire/models/scene-path.hpp>
-#include <minire/models/scene-queries.hpp>
 #include <minire/models/transform.hpp>
 
 #include <limits>
@@ -114,18 +113,6 @@ namespace minire::events::controller
     };
 
     // Scene queries
-
-    struct SceneSetQuery
-    {
-        models::QueryEventFilter _eventFilter;
-        models::QueryKind        _queryKind;
-    };
-
-    struct SceneUnsetQuery
-    {
-        models::QueryEventFilter _eventFilter;
-        models::QueryKind        _queryKind;
-    };
 
     struct SetRayCaster
     {

@@ -8,8 +8,6 @@ namespace minire::events::application
 {
     struct OnResize : public Base
     {
-        static models::QueryEventFilter constexpr kQueueEventFilter = models::QueryEventFilter::kOnResize;
-
         size_t _width;
         size_t _height;
 
