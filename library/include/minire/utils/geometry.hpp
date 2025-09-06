@@ -6,6 +6,7 @@
 #include <glm/vec3.hpp>
 
 #include <algorithm>
+#include <optional>
 
 namespace minire::scene { class Viewpoint; }
 
@@ -22,9 +23,10 @@ namespace minire::utils
 
     Ray pixelToWorldRay(glm::vec2 const &,
                         scene::Viewpoint const &);
-#if 0
+
     std::optional<glm::vec3> intersectXZ(Ray const &);
 
+#if 0
     struct GroundHit
     {
         glm::vec2 _min;

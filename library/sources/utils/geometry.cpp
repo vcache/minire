@@ -61,7 +61,6 @@ namespace minire::utils
         };
     }
 
-#if 0
     std::optional<glm::vec3> intersectXZ(Ray const & ray)
     {
         static const glm::vec3 kPlaneNormal(0, 1, 0);
@@ -78,6 +77,7 @@ namespace minire::utils
         return std::nullopt;
     }
 
+#if 0
     void GroundHit::extend(glm::vec2 const & point)
     {
         if (_hit)
