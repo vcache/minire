@@ -150,9 +150,9 @@ namespace minire
             if (size_t const vpRevision = vp.revision();
                 _rayCasterRevision < vpRevision)
             {
-                auto rayCaster = std::make_unique<utils::RayCaster>(
+                auto rayCaster = std::make_shared<utils::RayCaster>(
                     vp.width(), vp.height(), vp.view(), vp.projection());
-                postEvent<events::application::OnRayCaster>(std::move(rayCaster));
+                postEvent<events::application::OnRayCaster>(rayCaster);
                 _rayCasterRevision = vpRevision;
             }
         }

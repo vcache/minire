@@ -9,13 +9,13 @@ namespace minire::events::application
 {
     struct OnRayCaster : public Base
     {
-        utils::RayCaster::Uptr _rayCaster;
+        utils::RayCaster::Sptr _rayCaster;
  
         template<typename... BaseArgs>
-        OnRayCaster(utils::RayCaster::Uptr rayCaster,
+        OnRayCaster(utils::RayCaster::Sptr const & rayCaster,
                     BaseArgs && ... baseArgs)
             : Base(std::forward<BaseArgs>(baseArgs)...)
-            , _rayCaster(std::move(rayCaster))
+            , _rayCaster(rayCaster)
         {}
     };
 }

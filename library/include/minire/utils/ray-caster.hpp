@@ -14,7 +14,7 @@ namespace minire::utils
     class RayCaster
     {
     public:
-        using Uptr = std::unique_ptr<RayCaster>;
+        using Sptr = std::shared_ptr<RayCaster>;
 
         RayCaster(size_t const width,
                   size_t const height,
