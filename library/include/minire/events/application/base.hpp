@@ -8,8 +8,11 @@ namespace minire::events::application
     {
         models::SceneTraits _sceneTraits;
 
-        Base(models::SceneTraits sceneTraits)
+        explicit Base(models::SceneTraits sceneTraits)
             : _sceneTraits(std::move(sceneTraits))
         {}
+
+        // NOTE: Not adding virtual dtor, because it is not supposed to be
+        //       used polymorphically.
     };
 }

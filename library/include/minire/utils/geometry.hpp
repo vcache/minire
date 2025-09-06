@@ -6,7 +6,6 @@
 #include <glm/vec3.hpp>
 
 #include <algorithm>
-#include <memory>
 #include <optional>
 
 namespace minire::scene { class Viewpoint; }
@@ -17,8 +16,6 @@ namespace minire::utils
     {
         glm::vec3 _origin = glm::vec3(0, 0, 0);
         glm::vec3 _direction = glm::vec3(0, 0, 0);
-
-        using Uptr = std::unique_ptr<Ray>;
     };
 
     bool isIntersects(Aabb const &, Aabb const &);
