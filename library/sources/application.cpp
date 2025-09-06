@@ -399,6 +399,10 @@ namespace minire
     void Application::handle(events::controller::SetRayCaster const & e)
     {
         _rayCasterEnabled = e._enabled;
+        if (_rayCasterEnabled)
+        {
+            _rayCasterRevision = 0;
+        }
     }
 
     void Application::handle(BasicController::Batch const & batch)
