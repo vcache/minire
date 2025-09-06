@@ -3,7 +3,7 @@
 #include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/grips/orbiting.hpp>
-#include <minire/grips/screen-space-panning.hpp>
+#include <minire/grips/panning.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/camera.hpp>
 #include <minire/models/mesh.hpp>
@@ -270,11 +270,11 @@ namespace
         }
 
     private:
-        Arguments const &                 _arguments;
-        minire::models::Transform         _cameraTransform;
-        glm::vec3                         _target;
-        minire::grips::Orbiting           _dollyGrip;
-        minire::grips::ScreenSpacePanning _panning;
+        Arguments const &            _arguments;
+        minire::models::Transform    _cameraTransform;
+        glm::vec3                    _target;
+        minire::grips::Orbiting      _dollyGrip;
+        minire::grips::Panning<true> _panning;
     };
 }
 

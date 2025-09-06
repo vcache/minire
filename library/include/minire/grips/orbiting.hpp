@@ -38,7 +38,7 @@ namespace minire::grips
 
         void evaluate(models::Transform & output)
         {
-            static const glm::vec3 kUp(0.0f, 1.0f, 0.0f);
+            static constexpr glm::vec3 kUp(0.0f, 1.0f, 0.0f);
 
             output._translation.x = _distance * std::cos(_thetha) * std::cos(_phi);
             output._translation.y = _distance * std::sin(_phi);

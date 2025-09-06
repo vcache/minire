@@ -10,7 +10,8 @@ namespace minire::grips
 {
     // TODO: camera's fov/zoom and screen resolution should be taken into account (instead "float scale")
     //       to provide uniform panning movement (i.e. the pixel under a cursor must remain the same)
-    class ScreenSpacePanning
+    template<bool kScreenSpace>
+    class Panning
     {
     public:
         void start(size_t mouseX, size_t mouseY)
@@ -37,8 +38,20 @@ namespace minire::grips
                                           static_cast<float>(mouseY)};
                 glm::vec2 const screenDelta = screenPos - _begin;
 
-                _offset = (glm::vec3(matrix[0]) * (-screenDelta.x) +
-                           glm::vec3(matrix[1])* (screenDelta.y)) * scale;
+                if constexpr (kScreenSpace)
+                {
+                    _offset = glm::vec3(matrix[0]) * (-screenDelta.x) +
+                              glm::vec3(matrix[1]) * (screenDelta.y);
+                }
+                else
+                {
+                    static constexpr glm::vec3 kUp(0.0f, 1.0f, 0.0f);
+                    glm::vec3 const column0(matrix[0]);
+                    _offset = column0 * (-screenDelta.x) +
+                              glm::cross(kUp, column0) * (screenDelta.y);
+                }
+
+                _offset *= scale;
             }
 
             return target + _offset;
