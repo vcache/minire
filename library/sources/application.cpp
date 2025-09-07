@@ -408,7 +408,7 @@ namespace minire
     void Application::handle(BasicController::Batch const & batch)
     {
 #       ifndef NDEBUG
-        if (batch._events.size() > 50)
+        if (batch._events.size() > 1000)
         {
             MINIRE_DEBUG("Got {} event inm controller's batch",
                          batch._events.size());
