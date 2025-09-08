@@ -6,6 +6,7 @@
 #include <opengl/program.hpp>
 #include <rasterizer/textures.hpp>
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 #include <optional>
@@ -56,7 +57,8 @@ namespace minire::rasterizer::materials
     public:
         void prepareDrawing(material::Instance const &,
                             glm::mat4 const & modelTransform,
-                            float const colorFactor) const override;
+                            float const colorFactor,
+                            glm::vec3 const & ambientLight) const override;
 
         opengl::Program const & glProgram() const override { return _program; }
 
@@ -101,6 +103,7 @@ namespace minire::rasterizer::materials
 
         GLint _modelUniformLocation = -1;
         GLint _colorFactorUniformLocation = -1;
+        GLint _ambientLightUniformLocation = -1;
 
         friend class PbrFactory;
     };

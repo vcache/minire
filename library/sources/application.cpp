@@ -20,6 +20,12 @@ namespace minire
     static const float kNear = 0.001f;
     static const float kFar = 1000.0f;
 
+#   ifdef NDEBUG
+    constexpr static bool kDebug = false;
+#   else
+    constexpr static bool kDebug = true;
+#   endif
+
     Application::Application(int width, int height,
                              std::string const & title,
                              content::Manager & contentManager)
@@ -50,6 +56,8 @@ namespace minire
 
         _frameBegin = utils::uNow();
         _frameEnd = 0;
+
+        MINIRE_INFO("Minire Application started, [{}] build", kDebug ? "DEBUG" : "RELEASE");
     }
 
     Application::~Application()

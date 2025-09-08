@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 
 #include <cstddef>
 #include <memory>
@@ -64,7 +65,8 @@ namespace minire::material
         // Assuming that the next call will be glDrawArrays or glDrawElements
         virtual void prepareDrawing(Instance const &,
                                     glm::mat4 const & modelTransform,
-                                    float const colorFactor) const = 0;
+                                    float const colorFactor, // TODO: remove this color factor, it is pointless
+                                    glm::vec3 const & ambientLight) const = 0;
 
         virtual opengl::Program const & glProgram() const = 0;
 

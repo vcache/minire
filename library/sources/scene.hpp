@@ -56,6 +56,11 @@ namespace minire
 
         bool advanceAnimations(float delta /* seconds */, size_t epochNumber);
 
+        void setAmbientLight(glm::vec3 const & ambientLight)
+        {
+            _ambientLight = ambientLight;
+        }
+
     public:
         template<typename Callable>
         void cullModels(Callable callable) const
@@ -121,6 +126,8 @@ namespace minire
             }
             return index;
         }
+
+        glm::vec3 const & ambientLight() const { return _ambientLight; }
 
     private:
         void updateGlobalTransforms();
@@ -263,6 +270,7 @@ namespace minire
         ActiveCamera     _activeCamera;
         scene::Viewpoint _viewpoint;
         size_t           _nodesEstimate = 1;
+        glm::vec3        _ambientLight = glm::vec3(0.03f);
 
 mutable PointLightLeaves _pointLightLeaves;
 mutable MeshLeaves       _meshLeaves;

@@ -60,7 +60,8 @@ namespace minire::rasterizer
                           const float metallic,
                           const float roughness,
                           const vec3 normal,
-                          const float ao)
+                          const float ao,
+                          const vec3 ambientLight)
         {
             // TODO: normal mapping
 
@@ -124,7 +125,7 @@ namespace minire::rasterizer
             
             // ambient lighting (note that the next IBL tutorial will replace 
             // this ambient lighting with environment lighting).
-            vec3 ambient = vec3(0.03) * albedo * ao;
+            vec3 ambient = ambientLight * albedo * ao;
 
             vec3 color = ambient + Lo;
 
@@ -244,6 +245,8 @@ namespace minire::rasterizer
 
         uniform float bznkColorFactor = 1.0;
 
+        uniform vec3 bznkAmbientLight = vec3(0.03);
+
         // routines //
 
         {% include "shaders/pbr-kit.incl" %}
@@ -292,7 +295,8 @@ namespace minire::rasterizer
                                         metallic,
                                         roughness,
                                         normal,
-                                        ao);
+                                        ao,
+                                        bznkAmbientLight);
             bznkOutColor += emissiveFactor;
             bznkOutColor *= bznkColorFactor;
         }

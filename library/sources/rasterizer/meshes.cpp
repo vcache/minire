@@ -67,11 +67,12 @@ namespace minire::rasterizer
     {
         // TODO: group models by a material signature (to avoid frequent program switch)
         scene.cullModels(
-            [](MeshToken const & meshToken,
+            [&ambientLight = scene.ambientLight()]
+            (MeshToken const & meshToken,
                glm::mat4 const & transform)
             {
                 assert(meshToken._mesh);
-                meshToken._mesh->draw(transform, 1.0f /* TODO: wtf is a colorFactor? */);
+                meshToken._mesh->draw(transform, 1.0f /* TODO: wtf is a colorFactor? */, ambientLight);
             }
         );
     }

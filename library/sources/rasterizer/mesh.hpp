@@ -8,6 +8,7 @@
 #include <opengl/vertex-buffer.hpp>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 
 #include <memory>
 #include <string>
@@ -33,7 +34,8 @@ namespace minire::rasterizer
 
         // assuming that caller will "use" gl's program!
         void draw(glm::mat4 const &,
-                  float const colorFactor) const;
+                  float const colorFactor,
+                  glm::vec3 const & ambientLight) const;
 
         utils::Aabb const & aabb() const { return _aabb; }
 

@@ -107,7 +107,8 @@ namespace minire::rasterizer::materials
 
     void PbrProgram::prepareDrawing(material::Instance const & instance,
                                     glm::mat4 const & modelTransform,
-                                    float const colorFactor) const
+                                    float const colorFactor,
+                                    glm::vec3 const & ambientLight) const
     {
         _program.use();
 
@@ -115,6 +116,7 @@ namespace minire::rasterizer::materials
 
         _program.setUniform(_modelUniformLocation, modelTransform);
         _program.setUniform(_colorFactorUniformLocation, colorFactor);
+        _program.setUniform(_ambientLightUniformLocation, ambientLight);
 
         // setup mappers
 
@@ -248,6 +250,9 @@ namespace minire::rasterizer::materials
 
         result->_colorFactorUniformLocation = result->_program.getUniformLocation("bznkColorFactor");
         assert(result->_colorFactorUniformLocation != -1);
+
+        result->_ambientLightUniformLocation = result->_program.getUniformLocation("bznkAmbientLight");
+        assert(result->_ambientLightUniformLocation != -1);
 
         result->_positionAttribute = result->_program.getAttribLocation("bznkVertex");
         assert(result->_positionAttribute != -1);
