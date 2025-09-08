@@ -25,6 +25,7 @@ namespace std
             size_t result = 0xCB39ACEFA8402761ULL;
             for(std::string const & i : v)
             {
+                // TODO: add index into a hash
                 boost::hash_combine(result, std::hash<std::string>{}(i));
             }
             return result;

@@ -72,9 +72,6 @@ namespace minire::rasterizer
                                  std::get<content::path::Special>(source[1]) == content::path::Special::kMeshes,
                                  "source path doesn't point to a meshes store: {}", source);
 
-                MINIRE_INVARIANT(std::holds_alternative<content::path::Index>(source[2]),
-                                 "source path indexes mesh not by a number: {}", source);
-
                 // Fetch mesh index
                 size_t const meshIndex = std::visit(utils::Overloaded
                     {
