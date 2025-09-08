@@ -9,6 +9,8 @@
 #include <minire/models/scene-path.hpp>
 #include <minire/models/transform.hpp>
 
+#include <glm/vec3.hpp>
+
 #include <limits>
 #include <string>
 #include <vector>
@@ -28,6 +30,11 @@ namespace minire::events::controller
     struct SceneActivateCamera
     {
         models::ScenePath _item;    // a node or a leaf
+    };
+
+    struct SceneSetAmbientLight
+    {
+        glm::vec3 _ambientLight;
     };
 
     // Nodes and items builders

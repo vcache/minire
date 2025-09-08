@@ -32,6 +32,7 @@ namespace minire
         void handle(events::controller::SceneReset const &);
         void handle(events::controller::SceneDispose const &);
         void handle(events::controller::SceneActivateCamera const &);
+        void handle(events::controller::SceneSetAmbientLight const &);
         void handle(events::controller::SceneNewNode const &);
         void handle(events::controller::SceneNewMesh const &);
         void handle(events::controller::SceneNewPointLight const &);
@@ -55,11 +56,6 @@ namespace minire
         void lerp(float weight, size_t epochNumber);
 
         bool advanceAnimations(float delta /* seconds */, size_t epochNumber);
-
-        void setAmbientLight(glm::vec3 const & ambientLight)
-        {
-            _ambientLight = ambientLight;
-        }
 
     public:
         template<typename Callable>

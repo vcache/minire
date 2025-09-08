@@ -42,6 +42,7 @@ namespace minire::events
                                     controller::SceneReset,
                                     controller::SceneDispose,
                                     controller::SceneActivateCamera,
+                                    controller::SceneSetAmbientLight,
                                     controller::SceneNewNode,
                                     controller::SceneNewFromSource,
                                     controller::SceneNewMesh,

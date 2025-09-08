@@ -329,6 +329,11 @@ namespace minire
         _scene->handle(e);
     }
 
+    void Application::handle(events::controller::SceneSetAmbientLight const & e)
+    {
+        _scene->handle(e);
+    }
+
     void Application::handle(events::controller::SceneNewNode const & e)
     {
         _scene->handle(e);

@@ -157,6 +157,11 @@ namespace minire
         }
     }
 
+    void Scene::handle(events::controller::SceneSetAmbientLight const & e)
+    {
+        _ambientLight = e._ambientLight;
+    }
+
     void Scene::handle(events::controller::SceneNewNode const & e)
     {
         Node::Sptr parent = find<Node::Sptr>(e._parent);
