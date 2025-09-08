@@ -243,8 +243,6 @@ namespace minire::rasterizer
 
         uniform vec3 bznkEmissiveFactor = vec3(0.0, 0.0, 0.0);
 
-        uniform float bznkColorFactor = 1.0;
-
         uniform vec3 bznkAmbientLight = vec3(0.03);
 
         // routines //
@@ -298,7 +296,6 @@ namespace minire::rasterizer
                                         ao,
                                         bznkAmbientLight);
             bznkOutColor += emissiveFactor;
-            bznkOutColor *= bznkColorFactor;
         }
     )";
 }

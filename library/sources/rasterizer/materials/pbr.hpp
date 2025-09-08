@@ -57,7 +57,6 @@ namespace minire::rasterizer::materials
     public:
         void prepareDrawing(material::Instance const &,
                             glm::mat4 const & modelTransform,
-                            float const colorFactor,
                             glm::vec3 const & ambientLight) const override;
 
         opengl::Program const & glProgram() const override { return _program; }
@@ -102,7 +101,6 @@ namespace minire::rasterizer::materials
         GLint _tangentAttribute = -1;
 
         GLint _modelUniformLocation = -1;
-        GLint _colorFactorUniformLocation = -1;
         GLint _ambientLightUniformLocation = -1;
 
         friend class PbrFactory;

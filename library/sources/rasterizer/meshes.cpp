@@ -72,7 +72,7 @@ namespace minire::rasterizer
                glm::mat4 const & transform)
             {
                 assert(meshToken._mesh);
-                meshToken._mesh->draw(transform, 1.0f /* TODO: wtf is a colorFactor? */, ambientLight);
+                meshToken._mesh->draw(transform, ambientLight);
             }
         );
     }
