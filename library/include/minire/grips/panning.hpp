@@ -37,7 +37,7 @@ namespace minire::grips
                          glm::vec3 const & cameraPosition)
         {
             assert(isActive());
-            if (isActive() && windowSize.y != 0.0f)
+            if (isActive() && windowSize.x != 0.0f && windowSize.y != 0.0)
             {
                 glm::vec2 const screenPos{static_cast<float>(mouseX),
                                           static_cast<float>(mouseY)};
