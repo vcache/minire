@@ -37,7 +37,7 @@ namespace minire::grips
                          glm::vec3 const & cameraPosition)
         {
             assert(isActive());
-            if (isActive())
+            if (isActive() && windowSize.y != 0.0f)
             {
                 glm::vec2 const screenPos{static_cast<float>(mouseX),
                                           static_cast<float>(mouseY)};
@@ -79,18 +79,28 @@ namespace minire::grips
         operator bool() const { return isActive(); }
 
     private:
-        glm::vec2 scale(
-            glm::vec3 const & target,
-            glm::vec3 const & cameraPosition,
-            models::PerspectiveCamera const & camera,
-            glm::vec2 const & windowSize) const
+        glm::vec2 scale(glm::vec3 const & target,
+                        glm::vec3 const & cameraPosition,
+                        models::PerspectiveCamera const & camera,
+                        glm::vec2 const & windowSize) const
         {
+            assert(windowSize.y != 0.0f);
             float effectiveDistance = glm::length(target - cameraPosition);
             effectiveDistance *= std::tan(camera._yFov / 2.0f);
             return glm::vec2(2.0f * effectiveDistance / windowSize.y);
         }
 
-        // TODO: implement for models::OrthographicCamera
+        glm::vec2 scale(glm::vec3 const &,
+                        glm::vec3 const &,
+                        models::OrthographicCamera const & camera,
+                        glm::vec2 const & windowSize) const
+        {
+            // see viewpoint.cpp for details
+            assert(windowSize.y != 0.0f);
+            float const aspectRatio = windowSize[1] / windowSize[0];
+            glm::vec2 const sizes(2.0f, 2.0f * aspectRatio);
+            return sizes / windowSize * glm::vec2(camera._xMag, camera._yMag);
+        }
 
     private:
         glm::vec2 _begin = glm::vec2(0.0f);   // screen space

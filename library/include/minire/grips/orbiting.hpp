@@ -68,6 +68,8 @@ namespace minire::grips
 
         glm::vec3 const & target() const { return _target; }
 
+        float distance() const { return _distance; }
+
     private:
         glm::vec3       _target;
         float           _distance;

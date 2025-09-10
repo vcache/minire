@@ -109,27 +109,17 @@ namespace minire::scene
                 }
                 invalidate();
             },
-            [this](models::OrthographicCamera const &)
+            [this](models::OrthographicCamera const & camera)
             {
-                MINIRE_THROW("orthographic camera isn't implemented");
-                /*
-                float const halfWidth = static_cast<float>(_vpWidth) / 2.0f;
-                float const halfHeight = static_cast<float>(_vpHeight) / 2.0f;
-
-                //pmat = glm::ortho(0.0f, fWidth, 0.0f, fHeight, kNear, kFar);
-                _projection = glm::ortho(-halfWidth * camera._xMag,
-                                          halfWidth * camera._xMag,
-                                         -halfHeight * camera._yMag,
-                                          halfHeight * camera._yMag,
+                float const aspectRatio = static_cast<float>(_vpHeight) /
+                                          static_cast<float>(_vpWidth);
+                _projection = glm::ortho(-camera._xMag,
+                                          camera._xMag,
+                                         -camera._yMag * aspectRatio,   // NOTE: aspectRatio is implictly multiplied
+                                          camera._yMag * aspectRatio,   //       by 1.0 which is the "width"
                                           camera._zNear, camera._zFar);
 
-                float const ratio = fWidth / fHeight;
-                float const scale = 10.0f;
-                pmat = glm::ortho(-scale, scale,
-                                  -scale * ratio, scale * ratio,
-                                  kNear, kFar);
                 invalidate();
-                */
             }
         }, _camera);
     }
