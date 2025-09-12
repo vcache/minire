@@ -5,6 +5,9 @@
 
 namespace minire::events::controller
 {
+    struct Quit
+    {};
+
     struct MouseGrab
     {
         bool _grab;
@@ -15,6 +18,8 @@ namespace minire::events::controller
         std::vector<float> _linesBuffer;
     };
 
-    struct Quit
-    {};
+    struct SetInstrumentation
+    {
+        bool _enabled;
+    };
 }

@@ -1,5 +1,7 @@
 #include <minire/application.hpp>
 
+#include <minire/instrumentation/formatters.hpp>
+#include <minire/instrumentation/stopwatch.hpp>
 #include <minire/logging.hpp>
 #include <minire/utils/geometry.hpp>
 #include <minire/utils/ray-caster.hpp>
@@ -11,6 +13,8 @@
 #include <scene/gltf-instantiator.hpp>
 #include <scene/viewpoint.hpp>
 #include <utils/overloaded.hpp>
+
+#include <fmt/format.h>
 
 #include <algorithm>
 
@@ -58,6 +62,11 @@ namespace minire
         _frameEnd = 0;
 
         MINIRE_INFO("Minire Application started, [{}] build", kDebug ? "DEBUG" : "RELEASE");
+
+        if (kDebug)
+        {
+            enableInstrumentation();
+        }
     }
 
     Application::~Application()
@@ -166,6 +175,20 @@ namespace minire
         }
     }
 
+    void Application::enableInstrumentation()
+    {
+        if (!_timekeeper)
+        {
+            _timekeeper = std::make_shared<instrumentation::Histogram<>>(
+                std::chrono::seconds(5));
+        }
+    }
+
+    void Application::disableInstrumentation()
+    {
+        _timekeeper.reset();
+    }
+
     void Application::handle(events::controller::Quit const &)
     {
         MINIRE_THROW("TODO: not implemented");
@@ -180,6 +203,18 @@ namespace minire
     void Application::handle(events::controller::DebugDrawsUpdate const & e)
     {
         _rasterizer->lines().update(e._linesBuffer);
+    }
+
+    void Application::handle(events::controller::SetInstrumentation const & e)
+    {
+        if (e._enabled)
+        {
+            enableInstrumentation();
+        }
+        else
+        {
+            disableInstrumentation();
+        }
     }
 
     void Application::handle(events::controller::CreateSprite const & e)
@@ -439,24 +474,38 @@ namespace minire
     {
         assert(_controller);
 
+        auto totalStopwatch =
+            _timekeeper ? std::make_unique<instrumentation::Stopwatch<>>("total", _timekeeper)
+                        : std::unique_ptr<instrumentation::Stopwatch<>>();
+
         // maybe issue a ray caster
-        maybeIssueRayCaster();
+        {
+            instrumentation::Stopwatch<> stopwatch("ray-caster", _timekeeper);
+            maybeIssueRayCaster();
+        }
 
         // notify logic thread about new events
-        size_t const pendedEvents = _applicationEvents.size(); // TODO: reserve max or p99
-        _controller->push(std::move(_applicationEvents));
-        _applicationEvents = events::ApplicationQueue();
-        _applicationEvents.reserve(pendedEvents);
+        {
+            instrumentation::Stopwatch<> stopwatch("controller-notify", _timekeeper);
+            size_t const pendedEvents = _applicationEvents.size(); // TODO: reserve max or p99
+            _controller->push(std::move(_applicationEvents));
+            _applicationEvents = events::ApplicationQueue();
+            _applicationEvents.reserve(pendedEvents);
+        }
 
         // fetch and handle events from controller if any
-        BasicController::BatchQueue batchQueue = _controller->pull();
-        std::move(batchQueue.begin(), batchQueue.end(),
-                  std::back_inserter(_controllerEvents));
+        {
+            instrumentation::Stopwatch<> stopwatch("batch-fetching", _timekeeper);
+            BasicController::BatchQueue batchQueue = _controller->pull();
+            std::move(batchQueue.begin(), batchQueue.end(),
+                      std::back_inserter(_controllerEvents));
+        }
 
         bool performLerp = false;
         bool newEpochStarted = false;
         if (!_controllerEvents.empty())
         {
+            instrumentation::Stopwatch<> stopwatch("events-handling", _timekeeper);
             if (_batchPlayed < 0)
             {
                 // very first batch and very slow controller case
@@ -507,21 +556,26 @@ namespace minire
 
         if (newEpochStarted)
         {
+            instrumentation::Stopwatch<> stopwatch("animation-advance", _timekeeper);
             performLerp |= _scene->advanceAnimations(_animationGap, _epochNumber);
             _animationGap = 0;
         }
 
         if (performLerp)
         {
+            instrumentation::Stopwatch<> stopwatch("scene-lerping", _timekeeper);
             double const weight = _batchPlayed / _controllerEvents[0]._duration;
             _scene->lerp(weight, _epochNumber);
         }
 
         // draw a frame
         // TODO: maybe skip it if not performLerp ?
-        MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        _rasterizer->draw(*_scene);
-        ::SDL_GL_SwapWindow(window());
+        {
+            instrumentation::Stopwatch<> stopwatch("scene-rendering", _timekeeper);
+            MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            _rasterizer->draw(*_scene);
+            ::SDL_GL_SwapWindow(window());
+        }
 
         // calc frame time
         _frameEnd = utils::uNow();
@@ -535,5 +589,15 @@ namespace minire
         _animationGap += frameTime;
 
         _frame++;
+
+        // maybe print performance data
+        totalStopwatch.reset();
+        if (_timekeeper)
+        {
+            if (auto aggregation = _timekeeper->fetch(); aggregation)
+            {
+                MINIRE_INFO("{}", instrumentation::tabulate<double>(*aggregation));
+            }
+        }
     }
 }

@@ -5,6 +5,7 @@
 #include <minire/errors.hpp>
 #include <minire/events/application.hpp>
 #include <minire/events/controller.hpp>
+#include <minire/instrumentation/histogram.hpp>
 #include <minire/sdl/gl-application.hpp>
 
 // STLs
@@ -63,6 +64,7 @@ namespace minire
         void handle(events::controller::Quit const &);
         void handle(events::controller::MouseGrab const &);
         void handle(events::controller::DebugDrawsUpdate const &);
+        void handle(events::controller::SetInstrumentation const &);
         void handle(events::controller::CreateSprite const &);
         void handle(events::controller::CreateNinePatch const &);
         void handle(events::controller::ResizeNinePatch const &);
@@ -111,6 +113,9 @@ namespace minire
 
         void maybeIssueRayCaster();
 
+        void enableInstrumentation();
+        void disableInstrumentation();
+
     private:
         content::Manager          & _contentManager;
 
@@ -138,5 +143,8 @@ namespace minire
         // state
         size_t                      _mouseX = 0;
         size_t                      _mouseY = 0;
+
+        // instrumentations
+        instrumentation::Histogram<>::Sptr _timekeeper;
     };
 }
