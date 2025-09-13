@@ -72,7 +72,7 @@ namespace minire
                     {
                         auto parent = mesh->_parent.lock();
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
-                        assert(parent->_hasGlobalTransform);
+                        assert(parent->hasGlobalTransform());
                         assert(mesh->_mesh);
                         callable(*mesh->_mesh, parent->_globalTransform);
                     }
@@ -103,7 +103,7 @@ namespace minire
                     {
                         auto parent = pointLight->_parent.lock();
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
-                        assert(parent->_hasGlobalTransform);
+                        assert(parent->hasGlobalTransform());
                         callable(index,
                                  parent->_globalPosition,
                                  pointLight->current()._color,
@@ -213,6 +213,13 @@ namespace minire
             using ChildrenMap = std::unordered_map<std::string, Child>;
             using LerpableTransform = utils::Lerpable<models::Transform>;
 
+            enum class GlobalTransformState
+            {
+                kClean, // both own and every children's are up to date
+                kDirty, // own transform is outdated
+                kGrey,  // own is clean, but some children are outdated
+            };
+
             Scene                 & _scene;
             LerpableTransform       _localTransform;
             glm::vec3               _globalPosition;
@@ -221,11 +228,11 @@ namespace minire
             ChildrenMap             _children;
             AnimationSet            _animationSet;
             ActiveAnimation::Uptr   _activeAnimation;
+            GlobalTransformState    _globalTransformState = GlobalTransformState::kDirty;
             bool                    _visible = true;
             bool                    _activated = false; // for _localTransform
             bool                    _childActivated = false;
             bool                    _hasActiveChildrenAnimation = false;
-            bool                    _hasGlobalTransform = false;
 
             Node(Scene & scene, models::Transform,
                  Wptr parent, bool visible);
@@ -233,6 +240,11 @@ namespace minire
             ~Node();
 
             bool lerp(float weight, size_t epochNumber);
+
+            bool hasGlobalTransform() const
+            {
+                return GlobalTransformState::kClean == _globalTransformState;
+            }
         };
 
         using ActiveCamera = std::variant<std::monostate,
@@ -256,6 +268,8 @@ namespace minire
 
         void activeChildrenAnimation(Node::Sptr);
         void deactiveChildrenAnimation(Node::Sptr);
+
+        void invalidateGlobalTransform(Node::Sptr);
 
     private:
         Rasterizer     & _rasterizer;

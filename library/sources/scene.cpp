@@ -620,7 +620,7 @@ namespace minire
             if (node->_activated)
             {
                 node->_activated = node->lerp(weight, epochNumber);
-                node->_hasGlobalTransform = false;
+                invalidateGlobalTransform(node);
             }
 
             if (node->_childActivated)
@@ -655,6 +655,20 @@ namespace minire
         actualizeViewpoint();
     }
 
+    void Scene::invalidateGlobalTransform(Node::Sptr node)
+    {
+        assert(node);
+        node->_globalTransformState = Node::GlobalTransformState::kDirty;
+
+        node = node->_parent.lock();
+        while(node &&
+              Node::GlobalTransformState::kClean == node->_globalTransformState)
+        {
+            node->_globalTransformState = Node::GlobalTransformState::kGrey;
+            node = node->_parent.lock();
+        }
+    }
+
     // TODO: don't lerp invisible nodes
     // TODO: don't lerp culled-out nodes
     void Scene::updateGlobalTransforms()
@@ -663,6 +677,10 @@ namespace minire
         static const glm::vec4 kOrigin(0, 0, 0, 1);
 
         assert(_root);
+
+        if (Node::GlobalTransformState::kClean == _root->_globalTransformState)
+            return;
+
         std::vector<Node::Sptr> queue{_root};
         queue.reserve(_nodesEstimate);
         while (!queue.empty())
@@ -672,38 +690,43 @@ namespace minire
 
             assert(node);
 
-            bool dropChildTrans = false;
-            if (!node->_hasGlobalTransform)
+            // actualize own global transform
+            if (Node::GlobalTransformState::kDirty == node->_globalTransformState)
             {
                 models::Transform const & localTransform = node->_localTransform.current();
                 glm::mat4 localTransformMatrix = localTransform.matrix();
                 Node::Sptr parent = node->_parent.lock();
-                assert(!parent || parent->_hasGlobalTransform);
+                assert(!parent || parent->_globalTransformState == Node::GlobalTransformState::kClean);
                 glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransform
                                                                  : kIdentityMatrix;
                 node->_globalTransform = parentGlobalTransform * localTransformMatrix;
                 node->_globalPosition = node->_globalTransform * kOrigin; // will drop "w"
-                node->_hasGlobalTransform = true;
-                dropChildTrans = true;
             }
 
-            // TODO: don't need do it for all children, maybe use 3-state flag:
-            //  - green: has global trans and so as all children
-            //  - yellow: has global trans, but some children may not (update bottom-up)
-            //  - red: no global trans, have to recalc as for all children
-            for(auto & [_, child] : node->_children)
+            // maybe schedule children actualization
+            if (Node::GlobalTransformState::kClean != node->_globalTransformState)
             {
-                std::visit(utils::Overloaded
+                bool const forceDirty = Node::GlobalTransformState::kDirty == node->_globalTransformState;
+                for(auto & [_, child] : node->_children)
                 {
-                    [&queue, dropChildTrans](Node::Sptr & node)
+                    if (Node::Sptr * pnode = std::get_if<Node::Sptr>(&child); pnode)
                     {
+                        Node::Sptr node = *pnode;
                         assert(node);
-                        if (dropChildTrans) node->_hasGlobalTransform = false;
-                        queue.push_back(node);
-                    },
-                    [](auto &) {},
-                }, child);
+                        if (forceDirty)
+                        {
+                            node->_globalTransformState = Node::GlobalTransformState::kDirty;
+                        }
+                        if (Node::GlobalTransformState::kClean != node->_globalTransformState)
+                        {
+                            queue.push_back(node);
+                        }
+                    }
+                }
             }
+
+            // mark node as clean
+            node->_globalTransformState = Node::GlobalTransformState::kClean;
         }
     }
 
@@ -718,7 +741,7 @@ namespace minire
                 {
                     Node::Sptr parent = camera->_parent.lock();
                     MINIRE_INVARIANT(parent, "an active camera has no parent");
-                    MINIRE_INVARIANT(parent->_hasGlobalTransform,
+                    MINIRE_INVARIANT(parent->hasGlobalTransform(),
                                      "an active camera's node has no global transform");
                     // TODO: don't update if transform didn't change
                     //       (to avoid expensive change checks inside setTransform)
