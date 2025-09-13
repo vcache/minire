@@ -1,5 +1,6 @@
 #include <minire/application.hpp>
 
+#include <minire/content/manager.hpp>
 #include <minire/instrumentation/formatters.hpp>
 #include <minire/instrumentation/stopwatch.hpp>
 #include <minire/logging.hpp>
@@ -220,11 +221,18 @@ namespace minire
     void Application::handle(events::controller::NewResourceLayer const & e)
     {
         _rasterizer->newResourceLayer(e._name);
+        _contentManager.newLayer(e._name);
     }
 
     void Application::handle(events::controller::DisposeResourceLayer const & e)
     {
         _rasterizer->disposeResourceLayer(e._name);
+        _contentManager.disposeLayer(e._name);
+    }
+
+    void Application::handle(events::controller::ContentManagerCleanup const & e)
+    {
+        _contentManager.cleanup(e._force);
     }
 
     void Application::handle(events::controller::CreateSprite const & e)

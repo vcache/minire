@@ -30,19 +30,34 @@ namespace minire::content
     // The manager manages only RAM-allocated items.
     class Manager
     {
+    public:
+        using LayerId = std::string;
+
+    private:
         struct AssetBlock
         {
-            Asset  _asset;
-            size_t _usage = 0;
-            size_t _size = 0; // bytes
+            Asset   _asset;
+            LayerId _layerId;
+            size_t  _usage = 0;
+            size_t  _size = 0; // bytes
         };
 
         using Store = std::unordered_map<Id, AssetBlock>;
+        using Layers = std::unordered_multimap<LayerId, Id>;
 
     public:
         explicit Manager(size_t sizeLimit = 0);
 
         virtual ~Manager();
+
+    public:
+        // See rasterizer/resources.hpp for details,
+        // Manager implements the semantics.
+        void newLayer(LayerId const &);
+
+        void disposeLayer(LayerId const &);
+
+        LayerId const & current() const { return _currentLayer; }
 
     public:
         void setReader(Reader::Uptr);
@@ -63,6 +78,9 @@ namespace minire::content
         // TODO: add "shadow" flag into a Store key to avoid Id's namespace cluttering
         std::unique_ptr<Lease> upload(Id const &, Asset);
 
+    public:
+        void cleanup(bool force = false);
+
     private:
         std::unique_ptr<Lease> borrowImpl(Id const &);
 
@@ -70,14 +88,16 @@ namespace minire::content
 
         void decUsage(Store::iterator) noexcept;
 
-        void cleanup(bool force);
+        void cleanup(Store::iterator);
 
     private:
+        LayerId      _currentLayer;
         Reader::Uptr _reader;
         size_t const _sizeLimit = 0;
         size_t       _sizeCurrent = 0;
         Store        _store;
         Store        _garbage;
+        Layers       _layers;
 
         friend class Lease;
     };

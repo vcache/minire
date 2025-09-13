@@ -47,6 +47,34 @@ namespace minire::content
         _reader = std::move(reader);
     }
 
+    void Manager::newLayer(LayerId const & layerId)
+    {
+        _currentLayer = layerId;
+    }
+
+    void Manager::disposeLayer(LayerId const & layerId)
+    {
+        auto range = _layers.equal_range(layerId);
+        for (auto it = range.first; it != range.second; ++it)
+        {
+            cleanup(_garbage.find(it->second));
+
+            // NOTE: can't really dispose items from _store,
+            //       because they are currently in use.
+            // TODO: this case might cause a memory leak,
+            //       until the next call of cleanup()
+            if (_store.contains(it->second))
+            {
+                MINIRE_WARNING(
+                    "requested to dispose layer \"{}\", but the asset \"{}\" "
+                    "can't be disposed, because it is currently in use. "
+                    "Please schedule an explicitl call to ContentManagerCleanup.",
+                    layerId, it->second);
+            }
+        }
+        _layers.erase(layerId);
+    }
+
     std::unique_ptr<Lease> Manager::borrow(Id const & id) try
     {
         return borrowImpl(id);
@@ -80,8 +108,12 @@ namespace minire::content
                 MINIRE_INVARIANT(_reader, "can't load an asset, no reader set: {}", id);
                 auto asset = _reader->load(id);
                 MINIRE_INVARIANT(hasData(asset), "failed to load asset: {}", id);
-                auto result = _store.emplace(id, AssetBlock{std::move(asset), 0, sizeOf(asset)});
+                auto result = _store.emplace(id, AssetBlock{._asset = std::move(asset),
+                                                            ._layerId = _currentLayer,
+                                                            ._usage = 0,
+                                                            ._size = sizeOf(asset)});
                 MINIRE_INVARIANT(result.second, "failed to insert an AssetBlock: {}", id);
+                _layers.emplace(_currentLayer, id);
 
                 it = result.first;
             }
@@ -102,8 +134,12 @@ namespace minire::content
 
     std::unique_ptr<Lease> Manager::upload(Id const & id, Asset asset)
     {
-        auto [it, inserted] = _store.emplace(id, AssetBlock{std::move(asset), 0, sizeOf(asset)});
+        auto [it, inserted] = _store.emplace(id, AssetBlock{._asset = std::move(asset),
+                                                            ._layerId = _currentLayer,
+                                                            ._usage = 0,
+                                                            ._size = sizeOf(asset)});
         MINIRE_INVARIANT(inserted, "failed to upload raw asset: {}", id);
+        _layers.emplace(_currentLayer, id);
         return std::unique_ptr<Lease>(new Lease(it, *this));
     }
 
@@ -114,14 +150,18 @@ namespace minire::content
         while(_sizeCurrent > _sizeLimit &&
               !_garbage.empty())
         {
-            auto it = _garbage.begin();
-            assert(it != _garbage.end());
-            assert(it->second._usage == 0);
-            assert(it->second._size <= _sizeCurrent);
-
-            _sizeCurrent -= it->second._size;
-            _garbage.erase(it);
+            cleanup(_garbage.begin());
         }
+    }
+
+    void Manager::cleanup(Store::iterator it)
+    {
+        assert(it != _garbage.end());
+        assert(it->second._usage == 0);
+        assert(it->second._size <= _sizeCurrent);
+
+        _sizeCurrent -= it->second._size;
+        _garbage.erase(it);
     }
 
     void Manager::incUsage(Store::iterator it) noexcept

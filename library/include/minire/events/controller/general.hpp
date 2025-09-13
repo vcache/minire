@@ -33,4 +33,9 @@ namespace minire::events::controller
     {
         std::string _name;
     };
+
+    struct ContentManagerCleanup
+    {
+        bool _force;
+    };
 }
