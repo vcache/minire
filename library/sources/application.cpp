@@ -569,7 +569,6 @@ namespace minire
         }
 
         // draw a frame
-        // TODO: maybe skip it if not performLerp ?
         {
             instrumentation::Stopwatch<> stopwatch("scene-rendering", _timekeeper);
             MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

@@ -184,7 +184,7 @@ namespace minire::content::readers
         std::string ext = path.extension();
         boost::algorithm::to_lower(ext);
 
-        MINIRE_INFO("Loading asset: {}", path.string());
+        MINIRE_INFO("Reading asset from file: {}", path.string());
         if (".png"  == ext ||
             ".jpg" == ext ||
             ".jpeg" == ext ||

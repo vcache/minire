@@ -58,8 +58,6 @@ namespace minire::rasterizer
         std::shared_ptr<MeshToken> result = std::make_shared<MeshToken>();
         result->_mesh = std::make_unique<Mesh>(source, defaultMaterial,
                                                _contentManager, _materials, _ubo);
-        MINIRE_INFO("Loading model: {}, {}", source, defaultMaterial ? "(default material)"
-                                                                     : "(no default material)");
         return result;
     }
 

@@ -22,7 +22,7 @@ namespace minire::rasterizer
                               Materials const & materials,
                               Ubo const & ubo)
     {
-        MINIRE_INFO("Loading a mesh from source: {}", source);
+        MINIRE_INFO("Loading a mesh into a GPU: {}", source);
 
         MINIRE_INVARIANT(!source.empty(), "source path is empty");
         MINIRE_INVARIANT(std::holds_alternative<content::Id>(source[0]),
