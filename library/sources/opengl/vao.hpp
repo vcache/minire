@@ -37,9 +37,15 @@ namespace minire::opengl
             }
         }
 
+        // NOTE: Avoid direct call to glBindVertexArray,
+        //       since it will break synchronization!
         void bind() const
         {
-            MINIRE_GL(glBindVertexArray, _vaoId);
+            if (_used != _vaoId)
+            {
+                MINIRE_GL(glBindVertexArray, _vaoId);
+                _used = _vaoId;
+            }
         }
 
         void enableAttrib(GLuint index) const
@@ -81,10 +87,16 @@ namespace minire::opengl
 
         static void unbind()
         {
-            MINIRE_GL(glBindVertexArray, 0);
+            if (_used)
+            {
+                MINIRE_GL(glBindVertexArray, 0);
+                _used = 0;
+            }
         }
 
     private:
         GLuint _vaoId;
+
+        static GLuint _used;
     };
 }
