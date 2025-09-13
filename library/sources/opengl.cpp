@@ -4,6 +4,8 @@
 
 namespace minire::opengl
 {
+    static bool gPedanticCheck = true;
+
     std::string_view errorToString(GLenum const errorCode)
     {
 #       define __MINIRE_GL_ENUM_CASE(ec) case ec: return #ec
@@ -28,6 +30,7 @@ namespace minire::opengl
                            const char * file,
                            char const * prettyFunction)
     {
+        if (!gPedanticCheck) return;
         if (auto const err = ::glGetError();
             GL_NO_ERROR != err)
         {
@@ -36,5 +39,21 @@ namespace minire::opengl
                 ::minire::formatNoExc("OpengGL call {} failed: {}",
                                       glCallName, errorToString(err)));
         }
+    }
+
+    void setGlErrorCheckMode(bool pedantic)
+    {
+        gPedanticCheck = pedantic;
+    }
+
+    bool isInPedanticMode()
+    {
+        return gPedanticCheck;
+    }
+
+    bool havePendedGlError()
+    {
+        auto const err = ::glGetError();
+        return GL_NO_ERROR != err;
     }
 }

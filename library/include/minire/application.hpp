@@ -149,5 +149,6 @@ namespace minire
 
         // instrumentations
         instrumentation::Histogram<>::Sptr _timekeeper;
+        size_t                             _pedanticGlCounter = 0;
     };
 }

@@ -68,6 +68,11 @@ namespace minire
         {
             enableInstrumentation();
         }
+
+        if (!kDebug)
+        {
+            opengl::setGlErrorCheckMode(false);
+        }
     }
 
     Application::~Application()
@@ -614,6 +619,27 @@ namespace minire
             if (auto aggregation = _timekeeper->fetch(); aggregation)
             {
                 MINIRE_INFO("{}", instrumentation::tabulate<double>(*aggregation));
+            }
+        }
+
+        // ensure that frame was rendered fine (TODO: maybe move this to Rasterizer?)
+        if (!kDebug)
+        {
+            if (opengl::isInPedanticMode())
+            {
+                _pedanticGlCounter++;
+                if (_pedanticGlCounter > 1000)
+                {
+                    opengl::setGlErrorCheckMode(false);
+                    MINIRE_INFO("Pendatic mode deactivated after {} frames",
+                                _pedanticGlCounter);
+                    _pedanticGlCounter = 0;
+                }
+            }
+            else if (opengl::havePendedGlError())
+            {
+                opengl::setGlErrorCheckMode(true);
+                MINIRE_ERROR("Unknown GL error detected! Pendatic mode is activated");
             }
         }
     }

@@ -16,6 +16,12 @@ namespace minire::opengl
                            int line,
                            char const * file,
                            char const * prettyFunction);
+
+    void setGlErrorCheckMode(bool pedantic);
+
+    bool isInPedanticMode();
+
+    bool havePendedGlError();
 }
 
 #define MINIRE_MAYBE_THROW_GL(func) \
