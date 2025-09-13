@@ -7,7 +7,6 @@
 #include <rasterizer/textures/id.hpp>
 
 #include <memory>
-#include <unordered_map>
 
 namespace minire::content { class Manager; }
 namespace minire::models { struct Image; }

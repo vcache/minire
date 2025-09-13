@@ -4,6 +4,7 @@
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 
+#include <rasterizer/resources.hpp>
 #include <scene.hpp>
 
 #include <cassert>
@@ -22,33 +23,27 @@ namespace minire::rasterizer
 
     Meshes::Meshes(Ubo const & ubo,
                    Materials const & materials,
-                   content::Manager & contentManager)
+                   content::Manager & contentManager,
+                   Resources & resources)
         : _contentManager(contentManager)
+        , _resources(resources)
         , _ubo(ubo)
         , _materials(materials)
     {}
 
-    std::shared_ptr<MeshToken> Meshes::getMesh(content::Path const & source,
-                                               material::Model::Sptr const & defaultMaterial)
+    std::shared_ptr<MeshToken> Meshes::getMesh(meshes::Id const & key)
     {
-        Key key(source, defaultMaterial);
-
-        if (auto it = _store.find(key);
-            it != _store.cend())
+        // Look up in a resource cache
+        if (std::any const & cached = _resources.find(key);
+            cached.has_value())
         {
-            if (auto token = it->second.lock(); token)
-            {
-                return token;
-            }
-            else
-            {
-                _store.erase(it);
-            }
+            return std::any_cast<std::shared_ptr<MeshToken>>(cached);
         }
 
-        auto token = load(source, defaultMaterial);
-        auto [_, inserted] = _store.emplace(key, token);
-        MINIRE_INVARIANT(inserted, "failed to store MeshToken into a store: {}", source);
+        // Upload new mesh into a GPU and save into a cache
+        auto token = load(key._contentPath, key._defaultMaterial);
+        _resources.insert(key, token);
+
         return token;
     }
 

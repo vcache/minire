@@ -1,5 +1,6 @@
 #pragma once
 
+#include <rasterizer/meshes/id.hpp>
 #include <rasterizer/textures/id.hpp>
 
 #include <any>
@@ -21,7 +22,7 @@ namespace minire::rasterizer
     public:
         // NOTE: LayerId can be "". Although seems strange, but must be a valid case.
         using LayerId = std::string;
-        using Key = std::variant<textures::Id>;
+        using Key = std::variant<textures::Id, meshes::Id>;
 
     public:
         // creates a new Layer and makes it current;

@@ -64,8 +64,8 @@ namespace minire::rasterizer
     Textures::get(textures::Id const & key) const
     {
         // Look up in cache
-        std::any const & cached = _resources.find(key);
-        if (cached.has_value())
+        if (std::any const & cached = _resources.find(key);
+            cached.has_value())
         {
             return std::any_cast<Texture::Sptr>(cached);
         }

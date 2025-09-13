@@ -22,7 +22,7 @@ namespace minire
         , _lines(_ubo)
         , _textures(_contentManager, _resources)
         , _materials()
-        , _meshes(_ubo, _materials, _contentManager)
+        , _meshes(_ubo, _materials, _contentManager, _resources)
         , _fonts(_contentManager, fontsPreload)
         , _labels(_fonts)
         , _sprites(_textures)

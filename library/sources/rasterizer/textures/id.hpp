@@ -3,9 +3,9 @@
 #include <minire/content/id.hpp>
 #include <minire/models/sampler.hpp>
 
-#include <functional> // For std::hash
-
 #include <boost/container_hash/hash.hpp> // for hash_combine
+
+#include <functional> // For std::hash
 
 namespace minire::rasterizer::textures
 {
