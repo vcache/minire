@@ -29,10 +29,15 @@ namespace minire::opengl
         Program & operator=(Program &&);
 
     public:
+        // NOTE: Avoid direct call to glUseProgram,
+        //       since it will break synchronization!
         void use() const
         {
-            MINIRE_GL(glUseProgram, _id);
-            _used = _id;
+            if (_used != _id)
+            {
+                MINIRE_GL(glUseProgram, _id);
+                _used = _id;
+            }
         }
 
         GLint getUniformLocation(GLchar const * name) const
