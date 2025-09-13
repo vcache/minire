@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace minire::events::controller
@@ -21,5 +22,15 @@ namespace minire::events::controller
     struct SetInstrumentation
     {
         bool _enabled;
+    };
+
+    struct NewResourceLayer
+    {
+        std::string _name;
+    };
+
+    struct DisposeResourceLayer
+    {
+        std::string _name;
     };
 }

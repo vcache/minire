@@ -217,6 +217,16 @@ namespace minire
         }
     }
 
+    void Application::handle(events::controller::NewResourceLayer const & e)
+    {
+        _rasterizer->newResourceLayer(e._name);
+    }
+
+    void Application::handle(events::controller::DisposeResourceLayer const & e)
+    {
+        _rasterizer->disposeResourceLayer(e._name);
+    }
+
     void Application::handle(events::controller::CreateSprite const & e)
     {
         _rasterizer->sprites().create(e._id, e._texture, e._tile, e._position,

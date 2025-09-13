@@ -14,6 +14,8 @@ namespace minire::events
                                     controller::MouseGrab,
                                     controller::DebugDrawsUpdate,
                                     controller::SetInstrumentation,
+                                    controller::NewResourceLayer,
+                                    controller::DisposeResourceLayer,
 
                                     controller::CreateSprite,
                                     controller::CreateNinePatch,
