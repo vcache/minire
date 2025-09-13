@@ -11,6 +11,7 @@
 #include <scene/viewpoint.hpp>
 #include <utils/lerpable.hpp>
 
+#include <list>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -62,8 +63,7 @@ namespace minire
         void cullModels(Callable callable) const
         {
             auto it = _meshLeaves.begin();
-            auto end = _meshLeaves.end();
-            while(it != end)
+            while(it != _meshLeaves.end())
             {
                 if (auto mesh = it->lock();
                     mesh)
@@ -82,7 +82,6 @@ namespace minire
                 else
                 {
                     it = _meshLeaves.erase(it);
-                    end = _meshLeaves.end();
                 }
             }
         }
@@ -95,8 +94,7 @@ namespace minire
 
             size_t index = 0;
             auto it = _pointLightLeaves.begin();
-            auto end = _pointLightLeaves.end();
-            while(it != end && index < limit)
+            while(it != _pointLightLeaves.end() && index < limit)
             {
                 if (auto pointLight = it->lock();
                     pointLight)
@@ -117,7 +115,6 @@ namespace minire
                 else
                 {
                     it = _pointLightLeaves.erase(it);
-                    end =  _pointLightLeaves.end();
                 }
             }
             return index;
@@ -243,8 +240,8 @@ namespace minire
                                           OrthographicCameraLeaf::Wptr>;
 
     private:
-        using PointLightLeaves = std::vector<PointLightLeaf::Wptr>;
-        using MeshLeaves = std::vector<MeshLeaf::Wptr>;
+        using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
+        using MeshLeaves = std::list<MeshLeaf::Wptr>;
         using ChildIterator = std::pair<Node::Sptr, Node::ChildrenMap::iterator>;
 
         // NOTE: empty path points to the _root,
