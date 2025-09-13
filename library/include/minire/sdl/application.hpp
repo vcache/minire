@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minire/models/mouse-button.hpp>
+#include <minire/models/msaa-params.hpp>
 
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_scancode.h>
@@ -21,7 +22,8 @@ namespace minire::sdl
     {
     public:
         Application(int width, int height,
-                    std::string const & title);
+                    std::string const & title,
+                    models::MsaaParams const & = {});
         virtual ~Application();
 
         void run();

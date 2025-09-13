@@ -12,7 +12,8 @@
 namespace minire::sdl
 {
     Application::Application(int width, int height,
-                             std::string const & title)
+                             std::string const & title,
+                             models::MsaaParams const & msaaParams)
         : _window(nullptr)
         , _width(width)
         , _height(height)
@@ -28,6 +29,13 @@ namespace minire::sdl
             {
                 MINIRE_THROW("SDL_Init failed: {}", SDL_GetError());
             }
+
+            MINIRE_INVARIANT(0 == ::SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, msaaParams._buffers),
+                             "SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, {}): {}",
+                             msaaParams._buffers, ::SDL_GetError());
+            MINIRE_INVARIANT(0 == ::SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, msaaParams._samples),
+                             "SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, {}): {}",
+                             msaaParams._buffers, ::SDL_GetError());
 
             _window = ::SDL_CreateWindow(
                 title.c_str(),

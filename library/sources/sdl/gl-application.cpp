@@ -34,11 +34,21 @@ namespace minire::sdl
         {
             ::glDisable(GL_DEBUG_OUTPUT);
         }
+
+        int getGlAttribute(SDL_GLattr attr)
+        {
+            int value = 0;
+            MINIRE_INVARIANT(0 == ::SDL_GL_GetAttribute(attr, &value),
+                             "SDL_GL_GetAttribute for SDL_GLattr={} failed: {}",
+                             static_cast<int>(attr), ::SDL_GetError());
+            return 0;
+        }
     }
 
     GlApplication::GlApplication(int width, int height,
-                                 std::string const & title)
-        : Application(width, height, title)
+                                 std::string const & title,
+                                 models::MsaaParams const & msaaParams)
+        : Application(width, height, title, msaaParams)
         , _SDLGlContext()
     {
         try
@@ -58,6 +68,21 @@ namespace minire::sdl
             }
 
             MINIRE_INFO("OpenGL: {}", (const char *) ::glGetString(GL_VERSION));
+
+            // Test expected parameters of GL context
+            if (int const buffers = getGlAttribute(SDL_GL_MULTISAMPLEBUFFERS);
+                buffers != static_cast<int>(msaaParams._buffers))
+            {
+                MINIRE_WARNING("{} MSAA buffers have been requested, but {} is allocated",
+                               msaaParams._buffers, buffers);
+            }
+
+            if (int const samples = getGlAttribute(SDL_GL_MULTISAMPLESAMPLES);
+                samples != static_cast<int>(msaaParams._samples))
+            {
+                MINIRE_WARNING("{} MSAA samples have been requested, but {} is allocated",
+                               msaaParams._samples, samples);
+            }
         }
         catch(...)
         {

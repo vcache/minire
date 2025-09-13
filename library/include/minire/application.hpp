@@ -26,7 +26,8 @@ namespace minire
     public:
         Application(int width, int height,
                     std::string const & title,
-                    content::Manager & contentManager);
+                    content::Manager & contentManager,
+                    models::MsaaParams const & = {});
         ~Application() override;
 
     public:

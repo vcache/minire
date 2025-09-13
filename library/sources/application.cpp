@@ -33,8 +33,9 @@ namespace minire
 
     Application::Application(int width, int height,
                              std::string const & title,
-                             content::Manager & contentManager)
-        : sdl::GlApplication(width, height, title)
+                             content::Manager & contentManager,
+                             models::MsaaParams const & msaaParams)
+        : sdl::GlApplication(width, height, title, msaaParams)
         , _contentManager(contentManager)
         , _rasterizer(std::make_unique<Rasterizer>(contentManager))
         , _scene(std::make_unique<Scene>(*_rasterizer))

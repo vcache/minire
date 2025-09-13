@@ -12,7 +12,8 @@ namespace minire::sdl
     {
     public:
         GlApplication(int width, int height,
-                      std::string const & title);
+                      std::string const & title,
+                      models::MsaaParams const & = {});
         ~GlApplication() override;
 
         void setVsync(bool enabled) const;
