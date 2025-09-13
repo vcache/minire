@@ -13,7 +13,6 @@ namespace minire::content { class Manager; }
 namespace minire::rasterizer
 {
     class Materials;
-    class MeshToken;
     class Resources;
     class Ubo;
 
@@ -27,10 +26,10 @@ namespace minire::rasterizer
 
         void draw(Scene const &) const;
 
-        std::shared_ptr<MeshToken> getMesh(meshes::Id const &);
+        std::shared_ptr<Mesh> getMesh(meshes::Id const &);
 
-        std::shared_ptr<MeshToken> getMesh(content::Path const & source,
-                                           material::Model::Sptr const & defaultMaterial = {})
+        std::shared_ptr<Mesh> getMesh(content::Path const & source,
+                                      material::Model::Sptr const & defaultMaterial = {})
         {
             meshes::Id id{._contentPath = source,
                           ._defaultMaterial = defaultMaterial};
@@ -38,8 +37,8 @@ namespace minire::rasterizer
         }
 
     private:
-        std::shared_ptr<MeshToken> load(content::Path const & source,
-                                        material::Model::Sptr const & defaultMaterial);
+        std::shared_ptr<Mesh> load(content::Path const & source,
+                                   material::Model::Sptr const & defaultMaterial);
 
     private:
         content::Manager & _contentManager;

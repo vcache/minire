@@ -17,7 +17,7 @@
 #include <variant>
 
 namespace minire::content { class Manager; }
-namespace minire::rasterizer { class MeshToken; }
+namespace minire::rasterizer { class Mesh; }
 
 namespace minire
 {
@@ -73,8 +73,8 @@ namespace minire
                         auto parent = mesh->_parent.lock();
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
                         assert(parent->_hasGlobalTransform);
-                        assert(mesh->_meshToken);
-                        callable(*mesh->_meshToken, parent->_globalTransform);
+                        assert(mesh->_mesh);
+                        callable(*mesh->_mesh, parent->_globalTransform);
                     }
 
                     ++it;
@@ -153,12 +153,12 @@ namespace minire
 
         struct Mesh
         {
-            using ElementType = std::shared_ptr<rasterizer::MeshToken>;
+            using ElementType = std::shared_ptr<rasterizer::Mesh>;
 
-            ElementType _meshToken;
+            ElementType _mesh;
 
-            explicit Mesh(ElementType meshToken)
-                : _meshToken(std::move(meshToken))
+            explicit Mesh(ElementType mesh)
+                : _mesh(mesh)
             {}
 
             bool lerp(float, size_t) { return false; } // just for compatibility

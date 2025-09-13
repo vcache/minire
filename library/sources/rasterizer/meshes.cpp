@@ -14,13 +14,6 @@ namespace minire::rasterizer
 {
     // TODO: bucket drawing call to minimize program switch
 
-    class MeshToken
-    {
-        Mesh::Uptr _mesh;
-
-        friend class Meshes;
-    };
-
     Meshes::Meshes(Ubo const & ubo,
                    Materials const & materials,
                    content::Manager & contentManager,
@@ -31,13 +24,13 @@ namespace minire::rasterizer
         , _materials(materials)
     {}
 
-    std::shared_ptr<MeshToken> Meshes::getMesh(meshes::Id const & key)
+    std::shared_ptr<Mesh> Meshes::getMesh(meshes::Id const & key)
     {
         // Look up in a resource cache
         if (std::any const & cached = _resources.find(key);
             cached.has_value())
         {
-            return std::any_cast<std::shared_ptr<MeshToken>>(cached);
+            return std::any_cast<std::shared_ptr<Mesh>>(cached);
         }
 
         // Upload new mesh into a GPU and save into a cache
@@ -47,13 +40,11 @@ namespace minire::rasterizer
         return token;
     }
 
-    std::shared_ptr<MeshToken> Meshes::load(content::Path const & source,
-                                            material::Model::Sptr const & defaultMaterial)
+    std::shared_ptr<Mesh> Meshes::load(content::Path const & source,
+                                       material::Model::Sptr const & defaultMaterial)
     {
-        std::shared_ptr<MeshToken> result = std::make_shared<MeshToken>();
-        result->_mesh = std::make_unique<Mesh>(source, defaultMaterial,
-                                               _contentManager, _materials, _ubo);
-        return result;
+        return std::make_shared<Mesh>(source, defaultMaterial,
+                                      _contentManager, _materials, _ubo);
     }
 
     void Meshes::draw(Scene const & scene) const
@@ -61,11 +52,9 @@ namespace minire::rasterizer
         // TODO: group models by a material signature (to avoid frequent program switch)
         scene.cullModels(
             [&ambientLight = scene.ambientLight()]
-            (MeshToken const & meshToken,
-               glm::mat4 const & transform)
+            (Mesh const & mesh, glm::mat4 const & transform)
             {
-                assert(meshToken._mesh);
-                meshToken._mesh->draw(transform, ambientLight);
+                mesh.draw(transform, ambientLight);
             }
         );
     }

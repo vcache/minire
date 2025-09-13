@@ -173,13 +173,13 @@ namespace minire
     
     void Scene::handle(events::controller::SceneNewMesh const & e)
     {
-        auto meshToken = _rasterizer.meshes().getMesh(e._data._source,
-                                                      e._data._defaultMaterial);
-        assert(meshToken);
+        auto mesh = _rasterizer.meshes().getMesh(e._data._source,
+                                                 e._data._defaultMaterial);
+        assert(mesh);
 
         Node::Sptr parent = find<Node::Sptr>(e._parent);
         assert(parent);
-        auto meshLeaf = std::make_shared<MeshLeaf>(std::move(meshToken), parent, e._visible);
+        auto meshLeaf = std::make_shared<MeshLeaf>(mesh, parent, e._visible);
         auto [_, inserted] = parent->_children.emplace(e._id, meshLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
         _meshLeaves.push_back(meshLeaf);
