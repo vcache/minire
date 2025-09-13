@@ -24,6 +24,15 @@ namespace minire
 {
     class Rasterizer;
 
+    /**
+     * Main loop's expected call sequence:
+     *
+     *  advanceAnimations() // optional
+     *  lerp()              // optional (mandatory if animations advanced)
+     *  revalidateNode()    // mandatory
+     *  cullModels(...)
+     *
+     * */
     class Scene
     {
     public:
@@ -55,6 +64,8 @@ namespace minire
         scene::Viewpoint const & viewpoint() const { return _viewpoint; }
 
         void lerp(float weight, size_t epochNumber);
+
+        void revalidateNodes();
 
         bool advanceAnimations(float delta /* seconds */, size_t epochNumber);
 

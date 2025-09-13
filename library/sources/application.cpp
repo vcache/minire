@@ -591,6 +591,11 @@ namespace minire
             _scene->lerp(weight, _epochNumber);
         }
 
+        {
+            instrumentation::Stopwatch<> stopwatch("scene-revalidation", _timekeeper);
+            _scene->revalidateNodes();
+        }
+
         // draw a frame
         {
             instrumentation::Stopwatch<> stopwatch("scene-rendering", _timekeeper);

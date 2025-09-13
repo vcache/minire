@@ -166,8 +166,9 @@ namespace minire
     {
         Node::Sptr parent = find<Node::Sptr>(e._parent);
         assert(parent);
-        auto [_, inserted] = parent->_children.emplace(
-            e._id, std::make_shared<Node>(*this, std::move(e._origin), parent, e._visible));
+        Node::Sptr node = std::make_shared<Node>(*this, std::move(e._origin), parent, e._visible);
+        auto [_, inserted] = parent->_children.emplace(e._id, node);
+        invalidateGlobalTransform(node);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
     }
     
@@ -231,6 +232,13 @@ namespace minire
         // Reset _parent for the element
         std::visit(utils::Overloaded
         {
+            [&oldParent, &newParent, this](Node::Sptr & child)
+            {
+                assert(child);
+                assert(child->_parent.lock() == oldParent);
+                child->_parent = newParent;
+                invalidateGlobalTransform(child);
+            },
             [&oldParent, &newParent](auto & child)
             {
                 assert(child);
@@ -259,7 +267,7 @@ namespace minire
         auto node = find<Node::Sptr>(e._item);
         assert(node);
         node->_localTransform.update(epochNumber, e._attribute);
-        activate(*node);
+        activate(*node); // NOTE: will also invalidate global transform
     }
     
     void Scene::handle(events::controller::SceneSetPointLight const & e,
@@ -608,6 +616,10 @@ namespace minire
     void Scene::lerp(float weight, size_t epochNumber)
     {
         assert(_root);
+
+        if (!_root->_activated && !_root->_childActivated)
+            return;
+
         std::vector<Node::Sptr> queue{_root};
         queue.reserve(_nodesEstimate);
         while(!queue.empty())
@@ -650,7 +662,10 @@ namespace minire
                 activateParents(node->_parent.lock());
             }
         }
+    }
 
+    void Scene::revalidateNodes()
+    {
         updateGlobalTransforms();
         actualizeViewpoint();
     }
