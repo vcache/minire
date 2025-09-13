@@ -1,22 +1,23 @@
-#error "FIX ME"
+#include <utils/sparse-range.hpp>
 
-#include <bznk-lib/sparse-range.hpp>
-#include <iostream>
+#include <gtest/gtest.h>
 
-int main()
+namespace minire::utils::test
 {
-    bznk::SparseRange<float> v;
+    // TODO: cover corner-cases
 
-    v.insert(10, 12 + 1);
-    v.insert(13, 14 + 1);
-    v.insert(15, 16 + 1);
-
-    std::cout << "input: " << v << std::endl;
-
-    for(auto i : v.tighten())
+    TEST(SparseRange, SmokeTest)
     {
-        std::cout << "[" << i.first << "; " << i.second << "]" << std::endl;
-    }
+        SparseRange<float> sparseRange;
 
-    return 0;
+        sparseRange.insert(10, 13);
+        sparseRange.insert(13, 14);
+        sparseRange.insert(15, 16);
+
+        auto const & result = sparseRange.tighten();
+
+        ASSERT_EQ(result.size(), 2);
+        EXPECT_EQ(result[0], std::make_pair(10.0f, 14.0f));
+        EXPECT_EQ(result[1], std::make_pair(15.0f, 16.0f));
+    }
 }

@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 
+# Common options
+set(MINIRE_CXX_STD cxx_std_20)
+set(MINIRE_COMP_OPTS -Wall -Wextra -pedantic -Werror)
+
 # Configure threads library
 find_package(Threads REQUIRED)
 
@@ -18,6 +22,9 @@ find_package(fmt REQUIRED)
 
 # Configure GLM
 find_package(glm REQUIRED)
+
+# Configure GTest
+find_package(GTest)
 
 # Setup defines
 add_definitions(-DCMAKE_CURRENT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -59,7 +66,7 @@ target_link_libraries(minire
     "${OPENGL_LIBRARIES}"
 )
 
-target_compile_features(minire PUBLIC cxx_std_20)
+target_compile_features(minire PUBLIC "${MINIRE_CXX_STD}")
 
 # TODO: make 3rd-party optional (take em' from the system or
 #       from a common build dir (when used as a submodule))
@@ -73,6 +80,22 @@ target_include_directories(minire PUBLIC
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources"
 )
 
-target_compile_options(minire
-    PRIVATE -Wall -Wextra -pedantic -Werror
-)
+target_compile_options(minire PRIVATE ${MINIRE_COMP_OPTS})
+
+# Build unit tests
+
+if (GTest_FOUND)
+    file(GLOB_RECURSE MINIRE_TESTS
+         LIST_DIRECTORIES FALSE
+         "${CMAKE_CURRENT_SOURCE_DIR}/sources/*_test.cpp")  # TODO: why underscore instead hyphen?
+    add_executable(minire-tests ${MINIRE_TESTS})
+    target_compile_features(minire-tests PUBLIC "${MINIRE_CXX_STD}")
+    target_link_libraries(minire-tests minire ${GTEST_BOTH_LIBRARIES})
+    target_include_directories(minire-tests PUBLIC
+        ${GTEST_INCLUDE_DIR}
+        "${CMAKE_CURRENT_SOURCE_DIR}/sources")
+    target_compile_options(minire-tests PRIVATE ${MINIRE_COMP_OPTS})
+    gtest_add_tests(TARGET minire-tests)
+else()
+    message("GTest library not found, thus, unit-test won't be built.")
+endif(GTest_FOUND)
