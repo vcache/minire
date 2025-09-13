@@ -8,7 +8,7 @@ namespace minire::rasterizer::test
     {
         Resources resources;
 
-        Resources::Key key = Resources::TextureId("foo", models::Sampler());
+        Resources::Key key = textures::Id{"foo", models::Sampler(), false};
 
         // Empty storage
         {
@@ -40,7 +40,7 @@ namespace minire::rasterizer::test
     {
         Resources resources;
 
-        Resources::Key key = Resources::TextureId("foo", models::Sampler());
+        Resources::Key key = textures::Id{"foo", models::Sampler(), false};
 
         resources.insert(key, std::string("foo-data"));
         ASSERT_TRUE(resources.find(key).has_value());
@@ -53,8 +53,8 @@ namespace minire::rasterizer::test
     {
         Resources resources;
 
-        Resources::Key keyFoo = Resources::TextureId("foo", models::Sampler());
-        Resources::Key keyBar = Resources::TextureId("bar", models::Sampler());
+        Resources::Key keyFoo = textures::Id{"foo", models::Sampler(), false};
+        Resources::Key keyBar = textures::Id{"bar", models::Sampler(), false};
 
         resources.insert(keyFoo, std::string("foo-data"));
         ASSERT_TRUE(resources.find(keyFoo).has_value());

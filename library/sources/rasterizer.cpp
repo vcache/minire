@@ -20,7 +20,7 @@ namespace minire
         , _ubo()
         , _coordinates(_ubo)
         , _lines(_ubo)
-        , _textures(_contentManager)
+        , _textures(_contentManager, _resources)
         , _materials()
         , _meshes(_ubo, _materials, _contentManager)
         , _fonts(_contentManager, fontsPreload)

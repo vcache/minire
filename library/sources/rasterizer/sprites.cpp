@@ -463,7 +463,7 @@ namespace minire::rasterizer
                          int const z)
     {
         auto res = _store.emplace(id,
-            std::make_unique<Sprite>(_textures.getNoMipmap(texture), tile,
+            std::make_unique<Sprite>(_textures.get(texture, {}, false /* no mipmap */), tile,
                                      position, glm::vec2(), visible, z,
                                      *_program));
         if (!res.second)
@@ -481,7 +481,7 @@ namespace minire::rasterizer
                          int const z)
     {
         auto res = _store.emplace(id,
-            std::make_unique<Sprite>(_textures.getNoMipmap(texture), tile,
+            std::make_unique<Sprite>(_textures.get(texture, {}, false /* no mipmap */), tile,
                                      position, dimensions, visible, z,
                                      *_program));
         if (!res.second)

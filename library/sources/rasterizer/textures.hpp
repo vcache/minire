@@ -2,9 +2,9 @@
 
 #include <minire/content/id.hpp>
 #include <minire/models/sampler.hpp>
-#include <minire/utils/std-pair-hash.hpp>
 
 #include <opengl/texture.hpp>
+#include <rasterizer/textures/id.hpp>
 
 #include <memory>
 #include <unordered_map>
@@ -14,6 +14,8 @@ namespace minire::models { struct Image; }
 
 namespace minire::rasterizer
 {
+    class Resources;
+
     class Textures
     {
     public:
@@ -51,51 +53,36 @@ namespace minire::rasterizer
         };
 
     public:
-        explicit Textures(content::Manager & contentManager)
+        explicit Textures(content::Manager & contentManager,
+                          Resources & resources)
             : _contentManager(contentManager)
+            , _resources(resources)
         {}
 
         // use this both for preload and for getting ptr
-        Texture::Sptr get(content::Id const & id,
-                          models::Sampler const & sampler = {}) const
+        // TODO: why is this a const-method?
+        Texture::Sptr get(textures::Id const &) const;
+
+        Texture::Sptr get(content::Id const & contentId,
+                          models::Sampler const & sampler = {},
+                          bool hasMipMaps = true) const
         {
-            return get(_contentManager, id, sampler, _cache, true);
+            textures::Id key{._contentId = contentId,
+                             ._sampler = sampler,
+                             ._hasMipMaps = hasMipMaps};
+            return get(key);
         }
 
-        Texture::Sptr get(content::MaybeId const & id,
-                          models::Sampler const & sampler = {}) const
+        Texture::Sptr get(content::MaybeId const & contentId,
+                          models::Sampler const & sampler = {},
+                          bool hasMipMaps = true) const
         {
-            return id ? get(*id, sampler) : Texture::Sptr();
-        }
-
-        Texture::Sptr getNoMipmap(content::Id const & id,
-                                  models::Sampler const & sampler = {}) const
-        {
-            return get(_contentManager, id, sampler, _cacheNoMipmap, false);
-        }
-
-        Texture::Sptr getNoMipmap(content::MaybeId const & id,
-                                  models::Sampler const & sampler = {}) const
-        {
-            return id ? get(*id, sampler) : Texture::Sptr();
+            return contentId ? get(*contentId, sampler, hasMipMaps)
+                             : Texture::Sptr();
         }
 
     private:
-        using Key = std::pair<content::Id, models::Sampler>;
-        using Cache = std::unordered_map<Key, Texture::Sptr>;
-
-        static Texture::Sptr get(content::Manager &,
-                                 content::Id const &,
-                                 models::Sampler const &,
-                                 Cache &,
-                                 bool mipmaps);
-
-        // TODO: move mipmap into Sampler and merge _cache w/ _cacheNoMipmap
-
-    private:
-        content::Manager       & _contentManager;
-
-        mutable Cache            _cache;
-        mutable Cache            _cacheNoMipmap;
+        content::Manager & _contentManager;
+        Resources        & _resources;
     };
 }

@@ -1,8 +1,6 @@
 #pragma once
 
-#include <minire/content/id.hpp>
-#include <minire/models/sampler.hpp>
-#include <minire/utils/std-pair-hash.hpp>
+#include <rasterizer/textures/id.hpp>
 
 #include <any>
 #include <string>
@@ -23,8 +21,7 @@ namespace minire::rasterizer
     public:
         // NOTE: LayerId can be "". Although seems strange, but must be a valid case.
         using LayerId = std::string;
-        using TextureId = std::pair<content::Id, models::Sampler>;
-        using Key = std::variant<TextureId>;
+        using Key = std::variant<textures::Id>;
 
     public:
         // creates a new Layer and makes it current;

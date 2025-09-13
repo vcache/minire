@@ -4,6 +4,7 @@
 #include <minire/errors.hpp>
 
 #include <opengl.hpp>
+#include <rasterizer/resources.hpp>
 
 #include <glm/glm.hpp>
 
@@ -60,27 +61,26 @@ namespace minire::rasterizer
     }
 
     Textures::Texture::Sptr
-    Textures::get(content::Manager & contentManager,
-                  content::Id const & id,
-                  models::Sampler const & sampler,
-                  Cache & cache,
-                  bool mipmaps)
+    Textures::get(textures::Id const & key) const
     {
-        Key key(id, sampler);
-
-        auto it = cache.find(key);
-        if (it == cache.cend())
+        // Look up in cache
+        std::any const & cached = _resources.find(key);
+        if (cached.has_value())
         {
-            auto lease = contentManager.borrow(id);
-            assert(lease);
-            models::Image::Sptr image = lease->as<models::Image::Sptr>();
-            MINIRE_INVARIANT(image, "no valid image inside an asset: {}", id);
-            auto texture = std::make_shared<Texture>(*image, sampler, mipmaps);
-            auto [newIt, inserted]  = cache.emplace(key, texture);
-            MINIRE_INVARIANT(inserted, "failed to cache a texture");
-            it = newIt;
+            return std::any_cast<Texture::Sptr>(cached);
         }
 
-        return it->second;
+        // Build a new one
+        auto lease = _contentManager.borrow(key._contentId);
+        assert(lease);
+
+        models::Image::Sptr image = lease->as<models::Image::Sptr>();
+        MINIRE_INVARIANT(image, "no valid image inside an asset: {}", key._contentId);
+        auto texture = std::make_shared<Texture>(*image, key._sampler, key._hasMipMaps);
+
+        // Put in a resource cache
+        _resources.insert(key, texture);
+
+        return texture;
     }
 }

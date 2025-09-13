@@ -8,6 +8,7 @@
 #include <rasterizer/lines.hpp>
 #include <rasterizer/materials.hpp>
 #include <rasterizer/meshes.hpp>
+#include <rasterizer/resources.hpp>
 #include <rasterizer/sprites.hpp>
 #include <rasterizer/textures.hpp>
 #include <rasterizer/ubo.hpp>
@@ -36,6 +37,11 @@ namespace minire
         rasterizer::Meshes & meshes() { return _meshes; }
         rasterizer::Lines & lines() { return _lines; }
 
+    public:
+        void newResourceLayer(rasterizer::Resources::LayerId const & layerId) { _resources.newLayer(layerId); }
+        void disposeResourceLayer(rasterizer::Resources::LayerId const & layerId) { _resources.disposeLayer(layerId); }
+        rasterizer::Resources::LayerId const & currentResourceLayer() const { return _resources.current(); }
+
     private:
         void draw3d(Scene const & scene);
         void draw2d();
@@ -53,6 +59,8 @@ namespace minire
         rasterizer::Fonts              _fonts;
         rasterizer::Labels             _labels;
         rasterizer::Sprites            _sprites;
+
+        rasterizer::Resources          _resources;
 
         glm::mat4                      _2dProjection;
         rasterizer::Drawable::PtrsList _drawables;
