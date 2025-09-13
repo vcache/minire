@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cstdlib> // for std::abort
 #include <filesystem>
+#include <new> // for std::bac_alloc
 
 namespace minire::content
 {
@@ -46,7 +47,18 @@ namespace minire::content
         _reader = std::move(reader);
     }
 
-    std::unique_ptr<Lease> Manager::borrow(Id const & id)
+    std::unique_ptr<Lease> Manager::borrow(Id const & id) try
+    {
+        return borrowImpl(id);
+    }
+    catch(std::bad_alloc const & e)
+    {
+        MINIRE_WARNING("bad_alloc caught: {}, forcing GC", e.what());
+        cleanup(true);
+        return borrowImpl(id);
+    }
+
+    std::unique_ptr<Lease> Manager::borrowImpl(Id const & id)
     {
         auto it = _store.find(id);
 
@@ -76,7 +88,7 @@ namespace minire::content
 
             assert(it != _store.cend());
             _sizeCurrent += it->second._size;
-            cleanup();
+            cleanup(false);
         }
 
         assert(it != _store.cend());
@@ -84,7 +96,7 @@ namespace minire::content
 
         // My deep condolences on the usage of a "new" operator,
         // but I have to do it since Lease::Lease is private and
-        // std::make_unique won't be able to call.
+        // std::make_unique won't be able to call it.
         return std::unique_ptr<Lease>(new Lease(it, *this));
     }
 
@@ -95,9 +107,9 @@ namespace minire::content
         return std::unique_ptr<Lease>(new Lease(it, *this));
     }
 
-    void Manager::cleanup()
+    void Manager::cleanup(bool force)
     {
-        if (0 == _sizeLimit) return;
+        if (0 == _sizeLimit && !force) return;
 
         while(_sizeCurrent > _sizeLimit &&
               !_garbage.empty())

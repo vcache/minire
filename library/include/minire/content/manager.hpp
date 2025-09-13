@@ -27,6 +27,7 @@ namespace minire::content
         virtual Asset load(Id const & id) const = 0;
     };
 
+    // The manager manages only RAM-allocated items.
     class Manager
     {
         struct AssetBlock
@@ -55,6 +56,7 @@ namespace minire::content
         }
 
         // TODO: maybe it should be const?
+        // May forcefully run GC in case of std::bad_alloc caught.
         std::unique_ptr<Lease> borrow(Id const &);
 
     public:
@@ -62,11 +64,13 @@ namespace minire::content
         std::unique_ptr<Lease> upload(Id const &, Asset);
 
     private:
+        std::unique_ptr<Lease> borrowImpl(Id const &);
+
         void incUsage(Store::iterator it) noexcept;
 
         void decUsage(Store::iterator) noexcept;
 
-        void cleanup();
+        void cleanup(bool force);
 
     private:
         Reader::Uptr _reader;
