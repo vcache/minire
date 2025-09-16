@@ -20,9 +20,9 @@ namespace minire::utils
                 case models::VertexBuffer::DrawMode::kLines:         return GL_LINES;
                 case models::VertexBuffer::DrawMode::kLineStrip:     return GL_LINE_STRIP;
                 case models::VertexBuffer::DrawMode::kLineLoop:      return GL_LINE_LOOP;
-                case models::VertexBuffer::DrawMode::kTrinagles:     return GL_TRIANGLES;
-                case models::VertexBuffer::DrawMode::kTrinagleStrip: return GL_TRIANGLE_STRIP;
-                case models::VertexBuffer::DrawMode::kTrinagleFan:   return GL_TRIANGLE_FAN;
+                case models::VertexBuffer::DrawMode::kTriangles:     return GL_TRIANGLES;
+                case models::VertexBuffer::DrawMode::kTriangleStrip: return GL_TRIANGLE_STRIP;
+                case models::VertexBuffer::DrawMode::kTriangleFan:   return GL_TRIANGLE_FAN;
                 case models::VertexBuffer::DrawMode::kQuads:         return GL_QUADS;
                 case models::VertexBuffer::DrawMode::kQuadStrip:     return GL_QUAD_STRIP;
             }

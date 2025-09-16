@@ -23,9 +23,9 @@ namespace minire::models
             kLines,         // GL_LINES
             kLineStrip,     // GL_LINE_STRIP
             kLineLoop,      // GL_LINE_LOOP
-            kTrinagles,     // GL_TRIANGLES
-            kTrinagleStrip, // GL_TRIANGLE_STRIP
-            kTrinagleFan,   // GL_TRIANGLE_FAN
+            kTriangles,     // GL_TRIANGLES
+            kTriangleStrip, // GL_TRIANGLE_STRIP
+            kTriangleFan,   // GL_TRIANGLE_FAN
             kQuads,         // GL_QUADS
             kQuadStrip,     // GL_QUAD_STRIP
         };

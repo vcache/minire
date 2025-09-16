@@ -183,7 +183,7 @@ namespace
             size_t const stride = sizeof(VertexData);
             return VertexBuffer
             {
-                ._drawMode = VertexBuffer::DrawMode::kTrinagles,
+                ._drawMode = VertexBuffer::DrawMode::kTriangles,
                 ._elements = VertexBuffer::ElementBuffer
                 {
                     ._indecesBuffer = VertexBuffer::ElementBuffer::IndecesBuffer(elements),
