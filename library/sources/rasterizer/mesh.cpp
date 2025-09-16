@@ -7,6 +7,7 @@
 #include <minire/utils/std-pair-hash.hpp>
 
 #include <rasterizer/materials.hpp>
+#include <rasterizer/vertex-buffers.hpp>
 #include <utils/gltf-interpreters.hpp>
 #include <utils/obj-interpreters.hpp>
 #include <utils/overloaded.hpp>
@@ -20,11 +21,50 @@ namespace minire::rasterizer
                               material::Model::Sptr const & defaultMaterial,
                               content::Manager & contentManager,
                               Materials const & materials,
-                              Ubo const & ubo)
+                              Ubo const & ubo,
+                              VertexBuffers const & vertexBuffers)
     {
         MINIRE_INFO("Loading a mesh into a GPU: {}", source);
-
         MINIRE_INVARIANT(!source.empty(), "source path is empty");
+
+        // Special case, loading from VertexBuffers
+
+        if (std::holds_alternative<content::path::Special>(source[0]) &&
+            std::get<content::path::Special>(source[0]) == content::path::Special::kVertexBuffers)
+        {
+            // Sanity check
+
+            MINIRE_INVARIANT(source.size() == 2, "unexpected size of path to vertex-buffers ({}): {}",
+                             source.size(), source);
+            MINIRE_INVARIANT(std::holds_alternative<content::Id>(source[1]),
+                             "unexpected component type of vertex buffer path: {}", source);
+            content::Id vertexBufferId = std::get<content::Id>(source[1]);
+
+            // Build material instance and fetch a program
+            models::MeshFeatures const & meshFeatures = vertexBuffers.meshFeatures(vertexBufferId);
+            auto matProgram = materials.build(*defaultMaterial, meshFeatures, ubo);
+            auto matInstance = materials.instantiate(*defaultMaterial, meshFeatures);
+            MINIRE_INVARIANT(matProgram, "no material program for {}", source);
+            MINIRE_INVARIANT(matInstance, "no material instance for {}", source);
+
+            // Create or make opengl::VertexBuffer for a given Locations
+            material::Program::Locations const & locations = matProgram->locations();
+            auto openglVertexBuffer = vertexBuffers.build(vertexBufferId, locations);
+            assert(openglVertexBuffer);
+
+            // extend aabb
+            _aabb.extend(openglVertexBuffer->_aabb);
+
+            // setup _primitives and _materials
+
+            _primitives.emplace_back(std::move(openglVertexBuffer));
+            _materials.emplace_back(Material{std::move(matProgram), std::move(matInstance), {0}});
+
+            return;
+        }
+
+        // Regular case, loading from a file
+
         MINIRE_INVARIANT(std::holds_alternative<content::Id>(source[0]),
                          "source's path doesn't start from Id");
 
@@ -58,7 +98,8 @@ namespace minire::rasterizer
 
                 _aabb.extend(vertexBuffer._aabb);
 
-                _primitives.emplace_back(Primitive{std::move(vertexBuffer)});
+                _primitives.emplace_back(
+                    std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)));
                 _materials.emplace_back(Material{std::move(matProgram), std::move(matInstance), {0}});
             },
 
@@ -148,7 +189,8 @@ namespace minire::rasterizer
                 for(opengl::VertexBuffer & vertexBuffer : vertexBuffers)
                 {
                     _aabb.extend(vertexBuffer._aabb);
-                    _primitives.emplace_back(std::move(vertexBuffer));
+                    _primitives.emplace_back(
+                        std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)));
                 }
             },
 
@@ -163,9 +205,10 @@ namespace minire::rasterizer
                material::Model::Sptr const & defaultMaterial,
                content::Manager & contentManager,
                Materials const & materials,
-               Ubo const & ubo)
+               Ubo const & ubo,
+               VertexBuffers const & vertexBuffers)
     {
-        loadPrimitives(source, defaultMaterial, contentManager, materials, ubo);
+        loadPrimitives(source, defaultMaterial, contentManager, materials, ubo, vertexBuffers);
     }
 
     void Mesh::draw(glm::mat4 const & modelTransform,
@@ -181,7 +224,7 @@ namespace minire::rasterizer
             for(size_t const primIndex : material._primitives)
             {
                 assert(primIndex < _primitives.size());
-                _primitives[primIndex]._buffer.drawElements();
+                _primitives[primIndex]._buffer->drawElements();
             }
         }
     }

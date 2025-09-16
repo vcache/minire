@@ -20,6 +20,7 @@ namespace minire::rasterizer
 {
     class Materials;
     class Ubo;
+    class VertexBuffers;
 
     class Mesh final
     {
@@ -30,7 +31,8 @@ namespace minire::rasterizer
                       material::Model::Sptr const & defaultMaterial,
                       content::Manager &,
                       Materials const &,
-                      Ubo const &);
+                      Ubo const &,
+                      VertexBuffers const &);
 
         // assuming that caller will "use" gl's program!
         void draw(glm::mat4 const &,
@@ -48,7 +50,18 @@ namespace minire::rasterizer
 
         struct Primitive
         {
-            opengl::VertexBuffer _buffer;
+            // Since the ownership of _buffer is shared, it is valid and sane
+            // that some other owners may change the contents of a buffer.
+            // For example, it might be used to implement dynamically changable meshes,
+            //              or UV-based animations.
+            //
+            // (!) Despite that, other owners  MUST  guarantee, that mesh alternations
+            // will be done in a compatible with an initially given attrib locations way!
+            std::shared_ptr<opengl::VertexBuffer> _buffer;
+
+            explicit Primitive(std::shared_ptr<opengl::VertexBuffer> buffer)
+                : _buffer(std::move(buffer))
+            {}
         };
 
     private:
@@ -56,7 +69,8 @@ namespace minire::rasterizer
                             material::Model::Sptr const & defaultMaterial,
                             content::Manager & contentManager,
                             Materials const & materials,
-                            Ubo const & ubo);
+                            Ubo const & ubo,
+                            VertexBuffers const &);
 
     private:
         std::vector<Material>  _materials;

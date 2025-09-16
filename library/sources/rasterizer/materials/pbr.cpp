@@ -178,7 +178,7 @@ namespace minire::rasterizer::materials
 
         if (features.hasTangent() && !pbrModel._normalTexture.has_value())
         {
-            MINIRE_WARNING("a model has tangents while has no normal texture, "
+            MINIRE_WARNING("a model has tangents while has no normal texture provided, "
                            "which is a waste of memory");
         }
 

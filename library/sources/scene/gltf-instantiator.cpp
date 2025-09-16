@@ -530,6 +530,9 @@ namespace minire::scene
                 case content::path::Special::kScenes:
                     instantiateGltfScene(scene, e, *gltf, path[2], context);
                     break;
+
+                case content::path::Special::kVertexBuffers:
+                    MINIRE_THROW("vertex-buffer cannot be a part of gLTF collection: {}", path);
             }
         }
     }

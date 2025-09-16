@@ -4,7 +4,7 @@
 
 namespace minire::rasterizer::test
 {
-    TEST(Rasterizer, SmokeTest)
+    TEST(Resources, SmokeTest)
     {
         Resources resources;
 
@@ -36,7 +36,7 @@ namespace minire::rasterizer::test
         }
     }
 
-    TEST(Rasterizer, LayerDisposal)
+    TEST(Resources, LayerDisposal)
     {
         Resources resources;
 
@@ -49,7 +49,7 @@ namespace minire::rasterizer::test
         EXPECT_FALSE(resources.find(key).has_value());
     }
 
-    TEST(Rasterizer, LayerSwitch)
+    TEST(Resources, LayerSwitch)
     {
         Resources resources;
 
@@ -67,5 +67,42 @@ namespace minire::rasterizer::test
         resources.disposeLayer("another");
         EXPECT_FALSE(resources.find(keyBar).has_value());
         EXPECT_TRUE(resources.find(keyFoo).has_value());
+    }
+
+    TEST(Resources, Override)
+    {
+        Resources resources;
+
+        Resources::Key key = textures::Id{"foo", models::Sampler(), false};
+
+        resources.insert(key, std::string("foo-data"));
+        ASSERT_TRUE(resources.find(key).has_value());
+
+        EXPECT_THROW(resources.insert(key, std::string("new-data")),
+                     std::exception);
+        std::any oldValue = resources.find(key);
+        ASSERT_TRUE(oldValue.has_value());
+        EXPECT_EQ(std::any_cast<std::string>(oldValue), "foo-data");
+
+        EXPECT_NO_THROW(resources.insert(key, std::string("new-data"), true));
+        std::any newValue = resources.find(key);
+        ASSERT_TRUE(newValue.has_value());
+        EXPECT_EQ(std::any_cast<std::string>(newValue), "new-data");
+    }
+
+    TEST(Resources, OverrideAndKeepLayer)
+    {
+        Resources resources;
+
+        Resources::Key key = textures::Id{"foo", models::Sampler(), false};
+
+        resources.insert(key, std::string("foo-data"));
+        resources.newLayer("new-layer");
+        resources.insert(key, std::string("new-data"), true);
+        resources.disposeLayer("new-layer");
+
+        std::any newValue = resources.find(key);
+        ASSERT_TRUE(newValue.has_value());
+        EXPECT_EQ(std::any_cast<std::string>(newValue), "new-data");
     }
 }

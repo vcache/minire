@@ -12,6 +12,7 @@
 #include <rasterizer/sprites.hpp>
 #include <rasterizer/textures.hpp>
 #include <rasterizer/ubo.hpp>
+#include <rasterizer/vertex-buffers.hpp>
 
 #include <glm/mat4x4.hpp>
 
@@ -36,6 +37,7 @@ namespace minire
         rasterizer::Sprites & sprites() { return _sprites; }
         rasterizer::Meshes & meshes() { return _meshes; }
         rasterizer::Lines & lines() { return _lines; }
+        rasterizer::VertexBuffers & vertexBuffers() { return _vertexBuffers; }
 
     public:
         void newResourceLayer(rasterizer::Resources::LayerId const & layerId) { _resources.newLayer(layerId); }
@@ -55,6 +57,7 @@ namespace minire
         rasterizer::Lines              _lines;
         rasterizer::Textures           _textures;
         rasterizer::Materials          _materials;
+        rasterizer::VertexBuffers      _vertexBuffers;
         rasterizer::Meshes             _meshes;
         rasterizer::Fonts              _fonts;
         rasterizer::Labels             _labels;

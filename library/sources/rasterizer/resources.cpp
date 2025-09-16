@@ -31,17 +31,31 @@ namespace minire::rasterizer
                                    : kEmpty;
     }
 
-    void Resources::insert(Key key, std::any data)
+    void Resources::insert(Key key, std::any data, bool override)
     {
-        auto [_, inserted1] = _store.emplace(key, Contents
+        if (override)
+        {
+            auto existing = _store.find(key);
+            if (existing == _store.end())
             {
-                ._data = std::move(data),
-                ._layer = _current,
-            });
-        MINIRE_INVARIANT(inserted1, "failed to insert a new resource (a layer is \"{}\")",
-                         _current); // TODO: print the Key
+                insert(key, data, false);
+            }
+            existing->second._data = std::move(data);
+            // NOTE: Resource's _layer shouldn't be changed on override,
+            //       event if the current layer is changed.
+        }
+        else
+        {
+            auto [_, inserted1] = _store.emplace(key, Contents
+                {
+                    ._data = std::move(data),
+                    ._layer = _current,
+                });
+            MINIRE_INVARIANT(inserted1, "failed to insert a new resource (a layer is \"{}\")",
+                             _current); // TODO: print the Key
 
-        _layers.emplace(_current, key);
+            _layers.emplace(_current, key);
+        }
     }
 
     void Resources::erase(Key const & key)

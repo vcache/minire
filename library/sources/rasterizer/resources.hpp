@@ -2,6 +2,7 @@
 
 #include <rasterizer/meshes/id.hpp>
 #include <rasterizer/textures/id.hpp>
+#include <rasterizer/vertex-buffers/id.hpp>
 
 #include <any>
 #include <string>
@@ -22,7 +23,9 @@ namespace minire::rasterizer
     public:
         // NOTE: LayerId can be "". Although seems strange, but must be a valid case.
         using LayerId = std::string;
-        using Key = std::variant<textures::Id, meshes::Id>;
+        using Key = std::variant<textures::Id,
+                                 meshes::Id,
+                                 vertex_buffers::Id>;
 
     public:
         // creates a new Layer and makes it current;
@@ -40,7 +43,7 @@ namespace minire::rasterizer
     public:
         std::any const & find(Key const &) const;
 
-        void insert(Key, std::any);
+        void insert(Key, std::any, bool override = false);
 
         // TODO: this one might have linear complexity
         void erase(Key const &);

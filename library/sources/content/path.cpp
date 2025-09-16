@@ -16,11 +16,12 @@ namespace minire::content
         {
             switch(special)
             {
-                case path::Special::kCameras: return "cameras";
-                case path::Special::kLights:  return "lights";
-                case path::Special::kMeshes:  return "meshes";
-                case path::Special::kNodes:   return "nodes";
-                case path::Special::kScenes:  return "scenes";
+                case path::Special::kCameras:       return "cameras";
+                case path::Special::kLights:        return "lights";
+                case path::Special::kMeshes:        return "meshes";
+                case path::Special::kNodes:         return "nodes";
+                case path::Special::kScenes:        return "scenes";
+                case path::Special::kVertexBuffers: return "vertex-buffers";
             }
             MINIRE_THROW("unexpected special path component: {}",
                          static_cast<int>(special));

@@ -15,12 +15,14 @@ namespace minire::rasterizer
     class Materials;
     class Resources;
     class Ubo;
+    class VertexBuffers;
 
     class Meshes
     {
     public:
         explicit Meshes(Ubo const &,
                         Materials const &,
+                        VertexBuffers const &,
                         content::Manager &,
                         Resources &);
 
@@ -41,9 +43,10 @@ namespace minire::rasterizer
                                    material::Model::Sptr const & defaultMaterial);
 
     private:
-        content::Manager & _contentManager;
-        Resources        & _resources;
-        Ubo const &        _ubo;
-        Materials const &  _materials;
+        content::Manager &     _contentManager;
+        Resources &            _resources;
+        Ubo const &            _ubo;
+        Materials const &      _materials;
+        VertexBuffers const & _vertexBuffers;
     };
 }

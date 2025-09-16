@@ -1,9 +1,11 @@
 #pragma once
 
+#include <boost/container_hash/hash.hpp> // for hash_combine
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 #include <cstddef>
+#include <functional> // For std::hash
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -76,6 +78,14 @@ namespace minire::material
             int _uvAttribute;
             int _normalAttribute;
             int _tangentAttribute;
+
+            // NOTE: note the std::hash<Locations>
+
+            bool operator==(Locations const & o) const
+            {
+                return std::tie(  _vertexAttribute,   _uvAttribute,   _normalAttribute,   _tangentAttribute)
+                    == std::tie(o._vertexAttribute, o._uvAttribute, o._normalAttribute, o._tangentAttribute);
+            }
         };
 
         virtual Locations locations() const = 0;
@@ -98,5 +108,22 @@ namespace minire::material
         virtual Instance::Uptr instantiate(Model const &, models::MeshFeatures const &) const = 0;
 
         virtual std::string signature(Model const &, models::MeshFeatures const &) const = 0;
+    };
+}
+
+namespace std
+{
+    template<>
+    struct hash<::minire::material::Program::Locations>
+    {
+        size_t operator()(::minire::material::Program::Locations const & v) const
+        {
+            size_t result = 0;
+            boost::hash_combine(result, std::hash<int>{}(v._vertexAttribute));
+            boost::hash_combine(result, std::hash<int>{}(v._uvAttribute));
+            boost::hash_combine(result, std::hash<int>{}(v._normalAttribute));
+            boost::hash_combine(result, std::hash<int>{}(v._tangentAttribute));
+            return result;
+        }
     };
 }

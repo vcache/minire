@@ -8,6 +8,7 @@
 #include <opengl/vao.hpp>
 #include <opengl/vbo.hpp>
 
+#include <utility>
 #include <unordered_map>
 
 namespace minire::opengl
@@ -18,7 +19,7 @@ namespace minire::opengl
     {
         using VboMap = std::unordered_map<size_t, opengl::VBO>;
 
-        opengl::VAO::Sptr _vao;
+        opengl::VAO::Sptr _vao; // TODO: why not unique_ptr?
         VboMap            _vboMap;
         size_t            _elementsCount = 0;
         GLenum            _elementsType = 0;
@@ -44,6 +45,12 @@ namespace minire::opengl
             return it->second;
         }
 
+        opengl::VBO * findVbo(size_t index)
+        {
+            auto it = _vboMap.find(index);
+            return it != _vboMap.end() ? &it->second : nullptr;
+        }
+
         void bindVao() const { assert(_vao); _vao->bind(); }
 
         utils::Aabb const & aabb() const { return _aabb; }
@@ -52,6 +59,18 @@ namespace minire::opengl
         {
             bindVao();
             MINIRE_GL(glDrawElements, _drawMode, _elementsCount, _elementsType, 0);
+        }
+
+        VertexBuffer& operator=(VertexBuffer && other)
+        {
+            VertexBuffer tmp(std::move(other));
+            std::swap(tmp._vao, _vao);
+            std::swap(tmp._vboMap, _vboMap);
+            std::swap(tmp._elementsCount, _elementsCount);
+            std::swap(tmp._elementsType, _elementsType);
+            std::swap(tmp._aabb, _aabb);
+            std::swap(tmp._drawMode, _drawMode);
+            return *this;
         }
 
     private:

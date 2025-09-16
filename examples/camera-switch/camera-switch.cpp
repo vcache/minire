@@ -16,6 +16,9 @@ namespace
 {
     static size_t constexpr kCtrlFps = 30;
 
+    // TODO: This code is duplicated in other examples,
+    //       consider to make a base controller w/ orbiting, panning and dual-camera capabilities.
+
     class CameraSwitch
         : public minire::BasicController
     {

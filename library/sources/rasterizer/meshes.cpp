@@ -16,12 +16,14 @@ namespace minire::rasterizer
 
     Meshes::Meshes(Ubo const & ubo,
                    Materials const & materials,
+                   VertexBuffers const & vertexBuffers,
                    content::Manager & contentManager,
                    Resources & resources)
         : _contentManager(contentManager)
         , _resources(resources)
         , _ubo(ubo)
         , _materials(materials)
+        , _vertexBuffers(vertexBuffers)
     {}
 
     std::shared_ptr<Mesh> Meshes::getMesh(meshes::Id const & key)
@@ -44,7 +46,8 @@ namespace minire::rasterizer
                                        material::Model::Sptr const & defaultMaterial)
     {
         return std::make_shared<Mesh>(source, defaultMaterial,
-                                      _contentManager, _materials, _ubo);
+                                      _contentManager, _materials, _ubo,
+                                      _vertexBuffers);
     }
 
     void Meshes::draw(Scene const & scene) const

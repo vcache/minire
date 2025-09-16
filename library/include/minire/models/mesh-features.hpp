@@ -31,9 +31,9 @@ namespace minire::models
         }
 
     private:
-        bool const _hasUv;
-        bool const _hasNormal;
-        bool const _hasTangent;
+        bool _hasUv;
+        bool _hasNormal;
+        bool _hasTangent;
     };
 }
 

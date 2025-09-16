@@ -69,6 +69,7 @@ namespace minire
         void handle(events::controller::NewResourceLayer const &);
         void handle(events::controller::DisposeResourceLayer const &);
         void handle(events::controller::ContentManagerCleanup const &);
+        void handle(events::controller::CreateVertexBuffer const &);
         void handle(events::controller::CreateSprite const &);
         void handle(events::controller::CreateNinePatch const &);
         void handle(events::controller::ResizeNinePatch const &);

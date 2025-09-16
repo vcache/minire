@@ -22,6 +22,7 @@ namespace minire::content
             kMeshes,
             kNodes,
             kScenes,
+            kVertexBuffers,
         };
 
         using Index = size_t;
