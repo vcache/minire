@@ -127,8 +127,12 @@ namespace minire::utils
                       "unexpected size of a pointer, it is larger than ULL");
 
         auto loadVertexBuffer = [&result]
-                                (models::VertexBuffer::Buffer const & buffer, int attrIndex)
+                                (models::VertexBuffer::Buffer const & buffer, int attrIndex, char const * hint)
         {
+            bool isMonostate = std::holds_alternative<std::monostate>(buffer);
+            MINIRE_INVARIANT(isMonostate || attrIndex >= 0, "bad attrIndex = {} for {}, "
+                             "the material doesn't fit vertex buffer?", attrIndex, hint);
+
             std::visit(Overloaded
             {
                 [](std::monostate) {},
@@ -175,10 +179,10 @@ namespace minire::utils
             }, buffer);
         };
 
-        loadVertexBuffer(vertexBuffer._vertices, locations._vertexAttribute);
-        loadVertexBuffer(vertexBuffer._normals, locations._normalAttribute);
-        loadVertexBuffer(vertexBuffer._tangents, locations._tangentAttribute);
-        loadVertexBuffer(vertexBuffer._uvs, locations._uvAttribute);
+        loadVertexBuffer(vertexBuffer._vertices, locations._vertexAttribute, "vertices");
+        loadVertexBuffer(vertexBuffer._normals, locations._normalAttribute, "normals");
+        loadVertexBuffer(vertexBuffer._tangents, locations._tangentAttribute, "tangents");
+        loadVertexBuffer(vertexBuffer._uvs, locations._uvAttribute, "uvs");
 
         result->_aabb = vertexBuffer._aabb;
 
