@@ -6,6 +6,7 @@
 
 #include <glm/vec3.hpp>
 
+#include <memory>
 #include <string>
 
 namespace minire::models
@@ -53,5 +54,7 @@ namespace minire::models
 
     public:
         static std::string const kMaterialKind;
+
+        using Sptr = std::shared_ptr<PbrMaterial>;
     };
 }
