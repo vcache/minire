@@ -118,6 +118,11 @@ namespace minire::rasterizer
         }
     }
 
+    void VertexBuffers::dispose(content::Id const & id)
+    {
+        _resources.erase(vertex_buffers::Id{id});
+    }
+
     models::MeshFeatures VertexBuffers::meshFeatures(content::Id const & id) const
     {
         return find(id, _resources)->_meshFeatures;

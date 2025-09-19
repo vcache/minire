@@ -22,6 +22,8 @@ namespace minire::rasterizer
                     models::VertexBuffer const & vertexBuffer,
                     bool const override);
 
+        void dispose(content::Id const & id);
+
         models::MeshFeatures meshFeatures(content::Id const &) const;
 
         std::shared_ptr<opengl::VertexBuffer> build(content::Id const &,

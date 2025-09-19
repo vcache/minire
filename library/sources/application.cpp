@@ -246,6 +246,11 @@ namespace minire
         _rasterizer->vertexBuffers().create(e._id, e._vertexBuffer, e._override);
     }
 
+    void Application::handle(events::controller::DisposeVertexBuffer const & e)
+    {
+        _rasterizer->vertexBuffers().dispose(e._id);
+    }
+
     void Application::handle(events::controller::CreateSprite const & e)
     {
         _rasterizer->sprites().create(e._id, e._texture, e._tile, e._position,

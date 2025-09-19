@@ -18,6 +18,7 @@ namespace minire::events
                                     controller::DisposeResourceLayer,
                                     controller::ContentManagerCleanup,
                                     controller::CreateVertexBuffer,
+                                    controller::DisposeVertexBuffer,
 
                                     controller::CreateSprite,
                                     controller::CreateNinePatch,

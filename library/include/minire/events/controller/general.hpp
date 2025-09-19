@@ -53,7 +53,12 @@ namespace minire::events::controller
                                                 //  content::path::Special::kVertexBuffers/{_id}
         models::VertexBuffer _vertexBuffer;     // Controller MUST NOT modify provided buffers,
                                                 // otherwise thread-safety will be broken.
-        bool                 _override;         // If true, existing one will be rewritten,
-                                                // otherwise, a runtime-error will be generated
+        bool                 _override;         // If true, an existing one will be rewritten,
+                                                // otherwise, a runtime-error will be generated.
+    };
+
+    struct DisposeVertexBuffer
+    {
+        content::Id _id;
     };
 }
