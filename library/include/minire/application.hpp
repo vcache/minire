@@ -145,6 +145,7 @@ namespace minire
         // scene queries
         bool                        _rayCasterEnabled = false;
         size_t                      _rayCasterRevision = 0;
+        size_t                      _rayCasterLastEpoch = 0;
 
         // state
         size_t                      _mouseX = 0;

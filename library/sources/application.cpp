@@ -168,7 +168,7 @@ namespace minire
     void Application::maybeIssueRayCaster()
     {
         assert(_scene);
-        if (_rayCasterEnabled)
+        if (_rayCasterEnabled && _rayCasterLastEpoch < _epochNumber)
         {
             scene::Viewpoint const & vp = _scene->viewpoint();
             if (size_t const vpRevision = vp.revision();
@@ -178,6 +178,7 @@ namespace minire
                     vp.width(), vp.height(), vp.view(), vp.projection());
                 postEvent<events::application::OnRayCaster>(rayCaster);
                 _rayCasterRevision = vpRevision;
+                _rayCasterLastEpoch = _epochNumber;
             }
         }
     }
