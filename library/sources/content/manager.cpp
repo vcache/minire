@@ -1,6 +1,7 @@
 #include <minire/content/manager.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/formats/bdf.hpp>
 #include <minire/formats/gltf.hpp>
 #include <minire/formats/image.hpp>
 #include <minire/formats/obj.hpp>
@@ -22,6 +23,8 @@ namespace minire::content
 
     Manager::~Manager()
     {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+
         bool fatal = false;
         for(auto & [id, assetBlock] : _store)
         {
@@ -44,16 +47,20 @@ namespace minire::content
 
     void Manager::setReader(Reader::Uptr reader)
     {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
         _reader = std::move(reader);
     }
 
     void Manager::newLayer(LayerId const & layerId)
     {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
         _currentLayer = layerId;
     }
 
     void Manager::disposeLayer(LayerId const & layerId)
     {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+
         auto range = _layers.equal_range(layerId);
         for (auto it = range.first; it != range.second; ++it)
         {
@@ -75,15 +82,20 @@ namespace minire::content
         _layers.erase(layerId);
     }
 
-    std::unique_ptr<Lease> Manager::borrow(Id const & id) try
+    std::unique_ptr<Lease> Manager::borrow(Id const & id)
     {
-        return borrowImpl(id);
-    }
-    catch(std::bad_alloc const & e)
-    {
-        MINIRE_WARNING("bad_alloc caught: {}, forcing GC", e.what());
-        cleanup(true);
-        return borrowImpl(id);
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+
+        try
+        {
+            return borrowImpl(id);
+        }
+        catch(std::bad_alloc const & e)
+        {
+            MINIRE_WARNING("bad_alloc caught: {}, forcing GC", e.what());
+            cleanup(true);
+            return borrowImpl(id);
+        }
     }
 
     std::unique_ptr<Lease> Manager::borrowImpl(Id const & id)
@@ -134,6 +146,8 @@ namespace minire::content
 
     std::unique_ptr<Lease> Manager::upload(Id const & id, Asset asset)
     {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+
         auto [it, inserted] = _store.emplace(id, AssetBlock{._asset = std::move(asset),
                                                             ._layerId = _currentLayer,
                                                             ._usage = 0,
@@ -145,6 +159,8 @@ namespace minire::content
 
     void Manager::cleanup(bool force)
     {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+
         if (0 == _sizeLimit && !force) return;
 
         while(_sizeCurrent > _sizeLimit &&
@@ -166,6 +182,8 @@ namespace minire::content
 
     void Manager::incUsage(Store::iterator it) noexcept
     {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+
         assert(it != _store.cend());
         assert(it->second._usage != std::numeric_limits<size_t>::max());
         it->second._usage++;
@@ -173,6 +191,8 @@ namespace minire::content
 
     void Manager::decUsage(Store::iterator it) noexcept
     {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+
         assert(it != _store.cend());
         assert(it->second._usage != 0);
         it->second._usage--;
@@ -259,6 +279,10 @@ namespace minire::content::readers
         else if (".glb"  == ext)
         {
             return formats::loadGlb(path);
+        }
+        else if (".bdf"  == ext)
+        {
+            return std::make_shared<formats::Bdf>(path);
         }
         else
         {

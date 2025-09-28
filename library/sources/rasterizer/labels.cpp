@@ -10,15 +10,14 @@ namespace minire::rasterizer
         : _fonts(fonts)
     {}
 
-    Label & Labels::allocate(std::string key, int z, bool visible)
+    Label & Labels::allocate(std::string key, text::FormattedString const & text,
+                             int z, bool visible)
     {
-        auto res = _store.emplace(std::move(key),
-                                  std::make_unique<Label>(_fonts, z, visible));
-        if (!res.second)
-        {
-            MINIRE_THROW("label duplicate: \"{}\"", key);
-        }
-        return *(res.first->second);
+        auto [it, inserted] = _store.emplace(
+            key, std::make_unique<Label>(_fonts, text, z, visible));
+        MINIRE_INVARIANT(inserted, "label duplicate: \"{}\"", key);
+        assert(it != _store.cend());
+        return *it->second;
     }
     
     void Labels::deallocate(std::string const & key)
@@ -29,20 +28,14 @@ namespace minire::rasterizer
     Label & Labels::get(std::string const & key)
     {
         auto it = _store.find(key);
-        if (it == _store.cend())
-        {
-            MINIRE_THROW("no such label: \"{}\"", key);
-        }
+        MINIRE_INVARIANT(it != _store.cend(), "no such label: \"{}\"", key);
         return *it->second;
     }
 
     Label const & Labels::get(std::string const & key) const
     {
         auto it = _store.find(key);
-        if (it == _store.cend())
-        {
-            MINIRE_THROW("no such label: \"{}\"", key);
-        }
+        MINIRE_INVARIANT(it != _store.cend(), "no such label: \"{}\"", key);
         return *it->second;
     }
 

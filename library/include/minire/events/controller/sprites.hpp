@@ -17,12 +17,12 @@ namespace minire::events::controller
 
     struct CreateSprite
     {
-        std::string _id;
-        content::Id _texture;
-        utils::Rect _tile; // TODO: make it optional
-        glm::vec2   _position;
-        bool        _visible;
-        size_t      _z;
+        std::string      _id;
+        content::Id      _texture;
+        utils::MaybeRect _tile;
+        glm::vec2        _position;
+        bool             _visible;
+        size_t           _zOrder;
     };
 
     struct CreateNinePatch
@@ -33,7 +33,7 @@ namespace minire::events::controller
         glm::vec2        _position;
         glm::vec2        _dimensions;
         bool             _visible;
-        size_t           _z;
+        size_t           _zOrder;
     };
 
     struct ResizeNinePatch

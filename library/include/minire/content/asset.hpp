@@ -4,7 +4,7 @@
 #include <minire/formats/bdf.hpp>
 #include <minire/formats/gltf.hpp>
 #include <minire/formats/obj.hpp>
-#include <minire/models/font.hpp>
+#include <minire/models/font-face.hpp>
 #include <minire/models/image.hpp>
 
 #include <variant>
@@ -17,7 +17,7 @@ namespace minire::content
                                formats::Obj, // TODO: why not Sptr?
                                formats::GltfModelSptr,
                                models::Image::Sptr,
-                               models::Font>;
+                               models::FontFace>;
 
     std::string demangle(Asset const &);
 

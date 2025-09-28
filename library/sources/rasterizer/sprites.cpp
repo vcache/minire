@@ -160,7 +160,7 @@ namespace minire::rasterizer
                                   _dimensions.y - (tile._out._top - tile._boundary._top + 1.0f));
 
                 // III
-                offset += makeQuad(kDp,
+                offset += makeQuad(glm::vec2(0, corners.y),
                     tile._boundary._left,
                     tile._out._bottom,
                     tile._out._left,
@@ -168,7 +168,7 @@ namespace minire::rasterizer
                     offset, _vertices);
 
                 // IV
-                offset += makeQuad(glm::vec2(corners.x, 0),
+                offset += makeQuad(corners,
                     tile._out._right,
                     tile._out._bottom,
                     tile._boundary._right,
@@ -176,7 +176,7 @@ namespace minire::rasterizer
                     offset, _vertices);
 
                 // I
-                offset += makeQuad(glm::vec2(0, corners.y),
+                offset += makeQuad(kDp,
                     tile._boundary._left,
                     tile._boundary._top,
                     tile._out._left,
@@ -184,7 +184,7 @@ namespace minire::rasterizer
                     offset, _vertices);
 
                 // II
-                offset += makeQuad(corners,
+                offset += makeQuad(glm::vec2(corners.x, 0),
                     tile._out._right,
                     tile._boundary._top,
                     tile._boundary._right,
@@ -195,7 +195,8 @@ namespace minire::rasterizer
 
                 // bottom
                 offset += makeQuad(
-                    glm::vec2(tile._out._left - tile._boundary._left + 1.0f, 0),
+                    glm::vec2(tile._out._left - tile._boundary._left + 1.0f,
+                              _dimensions.y - (tile._out._top - tile._boundary._top + 1.0f)),
 
                     _dimensions.x - (tile._out._left - tile._boundary._left + 1.0f)
                                   - (tile._boundary._right - tile._out._right + 1.0f),
@@ -232,8 +233,7 @@ namespace minire::rasterizer
 
                 // top
                 offset += makeQuad(
-                    glm::vec2(tile._out._left - tile._boundary._left + 1.0f,
-                              _dimensions.y - (tile._out._top - tile._boundary._top + 1.0f)),
+                    glm::vec2(tile._out._left - tile._boundary._left + 1.0f, 0),
 
                     _dimensions.x - (tile._out._left - tile._boundary._left + 1.0f)
                                   - (tile._boundary._right - tile._out._right + 1.0f),
@@ -274,6 +274,7 @@ namespace minire::rasterizer
             }
 
             // TODO: don't need recalc UVs all the time
+            // TODO: why 6 vertices instead 4?
             size_t makeQuad(glm::vec2 const & dP, float width, float height,
                             float left, float top, float right, float bottom,
                             size_t offset, std::vector<Vertex> & out) const
@@ -293,18 +294,18 @@ namespace minire::rasterizer
                 glm::vec2 const repeat = glm::vec2(width, height) / texMinSz;
 
                 out[offset + 0]._pos = floor(_position + dP + glm::vec2(0.0, height));
-                out[offset + 1]._pos = floor(_position + dP);
+                out[offset + 1]._pos = floor(_position + dP + glm::vec2(0.0, 0.0));
                 out[offset + 2]._pos = floor(_position + dP + glm::vec2(width, 0.0));
                 out[offset + 3]._pos = floor(_position + dP + glm::vec2(0.0, height));
                 out[offset + 4]._pos = floor(_position + dP + glm::vec2(width, 0.0));
                 out[offset + 5]._pos = floor(_position + dP + glm::vec2(width, height));
 
-                out[offset + 0]._uv = glm::vec2(0, 0) * repeat;
-                out[offset + 1]._uv = glm::vec2(0, 1) * repeat;
-                out[offset + 2]._uv = glm::vec2(1, 1) * repeat;
-                out[offset + 3]._uv = glm::vec2(0, 0) * repeat;
-                out[offset + 4]._uv = glm::vec2(1, 1) * repeat;
-                out[offset + 5]._uv = glm::vec2(1, 0) * repeat;
+                out[offset + 0]._uv = glm::vec2(0, 1) * repeat;
+                out[offset + 1]._uv = glm::vec2(0, 0) * repeat;
+                out[offset + 2]._uv = glm::vec2(1, 0) * repeat;
+                out[offset + 3]._uv = glm::vec2(0, 1) * repeat;
+                out[offset + 4]._uv = glm::vec2(1, 0) * repeat;
+                out[offset + 5]._uv = glm::vec2(1, 1) * repeat;
 
                 for(int i(0); i < 6; ++i)
                 {
@@ -389,7 +390,7 @@ namespace minire::rasterizer
         {
             if (std::holds_alternative<utils::Rect>(_tileInfo))
             {
-                MINIRE_THROW("should not set dimensions for sprite!");
+                MINIRE_THROW("should not set dimensions for a sprite!");
             }
 
             _dimensions = d;
@@ -454,22 +455,23 @@ namespace minire::rasterizer
     {}
 
     Sprites::~Sprites() = default;
-    
+
     void Sprites::create(std::string const & id,
                          content::Id const & texture,
-                         utils::Rect const & tile,
+                         utils::MaybeRect const & tile,
                          glm::vec2 const & position,
                          bool const visible,
                          int const z)
     {
-        auto res = _store.emplace(id,
-            std::make_unique<Sprite>(_textures.get(texture, {}, false /* no mipmap */), tile,
-                                     position, glm::vec2(), visible, z,
-                                     *_program));
-        if (!res.second)
-        {
-            MINIRE_THROW("sprite alrady exists: \"{}\"", id);
-        }
+        auto textureSptr = _textures.get(texture, {}, false /* no mipmap */);
+        MINIRE_INVARIANT(textureSptr, "no texture found for \"{}\": {}", id, texture);
+
+        utils::Rect rect = tile ? *tile
+                                : utils::Rect(0, 0, textureSptr->width() - 1,
+                                                    textureSptr->height() - 1);
+        auto [_, inserted] = _store.emplace(id,
+            std::make_unique<Sprite>(textureSptr, rect, position, glm::vec2(), visible, z, *_program));
+        MINIRE_INVARIANT(inserted, "sprite alrady exists: \"{}\"", id);
     }
 
     void Sprites::create(std::string const & id,
@@ -480,14 +482,10 @@ namespace minire::rasterizer
                          bool const visible,
                          int const z)
     {
-        auto res = _store.emplace(id,
+        auto [_, inserted] = _store.emplace(id,
             std::make_unique<Sprite>(_textures.get(texture, {}, false /* no mipmap */), tile,
-                                     position, dimensions, visible, z,
-                                     *_program));
-        if (!res.second)
-        {
-            MINIRE_THROW("sprite alrady exists: \"{}\"", id);
-        }
+                                     position, dimensions, visible, z, *_program));
+        MINIRE_INVARIANT(inserted, "sprite alrady exists: \"{}\"", id);
     }
 
     void Sprites::move(std::string const & id,

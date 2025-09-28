@@ -6,75 +6,27 @@
 
 #include <glm/vec2.hpp>
 
+#include <optional>
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace minire::events::controller
 {
     struct CreateLabel
     {
-        std::string _id;
-        size_t      _z;
-        bool        _visible;
-    };
-
-    struct ResizeLabel
-    {
-        std::string _id;
-        size_t      _rows;
-        size_t      _cols;
+        std::string           _id;
+        text::FormattedString _text;
+        content::Id           _fontFace;
+        glm::vec2             _position;
+        bool                  _visible;
+        size_t                _zOrder;
     };
 
     struct MoveLabel
     {
         std::string _id;
-        float       _x;
-        float       _y;
-    };
-
-    struct SetCharLabel
-    {
-        std::string      _id;
-        text::TextFormat _format;
-        wchar_t          _char;
-        size_t           _row;
-        size_t           _col;
-    };
-
-    struct SetSymbolLabel
-    {
-        std::string  _id;
-        size_t       _row;
-        size_t       _col;
-        text::Symbol _symbol;
-    };
-
-    struct UnsetCharLabel
-    {
-        std::string _id;
-        size_t      _row;
-        size_t      _col;
-    };
-
-    struct SetStringLabel
-    {
-        std::string           _id;
-        text::FormattedString _string;
-        size_t                _row;
-        size_t                _col;
-    };
-
-    struct SetLabelCursor
-    {
-        std::string _id;
-        size_t      _row;
-        size_t      _col;
-    };
-
-    struct UnsetLabelCursor
-    {
-        std::string _id;
+        glm::vec2   _position;
     };
 
     struct SetLabelVisible
@@ -83,10 +35,22 @@ namespace minire::events::controller
         bool        _visible;
     };
 
-    struct SetLabelFonts
+    struct SetLabelText
+    {
+        std::string           _id;
+        text::FormattedString _text;
+    };
+
+    struct SetLabelFontFace
     {
         std::string _id;
-        std::string _fontName; // TODO: fontName -> fontId
+        content::Id _fontFace;
+    };
+
+    struct SetLabelClipping
+    {
+        std::string              _id;
+        std::optional<glm::vec2> _maxSize;
     };
 
     struct RemoveLabel

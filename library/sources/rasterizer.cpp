@@ -37,7 +37,8 @@ namespace minire
 
     void Rasterizer::setScreenSize(float w, float h)
     {
-        _2dProjection = glm::ortho(0.0f, w, 0.0f, h);
+        //_2dProjection = glm::ortho(0.0f, w, 0.0f, h);
+        _2dProjection = glm::ortho(0.0f, w, h, 0.0f);
     }
 
     void Rasterizer::draw(Scene const & scene)

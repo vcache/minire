@@ -6,16 +6,16 @@
 #include <minire/logging.hpp>
 #include <minire/utils/rect.hpp>
 
-#include <rasterizer/font.hpp>
-#include <rasterizer/fonts.hpp>
 #include <opengl.hpp>
 #include <opengl/program.hpp>
 #include <opengl/shader.hpp>
 #include <opengl/vao.hpp>
 #include <opengl/vbo.hpp>
-#include <utils/sparse-range.hpp>
+#include <rasterizer/font.hpp>
+#include <rasterizer/fonts.hpp>
+#include <text/iterator.hpp>
 
-#include <glm/gtc/type_ptr.hpp> // for gln::value_ptr
+#include <glm/common.hpp> // for gln::value_ptr
 
 #include <cassert>
 #include <cmath>
@@ -147,173 +147,135 @@ namespace minire::rasterizer
 
     class Label::Buffer
     {
-        void setupSymbol(size_t disp,
-                         float gx, float gy,
-                         float gw, float gh,
-                         text::Symbol const & symbol,
-                         Font const & font,
-                         uint32_t fontCode,
-                         bool const isCursor,
-                         std::vector<Vertex> & out)
+        size_t append(size_t disp,
+                      float gx, float gy,
+                      float gw, float gh,
+                      text::TextFormat const & format,
+                      wchar_t codePoint,
+                      Font const & font,
+                      glm::vec2 const & clip,
+                      std::vector<Vertex> & out)
         {
-            utils::Rect /*const &*/ uv = font.uvRect(symbol.codePoint(), L'?');
+            uint32_t const fontCode = fontCodeOf(format);
+            utils::Rect uv = font.uvRect(codePoint, L'?');
+            uv += .5f; // TODO: move that into rasterizer::Font::Font
 
-            if (true) // TODO: move that into rasterizer::Font::Font
+            glm::vec4 bg(0), fg(0);
+            if (!format.blank())
             {
-                uv._left += .5f;
-                uv._right += .5f;
-                uv._top += .5f;
-                uv._bottom += .5f;
-            }
-
-            glm::vec4 fg = symbol.foreground();
-            glm::vec4 bg = symbol.background();
-
-            if (symbol.blank())
-            {
-                bg = fg = glm::vec4(0);
-            }
-            else
-            {
-                /*
-                    inv cur | res
-                    --------+----
-                     0   0  |  0
-                     0   1  |  1
-                     1   0  |  1
-                     1   1  |  0
-                */
-                if (symbol.invertColors() != isCursor)
+                fg = format.foreground();
+                bg = format.background();
+                if (format.invertColors())
                 {
-                    std::swap(fg.x, bg.x);
-                    std::swap(fg.y, bg.y);
-                    std::swap(fg.z, bg.z);
-                    if (isCursor) fg.w = bg.w = 1.0f;
+                    std::swap(fg, bg);
                 }
             }
 
-            //gx -= .5f;
-            //gy -= .5f;
             gw -= .5f;
             gh -= .5f;
 
+            uv._right -= clip.x;
+            uv._bottom -= clip.y;
+            gw -= clip.x;
+            gh -= clip.y;
+
             out[disp + 0] = Vertex{ glm::vec2(gx, gy + gh),
-                                    glm::vec2(uv._left, uv._top),
-                                    fg, bg, fontCode};
-            out[disp + 1] = Vertex{ glm::vec2(gx, gy), 
                                     glm::vec2(uv._left, uv._bottom),
                                     fg, bg, fontCode};
-            out[disp + 2] = Vertex{ glm::vec2(gx + gw, gy),
-                                    glm::vec2(uv._right, uv._bottom),
-                                    fg, bg, fontCode};
-            out[disp + 3] = Vertex{ glm::vec2(gx, gy + gh),
+            out[disp + 1] = Vertex{ glm::vec2(gx, gy), 
                                     glm::vec2(uv._left, uv._top),
                                     fg, bg, fontCode};
-            out[disp + 4] = Vertex{ glm::vec2(gx + gw, gy),
-                                    glm::vec2(uv._right, uv._bottom),
-                                    fg, bg, fontCode};
-            out[disp + 5] = Vertex{ glm::vec2(gx + gw, gy + gh),
+            out[disp + 2] = Vertex{ glm::vec2(gx + gw, gy),
                                     glm::vec2(uv._right, uv._top),
                                     fg, bg, fontCode};
+            out[disp + 3] = Vertex{ glm::vec2(gx, gy + gh),
+                                    glm::vec2(uv._left, uv._bottom),
+                                    fg, bg, fontCode};
+            out[disp + 4] = Vertex{ glm::vec2(gx + gw, gy),
+                                    glm::vec2(uv._right, uv._top),
+                                    fg, bg, fontCode};
+            out[disp + 5] = Vertex{ glm::vec2(gx + gw, gy + gh),
+                                    glm::vec2(uv._right, uv._bottom),
+                                    fg, bg, fontCode};
+
+            return 6;
         }
 
-        std::pair<size_t, size_t> // in byte (first, past-the-end)
-        update(Symbols const & symbols,
-               Dirty const & /*dirty*/,
-               Font const & fontRegular,
-               Font const & fontBold,
-               Font const & fontItalic,
-               Label::Cursor const & cursor,
-               glm::vec2 const & glyphSize,
-               size_t const col,
-               size_t const row)
-        {
-            size_t const disp = col * 6 + row * 6 * symbols.cols();
-
-            text::Symbol const & symbol = symbols.at(row, col);
-            size_t const gw = glyphSize.x;
-            size_t const gh = glyphSize.y;
-
-            bool const isCursor = cursor._shown
-                               && cursor._row == row
-                               && cursor._column == col;
-
-            size_t const fontCode = fontCodeOf(symbol);
-            Font const * font = &fontRegular;
-            if (symbol.bold() && fontBold.loaded(symbol.codePoint()))
-                font = &fontBold;
-            if (symbol.italic() && fontItalic.loaded(symbol.codePoint()))
-                font = &fontItalic;
-
-            setupSymbol(disp, col * gw, row * gh, gw, gh,
-                        symbol, *font, fontCode, isCursor,
-                        _vertices);
-
-            return std::make_pair(disp * sizeof(Vertex),
-                                  (disp + 6) * sizeof(Vertex));
-        }
-
-        static size_t fontCodeOf(text::Symbol const & s)
+        static uint32_t fontCodeOf(text::TextFormat const & s)
         {
             if (s.bold()) return 1;
             if (s.italic()) return 2;
             return 0;
         }
 
+        static Font const & selectFont(wchar_t codePoint,
+                                       text::TextFormat const & format,
+                                       Font const & fontRegular,
+                                       Font const & fontBold,
+                                       Font const & fontItalic)
+        {
+            if (format.bold())
+            {
+                if (fontBold.loaded(codePoint))
+                {
+                    return fontBold;
+                }
+            }
+            else if (format.italic())
+            {
+                if (fontItalic.loaded(codePoint))
+                {
+                    return fontItalic;
+                }
+            }
+            return fontRegular;
+        }
+
     public:
-        void update(Symbols const & symbols,
-                    Dirty const & dirty,
+        void update(text::FormattedString const & text,
                     Font const & fontRegular,
                     Font const & fontBold,
                     Font const & fontItalic,
-                    Label::Cursor const & cursor,
-                    glm::vec2 const & glyphSize)
+                    std::optional<glm::vec2> const & maxSize)
         {
-            size_t const rows = symbols.rows();
-            size_t const cols = symbols.cols();
-            size_t required = rows * cols * 6 * sizeof(Vertex);
-
             _vao->bind();
-            assert(std::numeric_limits<GLsizeiptr>::max() > required);
-            if (static_cast<GLsizeiptr>(required) != _vbo.size())
-            {   // size changed, rebuild whole buffer
-                _vertices.resize(rows * cols * 6);
-                for(size_t col(0); col < cols; ++col)
-                for(size_t row(0); row < rows; ++row)
-                {
-                    update(symbols, dirty,
-                           fontRegular, fontBold, fontItalic,
-                           cursor, glyphSize, col, row);
-                }
 
-                // TODO: maybe reuse existing VBO if it is large enough
-                _vbo.bufferData(required, _vertices.data(), GL_STATIC_DRAW);
-            }
-            else if (!dirty.empty())
-            {   // size not changed, just update dirties
-                utils::SparseRange<size_t> updates; // in bytes
-                for (auto const & d: dirty)
+            assert(fontRegular.glyphSize() == fontBold.glyphSize());
+            assert(fontRegular.glyphSize() == fontItalic.glyphSize());
+            glm::vec2 const & glyphSize = fontRegular.glyphSize();
+
+            _vertices.resize(text.size() * 6);
+            size_t offset = 0;
+
+            text::iterate(text, glyphSize,
+                [&offset, this, &fontRegular, &fontBold, &fontItalic, &maxSize]
+                (text::TextFormat const & format, wchar_t codePoint,
+                 glm::vec2 const & position, glm::vec2 const & glyphSize)
                 {
-                    auto range = update(symbols, dirty, 
-                                        fontRegular, fontBold, fontItalic,
-                                        cursor, glyphSize, d.second, d.first);
-                    updates.insert(range.first, range.second);
-                }
-                for(auto const & range : updates.tighten())
-                {
-                    assert(range.first < range.second);
-                    size_t const offset = range.first;
-                    size_t const size = range.second - range.first;
-                    _vbo.bufferSubData(offset, size,
-                        reinterpret_cast<uint8_t*>(_vertices.data()) + offset);
-                }
-            }
+                    glm::vec2 clip(0);
+                    if (maxSize)
+                    {
+                        if (position.y >= maxSize->y) return false;
+                        if (position.x >= maxSize->x) return true;
+
+                        assert(position.x < maxSize->x);
+                        clip = glm::max(glm::vec2(0), position + glyphSize - *maxSize);
+                    }
+
+                    Font const & font = selectFont(codePoint, format, fontRegular, fontBold, fontItalic);
+                    offset += append(offset, position.x, position.y, glyphSize.x, glyphSize.y,
+                                     format, codePoint, font, clip, _vertices);
+                    return true;
+                });
+            _vertices.resize(offset);
+
+            _vbo.bufferData(_vertices.size() * sizeof(Vertex),
+                            _vertices.data(), GL_STATIC_DRAW);
         }
 
         void draw() const
         {
             _vao->bind();
-            _vbo.bind();
             MINIRE_GL(glDrawArrays, GL_TRIANGLES, 0, _vertices.size());
         }
 
@@ -324,7 +286,7 @@ namespace minire::rasterizer
             size_t const stride = sizeof(Vertex);
             size_t pointer = 0;
 
-           // layout(location = 0) in vec2 bznkPos;
+            // layout(location = 0) in vec2 bznkPos;
             _vao->enableAttrib(0);
             _vao->attribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, pointer);
             pointer += sizeof(Vertex::_pos);
@@ -357,10 +319,11 @@ namespace minire::rasterizer
     };
 
     Label::Label(Fonts const & fonts,
+                 text::FormattedString const & text,
                  int z, bool visible)
         : Drawable(z)
         , _fonts(fonts)
-        , _symbols()
+        , _text(text)
         , _position(0.0)
         , _program(Program::instance())
         , _buffer(std::make_unique<Buffer>())
@@ -370,21 +333,15 @@ namespace minire::rasterizer
 
     Label::~Label() = default;
 
-    void Label::resize(size_t rows, size_t cols)
-    {
-        _symbols.resize(rows, cols);
-        _invalidated = true;
-    }
-
-    void Label::setFont(content::Id const & fontName,
-                        content::Manager & contentManager)
+    void Label::setFontFace(content::Id const & fontName,
+                            content::Manager & contentManager)
     {
         auto lease = contentManager.borrow(fontName);
         assert(lease);
-        setFont(lease->as<models::Font>());
+        setFontFace(lease->as<models::FontFace>());
     }
 
-    void Label::setFont(models::Font const & fontData)
+    void Label::setFontFace(models::FontFace const & fontData)
     {
         _fontRegular = _fonts.get(fontData._regular);
         _fontBold = _fonts.get(fontData._bold);
@@ -394,21 +351,39 @@ namespace minire::rasterizer
         assert(_fontBold);
         assert(_fontItalic);
 
-        _glyphSize = _fontRegular->glyphSize();
-
-        if (_glyphSize != _fontBold->glyphSize())
-        {
-            MINIRE_THROW("fonts differs in size: {}, {}",
+        glm::vec2 glyphSize = _fontRegular->glyphSize();
+        MINIRE_INVARIANT(glyphSize == _fontBold->glyphSize(),
+                         "only monospaced fonts are supported, "
+                         "but fonts differ in size: {}, {}",
                          fontData._regular, fontData._bold);
-        }
-        if (_glyphSize != _fontItalic->glyphSize())
-        {
-            MINIRE_THROW("fonts differs in size: {}, {}",
+        MINIRE_INVARIANT(glyphSize == _fontItalic->glyphSize(),
+                         "only monospaced fonts are supported, "
+                         "but fonts differ in size: {}, {}",
                          fontData._regular, fontData._italic);
-        }
+        MINIRE_INVARIANT(fontData._glyphWidth == glyphSize.x &&
+                         fontData._glyphHeight == glyphSize.y,
+                         "glyph sizes differ from models: {}x{} != {}x{}",
+                         fontData._glyphWidth, fontData._glyphHeight,
+                         glyphSize.x, glyphSize.y);
 
-        assert(fontData._glyphWidth == _glyphSize.x);
-        assert(fontData._glyphHeight == _glyphSize.y);
+        _invalidated = true;
+    }
+
+    void Label::setMaxSize(std::optional<glm::vec2> const & maxSize)
+    {
+        _maxSize = maxSize;
+        _invalidated = true;
+    }
+
+    void Label::setText(text::FormattedString const & text)
+    {
+        _text = text;
+        _invalidated = true;
+    }
+
+    text::FormattedString const & Label::text() const
+    {
+        return _text;
     }
 
     void Label::draw(glm::mat4 const & projection) const
@@ -443,46 +418,9 @@ namespace minire::rasterizer
         _buffer->draw();
     }
 
-    void Label::set(size_t row, size_t col,
-                    text::FormattedString const & string)
+    void Label::setPosition(glm::vec2 position)
     {
-        size_t const rows = _symbols.rows();
-        size_t const cols = _symbols.cols();
-
-        for(auto const & i : string)
-        {
-            if (col >= cols)
-            {
-                col = 0;
-                ++row;
-            }
-
-            switch(i.second)
-            {
-                case L'\n':
-                    col = 0;
-                    ++row;
-                    break;
-
-                case L'\r':
-                    col = 0;
-                    break;
-            }
-
-            if (row >= rows)
-            {
-                MINIRE_ERROR("too small label: {} >= {}", row, rows);
-                return;
-            }
-
-            at(row, col).set(i.first, i.second);
-            ++col;
-        }
-    }
-
-    void Label::setPosition(float x, float y)
-    {
-        _position = pixelFix(glm::vec2(x, y));
+        _position = pixelFix(position);
     }
 
     void Label::revalidate() const
@@ -492,47 +430,12 @@ namespace minire::rasterizer
         assert(_fontBold);
         assert(_fontItalic);
 
-        _buffer->update(_symbols,
-                        _dirty,
+        _buffer->update(_text,
                         *_fontRegular,
                         *_fontBold,
                         *_fontItalic,
-                        _cursor,
-                        _glyphSize);
+                        _maxSize);
 
-        _dirty.clear();
         _invalidated = false;
-    }
-
-    void Label::setCursor(size_t column, size_t row)
-    {
-        text::Symbol & symbol = at(row, column);
-        if (symbol.blank())
-        {
-            symbol.set(L'\0');
-        }
-
-        if (_cursor._shown)
-        {
-            _dirty.emplace_back(_cursor._row, _cursor._column);
-        }
-
-        // dont need, at() will invalidate and mark as dirty:
-        //_dirty.emplace_back(row, column); 
-        //_invalidated = true;
-
-        _cursor._shown = true;
-        _cursor._column = column;
-        _cursor._row = row;
-    }
-
-    void Label::unsetCursor()
-    {
-        if (_cursor._shown)
-        {
-            _dirty.emplace_back(_cursor._row, _cursor._column);
-            _cursor._shown = false;
-            _invalidated = true;
-        }
     }
 }

@@ -27,14 +27,14 @@ namespace minire::rasterizer
 
         void create(std::string const & id,
                     content::Id const & texture,
-                    utils::Rect const & tile, // in pixels, on texture
+                    utils::MaybeRect const & tile, // in pixels, on a texture
                     glm::vec2 const & position,
                     bool const visible,
                     int const z);
 
         void create(std::string const & id,
                     content::Id const & texture,
-                    utils::NinePatch const & tile, // in pixels, on texture
+                    utils::NinePatch const & tile, // in pixels, on a texture
                     glm::vec2 const & position,
                     glm::vec2 const & dimensions,
                     bool const visible,

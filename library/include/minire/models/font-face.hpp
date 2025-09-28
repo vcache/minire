@@ -7,9 +7,8 @@
 
 namespace minire::models
 {
-    struct Font // TODO: rename to FontSet or like that
+    struct FontFace
     {
-        std::string _id; // TODO: [X] useless member or make it content::Id
         content::Id _regular;
         content::Id _bold;
         content::Id _italic;

@@ -23,8 +23,8 @@ namespace
         : public minire::BasicController
     {
     public:
-        explicit CameraSwitch()
-            : BasicController(kCtrlFps)
+        explicit CameraSwitch(minire::content::Manager & contentManager)
+            : BasicController(contentManager, kCtrlFps)
             , _target(0.0f, 0.0f, 0.0f)
             , _orbiting(_target, 10)
             , _orthographicCamera{._xMag = _orbiting.distance() / 2,

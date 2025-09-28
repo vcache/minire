@@ -108,8 +108,9 @@ namespace
         }
 
     public:
-        explicit RotatingCube(Arguments const & arguments)
-            : BasicController(arguments._maxCtrlFps)
+        explicit RotatingCube(minire::content::Manager & contentManager,
+                              Arguments const & arguments)
+            : BasicController(contentManager, arguments._maxCtrlFps)
             , _arguments(arguments)
         {}
 

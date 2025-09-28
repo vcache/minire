@@ -18,5 +18,5 @@ namespace minire::events::application
             , _width(width)
             , _height(height)
         {}
-    };   
+    };
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <minire/content/id.hpp>
 #include <minire/events/application.hpp>
 #include <minire/events/controller.hpp>
 #include <minire/utils/barrier.hpp>
@@ -8,6 +9,12 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+
+namespace minire::content { class Lease; }
+namespace minire::content { class Manager; }
+namespace minire::gui { class Component; }
+namespace minire::models { class FontFace; }
+namespace minire::text { class FormattedString; }
 
 namespace minire
 {
@@ -29,7 +36,7 @@ namespace minire
     public:
         using Uptr = std::unique_ptr<BasicController>;
 
-        explicit BasicController(size_t const maxFps);
+        explicit BasicController(content::Manager &, size_t const maxFps);
 
         virtual ~BasicController();
 
@@ -42,23 +49,29 @@ namespace minire
                          //       and derived class will destroy their data while
                          //       controller's worker thread is still running
 
-    public:
-        // NOTE: this call is thread-safe
+    public: // NOTE: these calls are thread-safe
         BatchQueue pull();
 
-        // NOTE: this call is thread-safe
         void push(events::ApplicationQueue &&);
 
-        // NOTE: this call is thread-safe
         void quit();
 
+        std::unique_ptr<content::Lease> borrow(content::Id const &);
+
+        glm::vec2 measure(text::FormattedString const &,
+                          content::Id const &) const;
+
+        glm::vec2 measure(text::FormattedString const &,
+                          models::FontFace const &) const;
+
     protected:
+        void enqueueRaw(events::Controller &&);
+
         template<typename EventType,
                  typename... Args>
         void enqueue(Args && ... args)
         {
-            _currentEventsBatch._events.emplace_back(
-                EventType(std::forward<Args>(args)...));
+            enqueueRaw(EventType(std::forward<Args>(args)...));
         }
 
         double frameTime() const { return _frameTime; }
@@ -91,6 +104,7 @@ namespace minire
         void finishCurrentBatch(double);
 
     private:
+        content::Manager       & _contentManager;
         size_t const             _maxFps = 0;
 
         std::mutex               _applicationEventsMutex;
@@ -106,5 +120,9 @@ namespace minire
         utils::Barrier           _initBarrier;
         double                   _frameTime = 0.0;
         double                   _absoluteTime = 0.0; // seconds since begin
+
+        // This helps to open access to enqueue() without
+        // making it public.
+        friend class gui::Component;
     };
 }

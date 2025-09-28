@@ -7,6 +7,7 @@
 
 #include <cassert>
 #include <limits>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -28,6 +29,7 @@ namespace minire::content
     };
 
     // The manager manages only RAM-allocated items.
+    // This class is thread-safe and can be used directly or from a Controller.
     class Manager
     {
     public:
@@ -66,6 +68,7 @@ namespace minire::content
                  typename... Args>
         T & setReader(Args && ... args)
         {
+            std::lock_guard<std::recursive_mutex> guard(_mutex);
             _reader = std::make_unique<T>(std::forward<Args>(args)...);
             return static_cast<T &>(*_reader);
         }
@@ -82,22 +85,23 @@ namespace minire::content
         void cleanup(bool force = false);
 
     private:
-        std::unique_ptr<Lease> borrowImpl(Id const &);
+        std::unique_ptr<Lease> borrowImpl(Id const &); // thread-unsafe
 
         void incUsage(Store::iterator it) noexcept;
 
         void decUsage(Store::iterator) noexcept;
 
-        void cleanup(Store::iterator);
+        void cleanup(Store::iterator); // thread-unsafe
 
     private:
-        LayerId      _currentLayer;
-        Reader::Uptr _reader;
-        size_t const _sizeLimit = 0;
-        size_t       _sizeCurrent = 0;
-        Store        _store;
-        Store        _garbage;
-        Layers       _layers;
+        std::recursive_mutex _mutex;
+        LayerId              _currentLayer;
+        Reader::Uptr         _reader;
+        size_t const         _sizeLimit = 0;
+        size_t               _sizeCurrent = 0;
+        Store                _store;
+        Store                _garbage;
+        Layers               _layers;
 
         friend class Lease;
     };
@@ -172,6 +176,9 @@ namespace minire::content
         friend class Manager;
     };
 }
+
+// NOTE: Readers don't have to be thread-safe, because
+//       thread-safety is guaranteed by a Manager.
 
 namespace minire::content::readers
 {

@@ -1,10 +1,12 @@
 #include <minire/basic-controller.hpp>
 
+#include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 #include <minire/utils/unow.hpp>
 
 #include <utils/fps-counter.hpp>
+#include <text/measurer.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -12,8 +14,10 @@
 
 namespace minire
 {
-    BasicController::BasicController(size_t const maxFps)
-        : _maxFps(maxFps)
+    BasicController::BasicController(content::Manager & contentMangager,
+                                     size_t const maxFps)
+        : _contentManager(contentMangager)
+        , _maxFps(maxFps)
         , _working(true)
         , _quitRequest(false)
     {}
@@ -175,6 +179,33 @@ namespace minire
     void BasicController::quit()
     {
         _quitRequest = true;
+    }
+
+    std::unique_ptr<content::Lease>
+    BasicController::borrow(content::Id const & id)
+    {
+        return _contentManager.borrow(id);
+    }
+
+    glm::vec2 BasicController::measure(text::FormattedString const & text,
+                                       content::Id const & id) const
+    {
+        auto lease = _contentManager.borrow(id);
+        assert(lease);
+        models::FontFace const & fontFace = lease->as<models::FontFace>();
+        return measure(text, fontFace);
+    }
+
+    glm::vec2 BasicController::measure(text::FormattedString const & text,
+                                       models::FontFace const & fontFace) const
+    {
+        return text::measure(text, fontFace);
+
+    }
+
+    void BasicController::enqueueRaw(events::Controller && event)
+    {
+        _currentEventsBatch._events.emplace_back(std::move(event));
     }
 
     void BasicController::handle(events::ApplicationQueue const & events)

@@ -2,8 +2,11 @@
 
 #include <glm/vec2.hpp>
 
+#include <optional>
+
 namespace minire::utils
 {
+    // TODO: move to glm::vec4
     struct Rect
     {
         float _left;
@@ -20,7 +23,18 @@ namespace minire::utils
             , _right(right)
             , _bottom(bottom)
         {}
+
+        Rect & operator+=(float offset)
+        {
+            _left += offset;
+            _top += offset;
+            _right += offset;
+            _bottom += offset;
+            return *this;
+        }
     };
+
+    using MaybeRect = std::optional<Rect>;
 
     /*
             outX0  inX0           inX1  outX1

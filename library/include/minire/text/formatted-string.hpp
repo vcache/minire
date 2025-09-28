@@ -19,6 +19,8 @@ namespace minire::text
         using Fragments = std::vector<Fragment>;
 
     public:
+        FormattedString() = default;
+
         FormattedString(FormattedString const &) = default;
 
         FormattedString(FormattedString && other)
@@ -51,6 +53,8 @@ namespace minire::text
             std::swap(_size, tmp._size);
             return *this;
         }
+
+        FormattedString & operator=(FormattedString const &) = default;
 
     public:
         TextFormat & append(std::wstring && s)

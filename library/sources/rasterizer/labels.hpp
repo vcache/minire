@@ -8,6 +8,8 @@
 #include <memory>
 #include <unordered_map>
 
+namespace minire::text { class FormattedString; }
+
 namespace minire::rasterizer
 {
     class Fonts;
@@ -18,7 +20,8 @@ namespace minire::rasterizer
         explicit Labels(Fonts const &);
 
     public:
-        Label & allocate(std::string, int z = 0, bool visible = true);
+        Label & allocate(std::string, text::FormattedString const &,
+                         int z = 0, bool visible = true);
 
         void deallocate(std::string const &);
 

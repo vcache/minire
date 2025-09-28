@@ -38,7 +38,8 @@ namespace minire
                           "Controller must be inherited from BasicController");
             MINIRE_INVARIANT(!_controller, "Controller cannot be re-set");
 
-            auto controller = std::make_unique<Controller>(std::forward<Args>(args)...);
+            auto controller = std::make_unique<Controller>(_contentManager,
+                                                           std::forward<Args>(args)...);
             controller->run(events::application::OnResize(width(), height()));
             _controller = std::move(controller);
             return static_cast<Controller &>(*_controller);
@@ -79,16 +80,11 @@ namespace minire
         void handle(events::controller::RemoveSprite const &);
         void handle(events::controller::BulkSetSpriteZOrders const &);
         void handle(events::controller::CreateLabel const &);
-        void handle(events::controller::ResizeLabel const &);
         void handle(events::controller::MoveLabel const &);
-        void handle(events::controller::SetCharLabel const &);
-        void handle(events::controller::SetSymbolLabel const &);
-        void handle(events::controller::UnsetCharLabel const &);
-        void handle(events::controller::SetStringLabel const &);
-        void handle(events::controller::SetLabelCursor const &);
-        void handle(events::controller::UnsetLabelCursor const &);
         void handle(events::controller::SetLabelVisible const &);
-        void handle(events::controller::SetLabelFonts const &);
+        void handle(events::controller::SetLabelFontFace const &);
+        void handle(events::controller::SetLabelClipping const &);
+        void handle(events::controller::SetLabelText const &);
         void handle(events::controller::RemoveLabel const &);
         void handle(events::controller::BulkSetLabelZOrders const &);
         void handle(events::controller::StartTextInput const &);

@@ -3,7 +3,9 @@
 #include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
+#include <minire/models/image.hpp>
 
+#include <cassert>
 #include <cstdlib> // for EXIT_SUCCESS
 
 namespace
@@ -11,6 +13,7 @@ namespace
     static size_t const kMaxCtrlFps = 120;
     static float const kVelocity = 150.0f;
     static std::string const kSpriteId = "my-sprite";
+    static std::string const kSpriteFile = "tux.png";
 
     class BouncingSprite
         : public minire::BasicController
@@ -25,12 +28,14 @@ namespace
 
         void start() override
         {
-            // TODO: fetch _imageSize from content::Manager (but if should be thread-safe!)
-            // TODO: make utils::Rect optional
+            auto lease = borrow(kSpriteFile);
+            assert(lease);
+            minire::models::Image::Sptr image = lease->as<minire::models::Image::Sptr>();
+            MINIRE_INVARIANT(image, "not a valid image: {}", kSpriteFile);
+            _imageSize = glm::vec2(image->_width, image->_height);
+
             enqueue<minire::events::controller::CreateSprite>(
-                kSpriteId, "tux.png",
-                minire::utils::Rect{0, 0, _imageSize.x, _imageSize.y},
-                _position, true, 0);
+                kSpriteId, kSpriteFile, std::nullopt, _position, true, 0);
         }
 
         void step() override
@@ -66,7 +71,7 @@ namespace
         glm::vec2 _windowSize{0, 0};
         glm::vec2 _position{0, 0};
         glm::vec2 _direction{1, 1};
-        glm::vec2 _imageSize{128, 152}; // TODO: wtf? why hardcoded?
+        glm::vec2 _imageSize{0, 0};
     };
 }
 

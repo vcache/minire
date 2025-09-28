@@ -132,8 +132,9 @@ namespace
         : public minire::BasicController
     {
     public:
-        explicit GltfViewer(Arguments const & arguments)
-            : BasicController(60)
+        explicit GltfViewer(minire::content::Manager & contentManager,
+                            Arguments const & arguments)
+            : BasicController(contentManager, 60)
             , _arguments(arguments)
             , _camera{._yFov = glm::radians(45.0f),
                       ._zNear = 0.001f,

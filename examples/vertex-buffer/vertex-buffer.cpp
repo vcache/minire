@@ -218,8 +218,8 @@ namespace
         }
 
     public:
-        explicit VertexBufferExample()
-            : BasicController(kCtrlFps)
+        explicit VertexBufferExample(minire::content::Manager & contentManager)
+            : BasicController(contentManager, kCtrlFps)
             , _target(0.0f, 0.0f, 0.0f)
             , _orbiting(_target, 10, glm::radians(45.0), glm::radians(45.0))
             , _orthographicCamera{._xMag = _orbiting.distance() / 2,

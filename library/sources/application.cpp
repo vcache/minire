@@ -255,13 +255,13 @@ namespace minire
     void Application::handle(events::controller::CreateSprite const & e)
     {
         _rasterizer->sprites().create(e._id, e._texture, e._tile, e._position,
-                                      e._visible, e._z);
+                                      e._visible, e._zOrder);
     }
 
     void Application::handle(events::controller::CreateNinePatch const & e)
     {
         _rasterizer->sprites().create(e._id, e._texture, e._tile, e._position,
-                                      e._dimensions, e._visible, e._z);
+                                      e._dimensions, e._visible, e._zOrder);
     }
 
     void Application::handle(events::controller::ResizeNinePatch const & e)
@@ -295,58 +295,14 @@ namespace minire
 
     void Application::handle(events::controller::CreateLabel const & e)
     {
-        _rasterizer->labels().allocate(e._id, e._z, e._visible);
-    }
-
-    void Application::handle(events::controller::ResizeLabel const & e)
-    {
-        _rasterizer->labels().get(e._id).resize(e._rows, e._cols);
+        rasterizer::Label & label = _rasterizer->labels().allocate(e._id, e._text, e._zOrder, e._visible);
+        label.setFontFace(e._fontFace, _contentManager);
+        label.setPosition(e._position);
     }
 
     void Application::handle(events::controller::MoveLabel const & e)
     {
-        _rasterizer->labels().get(e._id).setPosition(e._x, e._y);
-    }
-
-    void Application::handle(events::controller::SetCharLabel const & e)
-    {
-        _rasterizer->
-             labels()
-            .get(e._id)
-            .at(e._row, e._col)
-            .set(e._format, e._char);
-    }
-
-    void Application::handle(events::controller::SetSymbolLabel const & e)
-    {
-        _rasterizer->
-             labels()
-            .get(e._id)
-            .at(e._row, e._col) = e._symbol;
-    }
-    
-    void Application::handle(events::controller::UnsetCharLabel const & e)
-    {
-        _rasterizer->
-             labels()
-            .get(e._id)
-            .at(e._row, e._col)
-            .unset();
-    }
-
-    void Application::handle(events::controller::SetStringLabel const & e)
-    {
-        _rasterizer->labels().get(e._id).set(e._row, e._col, e._string);
-    }
-
-    void Application::handle(events::controller::SetLabelCursor const & e)
-    {
-        _rasterizer->labels().get(e._id).setCursor(e._col, e._row);
-    }
-
-    void Application::handle(events::controller::UnsetLabelCursor const & e)
-    {
-        _rasterizer->labels().get(e._id).unsetCursor();
+        _rasterizer->labels().get(e._id).setPosition(e._position);
     }
 
     void Application::handle(events::controller::SetLabelVisible const & e)
@@ -354,10 +310,19 @@ namespace minire
         _rasterizer->labels().get(e._id).setVisible(e._visible);
     }
 
-    void Application::handle(events::controller::SetLabelFonts const & e)
+    void Application::handle(events::controller::SetLabelFontFace const & e)
     {
-        _rasterizer->labels().get(e._id).setFont(e._fontName,
-                                                 _contentManager);
+        _rasterizer->labels().get(e._id).setFontFace(e._fontFace, _contentManager);
+    }
+
+    void Application::handle(events::controller::SetLabelClipping const & e)
+    {
+        _rasterizer->labels().get(e._id).setMaxSize(e._maxSize);
+    }
+
+    void Application::handle(events::controller::SetLabelText const & e)
+    {
+        _rasterizer->labels().get(e._id).setText(e._text);
     }
 
     void Application::handle(events::controller::RemoveLabel const & e)
