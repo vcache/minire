@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <variant>
 
 namespace minire
@@ -20,6 +21,7 @@ namespace minire
         , _maxFps(maxFps)
         , _working(true)
         , _quitRequest(false)
+        , _lowLatencyInput(false)
     {}
 
     BasicController::~BasicController()
@@ -86,8 +88,8 @@ namespace minire
             {
                 std::lock_guard<std::mutex> lock(_applicationEventsMutex);
                 std::swap(pendedEvents, _applicationEvents);
+                _applicationEvents.reserve(pendedEvents.size());
             }
-            _applicationEvents.reserve(pendedEvents.size());
             handle(pendedEvents);
 
             // do a logic step
@@ -104,12 +106,14 @@ namespace minire
                 continue;
             }
 
-            // sleep until frame's quant is done
+            // sleep until frame's quant is done or an urgent event arrived
             size_t const timeSpent = utils::uNow() - frameBegin;
             if (timeSpent < frameQuant)
             {
                 size_t const timeLeft = frameQuant - timeSpent;
-                std::this_thread::sleep_for(std::chrono::microseconds(timeLeft));
+                std::unique_lock<std::mutex> lock(_applicationEventsMutex);
+                _applicationEventsCond.wait_for(lock, std::chrono::microseconds(timeLeft),
+                                                [this] { return !_applicationEvents.empty(); });
             }
 
             // collect frame statistics
@@ -134,7 +138,19 @@ namespace minire
             {
                 std::string title = fmt::format("[{}  fps, mft = {:.4f} ms]",
                                                 fps->first, fps->second);
-                MINIRE_DEBUG("controller FPS: {}", title);
+                MINIRE_DEBUG("Controller FPS: {}", title);
+
+                if (_eventsLatency.size() >= 2)
+                {
+                    std::ranges::sort(_eventsLatency);
+                    MINIRE_DEBUG("Events latency: p0 = {}; p50 = {}; p90 = {}, p99 = {}, p100 = {}",
+                                 _eventsLatency.front(),
+                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size()) * .50f)],
+                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size()) * .90f)],
+                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size()) * .99f)],
+                                 _eventsLatency.back());
+                    _eventsLatency.clear();
+                }
             }
 #endif
         }
@@ -168,12 +184,20 @@ namespace minire
 
     void BasicController::push(events::ApplicationQueue && applicationQueue)
     {
-        std::lock_guard<std::mutex> lock(_applicationEventsMutex);
-        _applicationEvents.reserve(_applicationEvents.size() + applicationQueue.size());
-        std::move(applicationQueue.begin(),
-                  applicationQueue.end(),
-                  std::back_inserter(_applicationEvents));
-        applicationQueue.clear();
+        if (applicationQueue.empty())
+            return;
+
+        {
+            std::lock_guard<std::mutex> lock(_applicationEventsMutex);
+            _applicationEvents.reserve(_applicationEvents.size() + applicationQueue.size());
+            std::move(applicationQueue.begin(), applicationQueue.end(),
+                      std::back_inserter(_applicationEvents));
+        }
+
+        if (_lowLatencyInput)
+        {
+            _applicationEventsCond.notify_one();
+        }
     }
 
     void BasicController::quit()
@@ -203,6 +227,16 @@ namespace minire
 
     }
 
+    void BasicController::setLowLatencyInput(bool enabled)
+    {
+        _lowLatencyInput = enabled;
+    }
+
+    bool BasicController::lowLatencyInput() const
+    {
+        return _lowLatencyInput;
+    }
+
     void BasicController::enqueueRaw(events::Controller && event)
     {
         _currentEventsBatch._events.emplace_back(std::move(event));
@@ -210,9 +244,22 @@ namespace minire
 
     void BasicController::handle(events::ApplicationQueue const & events)
     {
+#       ifndef NDEBUG
+        size_t const now = utils::uNow();
+#       else
+        size_t constexpr now = 0;
+#       endif
+
         for(auto const & event: events)
         {
-            std::visit([this](auto const & e) { handle(e); }, event);
+            std::visit([this, now](auto const & e)
+                {
+#                   ifndef NDEBUG
+                    _eventsLatency.push_back(now - e._createTime);
+#                   endif
+
+                    handle(e);
+                }, event);
         }
     }
 

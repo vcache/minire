@@ -71,11 +71,13 @@ namespace minire::gui::layouts
         if (auto it = _mapping.find(id);
             it != _mapping.cend())
         {
+            assert(it->second < _cells.size());
             Cell & cell = _cells[it->second];
             assert(cell._id.has_value());
             assert(*cell._id == id);
             assert(it->second < _cells.size());
-            _cells[it->second]._id.reset();
+
+            cell._id.reset();
             _mapping.erase(it);
         }
     }

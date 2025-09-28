@@ -118,6 +118,8 @@ namespace minire
         void enableInstrumentation();
         void disableInstrumentation();
 
+        void pushPendedEvents();
+
     private:
         content::Manager          & _contentManager;
 

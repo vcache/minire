@@ -90,6 +90,10 @@ namespace minire
     void Application::postEvent(Args && ... args)
     {
         _applicationEvents.emplace_back(Event(std::forward<Args>(args)...));
+        if (_controller && _controller->lowLatencyInput())
+        {
+            pushPendedEvents();
+        }
     }
 
     void Application::onKeyUp(::SDL_Keycode key, ::SDL_Scancode code, uint16_t mod)
@@ -470,6 +474,15 @@ namespace minire
         }
     }
 
+    void Application::pushPendedEvents()
+    {
+        // TODO: does it have to be called when the queue is empty?
+        size_t const pendedEvents = _applicationEvents.size(); // TODO: reserve max or p99
+        _controller->push(std::move(_applicationEvents));
+        _applicationEvents = events::ApplicationQueue();
+        _applicationEvents.reserve(pendedEvents);
+    }
+
     void Application::onRender()
     {
         assert(_controller);
@@ -487,10 +500,7 @@ namespace minire
         // notify logic thread about new events
         {
             instrumentation::Stopwatch<> stopwatch("controller-notify", _timekeeper);
-            size_t const pendedEvents = _applicationEvents.size(); // TODO: reserve max or p99
-            _controller->push(std::move(_applicationEvents));
-            _applicationEvents = events::ApplicationQueue();
-            _applicationEvents.reserve(pendedEvents);
+            pushPendedEvents();
         }
 
         // fetch and handle events from controller if any

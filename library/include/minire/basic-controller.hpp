@@ -6,6 +6,7 @@
 #include <minire/utils/barrier.hpp>
 
 #include <atomic>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -64,6 +65,17 @@ namespace minire
         glm::vec2 measure(text::FormattedString const &,
                           models::FontFace const &) const;
 
+        /**
+         * When low lantecy input mode is enabled, messages from an Application
+         * will be delivered as soon as possible. As a side effect, Controller's
+         * FPS will sometimes be higher than \a maxFps (during an intense input stream).
+         *
+         * In addition, this mode might disrupt consistency of Application's FPS>
+         * */
+        void setLowLatencyInput(bool enabled);
+
+        bool lowLatencyInput() const;
+
     protected:
         void enqueueRaw(events::Controller &&);
 
@@ -108,6 +120,7 @@ namespace minire
         size_t const             _maxFps = 0;
 
         std::mutex               _applicationEventsMutex;
+        std::condition_variable  _applicationEventsCond;
         events::ApplicationQueue _applicationEvents;
 
         std::mutex               _pendedControllerEventsMutex;
@@ -116,10 +129,15 @@ namespace minire
 
         std::atomic<bool>        _working;
         std::atomic<bool>        _quitRequest;
+        std::atomic<bool>        _lowLatencyInput;
         std::thread              _thread;
         utils::Barrier           _initBarrier;
         double                   _frameTime = 0.0;
         double                   _absoluteTime = 0.0; // seconds since begin
+
+#       ifndef NDEBUG
+        std::vector<size_t>      _eventsLatency;
+#       endif
 
         // This helps to open access to enqueue() without
         // making it public.
