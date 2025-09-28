@@ -86,6 +86,16 @@ namespace minire
         }
     }
 
+    void Application::setSquashAdditiveEvents(bool enabled)
+    {
+        _squashAdditiveEvents = enabled;
+    }
+
+    bool Application::squashAdditiveEvents() const
+    {
+        return _squashAdditiveEvents;
+    }
+
     template<typename Event, typename... Args>
     void Application::postEvent(Args && ... args)
     {
@@ -94,6 +104,16 @@ namespace minire
         {
             pushPendedEvents();
         }
+    }
+
+    template<typename Event>
+    Event * Application::findEventToSquash()
+    {
+        if (_squashAdditiveEvents && !_applicationEvents.empty())
+        {
+            return std::get_if<Event>(&_applicationEvents.back());
+        }
+        return nullptr;
     }
 
     void Application::onKeyUp(::SDL_Keycode key, ::SDL_Scancode code, uint16_t mod)
@@ -116,17 +136,40 @@ namespace minire
 
     void Application::onMouseWheel(int dx, int dy)
     {
-        postEvent<events::application::OnMouseWheel>(dx, dy);
+        using namespace events::application;
+        if (auto * last = findEventToSquash<OnMouseWheel>(); last)
+        {
+            last->_dx += dx;
+            last->_dy += dy;
+        }
+        else
+        {
+            postEvent<OnMouseWheel>(dx, dy);
+        }
     }
 
     void Application::onMouseMove(int absX, int absY, int relX, int relY,
                                   bool left, bool middle, bool right,
                                   bool x1, bool x2)
     {
+        using namespace events::application;
+
         _mouseX = absX;
         _mouseY = absY;
-        postEvent<events::application::OnMouseMove>(
-            absX, absY, relX, relY, left, middle, right, x1, x2);
+
+        if (auto * last = findEventToSquash<OnMouseMove>();
+            last && last->_left == left && last->_middle == middle &&
+            last->_right == right && last->_x1 == x1 && last->_x2 == x2)
+        {
+            last->_absX = absX;
+            last->_absY = absY;
+            last->_relX += relX;
+            last->_relY += relY;
+        }
+        else
+        {
+            postEvent<OnMouseMove>(absX, absY, relX, relY, left, middle, right, x1, x2);
+        }
     }
 
     void Application::onMouseDown(int x, int y, bool doubleClick,
@@ -161,7 +204,15 @@ namespace minire
         _rasterizer->setScreenSize(fWidth, fHeight);
 
         // send event to controller
-        postEvent<events::application::OnResize>(width, height);
+        if (auto * last = findEventToSquash<events::application::OnResize>(); last)
+        {
+            last->_width = width;
+            last->_height = height;
+        }
+        else
+        {
+            postEvent<events::application::OnResize>(width, height);
+        }
     }
 
     void Application::onFps(size_t fps, double mft)

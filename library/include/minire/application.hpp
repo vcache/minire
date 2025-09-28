@@ -44,6 +44,11 @@ namespace minire
             _controller = std::move(controller);
             return static_cast<Controller &>(*_controller);
         }
+
+        void setSquashAdditiveEvents(bool enabled);
+
+        bool squashAdditiveEvents() const;
+
     private:
         void onResize(size_t width, size_t height) override;
         void onRender() override;
@@ -113,6 +118,9 @@ namespace minire
         template<typename Event, typename... Args>
         void postEvent(Args && ...);
 
+        template<typename Event>
+        Event * findEventToSquash();
+
         void maybeIssueRayCaster();
 
         void enableInstrumentation();
@@ -152,5 +160,8 @@ namespace minire
         // instrumentations
         instrumentation::Histogram<>::Sptr _timekeeper;
         size_t                             _pedanticGlCounter = 0;
+
+        // miscellaneous
+        bool                        _squashAdditiveEvents = true;
     };
 }
