@@ -40,6 +40,11 @@ namespace minire
     //       maybe shouldn't do it, becase Derive may not call GuiController::handle at all
     //       (when it intercepts the input).
 
+    void GuiController::handle(events::application::OnFps const & e)
+    {
+        BasicController::handle(e);
+    }
+
     void GuiController::handle(events::application::OnMouseWheel const & e)
     {
         BasicController::handle(e);
@@ -95,6 +100,11 @@ namespace minire
         {
             _guiFocused->handle(e);
         }
+    }
+
+    void GuiController::handle(events::application::OnRayCaster const & e)
+    {
+        BasicController::handle(e);
     }
 
     void GuiController::setFocus(gui::Component::Sptr component)

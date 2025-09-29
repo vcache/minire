@@ -33,6 +33,7 @@ namespace minire
 
         void handle(events::application::OnResize const &)  override;
 
+        void handle(events::application::OnFps const &) override;
         void handle(events::application::OnMouseWheel const &) override;
         void handle(events::application::OnMouseMove const &) override;
         void handle(events::application::OnMouseDown const &) override;
@@ -40,6 +41,7 @@ namespace minire
         void handle(events::application::OnKeyUp const &) override;
         void handle(events::application::OnKeyDown const &) override;
         void handle(events::application::OnTextInput const &) override;
+        void handle(events::application::OnRayCaster const &) override;
 
         gui::components::Container const & guiRoot() const
         {
