@@ -4,6 +4,8 @@
 #include <minire/text/formatted-string.hpp>
 #include <minire/utils/rect.hpp>
 
+#include <glm/vec2.hpp>
+
 #include <functional>
 #include <memory>
 #include <optional>
@@ -68,6 +70,9 @@ namespace minire::gui::components
         utils::Rect const & contentMargin() const { return _contentMargin; }
         void setContentMargin(utils::Rect const &);
 
+        glm::vec2 const & pressedContentDelta() const { return _pressedContentDelta; }
+        void setPressedContentDelta(glm::vec2 const & v) {_pressedContentDelta = v; }
+
         template<typename T>
         void setClickCallback(T clickCallback)
         {
@@ -99,6 +104,7 @@ namespace minire::gui::components
         MaybeText     _text;
         utils::Rect   _contentMargin = utils::Rect(0);
         ClickCallback _clickCallback;
+        glm::vec2     _pressedContentDelta{2, 2};
 
         State         _state = State::kNormal;
 

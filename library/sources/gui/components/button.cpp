@@ -312,10 +312,38 @@ namespace minire::gui::components
         enqueue<events::controller::SetSpriteVisible>(
             activeBackground(), false);
 
+        if (_state == State::kPressed)
+        {
+            if (!_textLabel.empty())
+            {
+                enqueue<events::controller::MoveLabel>(_textLabel, _textPosition);
+            }
+
+            if (!_iconSprite.empty())
+            {
+                enqueue<events::controller::MoveSprite>(_iconSprite, _iconPosition);
+            }
+        }
+
         _state = state;
 
         enqueue<events::controller::SetSpriteVisible>(
             activeBackground(), visible());
+
+        if (_state == State::kPressed)
+        {
+            if (!_textLabel.empty())
+            {
+                enqueue<events::controller::MoveLabel>(_textLabel,
+                                                       _textPosition + _pressedContentDelta);
+            }
+
+            if (!_iconSprite.empty())
+            {
+                enqueue<events::controller::MoveSprite>(_iconSprite,
+                                                        _iconPosition + _pressedContentDelta);
+            }
+        }
     }
 
     std::string const & Button::activeBackground() const
