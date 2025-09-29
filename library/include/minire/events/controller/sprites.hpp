@@ -39,7 +39,7 @@ namespace minire::events::controller
         glm::vec2   _position;
     };
 
-    struct VisibleSprite
+    struct SetSpriteVisible
     {
         std::string _id;
         bool        _visible;

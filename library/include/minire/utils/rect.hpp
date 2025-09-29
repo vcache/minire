@@ -15,14 +15,21 @@ namespace minire::utils
         float _right;
         float _bottom;
 
-        explicit Rect(float left = .0f,
-                      float top = .0f,
-                      float right = .0f,
-                      float bottom = .0f)
+        explicit Rect(float left,
+                      float top,
+                      float right,
+                      float bottom)
             : _left(left)
             , _top(top)
             , _right(right)
             , _bottom(bottom)
+        {}
+
+        explicit Rect(float v = 0.0f)
+            : _left(v)
+            , _top(v)
+            , _right(v)
+            , _bottom(v)
         {}
 
         Rect & operator+=(float offset)

@@ -23,7 +23,7 @@ namespace minire::events
                                     controller::CreateSprite,
                                     controller::ResizeSprite,
                                     controller::MoveSprite,
-                                    controller::VisibleSprite,
+                                    controller::SetSpriteVisible,
                                     controller::RemoveSprite,
                                     controller::BulkSetSpriteZOrders,
 

@@ -5,12 +5,11 @@
 #include <minire/events/controller.hpp>
 #include <minire/gui/area.hpp>
 #include <minire/gui/arranger.hpp>
+#include <minire/utils/rect.hpp>
 
 #include <memory>
 #include <optional>
 #include <string>
-#include <type_traits>
-#include <typeindex>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -66,15 +65,7 @@ namespace minire::gui
                                 ZOrderUpdates & sprites);
 
         template<typename T>
-        bool handle(T const & event)
-        {
-            if (_visible && isSubscribed<T>())
-            {
-                onEvent(event);
-                return true;
-            }
-            return false;
-        }
+        T & as() { return dynamic_cast<T &>(*this); }
 
     protected:
         void invalidateZOrder();
@@ -98,8 +89,6 @@ namespace minire::gui
         virtual size_t onZOrderChanged(size_t offset, ZOrderUpdates & labels,
                                        ZOrderUpdates & sprites) = 0;
 
-        virtual void onChildSubscriptionChanged() {}
-
         // TODO: why not glm::vec2 ?
         virtual std::optional<std::pair<float, float>> measureContent() const;
 
@@ -120,29 +109,6 @@ namespace minire::gui
         void unfocus();
 
     protected:
-        template<typename T>
-        constexpr static auto const & cleanTypeId()
-        {
-            return typeid(std::decay_t<T>);
-        }
-
-        template<typename T>
-        void subscribe()
-        {
-            _eventsFilter.emplace(cleanTypeId<T>());
-            notifyParentOnSubscription();
-        }
-
-        template<typename T>
-        void unsubscribe()
-        {
-            _eventsFilter.erase(cleanTypeId<T>());
-            notifyParentOnSubscription();
-        }
-
-        template<typename T>
-        bool isSubscribed() const { return _eventsFilter.contains(cleanTypeId<T>()); }
-
         virtual void onEvent(events::application::OnMouseWheel const &) {}
         virtual void onEvent(events::application::OnMouseMove const &) {}
         virtual void onEvent(events::application::OnMouseDown const &) {}
@@ -151,20 +117,24 @@ namespace minire::gui
         virtual void onEvent(events::application::OnKeyDown const &) {}
         virtual void onEvent(events::application::OnTextInput const &) {}
 
-        // TODO: add some high-level events, such as onClick, onMouseEnter, onMouseLeave
-        //       onFocus, onUnfocue
+        virtual void onMouseEnter(bool /*isClickReturn*/) {}
+        virtual void onMouseLeave() {}  // will be delivered even to a non-visible one
+
+        virtual void onFocus() {}
+        virtual void onUnfocus() {}     // will be delivered even to a non-visible one
+
+        virtual void onClick() {}
 
     protected: // Shortcuts to a GuiController
-        std::unique_ptr<content::Lease> borrow(content::Id const &);
+        std::unique_ptr<content::Lease> borrow(content::Id const &) const;
 
         glm::vec2 measure(text::FormattedString const & text,
                           content::Id const & id) const;
 
-    private:
-        void notifyParentOnSubscription();
+        std::pair<glm::vec2, bool> measure(utils::Patch const &,
+                                           content::Id const & texture) const;
 
     private:
-        using EventsFilter = std::unordered_set<std::type_index>; // TODO: why not std::bitset?
         using ParentWptr = std::weak_ptr<components::Container>;
         using ZOrderBoundaries = std::pair<size_t, size_t>;
 
@@ -174,12 +144,12 @@ namespace minire::gui
         Arrangers         _arrangers;
         Area              _clientArea;
         Area              _contentArea;
-        EventsFilter      _eventsFilter;
         size_t            _zOrder = 0;
         ZOrderBoundaries  _zOrderBoundaries{0, 0}; // the first and last offsets, like (begin, end)
         bool              _zOrderInvalidated = true;
         bool              _visible = true;
 
         friend class components::Container;
+        friend class ::minire::GuiController;
     };
 }

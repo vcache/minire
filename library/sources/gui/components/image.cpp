@@ -1,7 +1,5 @@
 #include <minire/gui/components/image.hpp>
 
-#include <utils/uuid.hpp>
-
 #include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
@@ -9,7 +7,7 @@
 #include <minire/logging.hpp>
 #include <minire/models/image.hpp>
 
-#include <utils/overloaded.hpp>
+#include <utils/uuid.hpp>
 
 #include <cassert>
 #include <variant>
@@ -24,34 +22,10 @@ namespace minire::gui::components
                  Arrangers arrangers)
         : Component(controller, id, parent)
     {
-        std::visit(utils::Overloaded
-        {
-            [this, &texture](std::monostate const &)
-            {
-                auto lease = borrow(texture);
-                assert(lease);
-                models::Image::Sptr image = lease->as<models::Image::Sptr>();
-                MINIRE_INVARIANT(image, "not a valid image: {}", texture);
-                _width = image->_width;
-                _height = image->_height;
-                _isResizable = false;
-            },
-
-            [this](utils::Rect const & tile)
-            {
-                _width = tile._right - tile._left + 1;
-                _height = tile._bottom - tile._top + 1;
-                _isResizable = false;
-            },
-
-            [this](utils::NinePatch const & ninePatch)
-            {
-                glm::vec2 sz = utils::defaultSize(ninePatch);
-                _width = sz.x;
-                _height = sz.y;
-                _isResizable = true;
-            },
-        }, patch);
+        auto [size, resizeable] = measure(patch, texture);
+        _width = size.x;
+        _height = size.y;
+        _isResizable = resizeable;
 
         if (!_isResizable)
         {
@@ -92,7 +66,7 @@ namespace minire::gui::components
         if (_spriteId.empty())
             return;
 
-        enqueue<events::controller::VisibleSprite>(_spriteId, visible());
+        enqueue<events::controller::SetSpriteVisible>(_spriteId, visible());
     }
 
     void Image::onContentAreaChanged()

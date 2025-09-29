@@ -48,9 +48,14 @@ namespace minire
     void GuiController::handle(events::application::OnMouseWheel const & e)
     {
         BasicController::handle(e);
-        if (_guiFocused)
+
+        if (auto focused = _guiFocused.lock(); focused)
         {
-            _guiFocused->handle(e);
+            focused->onEvent(e);
+        }
+        else if (auto destination = hovered(); destination)
+        {
+            destination->onEvent(e);
         }
     }
 
@@ -58,48 +63,63 @@ namespace minire
     {
         BasicController::handle(e);
         assert(_guiRoot);
-        _guiRoot->handle(e);
+
+        _mouseX = e._absX;
+        _mouseY = e._absY;
+        _mouseUpdated = true;
+
+        if (auto destination = hovered(); destination)
+            destination->onEvent(e);
     }
 
     void GuiController::handle(events::application::OnMouseDown const & e)
     {
         BasicController::handle(e);
-        assert(_guiRoot);
-        _guiRoot->handle(e);
+        if (auto destination = hovered(); destination)
+        {
+            _guiToClick = destination;
+            destination->onEvent(e);
+        }
     }
 
     void GuiController::handle(events::application::OnMouseUp const & e)
     {
         BasicController::handle(e);
-        assert(_guiRoot);
-        _guiRoot->handle(e);
+        if (auto destination = hovered(); destination)
+        {
+            destination->onEvent(e);
+
+            if (auto clickTarget = _guiToClick.lock();
+                clickTarget && clickTarget == destination)
+            {
+                clickTarget->onClick();
+            }
+        }
+        _guiToClick.reset();
     }
 
     void GuiController::handle(events::application::OnKeyUp const & e)
     {
         BasicController::handle(e);
-        if (_guiFocused)
-        {
-            _guiFocused->handle(e);
-        }
+        if (auto focused = _guiFocused.lock(); focused)
+            focused->onEvent(e);
     }
 
     void GuiController::handle(events::application::OnKeyDown const & e)
     {
         BasicController::handle(e);
-        if (!_guiHotKeys.handle(e) && _guiFocused)
-        {
-            _guiFocused->handle(e);
-        }
+        if (_guiHotKeys.handle(e))
+            return;
+
+        if (auto focused = _guiFocused.lock(); focused)
+            focused->onEvent(e);
     }
 
     void GuiController::handle(events::application::OnTextInput const & e)
     {
         BasicController::handle(e);
-        if (_guiFocused)
-        {
-            _guiFocused->handle(e);
-        }
+        if (auto focused = _guiFocused.lock(); focused)
+            focused->onEvent(e);
     }
 
     void GuiController::handle(events::application::OnRayCaster const & e)
@@ -107,9 +127,59 @@ namespace minire
         BasicController::handle(e);
     }
 
-    void GuiController::setFocus(gui::Component::Sptr component)
+    void GuiController::setFocus(gui::Component::Sptr const & component)
     {
+        auto focused = _guiFocused.lock();
+
+        if (focused == component)
+            return;
+
+        if (focused)
+            focused->onUnfocus();
+
         _guiFocused = component;
+
+        if (component)
+            component->onFocus();
+    }
+
+    void GuiController::setHover(gui::Component::Sptr const & component)
+    {
+        auto hovered = _guiHovered.lock();
+
+        if (hovered == component)
+            return;
+
+        if (hovered)
+            hovered->onMouseLeave();
+
+        _guiHovered = component;
+
+        if (component)
+            component->onMouseEnter(component == _guiToClick.lock());
+    }
+
+    gui::Component::Sptr GuiController::hovered()
+    {
+        if (auto result = _guiHovered.lock();
+            result && !_mouseUpdated)
+        {
+            if (result->visible())
+                return result;
+
+            _mouseUpdated = true; // force recalc hovered
+        }
+
+        if (_mouseUpdated)
+        {
+            assert(_guiRoot);
+            auto result = _guiRoot->findUnderCursor(_mouseX, _mouseY);
+            setHover(result);
+            _mouseUpdated = false;
+            return result;
+        }
+
+        return {};
     }
 
     void GuiController::set(::SDL_Scancode key, uint16_t mods,

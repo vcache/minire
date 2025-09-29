@@ -206,7 +206,7 @@ namespace minire
     }
 
     std::unique_ptr<content::Lease>
-    BasicController::borrow(content::Id const & id)
+    BasicController::borrow(content::Id const & id) const
     {
         return _contentManager.borrow(id);
     }

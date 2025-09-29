@@ -323,7 +323,7 @@ namespace minire
         _rasterizer->sprites().move(e._id, e._position);
     }
 
-    void Application::handle(events::controller::VisibleSprite const & e)
+    void Application::handle(events::controller::SetSpriteVisible const & e)
     {
         _rasterizer->sprites().visible(e._id, e._visible);
     }

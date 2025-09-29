@@ -79,29 +79,16 @@ namespace minire::gui::components
             return const_cast<T &>(const_cast<Container const *>(this)->at<T>(childId));
         }
 
+        Component::Sptr findUnderCursor(float x, float y);
+
     protected:
         void onVisibleChanged() override;
         void onContentAreaChanged() override;
         size_t onZOrderChanged(size_t offset, ZOrderUpdates & labels,
                                ZOrderUpdates & sprites) override;
-        void onChildSubscriptionChanged() override;
-
-        void onEvent(events::application::OnMouseWheel const &) override;
-        void onEvent(events::application::OnMouseMove const &) override;
-        void onEvent(events::application::OnMouseDown const &) override;
-        void onEvent(events::application::OnMouseUp const &) override;
-        void onEvent(events::application::OnKeyUp const &) override;
-        void onEvent(events::application::OnKeyDown const &) override;
-        void onEvent(events::application::OnTextInput const &) override;
 
     private:
         void updateChildrenContentArea(Component::Sptr const &);
-
-        template<typename T>
-        void broadcast(T const & e);
-
-        template<typename T>
-        void sendUnderCursor(T const & e);
 
     private:
         struct ZOrderCompare

@@ -258,7 +258,7 @@ namespace minire::rasterizer
                     tile._in._right, tile._in._bottom,
                     offset, _vertices);
 
-                assert(offset == _vertices.size());
+                assert(offset <= _vertices.size());
             }
 
         private:
@@ -282,12 +282,13 @@ namespace minire::rasterizer
                 if (!(width >= 0 && height >= 0 &&
                       left <= right && top <= bottom))
                 {
-                    MINIRE_THROW("bad quad: width = {}; height = {}; "
-                                 "left = {}; right = {}; "
-                                 "top = {}; bottom = {}; "
-                                 "dimensions = [{}, {}]",
-                                 width, height, left, right, top, bottom,
-                                 _dimensions.x, _dimensions.y);
+                    MINIRE_WARNING("bad quad: width = {}; height = {}; "
+                                   "left = {}; right = {}; "
+                                   "top = {}; bottom = {}; "
+                                   "dimensions = [{}, {}]",
+                                   width, height, left, right, top, bottom,
+                                   _dimensions.x, _dimensions.y);
+                    return 0;
                 }
 
                 glm::vec2 const texMinSz(right - left + 1.0f, bottom - top + 1.0f);

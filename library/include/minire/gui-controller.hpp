@@ -26,7 +26,7 @@ namespace minire
             });
         }
 
-        void setFocus(gui::Component::Sptr = {});
+        void setFocus(gui::Component::Sptr const & = {});
 
     protected:
         void step() override;
@@ -59,8 +59,19 @@ namespace minire
                  gui::HotKeys::Handler handler);
 
     private:
+        void setHover(gui::Component::Sptr const &);
+
+        gui::Component::Sptr hovered();
+
+    private:
         gui::components::Container::Sptr _guiRoot;
-        gui::Component::Sptr             _guiFocused;
+        gui::Component::Wptr             _guiFocused;
+        gui::Component::Wptr             _guiHovered;
+        gui::Component::Wptr             _guiToClick;
         gui::HotKeys                     _guiHotKeys;
+
+        float                            _mouseX = -1;
+        float                            _mouseY = -1;
+        bool                             _mouseUpdated = true;
     };
 }

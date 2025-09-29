@@ -115,9 +115,9 @@ int main()
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
         auto lease = manager.upload("ucs-6x13-example", minire::models::FontFace
             {
-                ._regular = "6x13.bdf",
-                ._bold = "6x13B.bdf",
-                ._italic = "6x13O.bdf",
+                ._regular = "../common/6x13.bdf",
+                ._bold = "../common/6x13B.bdf",
+                ._italic = "../common/6x13O.bdf",
                 ._glyphWidth = 6,
                 ._glyphHeight = 13,
             });

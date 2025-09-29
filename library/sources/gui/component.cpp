@@ -5,6 +5,10 @@
 #include <minire/gui-controller.hpp>
 #include <minire/gui/components/container.hpp>
 
+#include <utils/overloaded.hpp>
+
+#include <cassert>
+
 namespace minire::gui
 {
 
@@ -122,16 +126,8 @@ namespace minire::gui
         _controller.setFocus();
     }
 
-    void Component::notifyParentOnSubscription()
-    {
-        if (auto p = _parent.lock(); p)
-        {
-            p->onChildSubscriptionChanged();
-        }
-    }
-
     std::unique_ptr<content::Lease>
-    Component::borrow(content::Id const & id)
+    Component::borrow(content::Id const & id) const
     {
         return _controller.borrow(id);
     }
@@ -140,6 +136,36 @@ namespace minire::gui
                                  content::Id const & id) const
     {
         return _controller.measure(text, id);
+    }
+
+    std::pair<glm::vec2, bool>
+    Component::measure(utils::Patch const & patch,
+                       content::Id const & texture) const
+    {
+        return std::visit(utils::Overloaded
+        {
+            [this, &texture](std::monostate const &)
+            {
+                auto lease = borrow(texture);
+                assert(lease);
+                models::Image::Sptr image = lease->as<models::Image::Sptr>();
+                MINIRE_INVARIANT(image, "not a valid image: {}", texture);
+                return std::make_pair(glm::vec2(image->_width, image->_height),
+                                      false);
+            },
+
+            [this](utils::Rect const & tile)
+            {
+                return std::make_pair(glm::vec2(tile._right - tile._left + 1,
+                                                tile._bottom - tile._top + 1),
+                                      false);
+            },
+
+            [this](utils::NinePatch const & ninePatch)
+            {
+                return std::make_pair(utils::defaultSize(ninePatch), true);
+            },
+        }, patch);
     }
 
     std::optional<std::pair<float, float>>

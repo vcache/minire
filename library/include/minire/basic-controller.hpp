@@ -57,7 +57,7 @@ namespace minire
 
         void quit();
 
-        std::unique_ptr<content::Lease> borrow(content::Id const &);
+        std::unique_ptr<content::Lease> borrow(content::Id const &) const;
 
         glm::vec2 measure(text::FormattedString const &,
                           content::Id const &) const;

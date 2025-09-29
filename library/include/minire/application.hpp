@@ -80,7 +80,7 @@ namespace minire
         void handle(events::controller::CreateSprite const &);
         void handle(events::controller::ResizeSprite const &);
         void handle(events::controller::MoveSprite const &);
-        void handle(events::controller::VisibleSprite const &);
+        void handle(events::controller::SetSpriteVisible const &);
         void handle(events::controller::RemoveSprite const &);
         void handle(events::controller::BulkSetSpriteZOrders const &);
         void handle(events::controller::CreateLabel const &);
