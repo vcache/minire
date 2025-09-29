@@ -39,7 +39,7 @@ namespace minire::gui::components
     {
         assert(child);
         assert(_layout);
-        Area const & childArea = _layout->evaluate(_clientArea, *child);
+        Area const & childArea = _layout->evaluate(_contentArea, *child);
         child->setClientArea(childArea);
     }
 
