@@ -21,8 +21,7 @@ namespace minire::events
                                     controller::DisposeVertexBuffer,
 
                                     controller::CreateSprite,
-                                    controller::CreateNinePatch,
-                                    controller::ResizeNinePatch,
+                                    controller::ResizeSprite,
                                     controller::MoveSprite,
                                     controller::VisibleSprite,
                                     controller::RemoveSprite,

@@ -20,10 +20,12 @@ namespace minire::gui::components
                  Position hPos, Position vPos)
         : Component(controller, id, parent)
     {
+        utils::Patch patch;
         if (tile)
         {
             _width = tile->_right - tile->_left + 1;
             _height = tile->_bottom - tile->_top + 1;
+            patch = *tile;
         }
         else
         {
@@ -45,8 +47,8 @@ namespace minire::gui::components
         //       spriteId should be empty() at that time.
         _spriteId = utils::newUuid();
         enqueue<events::controller::CreateSprite>(
-            _spriteId, texture, tile, glm::vec2(contentArea()._left, contentArea()._top),
-            visible(), zOrder());
+            _spriteId, texture, patch, glm::vec2(contentArea()._left, contentArea()._top),
+            glm::vec2(0), visible(), zOrder());
     }
 
     Image::~Image()

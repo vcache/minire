@@ -1,7 +1,7 @@
 #pragma once
 
 #include <minire/content/id.hpp>
-#include <minire/utils/rect.hpp> // for NinePatch
+#include <minire/utils/rect.hpp>
 
 #include <rasterizer/drawable.hpp>
 
@@ -27,18 +27,11 @@ namespace minire::rasterizer
 
         void create(std::string const & id,
                     content::Id const & texture,
-                    utils::MaybeRect const & tile, // in pixels, on a texture
-                    glm::vec2 const & position,
-                    bool const visible,
-                    int const z);
-
-        void create(std::string const & id,
-                    content::Id const & texture,
-                    utils::NinePatch const & tile, // in pixels, on a texture
+                    utils::Patch const & patch, // in pixels, on a texture
                     glm::vec2 const & position,
                     glm::vec2 const & dimensions,
                     bool const visible,
-                    int const z);
+                    int const zOrder);
 
         void move(std::string const & id,
                   glm::vec2 const & position);

@@ -25,7 +25,7 @@ namespace minire::gui::components
         // NOTE: setArrangers will call onContentAreaChanged, thus,
         //       spriteId should be empty() at that time.
         _spriteId = utils::newUuid();
-        enqueue<events::controller::CreateNinePatch>(
+        enqueue<events::controller::CreateSprite>(
             _spriteId, texture, tile,
             glm::vec2(contentArea()._left, contentArea()._top),
             glm::vec2(contentArea()._width, contentArea()._height),
@@ -56,7 +56,7 @@ namespace minire::gui::components
             _spriteId, glm::vec2(area._left, area._top)
         );
 
-        enqueue<events::controller::ResizeNinePatch>(
+        enqueue<events::controller::ResizeSprite>(
             _spriteId, glm::vec2(area._width, area._height)
         );
     }

@@ -12,37 +12,27 @@
 
 namespace minire::events::controller
 {
-
-    // TODO: maybe use size_t as ID instead string
-
     struct CreateSprite
     {
-        std::string      _id;
-        content::Id      _texture;
-        utils::MaybeRect _tile;
-        glm::vec2        _position;
-        bool             _visible;
-        size_t           _zOrder;
+        std::string  _id;
+        content::Id  _texture;
+        utils::Patch _source;
+        glm::vec2    _position;
+        glm::vec2    _dimensions;   // it will be used ONLY for a NinePatch
+                                    // and will be ignored in all other cases
+                                    // TODO: support for a Rect
+        bool         _visible;
+        size_t       _zOrder;
     };
 
-    struct CreateNinePatch
-    {
-        std::string      _id;
-        content::Id      _texture;
-        utils::NinePatch _tile;
-        glm::vec2        _position;
-        glm::vec2        _dimensions;
-        bool             _visible;
-        size_t           _zOrder;
-    };
-
-    struct ResizeNinePatch
+    // Only applicable for a NinePatch
+    // TODO: support for a Rect
+    struct ResizeSprite
     {
         std::string _id;
         glm::vec2   _dimensions;
     };
 
-    // TODO: create _delta version
     struct MoveSprite
     {
         std::string _id;

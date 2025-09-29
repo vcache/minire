@@ -458,34 +458,42 @@ namespace minire::rasterizer
 
     void Sprites::create(std::string const & id,
                          content::Id const & texture,
-                         utils::MaybeRect const & tile,
+                         utils::Patch const & patch,
                          glm::vec2 const & position,
+                         glm::vec2 const & dimensions,
                          bool const visible,
-                         int const z)
+                         int const zOrder)
     {
         auto textureSptr = _textures.get(texture, {}, false /* no mipmap */);
         MINIRE_INVARIANT(textureSptr, "no texture found for \"{}\": {}", id, texture);
 
-        utils::Rect rect = tile ? *tile
-                                : utils::Rect(0, 0, textureSptr->width() - 1,
-                                                    textureSptr->height() - 1);
-        auto [_, inserted] = _store.emplace(id,
-            std::make_unique<Sprite>(textureSptr, rect, position, glm::vec2(), visible, z, *_program));
-        MINIRE_INVARIANT(inserted, "sprite alrady exists: \"{}\"", id);
-    }
+        auto sprite = std::visit(utils::Overloaded
+        {
+            [this, &textureSptr, &position, visible, zOrder]
+            (std::monostate const &)
+            {
+                utils::Rect rect(0, 0, textureSptr->width() - 1, textureSptr->height() - 1);
+                return std::make_unique<Sprite>(textureSptr, rect, position, glm::vec2(),
+                                                visible, zOrder, *_program);
+            },
 
-    void Sprites::create(std::string const & id,
-                         content::Id const & texture,
-                         utils::NinePatch const & tile,
-                         glm::vec2 const & position,
-                         glm::vec2 const & dimensions,
-                         bool const visible,
-                         int const z)
-    {
-        auto [_, inserted] = _store.emplace(id,
-            std::make_unique<Sprite>(_textures.get(texture, {}, false /* no mipmap */), tile,
-                                     position, dimensions, visible, z, *_program));
-        MINIRE_INVARIANT(inserted, "sprite alrady exists: \"{}\"", id);
+            [this, &textureSptr, &position, visible, zOrder]
+            (utils::Rect const & rect)
+            {
+                return std::make_unique<Sprite>(textureSptr, rect, position, glm::vec2(),
+                                                visible, zOrder, *_program);
+            },
+
+            [this, &textureSptr, &position, &dimensions, visible, zOrder]
+            (utils::NinePatch const & tile)
+            {
+                return std::make_unique<Sprite>(textureSptr, tile, position, dimensions,
+                                                visible, zOrder, *_program);
+            }
+        }, patch);
+
+        auto [_, inserted] = _store.emplace(id, std::move(sprite));
+        MINIRE_INVARIANT(inserted, "sprite already exists: \"{}\"", id);
     }
 
     void Sprites::move(std::string const & id,

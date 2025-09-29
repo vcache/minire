@@ -18,7 +18,7 @@ namespace minire::gui::components
 
     Text::Text(GuiController & controller,
                std::string const & id,
-               std::shared_ptr<components::Container> const & parent,
+               std::shared_ptr<Container> const & parent,
                text::FormattedString const & text,
                content::Id const & fontFace,
                Arrangers arrangers)

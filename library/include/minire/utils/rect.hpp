@@ -3,6 +3,7 @@
 #include <glm/vec2.hpp>
 
 #include <optional>
+#include <variant>
 
 namespace minire::utils
 {
@@ -67,4 +68,8 @@ namespace minire::utils
         Rect _out;
         Rect _in;
     };
+
+    using Patch = std::variant<std::monostate,   // whole texture
+                               utils::Rect,      // specific part of texture
+                               utils::NinePatch>;// 9-patch from texture
 }

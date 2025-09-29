@@ -78,8 +78,7 @@ namespace minire
         void handle(events::controller::CreateVertexBuffer const &);
         void handle(events::controller::DisposeVertexBuffer const &);
         void handle(events::controller::CreateSprite const &);
-        void handle(events::controller::CreateNinePatch const &);
-        void handle(events::controller::ResizeNinePatch const &);
+        void handle(events::controller::ResizeSprite const &);
         void handle(events::controller::MoveSprite const &);
         void handle(events::controller::VisibleSprite const &);
         void handle(events::controller::RemoveSprite const &);

@@ -14,10 +14,10 @@ namespace minire::gui::components
     public:
         NinePatchImage(GuiController & controller,
                        std::string const & id,
-                       std::shared_ptr<components::Container> const & parent,
+                       std::shared_ptr<Container> const & parent,
                        content::Id const & texture,
                        utils::NinePatch const & tile,
-                       Arrangers arranger = Arrangers());
+                       Arrangers arrangers = Arrangers());
 
         ~NinePatchImage() override;
 

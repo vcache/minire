@@ -309,17 +309,11 @@ namespace minire
 
     void Application::handle(events::controller::CreateSprite const & e)
     {
-        _rasterizer->sprites().create(e._id, e._texture, e._tile, e._position,
-                                      e._visible, e._zOrder);
-    }
-
-    void Application::handle(events::controller::CreateNinePatch const & e)
-    {
-        _rasterizer->sprites().create(e._id, e._texture, e._tile, e._position,
+        _rasterizer->sprites().create(e._id, e._texture, e._source, e._position,
                                       e._dimensions, e._visible, e._zOrder);
     }
 
-    void Application::handle(events::controller::ResizeNinePatch const & e)
+    void Application::handle(events::controller::ResizeSprite const & e)
     {
         _rasterizer->sprites().resize(e._id, e._dimensions);
     }
