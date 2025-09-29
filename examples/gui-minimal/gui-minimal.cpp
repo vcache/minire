@@ -107,14 +107,20 @@ namespace
             }
 
             guiRoot().emplace<minire::gui::components::Image>(
-                "origin-example", "origin.png", std::nullopt,
-                minire::gui::position::Constant{0},
-                minire::gui::position::Constant{0});
+                "origin-example", "origin.png", std::monostate(),
+                minire::gui::Arrangers
+                {
+                    ._horizontal = minire::gui::Arranger(minire::gui::position::Constant{0}),
+                    ._vertical = minire::gui::Arranger(minire::gui::position::Constant{0})
+                });
 
             _bottomRight = guiRoot().emplace<minire::gui::components::Image>(
-                "bottom-right-example", "bottom-right.png", std::nullopt,
-                minire::gui::position::Constant{0},
-                minire::gui::position::Constant{0});
+                "bottom-right-example", "bottom-right.png", std::monostate(),
+                minire::gui::Arrangers
+                {
+                    ._horizontal = minire::gui::Arranger(minire::gui::position::Constant{0}),
+                    ._vertical = minire::gui::Arranger(minire::gui::position::Constant{0})
+                });
         }
 
         void handle(minire::events::application::OnResize const & e) override

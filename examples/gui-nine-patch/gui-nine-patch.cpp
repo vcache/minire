@@ -3,7 +3,7 @@
 #include <minire/content/manager.hpp>
 #include <minire/gui-controller.hpp>
 #include <minire/gui/components/container.hpp>
-#include <minire/gui/components/nine-patch.hpp>
+#include <minire/gui/components/image.hpp>
 #include <minire/logging.hpp>
 
 #include <cstdlib> // for EXIT_SUCCESS
@@ -22,7 +22,7 @@ namespace
 
             namespace gui = minire::gui;
 
-            auto ninePatch = guiRoot().emplace<gui::components::NinePatchImage>(
+            auto ninePatch = guiRoot().emplace<gui::components::Image>(
                 "nine-patch-example", "hud.png",
                 minire::utils::NinePatch
                 {

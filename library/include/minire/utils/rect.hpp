@@ -69,7 +69,9 @@ namespace minire::utils
         Rect _in;
     };
 
-    using Patch = std::variant<std::monostate,   // whole texture
-                               utils::Rect,      // specific part of texture
-                               utils::NinePatch>;// 9-patch from texture
+    glm::vec2 defaultSize(NinePatch const &);
+
+    using Patch = std::variant<std::monostate,      // whole texture
+                               utils::Rect,         // specific part of texture
+                               utils::NinePatch>;   // 9-patch from texture
 }

@@ -16,9 +16,8 @@ namespace minire::gui::components
               std::string const & id,
               std::shared_ptr<Container> const & parent,
               content::Id const & texture,
-              utils::MaybeRect const & tile = std::nullopt,
-              Position hPos = position::Center{},
-              Position vPos = position::Center{});
+              utils::Patch const & patch = std::monostate(),
+              Arrangers arrangers = Arrangers());
 
         ~Image() override;
 
@@ -33,5 +32,6 @@ namespace minire::gui::components
         std::string _spriteId;
         float       _width = 0;
         float       _height = 0;
+        bool        _isResizable = false;
     };
 }

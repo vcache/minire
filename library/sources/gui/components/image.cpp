@@ -6,9 +6,13 @@
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
 #include <minire/events/controller.hpp>
+#include <minire/logging.hpp>
 #include <minire/models/image.hpp>
 
+#include <utils/overloaded.hpp>
+
 #include <cassert>
+#include <variant>
 
 namespace minire::gui::components
 {
@@ -16,39 +20,66 @@ namespace minire::gui::components
                  std::string const & id,
                  std::shared_ptr<components::Container> const & parent,
                  content::Id const & texture,
-                 utils::MaybeRect const & tile,
-                 Position hPos, Position vPos)
+                 utils::Patch const & patch,
+                 Arrangers arrangers)
         : Component(controller, id, parent)
     {
-        utils::Patch patch;
-        if (tile)
+        std::visit(utils::Overloaded
         {
-            _width = tile->_right - tile->_left + 1;
-            _height = tile->_bottom - tile->_top + 1;
-            patch = *tile;
-        }
-        else
+            [this, &texture](std::monostate const &)
+            {
+                auto lease = borrow(texture);
+                assert(lease);
+                models::Image::Sptr image = lease->as<models::Image::Sptr>();
+                MINIRE_INVARIANT(image, "not a valid image: {}", texture);
+                _width = image->_width;
+                _height = image->_height;
+                _isResizable = false;
+            },
+
+            [this](utils::Rect const & tile)
+            {
+                _width = tile._right - tile._left + 1;
+                _height = tile._bottom - tile._top + 1;
+                _isResizable = false;
+            },
+
+            [this](utils::NinePatch const & ninePatch)
+            {
+                glm::vec2 sz = utils::defaultSize(ninePatch);
+                _width = sz.x;
+                _height = sz.y;
+                _isResizable = true;
+            },
+        }, patch);
+
+        if (!_isResizable)
         {
-            auto lease = borrow(texture);
-            assert(lease);
-            models::Image::Sptr image = lease->as<models::Image::Sptr>();
-            MINIRE_INVARIANT(image, "not a valid image: {}", texture);
-            _width = image->_width;
-            _height = image->_height;
+            if (!std::holds_alternative<dimension::Content>(arrangers._horizontal.dimension()))
+            {
+                MINIRE_WARNING("image \"{}\" isn't resizable, "
+                               "its horizontal arranger must be Content", id);
+                arrangers._horizontal.setDimension(dimension::Content{});
+            }
+
+            if (!std::holds_alternative<dimension::Content>(arrangers._vertical.dimension()))
+            {
+                MINIRE_WARNING("image \"{}\" isn't resizable, "
+                               "its vertical arranger must be Content", id);
+                arrangers._vertical.setDimension(dimension::Content{});
+            }
         }
 
-        setArrangers(Arrangers
-        {
-            ._horizontal = Arranger(hPos, dimension::Constant{_width}),
-            ._vertical = Arranger(vPos, dimension::Constant{_height}),
-        });
+        assert(_spriteId.empty());
+        setArrangers(arrangers);
 
         // NOTE: setArrangers will call onContentAreaChanged, thus,
         //       spriteId should be empty() at that time.
         _spriteId = utils::newUuid();
+        Area const & area = contentArea();
         enqueue<events::controller::CreateSprite>(
-            _spriteId, texture, patch, glm::vec2(contentArea()._left, contentArea()._top),
-            glm::vec2(0), visible(), zOrder());
+            _spriteId, texture, patch, glm::vec2(area._left, area._top),
+            glm::vec2(area._width, area._height), visible(), zOrder());
     }
 
     Image::~Image()
@@ -69,11 +100,18 @@ namespace minire::gui::components
         if (_spriteId.empty())
             return;
 
-        // TODO: add stretching/shrinking depending on area._width and/or area._height
         Area const & area = contentArea();
+
         enqueue<events::controller::MoveSprite>(
             _spriteId, glm::vec2(area._left, area._top)
         );
+
+        if (_isResizable)
+        {
+            enqueue<events::controller::ResizeSprite>(
+                _spriteId, glm::vec2(area._width, area._height)
+            );
+        }
     }
 
     size_t Image::onZOrderChanged(size_t offset, ZOrderUpdates &,
