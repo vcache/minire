@@ -20,7 +20,7 @@ namespace minire::gui
             return;
 
         if (_visible)
-            rearrange();
+            rearrange(true);
 
         _visible = visible;
         onVisibleChanged();
@@ -74,7 +74,7 @@ namespace minire::gui
         rearrange();
     }
 
-    void Component::rearrange()
+    void Component::rearrange(bool force)
     {
         if (!_visible)
             return;
@@ -92,7 +92,7 @@ namespace minire::gui
                                ._top = top,
                                ._width = width,
                                ._height = height};
-        if (contentArea != _contentArea)
+        if (contentArea != _contentArea || force)
         {
             _contentArea = contentArea;
             onContentAreaChanged();

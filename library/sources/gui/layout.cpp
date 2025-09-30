@@ -9,7 +9,7 @@ namespace minire::gui
     {
         if (_parent)
         {
-            _parent->rearrange();
+            _parent->rearrange(true);
         }
     }
 

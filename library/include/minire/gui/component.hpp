@@ -94,7 +94,7 @@ namespace minire::gui
 
         Area const & contentArea() const { return _contentArea; }
 
-        void rearrange();
+        void rearrange(bool force = false);
 
         void enqueueRaw(events::Controller &&);
 
