@@ -21,8 +21,6 @@ namespace minire::gui
             }
         }, _dimension);
 
-        dimension += (_marginMax + _marginMin);
-
         float position = clientPosition + std::visit(utils::Overloaded
         {
             [this](position::Constant const & v)
@@ -35,16 +33,16 @@ namespace minire::gui
                 return _marginMin;
             },
 
-            [clientDimension, dimension]
+            [this, clientDimension, dimension]
             (position::Center const &)
             {
-                return (clientDimension - dimension) / 2.0f;
+                return (clientDimension - dimension - _marginMin - _marginMax) / 2.0f;
             },
 
             [this, clientDimension, dimension]
             (position::More const &)
             {
-                return (clientDimension - dimension);
+                return clientDimension - dimension - _marginMax;
             }
         }, _position);
 
