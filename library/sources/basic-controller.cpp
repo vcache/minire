@@ -146,9 +146,9 @@ namespace minire
                     std::ranges::sort(_eventsLatency);
                     MINIRE_DEBUG("Events latency: p0 = {}; p50 = {}; p90 = {}, p99 = {}, p100 = {}",
                                  _eventsLatency.front(),
-                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size()) * .50f)],
-                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size()) * .90f)],
-                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size()) * .99f)],
+                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size() - 1) * .50f)],
+                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size() - 1) * .90f)],
+                                 _eventsLatency[std::lround(static_cast<float>(_eventsLatency.size() - 1) * .99f)],
                                  _eventsLatency.back());
                     _eventsLatency.clear();
                 }
