@@ -47,6 +47,7 @@ namespace minire::gui::components
         assert(!_labelId.empty());
         _measurements = measure(text, _fontFace);
         enqueue<events::controller::SetLabelText>(_labelId, text);
+        rearrange();
     }
 
     void Text::onVisibleChanged()

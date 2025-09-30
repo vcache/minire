@@ -71,7 +71,37 @@ namespace
                     ._vertical = minire::gui::Arranger(minire::gui::position::More{},
                                                        minire::gui::dimension::Constant{size.y / 2})
                 });
+
+            _animatedText = guiRoot().emplace<minire::gui::components::Text>(
+                "animated-text", L"adsfsadf", kFontFaceId, minire::gui::Arrangers
+                {
+                    ._horizontal = minire::gui::Arranger(minire::gui::position::Center{},
+                                                         minire::gui::dimension::Content{}),
+                    ._vertical = minire::gui::Arranger(minire::gui::position::Less{},
+                                                       minire::gui::dimension::Content{},
+                                                       200)
+                });
         }
+
+        void step()
+        {
+            size_t barSize = std::lround(20.0 * (1.0 + std::sin(_phase)));
+
+            if (barSize != _barSize && barSize > 0)
+            {
+                minire::text::FormattedString str;
+                str.append(std::wstring(barSize, L'='));
+                _animatedText->setText(str);
+                _barSize = barSize;
+            }
+
+            _phase += frameTime();
+        }
+
+    private:
+        std::shared_ptr<minire::gui::components::Text> _animatedText;
+        double _phase = 0;
+        size_t _barSize = 0;
     };
 }
 

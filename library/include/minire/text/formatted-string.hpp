@@ -95,6 +95,11 @@ namespace minire::text
         }
 
     public:
+        // TODO BUG: it will crash when fragment is an empty string.
+        //           For example:
+        //              FormattedString str;
+        //              str.append(std::wstring());
+        //              for(auto i : str) ... <-- will crash
         class Iterator
         {
             friend class FormattedString;
