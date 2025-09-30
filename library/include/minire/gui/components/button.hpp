@@ -90,6 +90,7 @@ namespace minire::gui::components
                                ZOrderUpdates & sprites) override;
         std::optional<std::pair<float, float>> measureContent() const override;
 
+        void onCheckChanged() override;
 
         void onEvent(events::application::OnMouseDown const &) override;
         void onMouseEnter(bool isClickReturn) override;

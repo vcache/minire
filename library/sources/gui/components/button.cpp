@@ -287,6 +287,9 @@ namespace minire::gui::components
     {
         if (checkable())
         {
+            if (checked() && !canUncheck())
+                return;
+
             setState(checked() ? State::kNormal
                                : State::kPressed);
         }
@@ -322,6 +325,13 @@ namespace minire::gui::components
 
         setState(checkable() && checked() ? State::kPressed
                                           : State::kHovered);
+    }
+
+    void Button::onCheckChanged()
+    {
+        setState(checkable() && checked() ? State::kPressed
+                                          : (isHovered() ? State::kHovered
+                                                         : State::kNormal));
     }
 
     void Button::setState(Button::State state)

@@ -6,6 +6,7 @@
 #include <minire/gui/components/container.hpp>
 #include <minire/gui/components/image.hpp>
 #include <minire/gui/layouts/grid.hpp>
+#include <minire/gui/models/exclusive-group.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/font-face.hpp>
 
@@ -117,6 +118,16 @@ namespace
                     ._horizontal = Arranger(position::Center{}, dimension::Fraction{.5}),
                     ._vertical = Arranger(position::Center{}, dimension::Fraction{.5}),
                 },
+                Arrangers
+                {
+                    ._horizontal = Arranger(position::Center{}, dimension::Fraction{.5}),
+                    ._vertical = Arranger(position::Center{}, dimension::Fraction{.5}),
+                },
+                Arrangers
+                {
+                    ._horizontal = Arranger(position::Center{}, dimension::Fraction{.5}),
+                    ._vertical = Arranger(position::Center{}, dimension::Fraction{.5}),
+                },
             };
 
             // build grid container
@@ -151,11 +162,27 @@ namespace
 
             Rect const kIconRect(46, 7, 56, 19);
 
+            auto exclGroup1 = std::make_shared<minire::gui::models::ExclusiveGroup>(false);
+            auto exclGroup2 = std::make_shared<minire::gui::models::ExclusiveGroup>(true);
+
+            exclGroup1->setChangeCallback([](auto const * prev, auto const * curr)
+                {
+                    MINIRE_INFO("ExclusiveGroup 1 selection changed from {} to {}",
+                                (void const *)prev, (void const *)curr);
+                });
+
+            exclGroup2->setChangeCallback([](auto const * prev, auto const * curr)
+                {
+                    MINIRE_INFO("ExclusiveGroup 2 selection changed from {} to {}",
+                                (void const *)prev, (void const *)curr);
+                });
+
             for(size_t i = 0; i < kArrangers.size(); ++i)
             {
                 size_t row = 0;
 
-                bool const isCheckable = i == 6;
+                bool const isCheckable = i == 6 || i == 7 || i == 8;
+                auto exclGroup = i == 7 ? exclGroup1 : (i == 8 ? exclGroup2 : nullptr);
 
                 // empty content
                 {
@@ -165,6 +192,7 @@ namespace
                     button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
                     button->setCheckedCallback([cellId](models::Checkable & c)
                                                { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                    button->setExclusiveGroup(exclGroup);
                     _buttons.push_back(button);
                 }
 
@@ -177,6 +205,7 @@ namespace
                     button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
                     button->setCheckedCallback([cellId](models::Checkable & c)
                                                { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                    button->setExclusiveGroup(exclGroup);
                     _buttons.push_back(button);
                 }
 
@@ -193,6 +222,7 @@ namespace
                     button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
                     button->setCheckedCallback([cellId](models::Checkable & c)
                                                { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                    button->setExclusiveGroup(exclGroup);
                     _buttons.push_back(button);
                 }
 
@@ -224,6 +254,7 @@ namespace
                         button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
                         button->setCheckedCallback([cellId](models::Checkable & c)
                                                    { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                        button->setExclusiveGroup(exclGroup);
                         _buttons.push_back(button);
                     }
                 }

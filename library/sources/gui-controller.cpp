@@ -151,12 +151,18 @@ namespace minire
             return;
 
         if (hovered)
+        {
+            hovered->_isHovered = false;
             hovered->onMouseLeave();
+        }
 
         _guiHovered = component;
 
         if (component)
+        {
+            component->_isHovered = true;
             component->onMouseEnter(component == _guiToClick.lock());
+        }
     }
 
     gui::Component::Sptr GuiController::hovered()

@@ -125,6 +125,8 @@ namespace minire::gui
 
         virtual void onClick() {}
 
+        bool isHovered() const { return _isHovered; }
+
     protected: // Shortcuts to a GuiController
         std::unique_ptr<content::Lease> borrow(content::Id const &) const;
 
@@ -148,6 +150,7 @@ namespace minire::gui
         ZOrderBoundaries  _zOrderBoundaries{0, 0}; // the first and last offsets, like (begin, end)
         bool              _zOrderInvalidated = true;
         bool              _visible = true;
+        bool              _isHovered = false;
 
         friend class components::Container;
         friend class ::minire::GuiController;
