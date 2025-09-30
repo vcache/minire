@@ -19,7 +19,7 @@ namespace minire
                                      size_t const maxFps)
         : _contentManager(contentMangager)
         , _maxFps(maxFps)
-        , _working(true)
+        , _working(false)
         , _quitRequest(false)
         , _lowLatencyInput(false)
     {}
@@ -81,6 +81,7 @@ namespace minire
         _frameTime = static_cast<double>(frameQuant) / 1e6;
 
         utils::FpsCounter fpsCounter(2); (void) fpsCounter;
+        _working = true;
         while(_working)
         {
             // handle input events

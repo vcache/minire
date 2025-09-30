@@ -25,15 +25,6 @@ namespace minire::gui::layouts
         }
     }
 
-    void Grid::clear()
-    {
-        _mapping.clear();
-        for(Cell & cell : _cells)
-        {
-            cell._id.reset();
-        }
-    }
-
     std::optional<std::string> const & Grid::get(size_t row, size_t col) const
     {
         return _cells[indexOf(row, col)]._id;
@@ -55,6 +46,9 @@ namespace minire::gui::layouts
         cell._id = id;
         auto [_, inserted] = _mapping.emplace(id, index);
         MINIRE_INVARIANT(inserted, "failed to insert {} into a grid", id);
+
+        // notify parent about a change
+        notify();
     }
 
     void Grid::unset(size_t row, size_t col)
@@ -68,6 +62,15 @@ namespace minire::gui::layouts
 
     void Grid::unset(std::string const & id)
     {
+        if (unsetImpl(id))
+        {
+            // notify parent about a change
+            notify();
+        }
+    }
+
+    bool Grid::unsetImpl(std::string const & id)
+    {
         if (auto it = _mapping.find(id);
             it != _mapping.cend())
         {
@@ -79,7 +82,11 @@ namespace minire::gui::layouts
 
             cell._id.reset();
             _mapping.erase(it);
+
+            return true;
         }
+
+        return false;
     }
 
     Area Grid::evaluate(Area const & client,
@@ -107,6 +114,20 @@ namespace minire::gui::layouts
             MINIRE_WARNING("cannot perform grid-layout for {}, since it is not set",
                            component.id());
             return client;
+        }
+    }
+
+    void Grid::onErase(Component const & component)
+    {
+        unsetImpl(component.id());
+    }
+
+    void Grid::onClear()
+    {
+        _mapping.clear();
+        for(Cell & cell : _cells)
+        {
+            cell._id.reset();
         }
     }
 

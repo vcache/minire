@@ -16,7 +16,9 @@ namespace minire::gui::layouts
         Area evaluate(Area const & client,
                       Component const &) const override;
 
-        void clear();
+        void onErase(Component const &) override;
+
+        void onClear() override;
 
         std::optional<std::string> const & get(size_t row, size_t col) const;
 
@@ -32,6 +34,8 @@ namespace minire::gui::layouts
 
     private:
         size_t indexOf(size_t row, size_t col) const;
+
+        bool unsetImpl(std::string const &);
 
     private:
         struct Cell

@@ -15,14 +15,22 @@ namespace minire::gui::components
     class Container
         : public Component
     {
+        // NOTE: don't call it from the ctor!
+        std::shared_ptr<Container> sharedThis()
+        {
+            return std::dynamic_pointer_cast<Container>(shared_from_this());
+        }
+
     public:
         Container(GuiController & controller,
                   std::string const & id,
                   std::shared_ptr<Container> const & parent,
-                  std::shared_ptr<Layout> layout = {})
+                  Layout::Sptr const & layout = {})
             : Component(controller, std::move(id), parent)
             , _layout(layout ? layout : std::make_shared<Layout>())
-        {}
+        {
+            _layout->setParent(*this);
+        }
 
         using Sptr = std::shared_ptr<Container>;
 
@@ -31,8 +39,7 @@ namespace minire::gui::components
         std::shared_ptr<T> emplace(std::string const & childId,
                                    Args &&... args)
         {
-            auto sharedThis = std::dynamic_pointer_cast<Container>(shared_from_this());
-            auto ptr = std::make_shared<T>(_controller, childId, sharedThis,
+            auto ptr = std::make_shared<T>(_controller, childId, sharedThis(),
                                            std::forward<Args>(args)...);
             auto [_, inserted] = _children.emplace(childId, ptr);
             MINIRE_INVARIANT(inserted, "failed to insert parent component: \"{}\" into \"{}\"",

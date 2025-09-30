@@ -151,5 +151,6 @@ namespace minire::gui
 
         friend class components::Container;
         friend class ::minire::GuiController;
+        friend class Layout; // for rearrange()
     };
 }

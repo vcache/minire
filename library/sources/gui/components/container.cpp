@@ -10,6 +10,7 @@ namespace minire::gui::components
     {
         _children.clear();
         _zOrderStore.clear();
+        _layout->onClear();
     }
 
     void Container::erase(std::string const & id)
@@ -18,8 +19,10 @@ namespace minire::gui::components
             it != _children.end())
         {
             Component::Sptr const & child = it->second;
+            _layout->onErase(*child);
             _zOrderStore.erase(child);
             _children.erase(it);
+            rearrange();
         }
     }
 

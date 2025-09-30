@@ -115,7 +115,6 @@ namespace
             };
 
             // build grid container
-
             auto layout = std::make_shared<layouts::Grid>(3 + 4*2, kArrangers.size());
             auto container = guiRoot().emplace<Container>("container", layout);
 
