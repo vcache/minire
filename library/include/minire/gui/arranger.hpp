@@ -73,6 +73,7 @@ namespace minire::gui
     class Arranger
     {
     public:
+        // TODO: is there a point keep both min and max for margins?
         explicit Arranger(Position const & position = position::Center{},
                           Dimension const & dimension = dimension::Fill{},
                           float marginMin = 0,

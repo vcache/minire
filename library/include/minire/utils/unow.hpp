@@ -4,6 +4,7 @@
 
 namespace minire::utils
 {
+    // NOTE: it is not a calendar time!
     static inline size_t uNow()
     {
         using namespace std::chrono;
