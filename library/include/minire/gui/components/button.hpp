@@ -12,8 +12,6 @@
 #include <optional>
 #include <string>
 
-namespace minire::gui::models { class ExclusiveGroup; }
-
 namespace minire::gui::components
 {
     class Button final
@@ -69,8 +67,7 @@ namespace minire::gui::components
                MaybeIcon const & icon = std::nullopt,
                MaybeText const & text = std::nullopt,
                Arrangers arrangers = Arrangers(),
-               bool const checkable = false,
-               std::shared_ptr<models::ExclusiveGroup> const & = {});
+               bool const checkable = false);
 
         ~Button() override;
 

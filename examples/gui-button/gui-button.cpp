@@ -250,10 +250,11 @@ namespace
 
                         std::string cellId = fmt::format("{}x{}", row++, i);
                         auto button = container->at<Container>(cellId)
-                            .emplace<Button>("btn", kBg, icon, text, kArrangers[i], isCheckable, exclGroup);
+                            .emplace<Button>("btn", kBg, icon, text, kArrangers[i], isCheckable);
                         button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
                         button->setCheckedCallback([cellId](models::Checkable & c)
                                                    { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                        button->setExclusiveGroup(exclGroup);
                         _buttons.push_back(button);
                     }
                 }
