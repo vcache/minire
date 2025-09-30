@@ -16,8 +16,10 @@ namespace minire::gui::components
                    Background const & background,
                    MaybeIcon const & icon,
                    MaybeText const & text,
-                   Arrangers arrangers)
+                   Arrangers arrangers,
+                   bool const checkable)
         : Component(controller, id, parent)
+        , Checkable(checkable)
         , _background(background)
         , _icon(icon)
         , _text(text)
@@ -283,25 +285,43 @@ namespace minire::gui::components
 
     void Button::onEvent(events::application::OnMouseDown const &)
     {
-        setState(State::kPressed);
+        if (checkable())
+        {
+            setState(checked() ? State::kNormal
+                               : State::kPressed);
+        }
+        else
+        {
+            setState(State::kPressed);
+        }
     }
 
     void Button::onMouseEnter(bool isClickReturn)
     {
+        if (checkable())
+        {
+            isClickReturn ^= checked();
+        }
         setState(isClickReturn ? State::kPressed
                                : State::kHovered);
     }
 
     void Button::onMouseLeave()
     {
-        setState(State::kNormal);
+        setState(checkable() && checked() ? State::kPressed
+                                          : State::kNormal);
     }
 
     void Button::onClick()
     {
-        setState(State::kHovered);
+        if (checkable())
+            toggleCheck();
+
         if (_clickCallback)
             _clickCallback(*this);
+
+        setState(checkable() && checked() ? State::kPressed
+                                          : State::kHovered);
     }
 
     void Button::setState(Button::State state)
@@ -350,7 +370,7 @@ namespace minire::gui::components
     {
         switch(_state)
         {
-            case State::kNormal: return _normalSprite;
+            case State::kNormal:  return _normalSprite;
             case State::kHovered: return _hoveredSprite;
             case State::kPressed: return _pressedSprite;
         }

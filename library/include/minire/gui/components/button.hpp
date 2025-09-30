@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minire/gui/component.hpp>
+#include <minire/gui/models/checkable.hpp>
 #include <minire/text/formatted-string.hpp>
 #include <minire/utils/rect.hpp>
 
@@ -15,6 +16,7 @@ namespace minire::gui::components
 {
     class Button final
         : public Component
+        , public models::Checkable
     {
         enum State
         {
@@ -31,6 +33,7 @@ namespace minire::gui::components
             utils::NinePatch _normal;
             utils::NinePatch _hovered;
             utils::NinePatch _pressed;
+            // TODO: focused, hovered while pressed, and etc
         };
 
         struct Icon
@@ -63,7 +66,8 @@ namespace minire::gui::components
                Background const & background,
                MaybeIcon const & icon = std::nullopt,
                MaybeText const & text = std::nullopt,
-               Arrangers arrangers = Arrangers());
+               Arrangers arrangers = Arrangers(),
+               bool const checkable = false);
 
         ~Button() override;
 

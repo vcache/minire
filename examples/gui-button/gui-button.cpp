@@ -112,6 +112,11 @@ namespace
                     ._horizontal = Arranger(position::Center{}, dimension::Content{}),
                     ._vertical = Arranger(position::Center{}, dimension::Content{}),
                 },
+                Arrangers
+                {
+                    ._horizontal = Arranger(position::Center{}, dimension::Fraction{.5}),
+                    ._vertical = Arranger(position::Center{}, dimension::Fraction{.5}),
+                },
             };
 
             // build grid container
@@ -150,12 +155,16 @@ namespace
             {
                 size_t row = 0;
 
+                bool const isCheckable = i == 6;
+
                 // empty content
                 {
                     std::string cellId = fmt::format("{}x{}", row++, i);
                     auto button = container->at<Container>(cellId)
-                        .emplace<Button>("btn", kBg, std::nullopt, std::nullopt, kArrangers[i]);
+                        .emplace<Button>("btn", kBg, std::nullopt, std::nullopt, kArrangers[i], isCheckable);
                     button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
+                    button->setCheckedCallback([cellId](models::Checkable & c)
+                                               { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
                     _buttons.push_back(button);
                 }
 
@@ -164,8 +173,10 @@ namespace
                     Button::Icon icon {kAtlas, kIconRect};
                     std::string cellId = fmt::format("{}x{}", row++, i);
                     auto button = container->at<Container>(cellId)
-                        .emplace<Button>("btn", kBg, icon, std::nullopt, kArrangers[i]);
+                        .emplace<Button>("btn", kBg, icon, std::nullopt, kArrangers[i], isCheckable);
                     button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
+                    button->setCheckedCallback([cellId](models::Checkable & c)
+                                               { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
                     _buttons.push_back(button);
                 }
 
@@ -178,8 +189,10 @@ namespace
                     };
                     std::string cellId = fmt::format("{}x{}", row++, i);
                     auto button = container->at<Container>(cellId)
-                        .emplace<Button>("btn", kBg, std::nullopt, text, kArrangers[i]);
+                        .emplace<Button>("btn", kBg, std::nullopt, text, kArrangers[i], isCheckable);
                     button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
+                    button->setCheckedCallback([cellId](models::Checkable & c)
+                                               { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
                     _buttons.push_back(button);
                 }
 
@@ -207,8 +220,10 @@ namespace
 
                         std::string cellId = fmt::format("{}x{}", row++, i);
                         auto button = container->at<Container>(cellId)
-                            .emplace<Button>("btn", kBg, icon, text, kArrangers[i]);
+                            .emplace<Button>("btn", kBg, icon, text, kArrangers[i], isCheckable);
                         button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
+                        button->setCheckedCallback([cellId](models::Checkable & c)
+                                                   { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
                         _buttons.push_back(button);
                     }
                 }
