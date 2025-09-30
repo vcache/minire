@@ -48,6 +48,8 @@ namespace minire::gui
         {
             parent->_zOrderStore.insert(sharedThis);
         }
+
+        invalidateZOrder();
     }
 
     void Component::invalidateZOrder()

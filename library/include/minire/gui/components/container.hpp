@@ -44,6 +44,12 @@ namespace minire::gui::components
             auto [_, inserted] = _children.emplace(childId, ptr);
             MINIRE_INVARIANT(inserted, "failed to insert parent component: \"{}\" into \"{}\"",
                              childId, id());
+            if (!_zOrderStore.empty())
+            {
+                Component::Sptr const & last = *_zOrderStore.rbegin();
+                assert(last);
+                ptr->_zOrder = last->_zOrder + 1;
+            }
             _zOrderStore.emplace(ptr);
             updateChildrenContentArea(ptr);
             return ptr;
@@ -117,7 +123,8 @@ namespace minire::gui::components
         using Children = std::unordered_map<std::string, Component::Sptr>;
 
         Children         _children;
-        ZOrderStore      _zOrderStore;
+        ZOrderStore      _zOrderStore;  // NOTE: this is "logical zOrder"
+                                        // onZOrderChanged calcs "physical zOrder"
         Layout::Sptr     _layout;
 
         friend class Component;

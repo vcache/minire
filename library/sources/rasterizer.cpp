@@ -100,7 +100,7 @@ namespace minire
         _labels.predraw(_drawables);
         _sprites.predraw(_drawables);
 
-        // TODO: avoid sorting, use Z-buffer instead
+        // TODO: avoid sorting, use Z-buffer instead OR zOrder invalidation
         std::sort(_drawables.begin(), _drawables.end(),
             [](rasterizer::Drawable const * a, rasterizer::Drawable const * b)
             {
