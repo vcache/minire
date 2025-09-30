@@ -17,9 +17,10 @@ namespace minire::gui::components
                    MaybeIcon const & icon,
                    MaybeText const & text,
                    Arrangers arrangers,
-                   bool const checkable)
+                   bool const checkable,
+                   std::shared_ptr<models::ExclusiveGroup> const & exclGroup)
         : Component(controller, id, parent)
-        , Checkable(checkable)
+        , Checkable(checkable, exclGroup)
         , _background(background)
         , _icon(icon)
         , _text(text)

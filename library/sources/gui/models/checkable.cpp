@@ -4,9 +4,12 @@
 
 namespace minire::gui::models
 {
-    Checkable::Checkable(bool checkable)
+    Checkable::Checkable(bool checkable,
+                         ExclusiveGroupSptr const & exclGroup)
         : _checkable(checkable)
-    {}
+    {
+        setExclusiveGroup(exclGroup);
+    }
 
     Checkable::~Checkable()
     {

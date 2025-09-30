@@ -10,7 +10,10 @@ namespace minire::gui::models
     class Checkable
     {
     public:
-        explicit Checkable(bool checkable = false);
+        using ExclusiveGroupSptr = std::shared_ptr<ExclusiveGroup>;
+
+        explicit Checkable(bool checkable = false,
+                           ExclusiveGroupSptr const & = {});
 
         virtual ~Checkable();
 
@@ -35,7 +38,6 @@ namespace minire::gui::models
         }
 
     public:
-        using ExclusiveGroupSptr = std::shared_ptr<ExclusiveGroup>;
         void setExclusiveGroup(ExclusiveGroupSptr const &);
 
     protected:
