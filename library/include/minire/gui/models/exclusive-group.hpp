@@ -25,6 +25,8 @@ namespace minire::gui::models
 
         void select(Checkable *);
 
+        void select(Checkable & item) { select(&item); }
+
         void unselect();
 
         Checkable * selected() const { return _selected; }
