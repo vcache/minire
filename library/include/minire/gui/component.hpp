@@ -7,6 +7,7 @@
 #include <minire/gui/arranger.hpp>
 #include <minire/utils/rect.hpp>
 
+#include <any>
 #include <memory>
 #include <optional>
 #include <string>
@@ -66,6 +67,11 @@ namespace minire::gui
 
         template<typename T>
         T & as() { return dynamic_cast<T &>(*this); }
+
+    public:
+        std::any const & userData() const { return _userData; }
+
+        void setUserData(std::any v) { _userData = std::move(v); }
 
     protected:
         void invalidateZOrder();
@@ -142,6 +148,7 @@ namespace minire::gui
 
         GuiController   & _controller;
         std::string const _id;
+        std::any          _userData;
         ParentWptr        _parent;
         Arrangers         _arrangers;
         Area              _clientArea;
