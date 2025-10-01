@@ -139,6 +139,7 @@ namespace minire::utils
             return model.accessors[index];
         }
 
+        // TODO: this code is duplicated w/ buildMeshAabb() in aabb-tools.cpp
         Aabb calcAabb(::tinygltf::Accessor const & position,
                       std::string const & tag)
         {

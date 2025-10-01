@@ -1,3 +1,4 @@
+add_subdirectory(aabb-reader)
 add_subdirectory(bouncing-sprite)
 add_subdirectory(camera-switch)
 add_subdirectory(gl-application)

@@ -14,6 +14,8 @@
 
 #include <scene.hpp>
 #include <utils/gltf-buffer-reader.hpp>
+#include <utils/gltf-element-fetch.hpp>
+#include <utils/gltf-node-transform.hpp>
 #include <utils/overloaded.hpp>
 #include <utils/uuid.hpp>
 
@@ -24,7 +26,6 @@
 #include <memory>
 #include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -78,44 +79,12 @@ namespace minire::scene
             return std::get<std::shared_ptr<std::vector<T> const>>(it->second);
         }
 
-        template<typename T>
-        size_t getElementIndex(content::path::Component const & sceneId,
-                               std::vector<T> const & container,
-                               char const * kind)
-        {
-            return std::visit(utils::Overloaded
-                {
-                    [&container, kind](content::path::Index index) -> size_t
-                    {
-                        MINIRE_INVARIANT(index < container.size(),
-                             "bad {} index ({} >= {})",
-                             kind, index, container.size());
-                        return index;
-                    },
-                    [&container, kind](content::Id const & name) -> size_t
-                    {
-                        for(size_t i = 0; i < container.size(); ++i)
-                        {
-                            if (container[i].name == name)
-                                return i;
-                        }
-                        MINIRE_THROW("no such {}: \"{}\"", kind, name);
-                    },
-                    [](auto const & v) -> size_t
-                    {
-                        using U = std::decay_t<decltype(v)>;
-                        MINIRE_THROW("unexpected path component type (not a string or size_t): {}",
-                                     utils::demangle<U>());
-                    }
-                }, sceneId);
-        }
-
         void instantiateGltfCamera(Scene & scene,
                                    events::controller::SceneNewFromSource const & e,
                                    ::tinygltf::Model const & model,
                                    content::path::Component const & cameraId)
         {
-            size_t const cameraIndex = getElementIndex(cameraId, model.cameras, "camera");
+            size_t const cameraIndex = utils::getElementIndex(cameraId, model.cameras, "camera");
             ::tinygltf::Camera const & camera = model.cameras[cameraIndex];
 
             if (camera.type == "perspective")
@@ -172,7 +141,7 @@ namespace minire::scene
                                  ::tinygltf::Model const & model,
                                  content::path::Component const & meshId)
         {
-            size_t const meshIndex = getElementIndex(meshId, model.meshes, "mesh");
+            size_t const meshIndex = utils::getElementIndex(meshId, model.meshes, "mesh");
             ::tinygltf::Mesh const & mesh = model.meshes[meshIndex];
             scene.handle(events::controller::SceneNewMesh
             {
@@ -196,7 +165,7 @@ namespace minire::scene
                                   ::tinygltf::Model const & model,
                                   content::path::Component const & lightId)
         {
-            size_t const lightIndex = getElementIndex(lightId, model.lights, "camera");
+            size_t const lightIndex = utils::getElementIndex(lightId, model.lights, "camera");
             ::tinygltf::Light const & light = model.lights[lightIndex];
 
             if (light.type == "point")
@@ -235,7 +204,7 @@ namespace minire::scene
                                  Context & context)
         {
             //  check preconditions
-            size_t const nodeIndex = getElementIndex(nodeId, model.nodes, "node");
+            size_t const nodeIndex = utils::getElementIndex(nodeId, model.nodes, "node");
             ::tinygltf::Node const & node = model.nodes[nodeIndex];
 
             MINIRE_INVARIANT(node.lods.empty(), "MSFT_lod isn't supported: {}", e._source);
@@ -246,52 +215,7 @@ namespace minire::scene
 
             // create a node itself
 
-            models::Transform transform;
-
-            if (node.matrix.empty())
-            {
-                assert(transform._rotation == glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
-                if (!node.rotation.empty())
-                {
-                    MINIRE_INVARIANT(node.rotation.size() == 4,
-                                     "expected 4 components of rotation, but got {}: {}",
-                                     node.rotation.size(), e._source);
-                    transform._rotation = glm::quat(node.rotation[3],  // w
-                                                    node.rotation[0],  // x
-                                                    node.rotation[1],  // y
-                                                    node.rotation[2]); // z
-                }
-
-                assert(transform._scale == glm::vec3(1.0f));
-                if (!node.scale.empty())
-                {
-                    MINIRE_INVARIANT(node.scale.size() == 3,
-                                     "expected 3 components of scale, but got {}: {}",
-                                     node.scale.size(), e._source);
-                    transform._scale = glm::vec3(node.scale[0],    // x
-                                                 node.scale[1],    // y
-                                                 node.scale[2]);   // z
-                }
-
-                assert(transform._translation == glm::vec3(0.0f));
-                if (!node.translation.empty())
-                {
-                    MINIRE_INVARIANT(node.translation.size() == 3,
-                                     "expected 3 components of translation, but got {}: {}",
-                                     node.translation.size(), e._source);
-                    transform._translation = glm::vec3(node.translation[0],    // x
-                                                       node.translation[1],    // y
-                                                       node.translation[2]);   // z
-                }
-            }
-            else
-            {
-                MINIRE_INVARIANT(node.matrix.size() == 16,
-                                 "expected 16 components of transform matrix, but got {}: {}",
-                                 node.matrix.size(), e._source);
-                // a column-major order is both in glTF and GLM
-                transform.loadFromMatrix(glm::make_mat4x4(node.matrix.data()));
-            }
+            models::Transform transform = utils::getNodeTransform(node);
 
             events::controller::SceneNewNode newNode
             {
@@ -454,7 +378,7 @@ namespace minire::scene
                                   content::path::Component const & sceneId,
                                   Context & context)
         {
-            size_t const sceneIndex = getElementIndex(sceneId, model.scenes, "scene");
+            size_t const sceneIndex = utils::getElementIndex(sceneId, model.scenes, "scene");
             ::tinygltf::Scene const & gltfScene = model.scenes[sceneIndex];
 
             if (!gltfScene.audioEmitters.empty())

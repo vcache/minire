@@ -11,6 +11,8 @@
 
 namespace minire::content
 {
+    // TODO: all items should be Sptr to decrease the size of an Asset
+    //       TODO: don't forget to check std::visits w/ (auto &)
     using Asset = std::variant<std::monostate,
                                std::string,
                                formats::Bdf::Sptr,

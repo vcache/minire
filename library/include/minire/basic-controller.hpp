@@ -1,8 +1,10 @@
 #pragma once
 
 #include <minire/content/id.hpp>
+#include <minire/content/path.hpp>
 #include <minire/events/application.hpp>
 #include <minire/events/controller.hpp>
+#include <minire/utils/aabb.hpp>
 #include <minire/utils/barrier.hpp>
 
 #include <atomic>
@@ -64,6 +66,8 @@ namespace minire
 
         glm::vec2 measure(text::FormattedString const &,
                           models::FontFace const &) const;
+
+        utils::Aabb measure(content::Path const &) const;
 
         /**
          * When low lantecy input mode is enabled, messages from an Application

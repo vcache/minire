@@ -1,8 +1,11 @@
 #pragma once
 
-#include <glm/vec3.hpp>
+#include <minire/logging/formatters.hpp>
+
+#include <fmt/format.h>
 #include <glm/common.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/vec3.hpp>
 
 #include <array>
 #include <cmath>
@@ -46,7 +49,7 @@ namespace minire::utils
             _max = glm::max(_max, v._max);
         }
 
-        void transform(glm::mat4 const & transform, Aabb & out) const
+        void transform(glm::mat4 const & transform)
         {
             std::array<glm::vec4, 8> const vertices {
                 transform * glm::vec4(_min.x, _min.y, _min.z, 1.0f),
@@ -59,20 +62,14 @@ namespace minire::utils
                 transform * glm::vec4(_max.x, _max.y, _max.z, 1.0f),
             };
 
-            glm::vec4 min(vertices[0]);
-            glm::vec4 max(vertices[0]);
+            _min = vertices[0];
+            _max = vertices[0];
             for(glm::vec4 const & i : vertices)
             {
-                min = glm::min(min, i);
-                max = glm::max(max, i);
+                glm::vec3 vtx(i);
+                _min = glm::min(_min, vtx);
+                _max = glm::max(_max, vtx);
             }
-
-            out._min.x = min.x;
-            out._min.y = min.y;
-            out._min.z = min.z;
-            out._max.x = max.x;
-            out._max.y = max.y;
-            out._max.z = max.z;
         }
 
     private:
@@ -80,3 +77,15 @@ namespace minire::utils
         glm::vec3 _max;
     };
 }
+
+template <typename T>
+struct fmt::formatter<T, std::enable_if_t<std::is_same_v<T, ::minire::utils::Aabb>, char>>
+    : fmt::formatter<std::string>
+{
+    template <typename FormatCtx>
+    auto format(T const & value, FormatCtx & ctx) const
+    {
+        return fmt::formatter<std::string>::format(
+            fmt::format("{} - {}", value.min(), value.max()), ctx);
+    }
+};

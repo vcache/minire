@@ -5,8 +5,9 @@
 #include <minire/logging.hpp>
 #include <minire/utils/unow.hpp>
 
-#include <utils/fps-counter.hpp>
+#include <minire/utils/aabb-tools.hpp>
 #include <text/measurer.hpp>
+#include <utils/fps-counter.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -225,7 +226,11 @@ namespace minire
                                        models::FontFace const & fontFace) const
     {
         return text::measure(text, fontFace);
+    }
 
+    utils::Aabb BasicController::measure(content::Path const & path) const
+    {
+        return utils::buildAabb(_contentManager, path);
     }
 
     void BasicController::setLowLatencyInput(bool enabled)

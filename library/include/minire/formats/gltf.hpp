@@ -1,5 +1,6 @@
 #pragma once
 
+// TODO: should not expose these in a public header
 #define TINYGLTF_NO_INCLUDE_JSON
 #define TINYGLTF_NO_INCLUDE_STB_IMAGE
 #define TINYGLTF_NO_STB_IMAGE_WRITE
