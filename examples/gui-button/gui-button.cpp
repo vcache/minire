@@ -25,29 +25,6 @@ namespace
         using GuiController::GuiController;
 
     protected:
-
-        void handle(minire::events::application::OnKeyDown const & e)
-        {
-            GuiController::handle(e);
-
-            if (e._key == SDLK_TAB)
-            {
-                using namespace minire::gui::components;
-                for(auto & component : _buttons)
-                {
-                    auto & button = component->as<minire::gui::components::Button>();
-                    if (button.contentMargin()._left == 0)
-                    {
-                        button.setContentMargin(minire::utils::Rect(10.0f));
-                    }
-                    else
-                    {
-                        button.setContentMargin(minire::utils::Rect(0.0f));
-                    }
-                }
-            }
-        }
-
         void start() override
         {
             GuiController::start();
@@ -259,6 +236,26 @@ namespace
                     }
                 }
             }
+
+            // set hot keys
+
+            set(SDL_SCANCODE_TAB, 0, [this](::SDL_Scancode, uint16_t) -> bool
+            {
+                using namespace minire::gui::components;
+                for(auto & component : _buttons)
+                {
+                    auto & button = component->as<minire::gui::components::Button>();
+                    if (button.contentMargin()._left == 0)
+                    {
+                        button.setContentMargin(minire::utils::Rect(10.0f));
+                    }
+                    else
+                    {
+                        button.setContentMargin(minire::utils::Rect(0.0f));
+                    }
+                }
+                return true;
+            });
         }
 
     private:

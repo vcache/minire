@@ -281,19 +281,19 @@ namespace minire
     
     void BasicController::handle(events::application::OnResize const &) {}
     
-    void BasicController::handle(events::application::OnMouseWheel const &) {}
+    bool BasicController::handle(events::application::OnMouseWheel const &) { return false; }
     
-    void BasicController::handle(events::application::OnMouseMove const &) {}
+    bool BasicController::handle(events::application::OnMouseMove const &) { return false; }
     
-    void BasicController::handle(events::application::OnMouseDown const &) {}
+    bool BasicController::handle(events::application::OnMouseDown const &) { return false; }
     
-    void BasicController::handle(events::application::OnMouseUp const &) {}
+    bool BasicController::handle(events::application::OnMouseUp const &) { return false; }
     
-    void BasicController::handle(events::application::OnKeyUp const &) {}
+    bool BasicController::handle(events::application::OnKeyUp const &) { return false; }
     
-    void BasicController::handle(events::application::OnKeyDown const &) {}
+    bool BasicController::handle(events::application::OnKeyDown const &) { return false; }
 
-    void BasicController::handle(events::application::OnTextInput const &) {}
+    bool BasicController::handle(events::application::OnTextInput const &) { return false; }
 
     void BasicController::handle(events::application::OnRayCaster const &) {}
 }

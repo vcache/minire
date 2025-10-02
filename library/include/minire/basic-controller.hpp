@@ -101,15 +101,37 @@ namespace minire
         virtual void finish();
 
     protected:
+        // NOTE: input events are returning boolean value that
+        //       indicates a consumation of an event.
+        //       Normally, consumed events shouldn't be processed
+        //       by a descendant classes. The following pattern is
+        //       recommended (usually make sense w/ GuiController):
+        //
+        //       class Foo : public BasicController // or GuiController
+        //       {
+        //           bool handle(OnMouseDown const & e) override
+        //           {
+        //               if (BasicController::handle(e))
+        //                   return true;
+        //               ...
+        //               return true;
+        //           }
+        //       };
+        //
+        //       It is also legal to not call Base class's handle in
+        //       situations when descedant intend to capture inputs
+        //       exclusively (for example, when moving a camera by a
+        //       mouse and need to prevent activation of GUI elements).
+
         virtual void handle(events::application::OnFps const &);
         virtual void handle(events::application::OnResize const &);
-        virtual void handle(events::application::OnMouseWheel const &);
-        virtual void handle(events::application::OnMouseMove const &);
-        virtual void handle(events::application::OnMouseDown const &);
-        virtual void handle(events::application::OnMouseUp const &);
-        virtual void handle(events::application::OnKeyUp const &);
-        virtual void handle(events::application::OnKeyDown const &);
-        virtual void handle(events::application::OnTextInput const &);
+        virtual bool handle(events::application::OnMouseWheel const &);
+        virtual bool handle(events::application::OnMouseMove const &);
+        virtual bool handle(events::application::OnMouseDown const &);
+        virtual bool handle(events::application::OnMouseUp const &);
+        virtual bool handle(events::application::OnKeyUp const &);
+        virtual bool handle(events::application::OnKeyDown const &);
+        virtual bool handle(events::application::OnTextInput const &);
         virtual void handle(events::application::OnRayCaster const &);
 
         virtual void postprocess();

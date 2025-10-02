@@ -33,14 +33,18 @@ namespace minire
 
         void handle(events::application::OnResize const &)  override;
 
+        // NOTE: Descendant classes SHOULD call GuiController::handle
+        //       before its own implementation.
+        //       For details, see notes in basic-controller.hpp.
+
         void handle(events::application::OnFps const &) override;
-        void handle(events::application::OnMouseWheel const &) override;
-        void handle(events::application::OnMouseMove const &) override;
-        void handle(events::application::OnMouseDown const &) override;
-        void handle(events::application::OnMouseUp const &) override;
-        void handle(events::application::OnKeyUp const &) override;
-        void handle(events::application::OnKeyDown const &) override;
-        void handle(events::application::OnTextInput const &) override;
+        bool handle(events::application::OnMouseWheel const &) override;
+        bool handle(events::application::OnMouseMove const &) override;
+        bool handle(events::application::OnMouseDown const &) override;
+        bool handle(events::application::OnMouseUp const &) override;
+        bool handle(events::application::OnKeyUp const &) override;
+        bool handle(events::application::OnKeyDown const &) override;
+        bool handle(events::application::OnTextInput const &) override;
         void handle(events::application::OnRayCaster const &) override;
 
         gui::components::Container const & guiRoot() const

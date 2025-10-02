@@ -63,7 +63,7 @@ namespace
                 true);
         }
 
-        void handle(minire::events::application::OnMouseMove const & event) override
+        bool handle(minire::events::application::OnMouseMove const & event) override
         {
             using namespace minire::events::controller;
             using namespace minire::models;
@@ -99,25 +99,30 @@ namespace
                 _orbiting.evaluate(_cameraTransform);
                 enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
             }
+
+            return true;
         }
 
-        void handle(minire::events::application::OnMouseDown const & e) override
+        bool handle(minire::events::application::OnMouseDown const & e) override
         {
             if (e._mouseButton == minire::models::MouseButton::kRight)
             {
                 _panning.start(e._x, e._y);
             }
+
+            return true;
         }
 
-        void handle(minire::events::application::OnMouseUp const &) override
+        bool handle(minire::events::application::OnMouseUp const &) override
         {
             if (_panning)
             {
                 _panning.finish(_target);
             }
+            return true;
         }
 
-        void handle(minire::events::application::OnMouseWheel const & event) override
+        bool handle(minire::events::application::OnMouseWheel const & event) override
         {
             using namespace minire::events::controller;
             using namespace minire::models;
@@ -129,6 +134,7 @@ namespace
             _orthographicCamera._xMag = _orthographicCamera._yMag = _orbiting.distance() / 2.0f;
             enqueue<SceneSetOrthographicCamera>(ScenePath{"cam-node", "ortho-cam"},
                                                 _orthographicCamera);
+            return true;
         }
 
         void handle(minire::events::application::OnResize const & e) override
@@ -137,7 +143,7 @@ namespace
             _windowSize.y = static_cast<float>(e._height);
         }
 
-        void handle(minire::events::application::OnKeyDown const & e)
+        bool handle(minire::events::application::OnKeyDown const & e)
         {
             if (e._key == SDLK_c)
             {
@@ -148,6 +154,7 @@ namespace
                 using namespace minire::models;
                 enqueue<SceneActivateCamera>(ScenePath{"cam-node", _isPerspective ? "persp-cam" : "ortho-cam"});
             }
+            return true;
         }
 
     private:

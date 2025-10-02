@@ -216,7 +216,7 @@ namespace
             }
         }
 
-        void handle(minire::events::application::OnMouseMove const & event) override
+        bool handle(minire::events::application::OnMouseMove const & event) override
         {
             using namespace minire::events::controller;
             using namespace minire::models;
@@ -242,25 +242,29 @@ namespace
                 _orbiting.evaluate(_cameraTransform);
                 enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
             }
+
+            return true;
         }
 
-        void handle(minire::events::application::OnMouseDown const & e) override
+        bool handle(minire::events::application::OnMouseDown const & e) override
         {
             if (e._mouseButton == minire::models::MouseButton::kRight)
             {
                 _panning.start(e._x, e._y);
             }
+            return true;
         }
 
-        void handle(minire::events::application::OnMouseUp const &) override
+        bool handle(minire::events::application::OnMouseUp const &) override
         {
             if (_panning)
             {
                 _panning.finish(_target);
             }
+            return true;
         }
 
-        void handle(minire::events::application::OnMouseWheel const & event) override
+        bool handle(minire::events::application::OnMouseWheel const & event) override
         {
             using namespace minire::events::controller;
             using namespace minire::models;
@@ -268,6 +272,8 @@ namespace
             _orbiting.updateDistance(-0.5f * event._dy);
             _orbiting.evaluate(_cameraTransform);
             enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
+
+            return true;
         }
 
         void handle(minire::events::application::OnResize const & e) override

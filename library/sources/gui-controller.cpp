@@ -45,23 +45,30 @@ namespace minire
         BasicController::handle(e);
     }
 
-    void GuiController::handle(events::application::OnMouseWheel const & e)
+    bool GuiController::handle(events::application::OnMouseWheel const & e)
     {
-        BasicController::handle(e);
+        if(BasicController::handle(e))
+            return true;
 
         if (auto focused = _guiFocused.lock(); focused)
         {
             focused->onEvent(e);
+            return true;
         }
         else if (auto destination = hovered(); destination)
         {
             destination->onEvent(e);
+            return true;
         }
+
+        return false;
     }
 
-    void GuiController::handle(events::application::OnMouseMove const & e)
+    bool GuiController::handle(events::application::OnMouseMove const & e)
     {
-        BasicController::handle(e);
+        if(BasicController::handle(e))
+            return true;
+
         assert(_guiRoot);
 
         _mouseX = e._absX;
@@ -69,22 +76,34 @@ namespace minire
         _mouseUpdated = true;
 
         if (auto destination = hovered(); destination)
+        {
             destination->onEvent(e);
+            return true;
+        }
+
+        return false;
     }
 
-    void GuiController::handle(events::application::OnMouseDown const & e)
+    bool GuiController::handle(events::application::OnMouseDown const & e)
     {
-        BasicController::handle(e);
+        if(BasicController::handle(e))
+            return true;
+
         if (auto destination = hovered(); destination)
         {
             _guiToClick = destination;
             destination->onEvent(e);
+            return true;
         }
+
+        return false;
     }
 
-    void GuiController::handle(events::application::OnMouseUp const & e)
+    bool GuiController::handle(events::application::OnMouseUp const & e)
     {
-        BasicController::handle(e);
+        if(BasicController::handle(e))
+            return true;
+
         if (auto destination = hovered(); destination)
         {
             destination->onEvent(e);
@@ -94,32 +113,60 @@ namespace minire
             {
                 clickTarget->onClick();
             }
+
+            return true;
         }
+
         _guiToClick.reset();
+
+        return false;
     }
 
-    void GuiController::handle(events::application::OnKeyUp const & e)
+    bool GuiController::handle(events::application::OnKeyUp const & e)
     {
-        BasicController::handle(e);
+        if(BasicController::handle(e))
+            return true;
+
         if (auto focused = _guiFocused.lock(); focused)
+        {
             focused->onEvent(e);
+            return true;
+        }
+
+        return false;
     }
 
-    void GuiController::handle(events::application::OnKeyDown const & e)
+    bool GuiController::handle(events::application::OnKeyDown const & e)
     {
-        BasicController::handle(e);
+        if(BasicController::handle(e))
+            return true;
+
         if (_guiHotKeys.handle(e))
-            return;
+        {
+            return true;
+        }
 
         if (auto focused = _guiFocused.lock(); focused)
+        {
             focused->onEvent(e);
+            return true;
+        }
+
+        return false;
     }
 
-    void GuiController::handle(events::application::OnTextInput const & e)
+    bool GuiController::handle(events::application::OnTextInput const & e)
     {
-        BasicController::handle(e);
+        if(BasicController::handle(e))
+            return true;
+
         if (auto focused = _guiFocused.lock(); focused)
+        {
             focused->onEvent(e);
+            return true;
+        }
+
+        return false;
     }
 
     void GuiController::handle(events::application::OnRayCaster const & e)
