@@ -226,10 +226,13 @@ namespace minire
         if (_mouseUpdated)
         {
             assert(_guiRoot);
-            auto result = _guiRoot->findUnderCursor(_mouseX, _mouseY);
-            setHover(result);
-            _mouseUpdated = false;
-            return result;
+            if (auto result = _guiRoot->findUnderCursor(_mouseX, _mouseY);
+                result != _guiRoot)
+            {
+                setHover(result);
+                _mouseUpdated = false;
+                return result;
+            }
         }
 
         return {};
