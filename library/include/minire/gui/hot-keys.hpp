@@ -19,6 +19,6 @@ namespace minire::gui
         bool handle(events::application::OnKeyDown const & e) const;
 
     private:
-        std::unordered_map<models::KeyCombo, Handler> _store;
+        std::unordered_map<minire::models::KeyCombo, Handler> _store;
     };
 }
