@@ -64,10 +64,20 @@ namespace minire
         gui::Component::Sptr hovered();
 
     private:
+        // TODO: mouse-based events must be cancelled if some of
+        //       SDL_WindowEvent have happened (alt+tab, minimization,
+        //       unfocus, etc)
+
         gui::components::Container::Sptr _guiRoot;
         gui::Component::Wptr             _guiFocused;
         gui::Component::Wptr             _guiHovered;
         gui::Component::Wptr             _guiToClick;
+
+        // TODO: hot keys must be cleared if some of SDL_WindowEvent
+        //       have happened (alt+tab, minimization, unfocus, etc)
+        // TODO: hot keys must fire an action not at KeyDown, but on
+        //       a KeyUp and only if corresponding keys were pressed
+        //       before (on an KeyDown event)
         gui::HotKeys                     _guiHotKeys;
 
         float                            _mouseX = -1;

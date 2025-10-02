@@ -19,11 +19,11 @@ namespace minire::gui
         if (visible == _visible)
             return;
 
-        if (_visible)
-            rearrange(true);
-
         _visible = visible;
         onVisibleChanged();
+
+        if (_visible)
+            rearrange(true);
     }
 
     // NOTE: std::set cannot be re-ordered automatically just by
