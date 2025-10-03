@@ -57,5 +57,7 @@ namespace minire::models
                    glm::toMat4(_rotation) *
                    glm::scale(_scale);
         }
+
+        bool operator==(Transform const &) const = default;
     };
 }
