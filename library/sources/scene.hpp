@@ -54,6 +54,7 @@ namespace minire
         void handle(events::controller::SceneSetPointLight const &, size_t epochNumber);
         void handle(events::controller::SceneSetPerspectiveCamera const &, size_t epochNumber);
         void handle(events::controller::SceneSetOrthographicCamera const &, size_t epochNumber);
+        void handle(events::controller::SceneSetMeshAmbientLight const &);
         void handle(events::controller::SceneNewAnimationSet const &);
         void handle(events::controller::ScenePlayAnimation const &);
         void handle(events::controller::SceneStopAnimation const &);
@@ -85,7 +86,8 @@ namespace minire
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
                         assert(parent->hasGlobalTransform());
                         assert(mesh->_mesh);
-                        callable(*mesh->_mesh, parent->_globalTransform);
+                        callable(*mesh->_mesh, mesh->_ambientLight,
+                                 parent->_globalTransform);
                     }
 
                     ++it;
@@ -164,6 +166,7 @@ namespace minire
             using ElementType = std::shared_ptr<rasterizer::Mesh>;
 
             ElementType _mesh;
+            glm::vec4   _ambientLight = glm::vec4(0); // TODO: is not lerpable?
 
             explicit Mesh(ElementType mesh)
                 : _mesh(mesh)

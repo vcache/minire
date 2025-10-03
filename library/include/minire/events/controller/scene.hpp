@@ -10,6 +10,7 @@
 #include <minire/models/transform.hpp>
 
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 #include <limits>
 #include <string>
@@ -89,6 +90,15 @@ namespace minire::events::controller
     using SceneSetPointLight = impl::SceneItemModifier<models::PointLight>;
     using SceneSetPerspectiveCamera = impl::SceneItemModifier<models::PerspectiveCamera>;
     using SceneSetOrthographicCamera = impl::SceneItemModifier<models::OrthographicCamera>;
+
+    // Special effects
+
+    // (x, y, z) is a color, "w" is a factor (0 - don't override, 1 - full override).
+    // Resulting is AmbientLight = mix(SceneAmbientLight,
+    //                                 MeshAmbientLight.xyz,
+    //                                 MeshAmbientLight.w);
+    // Default is (0, 0, 0, 0).
+    using SceneSetMeshAmbientLight = impl::SceneItemModifier<glm::vec4>;
 
     // Animations
 

@@ -103,6 +103,7 @@ namespace minire
         void handle(events::controller::SceneNewPointLight const &);
         void handle(events::controller::SceneNewPerspectiveCamera const &);
         void handle(events::controller::SceneNewOrthographicCamera const &);
+        void handle(events::controller::SceneSetMeshAmbientLight const &);
         void handle(events::controller::SceneSetParent const &);
         void handle(events::controller::SceneSetVisibility const &);
         void handle(events::controller::SceneSetTransform const &);

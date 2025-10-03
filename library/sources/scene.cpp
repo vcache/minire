@@ -297,6 +297,13 @@ namespace minire
         activate(*orthographicCamera);
     }
 
+    void Scene::handle(events::controller::SceneSetMeshAmbientLight const & e)
+    {
+        auto mesh = find<MeshLeaf::Sptr>(e._item);
+        assert(mesh);
+        mesh->_ambientLight = e._attribute;
+    }
+
     void Scene::handle(events::controller::SceneNewAnimationSet const & e)
     {
         Node::Sptr containerNode = find<Node::Sptr>(e._containerNode);
@@ -384,6 +391,7 @@ namespace minire
     {
         static_assert(std::is_same_v<T, Node::Child> ||
                       std::is_same_v<T, Node::Sptr> ||
+                      std::is_same_v<T, MeshLeaf::Sptr> ||
                       std::is_same_v<T, PointLightLeaf::Sptr> ||
                       std::is_same_v<T, PerspectiveCameraLeaf::Sptr> ||
                       std::is_same_v<T, OrthographicCameraLeaf::Sptr> ||
@@ -422,6 +430,7 @@ namespace minire
         }
 
         if constexpr(std::is_same_v<T, Node::Sptr> ||
+                     std::is_same_v<T, MeshLeaf::Sptr> ||
                      std::is_same_v<T, PointLightLeaf::Sptr> ||
                      std::is_same_v<T, PerspectiveCameraLeaf::Sptr> ||
                      std::is_same_v<T, OrthographicCameraLeaf::Sptr>)

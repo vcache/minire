@@ -448,6 +448,11 @@ namespace minire
         _scene->handle(e);
     }
 
+    void Application::handle(events::controller::SceneSetMeshAmbientLight const & e)
+    {
+        _scene->handle(e);
+    }
+
     void Application::handle(events::controller::SceneSetParent const & e)
     {
         _scene->handle(e);
