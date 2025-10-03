@@ -114,6 +114,8 @@ namespace minire
                 clickTarget->onClick();
             }
 
+            _guiToClick.reset();
+
             return true;
         }
 
