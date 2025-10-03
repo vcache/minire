@@ -17,7 +17,7 @@
 
 namespace
 {
-    class AmbientLight
+    class MeshEmissiveFactor
         : public minire::BasicController
     {
     private:
@@ -37,9 +37,9 @@ namespace
         }
 
     public:
-        explicit AmbientLight(minire::content::Manager & contentManager)
+        explicit MeshEmissiveFactor(minire::content::Manager & contentManager)
             : BasicController(contentManager, 60)
-            , _sceneAmbientLights
+            , _emissiveFactors
             {
                 glm::vec3(0, 0, 0),
                 glm::vec3(0, 0, 1),
@@ -85,8 +85,6 @@ namespace
                     }()
                 },
                 true);
-
-            enqueue<SceneSetAmbientLight>(_sceneAmbientLights[0]);
         }
 
         bool handle(minire::events::application::OnKeyDown const & e) override
@@ -98,10 +96,9 @@ namespace
 
             if (e._key == SDLK_TAB)
             {
-                _sceneAmbientLight = (_sceneAmbientLight + 1) % _sceneAmbientLights.size();
-                MINIRE_INFO("Scene ambient light is set to ({}): {}",
-                            _sceneAmbientLight, _sceneAmbientLights[_sceneAmbientLight]);
-                enqueue<SceneSetAmbientLight>(_sceneAmbientLights[_sceneAmbientLight]);
+                _emissiveFactorsIndex = (_emissiveFactorsIndex + 1) % _emissiveFactors.size();
+                MINIRE_INFO("Mesh emissive factor is set to ({}): {}",
+                            _emissiveFactorsIndex, _emissiveFactors[_emissiveFactorsIndex]);
             }
 
             return true;
@@ -120,13 +117,14 @@ namespace
             enqueue<SceneSetTransform>(ScenePath{"cube-node"}, _cubeTransform);
 
             float const w = (1.0f + std::sin(_absoluteTime * 10.0f)) / 2.0f;
-            enqueue<SceneSetMeshAmbientLight>(ScenePath{"cube-node", "cube"},
-                                              glm::vec4(0, 1, 0, w));
+            enqueue<SceneSetMeshEmissiveFactor>(
+                ScenePath{"cube-node", "cube"},
+                _emissiveFactors[_emissiveFactorsIndex] * w);
         }
 
     private:
-        size_t                       _sceneAmbientLight = 0;
-        std::vector<glm::vec3> const _sceneAmbientLights;
+        size_t                       _emissiveFactorsIndex = 0;
+        std::vector<glm::vec3> const _emissiveFactors;
         minire::models::Transform    _cubeTransform;
         float                        _absoluteTime = 0;
     };
@@ -144,8 +142,8 @@ int main()
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
 
         // Create and run the Application and its Controller
-        minire::Application application(1280, 720, "Ambient Light", manager);
-        application.setController<AmbientLight>();
+        minire::Application application(1280, 720, "Emissive Factor", manager);
+        application.setController<MeshEmissiveFactor>();
         application.setVsync(true);
         application.setGlDebug(false);
 

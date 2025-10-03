@@ -36,7 +36,8 @@ namespace minire::rasterizer
 
         // assuming that caller will "use" gl's program!
         void draw(glm::mat4 const &,
-                  glm::vec3 const & ambientLight) const;
+                  glm::vec3 const & ambientLight,
+                  glm::vec3 const & emissiveFactor) const;
 
         utils::Aabb const & aabb() const { return _aabb; }
 

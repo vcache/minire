@@ -67,7 +67,8 @@ namespace minire::material
         // Assuming that the next call will be glDrawArrays or glDrawElements
         virtual void prepareDrawing(Instance const &,
                                     glm::mat4 const & modelTransform,
-                                    glm::vec3 const & ambientLight) const = 0;
+                                    glm::vec3 const & ambientLight,
+                                    glm::vec3 const & emissiveFactor) const = 0;
 
         virtual opengl::Program const & glProgram() const = 0;
 

@@ -297,11 +297,11 @@ namespace minire
         activate(*orthographicCamera);
     }
 
-    void Scene::handle(events::controller::SceneSetMeshAmbientLight const & e)
+    void Scene::handle(events::controller::SceneSetMeshEmissiveFactor const & e)
     {
         auto mesh = find<MeshLeaf::Sptr>(e._item);
         assert(mesh);
-        mesh->_ambientLight = e._attribute;
+        mesh->_emissiveFactor = e._attribute;
     }
 
     void Scene::handle(events::controller::SceneNewAnimationSet const & e)

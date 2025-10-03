@@ -107,7 +107,8 @@ namespace minire::rasterizer::materials
 
     void PbrProgram::prepareDrawing(material::Instance const & instance,
                                     glm::mat4 const & modelTransform,
-                                    glm::vec3 const & ambientLight) const
+                                    glm::vec3 const & ambientLight,
+                                    glm::vec3 const & emissiveFactor) const
     {
         _program.use();
 
@@ -142,7 +143,7 @@ namespace minire::rasterizer::materials
         PbrInstance::setUniform(pbrInstance._aoStrength, _program, _aoStrength);
 
         texUnit += PbrInstance::setUniform(pbrInstance._emissiveTexture, _program, _emissiveTexture, texUnit);
-        PbrInstance::setUniform(pbrInstance._emissiveFactor, _program, _emissiveFactor);
+        PbrInstance::setUniform(pbrInstance._emissiveFactor + emissiveFactor, _program, _emissiveFactor);
     }
 
     material::Program::Locations PbrProgram::locations() const

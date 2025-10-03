@@ -212,7 +212,8 @@ namespace minire::rasterizer
     }
 
     void Mesh::draw(glm::mat4 const & modelTransform,
-                    glm::vec3 const & ambientLight) const
+                    glm::vec3 const & ambientLight,
+                    glm::vec3 const & emissiveFactor) const
     {
         for(Material const & material : _materials)
         {
@@ -220,7 +221,8 @@ namespace minire::rasterizer
             assert(material._matInstance);
             material._matProgram->prepareDrawing(*(material._matInstance),
                                                    modelTransform,
-                                                   ambientLight);
+                                                   ambientLight,
+                                                   emissiveFactor);
             for(size_t const primIndex : material._primitives)
             {
                 assert(primIndex < _primitives.size());

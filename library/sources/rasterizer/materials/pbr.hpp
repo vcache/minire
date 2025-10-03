@@ -57,7 +57,8 @@ namespace minire::rasterizer::materials
     public:
         void prepareDrawing(material::Instance const &,
                             glm::mat4 const & modelTransform,
-                            glm::vec3 const & ambientLight) const override;
+                            glm::vec3 const & ambientLight,
+                            glm::vec3 const & emissiveFactor) const override;
 
         opengl::Program const & glProgram() const override { return _program; }
 

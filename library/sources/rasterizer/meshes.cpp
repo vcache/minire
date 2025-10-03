@@ -54,14 +54,11 @@ namespace minire::rasterizer
     {
         // TODO: group models by a material signature (to avoid frequent program switch)
         scene.cullModels(
-            [&sceneAmbientLight = scene.ambientLight()]
-            (Mesh const & mesh, glm::vec4 const & meshAmbientLight,
+            [&ambientLight = scene.ambientLight()]
+            (Mesh const & mesh, glm::vec3 const & emissiveFactor,
              glm::mat4 const & transform)
             {
-                glm::vec3 ambientLight = glm::mix(sceneAmbientLight,
-                                                  glm::vec3(meshAmbientLight),
-                                                  meshAmbientLight.w);
-                mesh.draw(transform, ambientLight);
+                mesh.draw(transform, ambientLight, emissiveFactor);
             }
         );
     }
