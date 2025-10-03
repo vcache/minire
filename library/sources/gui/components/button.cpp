@@ -3,6 +3,7 @@
 #include <minire/basic-controller.hpp>
 #include <minire/errors.hpp>
 #include <minire/events/controller.hpp>
+#include <minire/models/mouse-button.hpp>
 #include <utils/overloaded.hpp>
 #include <utils/uuid.hpp>
 
@@ -283,19 +284,22 @@ namespace minire::gui::components
         return offset;
     }
 
-    void Button::onEvent(events::application::OnMouseDown const &)
+    void Button::onEvent(events::application::OnMouseDown const & e)
     {
-        if (checkable())
+        if (e._mouseButton == minire::models::MouseButton::kLeft)
         {
-            if (checked() && !canUncheck())
-                return;
+            if (checkable())
+            {
+                if (checked() && !canUncheck())
+                    return;
 
-            setState(checked() ? State::kNormal
-                               : State::kPressed);
-        }
-        else
-        {
-            setState(State::kPressed);
+                setState(checked() ? State::kNormal
+                                   : State::kPressed);
+            }
+            else
+            {
+                setState(State::kPressed);
+            }
         }
     }
 

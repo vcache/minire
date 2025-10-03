@@ -11,6 +11,8 @@ namespace minire::gui::components
         : public Component
     {
     public:
+        using Sptr = std::shared_ptr<Text>;
+
         explicit Text(GuiController & controller,
                       std::string const & id,
                       std::shared_ptr<Container> const & parent,

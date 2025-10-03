@@ -29,6 +29,7 @@ namespace minire::gui::components
             : Component(controller, std::move(id), parent)
             , _layout(layout ? layout : std::make_shared<Layout>())
         {
+            // TODO: avoid call to sharedThis() and store weak_ptr into a Layout
             _layout->setParent(*this);
         }
 

@@ -1,21 +1,78 @@
 #include <minire/gui-controller.hpp>
 
+#include <minire/errors.hpp>
 #include <minire/events/controller.hpp>
+#include <minire/logging.hpp>
 
 #include <cassert>
 
 namespace minire
 {
+    gui::components::Container & GuiController::guiPush()
+    {
+        // cancel all in-progress operation in a current Overlay
+        if (!_overlays.empty())
+        {
+            Overlay & overlay = topOverlay();
+            overlay._focused.reset();
+            overlay._hovered.reset();
+            overlay._toClick.reset();
+            overlay._clickButton = {};
+        }
+
+        // create new overlay
+        auto root = std::make_shared<gui::components::Container>(*this, "", nullptr);
+        root->setArrangers(gui::Arrangers
+        {
+            ._horizontal = gui::Arranger(gui::position::Constant{0}, gui::dimension::Fill{}),
+            ._vertical =   gui::Arranger(gui::position::Constant{0}, gui::dimension::Fill{}),
+        });
+        _overlays.push_back(Overlay
+        {
+            ._root = root,
+            ._focused = {},
+            ._hovered = {},
+            ._toClick = {},
+            ._clickButton = {},
+        });
+        assert(root);
+        return *root;
+    }
+
+    void GuiController::guiPop()
+    {
+        MINIRE_INVARIANT(_overlays.size() > 1,
+                         "cannot pop the latest GUI overlay");
+        _overlays.pop_back();
+    }
+
+    GuiController::Overlay & GuiController::topOverlay()
+    {
+        assert(!_overlays.empty());
+        return _overlays.back();
+    }
+
+    GuiController::Overlay const & GuiController::topOverlay() const
+    {
+        assert(!_overlays.empty());
+        return _overlays.back();
+    }
+
     void GuiController::step()
     {
         BasicController::step();
 
-        assert(_guiRoot);
-
         gui::Component::ZOrderUpdates labels;
         gui::Component::ZOrderUpdates sprites;
 
-        _guiRoot->revalidateZOrder(0, labels, sprites);
+        size_t offset = 0, i = 0;
+        for(Overlay & overlay : _overlays)
+        {
+            assert(overlay._root);
+            offset = std::max(offset, i * 10'000'000'000);
+            offset = overlay._root->revalidateZOrder(offset, labels, sprites);
+            i++;
+        }
 
         if (!labels.empty())
         {
@@ -26,14 +83,28 @@ namespace minire
         {
             enqueue<events::controller::BulkSetSpriteZOrders>(std::move(sprites));
         }
+
+#       ifndef NDEBUG
+        if (!labels.empty() || !sprites.empty())
+        {
+            MINIRE_DEBUG("zOrder change happened: {} labels and {} sprites",
+                         labels.size(), sprites.size());
+        }
+#       endif
     }
 
     void GuiController::handle(events::application::OnResize const & e)
     {
         BasicController::handle(e);
-        guiRoot().setClientArea(gui::Area{._left = 0, ._top = 0,
-                                          ._width = static_cast<float>(e._width),
-                                          ._height = static_cast<float>(e._height)});
+        gui::Area area{._left = 0, ._top = 0,
+                       ._width = static_cast<float>(e._width),
+                       ._height = static_cast<float>(e._height)};
+
+        for(Overlay & overlay : _overlays)
+        {
+            assert(overlay._root);
+            overlay._root->setClientArea(area);
+        }
     }
 
     // TODO: following methods doesn't require to call Base::handle,
@@ -50,7 +121,9 @@ namespace minire
         if(BasicController::handle(e))
             return true;
 
-        if (auto focused = _guiFocused.lock(); focused)
+        Overlay & overlay = topOverlay();
+
+        if (auto focused = overlay._focused.lock(); focused)
         {
             focused->onEvent(e);
             return true;
@@ -68,8 +141,6 @@ namespace minire
     {
         if(BasicController::handle(e))
             return true;
-
-        assert(_guiRoot);
 
         _mouseX = e._absX;
         _mouseY = e._absY;
@@ -91,7 +162,12 @@ namespace minire
 
         if (auto destination = hovered(); destination)
         {
-            _guiToClick = destination;
+            Overlay & overlay = topOverlay();
+            if (e._mouseButton == models::MouseButton::kLeft)
+            {
+                overlay._toClick = destination;
+                overlay._clickButton = e._mouseButton;
+            }
             destination->onEvent(e);
             return true;
         }
@@ -104,22 +180,23 @@ namespace minire
         if(BasicController::handle(e))
             return true;
 
+        Overlay & overlay = topOverlay();
+
         if (auto destination = hovered(); destination)
         {
             destination->onEvent(e);
 
-            if (auto clickTarget = _guiToClick.lock();
-                clickTarget && clickTarget == destination)
+            if (auto clickTarget = overlay._toClick.lock();
+                clickTarget && clickTarget == destination &&
+                e._mouseButton == overlay._clickButton)
             {
                 clickTarget->onClick();
+                overlay._toClick.reset();
+                overlay._clickButton = {};
             }
-
-            _guiToClick.reset();
 
             return true;
         }
-
-        _guiToClick.reset();
 
         return false;
     }
@@ -129,7 +206,8 @@ namespace minire
         if(BasicController::handle(e))
             return true;
 
-        if (auto focused = _guiFocused.lock(); focused)
+        Overlay & overlay = topOverlay();
+        if (auto focused = overlay._focused.lock(); focused)
         {
             focused->onEvent(e);
             return true;
@@ -143,12 +221,13 @@ namespace minire
         if(BasicController::handle(e))
             return true;
 
-        if (_guiHotKeys.handle(e))
+        if (_hotKeys.handle(e))
         {
             return true;
         }
 
-        if (auto focused = _guiFocused.lock(); focused)
+        Overlay & overlay = topOverlay();
+        if (auto focused = overlay._focused.lock(); focused)
         {
             focused->onEvent(e);
             return true;
@@ -162,7 +241,8 @@ namespace minire
         if(BasicController::handle(e))
             return true;
 
-        if (auto focused = _guiFocused.lock(); focused)
+        Overlay & overlay = topOverlay();
+        if (auto focused = overlay._focused.lock(); focused)
         {
             focused->onEvent(e);
             return true;
@@ -178,7 +258,8 @@ namespace minire
 
     void GuiController::setFocus(gui::Component::Sptr const & component)
     {
-        auto focused = _guiFocused.lock();
+        Overlay & overlay = topOverlay();
+        auto focused = overlay._focused.lock();
 
         if (focused == component)
             return;
@@ -186,7 +267,7 @@ namespace minire
         if (focused)
             focused->onUnfocus();
 
-        _guiFocused = component;
+        overlay._focused = component;
 
         if (component)
             component->onFocus();
@@ -194,7 +275,8 @@ namespace minire
 
     void GuiController::setHover(gui::Component::Sptr const & component)
     {
-        auto hovered = _guiHovered.lock();
+        Overlay & overlay = topOverlay();
+        auto hovered = overlay._hovered.lock();
 
         if (hovered == component)
             return;
@@ -205,18 +287,19 @@ namespace minire
             hovered->onMouseLeave();
         }
 
-        _guiHovered = component;
+        overlay._hovered = component;
 
         if (component)
         {
             component->_isHovered = true;
-            component->onMouseEnter(component == _guiToClick.lock());
+            component->onMouseEnter(component == overlay._toClick.lock());
         }
     }
 
     gui::Component::Sptr GuiController::hovered()
     {
-        if (auto result = _guiHovered.lock();
+        Overlay & overlay = topOverlay();
+        if (auto result = overlay._hovered.lock();
             result && !_mouseUpdated)
         {
             if (result->visible())
@@ -227,9 +310,9 @@ namespace minire
 
         if (_mouseUpdated)
         {
-            assert(_guiRoot);
-            if (auto result = _guiRoot->findUnderCursor(_mouseX, _mouseY);
-                result != _guiRoot)
+            assert(overlay._root);
+            if (auto result = overlay._root->findUnderCursor(_mouseX, _mouseY);
+                result != overlay._root)
             {
                 setHover(result);
                 _mouseUpdated = false;
@@ -240,9 +323,37 @@ namespace minire
         return {};
     }
 
+    gui::components::Container const & GuiController::guiRoot() const
+    {
+        assert(!_overlays.empty());
+        assert(_overlays.front()._root);
+        return *(_overlays.front()._root);
+    }
+
+    gui::components::Container & GuiController::guiRoot()
+    {
+        assert(!_overlays.empty());
+        assert(_overlays.front()._root);
+        return *(_overlays.front()._root);
+    }
+
+    gui::components::Container const & GuiController::guiTop() const
+    {
+        Overlay const & overlay = topOverlay();
+        assert(overlay._root);
+        return *overlay._root;
+    }
+
+    gui::components::Container & GuiController::guiTop()
+    {
+        Overlay & overlay = topOverlay();
+        assert(overlay._root);
+        return *overlay._root;
+    }
+
     void GuiController::set(::SDL_Scancode key, uint16_t mods,
                             gui::HotKeys::Handler handler)
     {
-        _guiHotKeys.set(key, mods, std::move(handler));
+        _hotKeys.set(key, mods, std::move(handler));
     }
 }

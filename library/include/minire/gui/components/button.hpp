@@ -60,6 +60,8 @@ namespace minire::gui::components
         using MaybeText = std::optional<Text>;
 
     public:
+        using Sptr = std::shared_ptr<Button>;
+
         Button(GuiController & controller,
                std::string const & id,
                std::shared_ptr<Container> const & parent,

@@ -12,6 +12,8 @@ namespace minire::gui::components
         : public Component
     {
     public:
+        using Sptr = std::shared_ptr<Image>;
+
         Image(GuiController & controller,
               std::string const & id,
               std::shared_ptr<Container> const & parent,
