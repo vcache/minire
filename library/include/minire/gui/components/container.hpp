@@ -34,31 +34,29 @@ namespace minire::gui::components
         }
 
         using Sptr = std::shared_ptr<Container>;
+        using Wptr = std::weak_ptr<Container>;
 
     public:
+        void emplace(std::shared_ptr<Component> const &);
+
         template<typename T, typename ... Args>
         std::shared_ptr<T> emplace(std::string const & childId,
                                    Args &&... args)
         {
-            auto ptr = std::make_shared<T>(_controller, childId, sharedThis(),
-                                           std::forward<Args>(args)...);
-            auto [_, inserted] = _children.emplace(childId, ptr);
-            MINIRE_INVARIANT(inserted, "failed to insert parent component: \"{}\" into \"{}\"",
-                             childId, id());
-            if (!_zOrderStore.empty())
-            {
-                Component::Sptr const & last = *_zOrderStore.rbegin();
-                assert(last);
-                ptr->_zOrder = last->_zOrder + 1;
-            }
-            _zOrderStore.emplace(ptr);
-            updateChildrenContentArea(ptr);
-            return ptr;
+            auto child = std::make_shared<T>(_controller, childId, sharedThis(),
+                                             std::forward<Args>(args)...);
+            emplaceImpl(child);
+            return child;
         }
 
         void clear();
 
         void erase(std::string const & childId);
+
+    public:
+        Layout & layout() { assert(_layout); return *_layout; }
+
+        Layout const & layout() const { assert(_layout); return *_layout; }
 
     public:
         bool contains(std::string const & childId) const { return _children.contains(childId); }
@@ -103,6 +101,8 @@ namespace minire::gui::components
 
     private:
         void updateChildrenContentArea(Component::Sptr const &);
+
+        void emplaceImpl(std::shared_ptr<Component> const & child);
 
     private:
         struct ZOrderCompare

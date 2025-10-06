@@ -113,5 +113,9 @@ namespace minire::gui
         Arranger _vertical;
 
         bool operator==(Arrangers const &) const = default;
+
+    public:
+        static Arrangers const & fill();
+        static Arrangers const & center();
     };
 }

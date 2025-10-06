@@ -284,16 +284,17 @@ namespace minire::gui::components
         return offset;
     }
 
-    void Button::onEvent(events::application::OnMouseDown const & e)
+    bool Button::handle(events::application::OnMouseDown const & e)
     {
         if (e._mouseButton == minire::models::MouseButton::kLeft)
         {
             if (checkable())
             {
                 if (checked() && !canUncheck())
-                    return;
+                    return true;
 
-                setState(checked() ? State::kNormal
+                setState(checked() ? (isHovered() ? State::kHovered
+                                                  : State::kNormal)
                                    : State::kPressed);
             }
             else
@@ -301,6 +302,24 @@ namespace minire::gui::components
                 setState(State::kPressed);
             }
         }
+        return true;
+    }
+
+    bool Button::handle(events::application::OnMouseWheel const & e)
+    {
+        if (_mouseWheelCallback)
+        {
+            _mouseWheelCallback(*this, e);
+            return true;
+        }
+        return false;
+    }
+
+    void Button::onDragEnd(std::optional<events::application::OnMouseUp> const &)
+    {
+        setState(checkable() && checked() ? State::kPressed
+                                          : (isHovered() ? State::kHovered
+                                                         : State::kNormal));
     }
 
     void Button::onMouseEnter(bool isClickReturn)
@@ -315,8 +334,11 @@ namespace minire::gui::components
 
     void Button::onMouseLeave()
     {
-        setState(checkable() && checked() ? State::kPressed
-                                          : State::kNormal);
+        if (!isDragging())
+        {
+            setState(checkable() && checked() ? State::kPressed
+                                              : State::kNormal);
+        }
     }
 
     void Button::onClick()
@@ -328,7 +350,8 @@ namespace minire::gui::components
             _clickCallback(*this);
 
         setState(checkable() && checked() ? State::kPressed
-                                          : State::kHovered);
+                                          : (isHovered() ? State::kHovered
+                                                         : State::kNormal));
     }
 
     void Button::onCheckChanged()

@@ -4,10 +4,13 @@
 #include <minire/gui/component.hpp>
 #include <minire/gui/components/container.hpp>
 #include <minire/gui/hot-keys.hpp>
+#include <minire/models/input-handler.hpp>
 #include <minire/models/mouse-button.hpp>
 
+#include <list>
 #include <utility>
-#include <vector>
+
+namespace minire::gui { class Component; }
 
 namespace minire
 {
@@ -19,7 +22,7 @@ namespace minire
         GuiController(Args &&... args)
             : BasicController(std::forward<Args>(args)...)
         {
-            guiPush();
+            guiPush("__root__");
         }
 
         void setFocus(gui::Component::Sptr const & = {});
@@ -31,7 +34,7 @@ namespace minire
 
         // NOTE: Descendant classes SHOULD call GuiController::handle
         //       before its own implementation.
-        //       For details, see notes in basic-controller.hpp.
+        //       For details, see notes in minire/models/input-handler.hpp.
 
         void handle(events::application::OnFps const &) override;
         bool handle(events::application::OnMouseWheel const &) override;
@@ -48,8 +51,10 @@ namespace minire
 
         gui::components::Container const & guiTop() const;
         gui::components::Container & guiTop();
+        std::string const & guiTopTag() const;
 
-        gui::components::Container & guiPush();
+        gui::components::Container & guiPush(std::string,
+                                             models::InputHandler::Wptr = {});
 
         void guiPop();
 
@@ -64,6 +69,8 @@ namespace minire
             gui::Component::Wptr             _hovered;
             gui::Component::Wptr             _toClick;
             models::MouseButton              _clickButton;
+            std::string                      _tag;
+            models::InputHandler::Wptr       _fallbackHandler;
         };
 
         Overlay & topOverlay();
@@ -80,7 +87,7 @@ namespace minire
         //       SDL_WindowEvent have happened (alt+tab, minimization,
         //       unfocus, etc)
 
-        std::vector<Overlay> _overlays;
+        std::list<Overlay>   _overlays;
 
         // TODO: hot keys must be cleared if some of SDL_WindowEvent
         //       have happened (alt+tab, minimization, unfocus, etc)
@@ -89,8 +96,11 @@ namespace minire
         //       before (on an KeyDown event)
         gui::HotKeys         _hotKeys;
 
+        gui::Area            _windowArea;
         float                _mouseX = -1;
         float                _mouseY = -1;
         bool                 _mouseUpdated = true;
+
+        friend class gui::Component;
     };
 }

@@ -4,6 +4,7 @@
 #include <minire/content/path.hpp>
 #include <minire/events/application.hpp>
 #include <minire/events/controller.hpp>
+#include <minire/models/input-handler.hpp>
 #include <minire/utils/aabb.hpp>
 #include <minire/utils/barrier.hpp>
 
@@ -24,6 +25,7 @@ namespace minire
     // NOTE: DO NOT init or deinit derived classes from ctor/dtor
     //       (especially when working w/ queue()), use start()/finish() instead
     class BasicController
+        : public models::InputHandler
     {
     public:
         // TODO: these should be hidden from public interfaces
@@ -101,40 +103,19 @@ namespace minire
         virtual void finish();
 
     protected:
-        // NOTE: input events are returning boolean value that
-        //       indicates a consumation of an event.
-        //       Normally, consumed events shouldn't be processed
-        //       by a descendant classes. The following pattern is
-        //       recommended (usually make sense w/ GuiController):
-        //
-        //       class Foo : public BasicController // or GuiController
-        //       {
-        //           bool handle(OnMouseDown const & e) override
-        //           {
-        //               if (BasicController::handle(e))
-        //                   return true;
-        //               ...
-        //               return true;
-        //           }
-        //       };
-        //
-        //       It is also legal to not call Base class's handle in
-        //       situations when descedant intend to capture inputs
-        //       exclusively (for example, when moving a camera by a
-        //       mouse and need to prevent activation of GUI elements).
-
         virtual void handle(events::application::OnFps const &);
         virtual void handle(events::application::OnResize const &);
-        virtual bool handle(events::application::OnMouseWheel const &);
-        virtual bool handle(events::application::OnMouseMove const &);
-        virtual bool handle(events::application::OnMouseDown const &);
-        virtual bool handle(events::application::OnMouseUp const &);
-        virtual bool handle(events::application::OnKeyUp const &);
-        virtual bool handle(events::application::OnKeyDown const &);
-        virtual bool handle(events::application::OnTextInput const &);
         virtual void handle(events::application::OnRayCaster const &);
 
         virtual void postprocess();
+
+        bool handle(events::application::OnMouseWheel const &) override;
+        bool handle(events::application::OnMouseMove const &) override;
+        bool handle(events::application::OnMouseDown const &) override;
+        bool handle(events::application::OnMouseUp const &) override;
+        bool handle(events::application::OnKeyUp const &) override;
+        bool handle(events::application::OnKeyDown const &) override;
+        bool handle(events::application::OnTextInput const &) override;
 
     private:
         void worker(events::application::OnResize const & initial);

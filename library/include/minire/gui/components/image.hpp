@@ -13,6 +13,7 @@ namespace minire::gui::components
     {
     public:
         using Sptr = std::shared_ptr<Image>;
+        using Wptr = std::weak_ptr<Image>;
 
         Image(GuiController & controller,
               std::string const & id,

@@ -12,6 +12,7 @@ namespace minire::gui::components
     {
     public:
         using Sptr = std::shared_ptr<Text>;
+        using Wptr = std::weak_ptr<Text>;
 
         explicit Text(GuiController & controller,
                       std::string const & id,

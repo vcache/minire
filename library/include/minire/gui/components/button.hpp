@@ -61,6 +61,7 @@ namespace minire::gui::components
 
     public:
         using Sptr = std::shared_ptr<Button>;
+        using Wptr = std::weak_ptr<Button>;
 
         Button(GuiController & controller,
                std::string const & id,
@@ -79,11 +80,28 @@ namespace minire::gui::components
         glm::vec2 const & pressedContentDelta() const { return _pressedContentDelta; }
         void setPressedContentDelta(glm::vec2 const & v) {_pressedContentDelta = v; }
 
-        template<typename T>
-        void setClickCallback(T clickCallback)
+    public:
+        using ClickCallback = std::function<void(Button &)>;
+
+        template<typename Callback>
+        void setClickCallback(Callback clickCallback)
         {
             _clickCallback = clickCallback;
         }
+
+        bool hasClickCallback() const { return _clickCallback.operator bool(); }
+
+    public:
+        using MouseWheelCallback =
+            std::function<void(Button &, events::application::OnMouseWheel const &)>;
+
+        template<typename Callback>
+        void setMouseWheelCallback(Callback callback)
+        {
+            _mouseWheelCallback = callback;
+        }
+
+        bool hasMouseWheelCallback() const { return _mouseWheelCallback.operator bool(); }
 
     private:
         void onVisibleChanged() override;
@@ -94,7 +112,10 @@ namespace minire::gui::components
 
         void onCheckChanged() override;
 
-        void onEvent(events::application::OnMouseDown const &) override;
+        bool handle(events::application::OnMouseDown const &) override;
+        bool handle(events::application::OnMouseWheel const &) override;
+
+        void onDragEnd(std::optional<events::application::OnMouseUp> const &) override;
         void onMouseEnter(bool isClickReturn) override;
         void onMouseLeave() override;
         void onClick() override;
@@ -104,27 +125,28 @@ namespace minire::gui::components
         std::string const & activeBackground() const;
 
     private:
-        using ClickCallback = std::function<void(Button &)>;
+        Background         _background;
+        MaybeIcon          _icon;
+        MaybeText          _text;
+        utils::Rect        _contentMargin = utils::Rect(0);
+        ClickCallback      _clickCallback;
+        MouseWheelCallback _mouseWheelCallback;
+        glm::vec2          _pressedContentDelta{2, 2};
 
-        Background    _background;
-        MaybeIcon     _icon;
-        MaybeText     _text;
-        utils::Rect   _contentMargin = utils::Rect(0);
-        ClickCallback _clickCallback;
-        glm::vec2     _pressedContentDelta{2, 2};
+        State              _state = State::kNormal;
 
-        State         _state = State::kNormal;
+        std::string        _normalSprite;
+        std::string        _hoveredSprite;
+        std::string        _pressedSprite;
+        std::string        _iconSprite;
+        std::string        _textLabel;
 
-        std::string   _normalSprite;
-        std::string   _hoveredSprite;
-        std::string   _pressedSprite;
-        std::string   _iconSprite;
-        std::string   _textLabel;
+        glm::vec2          _iconPosition{0, 0};
+        glm::vec2          _iconSize{0, 0};
 
-        glm::vec2     _iconPosition{0, 0};
-        glm::vec2     _iconSize{0, 0};
+        glm::vec2          _textPosition{0, 0};
+        glm::vec2          _textSize{0, 0};
 
-        glm::vec2     _textPosition{0, 0};
-        glm::vec2     _textSize{0, 0};
+        friend class Dropdown;
     };
 }

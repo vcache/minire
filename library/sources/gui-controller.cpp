@@ -8,15 +8,32 @@
 
 namespace minire
 {
-    gui::components::Container & GuiController::guiPush()
+    gui::components::Container & GuiController::guiPush(std::string tag,
+                                                        models::InputHandler::Wptr fallbackHandler)
     {
         // cancel all in-progress operation in a current Overlay
         if (!_overlays.empty())
         {
             Overlay & overlay = topOverlay();
-            overlay._focused.reset();
-            overlay._hovered.reset();
-            overlay._toClick.reset();
+            overlay._focused.reset(); // TODO: send onUnfocus
+
+            if (auto hovered = overlay._hovered.lock(); hovered)
+            {
+                hovered->_isHovered = false;
+                hovered->onMouseLeave();
+                overlay._hovered.reset();
+            }
+
+            if (auto clickTarget = overlay._toClick.lock(); clickTarget)
+            {
+                if (clickTarget->_isDragging)
+                {
+                    clickTarget->_isDragging = false;
+                    clickTarget->onDragEnd(std::nullopt);
+                }
+                overlay._toClick.reset();
+            }
+
             overlay._clickButton = {};
         }
 
@@ -27,6 +44,8 @@ namespace minire
             ._horizontal = gui::Arranger(gui::position::Constant{0}, gui::dimension::Fill{}),
             ._vertical =   gui::Arranger(gui::position::Constant{0}, gui::dimension::Fill{}),
         });
+        root->setClientArea(_windowArea);
+
         _overlays.push_back(Overlay
         {
             ._root = root,
@@ -34,7 +53,12 @@ namespace minire
             ._hovered = {},
             ._toClick = {},
             ._clickButton = {},
+            ._tag = std::move(tag),
+            ._fallbackHandler = fallbackHandler,
         });
+
+        _mouseUpdated = true; // force recalc hovered
+
         assert(root);
         return *root;
     }
@@ -96,14 +120,15 @@ namespace minire
     void GuiController::handle(events::application::OnResize const & e)
     {
         BasicController::handle(e);
-        gui::Area area{._left = 0, ._top = 0,
-                       ._width = static_cast<float>(e._width),
-                       ._height = static_cast<float>(e._height)};
+
+        _windowArea = gui::Area{._left = 0, ._top = 0,
+                                ._width = static_cast<float>(e._width),
+                                ._height = static_cast<float>(e._height)};
 
         for(Overlay & overlay : _overlays)
         {
             assert(overlay._root);
-            overlay._root->setClientArea(area);
+            overlay._root->setClientArea(_windowArea);
         }
     }
 
@@ -125,13 +150,15 @@ namespace minire
 
         if (auto focused = overlay._focused.lock(); focused)
         {
-            focused->onEvent(e);
-            return true;
+            return focused->handle(e);
         }
         else if (auto destination = hovered(); destination)
         {
-            destination->onEvent(e);
-            return true;
+            return destination->handle(e);
+        }
+        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        {
+            sink->handle(e);
         }
 
         return false;
@@ -146,10 +173,22 @@ namespace minire
         _mouseY = e._absY;
         _mouseUpdated = true;
 
+        Overlay & overlay = topOverlay();
+
+        if (auto clickTarget = overlay._toClick.lock();
+            clickTarget && clickTarget->isDragable())
+        {
+            assert(clickTarget->_isDragging);
+            clickTarget->onDragMove(e);
+        }
+
         if (auto destination = hovered(); destination)
         {
-            destination->onEvent(e);
-            return true;
+            return destination->handle(e);
+        }
+        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        {
+            sink->handle(e);
         }
 
         return false;
@@ -160,16 +199,26 @@ namespace minire
         if(BasicController::handle(e))
             return true;
 
+        Overlay & overlay = topOverlay();
+
         if (auto destination = hovered(); destination)
         {
-            Overlay & overlay = topOverlay();
             if (e._mouseButton == models::MouseButton::kLeft)
             {
                 overlay._toClick = destination;
                 overlay._clickButton = e._mouseButton;
+                if (destination->isDragable())
+                {
+                    assert(!destination->_isDragging);
+                    destination->_isDragging = true;
+                    destination->onDragBegin(e);
+                }
             }
-            destination->onEvent(e);
-            return true;
+            return destination->handle(e);
+        }
+        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        {
+            sink->handle(e);
         }
 
         return false;
@@ -182,20 +231,30 @@ namespace minire
 
         Overlay & overlay = topOverlay();
 
+        auto clickTarget = overlay._toClick.lock();
+        if (clickTarget && clickTarget->isDragable())
+        {
+            assert(clickTarget->_isDragging);
+            clickTarget->_isDragging = false;
+            clickTarget->onDragEnd(e);
+            overlay._toClick.reset();
+        }
+
         if (auto destination = hovered(); destination)
         {
-            destination->onEvent(e);
-
-            if (auto clickTarget = overlay._toClick.lock();
-                clickTarget && clickTarget == destination &&
+            if (clickTarget && clickTarget == destination &&
                 e._mouseButton == overlay._clickButton)
             {
                 clickTarget->onClick();
-                overlay._toClick.reset();
-                overlay._clickButton = {};
             }
 
-            return true;
+            overlay._clickButton = {};
+
+            return destination->handle(e); // TODO: should it be delivered to a non-click target?
+        }
+        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        {
+            sink->handle(e);
         }
 
         return false;
@@ -209,8 +268,11 @@ namespace minire
         Overlay & overlay = topOverlay();
         if (auto focused = overlay._focused.lock(); focused)
         {
-            focused->onEvent(e);
-            return true;
+            return focused->handle(e);
+        }
+        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        {
+            sink->handle(e);
         }
 
         return false;
@@ -229,8 +291,11 @@ namespace minire
         Overlay & overlay = topOverlay();
         if (auto focused = overlay._focused.lock(); focused)
         {
-            focused->onEvent(e);
-            return true;
+            return focused->handle(e);
+        }
+        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        {
+            sink->handle(e);
         }
 
         return false;
@@ -244,8 +309,11 @@ namespace minire
         Overlay & overlay = topOverlay();
         if (auto focused = overlay._focused.lock(); focused)
         {
-            focused->onEvent(e);
-            return true;
+            return focused->handle(e);
+        }
+        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        {
+            sink->handle(e);
         }
 
         return false;
@@ -296,9 +364,12 @@ namespace minire
         }
     }
 
+    // TODO: what if some Component suddenly appeared (become visible)
+    //       under the mouse's cursor and then a MouseDown will happen w/o a MouseMove?
     gui::Component::Sptr GuiController::hovered()
     {
         Overlay & overlay = topOverlay();
+
         if (auto result = overlay._hovered.lock();
             result && !_mouseUpdated)
         {
@@ -311,13 +382,14 @@ namespace minire
         if (_mouseUpdated)
         {
             assert(overlay._root);
-            if (auto result = overlay._root->findUnderCursor(_mouseX, _mouseY);
-                result != overlay._root)
+            if (auto result = overlay._root->findUnderCursor(_mouseX, _mouseY))
             {
+                if (result == overlay._root)
+                    result.reset();
                 setHover(result);
-                _mouseUpdated = false;
                 return result;
             }
+            _mouseUpdated = false;
         }
 
         return {};
@@ -349,6 +421,13 @@ namespace minire
         Overlay & overlay = topOverlay();
         assert(overlay._root);
         return *overlay._root;
+    }
+
+    std::string const & GuiController::guiTopTag() const
+    {
+        Overlay const & overlay = topOverlay();
+        assert(overlay._root);
+        return overlay._tag;
     }
 
     void GuiController::set(::SDL_Scancode key, uint16_t mods,

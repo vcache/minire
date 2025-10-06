@@ -23,7 +23,14 @@ namespace minire::gui
         onVisibleChanged();
 
         if (_visible)
+        {
+            if (auto p = parent(); p)
+            {
+                p->updateChildrenContentArea(shared_from_this());
+            }
+
             rearrange(true);
+        }
     }
 
     // NOTE: std::set cannot be re-ordered automatically just by
@@ -59,6 +66,24 @@ namespace minire::gui
         {
             p->invalidateZOrder();
         }
+    }
+
+    void Component::onDragBegin(events::application::OnMouseDown const & e)
+    {
+        if (_dragBeginCallback)
+            _dragBeginCallback(*this, e);
+    }
+
+    void Component::onDragMove(events::application::OnMouseMove const & e)
+    {
+        if (_dragMoveCallback)
+            _dragMoveCallback(*this, e);
+    }
+
+    void Component::onDragEnd(std::optional<events::application::OnMouseUp> const & e)
+    {
+        if (_dragEndCallback)
+            _dragEndCallback(*this, e);
     }
 
     void Component::setClientArea(Area clientArea)
@@ -174,5 +199,21 @@ namespace minire::gui
     Component::measureContent() const
     {
         return std::nullopt;
+    }
+
+    gui::components::Container & Component::guiPush(std::string tag,
+        minire::models::InputHandler::Wptr defaultHandler)
+    {
+        return _controller.guiPush(std::move(tag), defaultHandler);
+    }
+
+    std::string const & Component::guiTopTag() const
+    {
+        return _controller.guiTopTag();
+    }
+
+    void Component::guiPop()
+    {
+        _controller.guiPop();
     }
 }

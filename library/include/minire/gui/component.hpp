@@ -5,9 +5,11 @@
 #include <minire/events/controller.hpp>
 #include <minire/gui/area.hpp>
 #include <minire/gui/arranger.hpp>
+#include <minire/models/input-handler.hpp>
 #include <minire/utils/rect.hpp>
 
 #include <any>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -24,6 +26,7 @@ namespace minire::gui
 {
     class Component
         : public std::enable_shared_from_this<Component>
+        , public minire::models::InputHandler
     {
     public:
         Component(GuiController & controller,
@@ -69,9 +72,45 @@ namespace minire::gui
         T & as() { return dynamic_cast<T &>(*this); }
 
     public:
+        bool isDragable() const { return _isDragable; }
+        void setIsDragable(bool v) { _isDragable = v; }
+
+        bool isDragging() const { return _isDragging; }
+
+        using DragBeginCallback =
+            std::function<void(Component &, events::application::OnMouseDown const &)>;
+
+        using DragMoveCallback =
+            std::function<void(Component &, events::application::OnMouseMove const &)>;
+
+        using DragEndCallback =
+            std::function<void(Component &, std::optional<events::application::OnMouseUp> const &)>;
+
+        template<typename Callback>
+        void setDragBeginCallback(Callback c) { _dragBeginCallback = c; }
+
+        template<typename Callback>
+        void setDragMoveCallback(Callback c) { _dragMoveCallback = c; }
+
+        template<typename Callback>
+        void setDragEndCallback(Callback c) { _dragEndCallback = c; }
+
+        virtual void onDragBegin(events::application::OnMouseDown const &);
+        virtual void onDragMove(events::application::OnMouseMove const &);
+        // NOTE: when e == std::nullopt, dragging is cancelled
+        virtual void onDragEnd(std::optional<events::application::OnMouseUp> const &);
+
+    public:
         std::any const & userData() const { return _userData; }
 
         void setUserData(std::any v) { _userData = std::move(v); }
+
+    public:
+        // Relative to a parent
+        Area const & contentArea() const { return _contentArea; }
+
+        // Abosulute values
+        Area const & clientArea() const { return _clientArea; }
 
     protected:
         void invalidateZOrder();
@@ -98,8 +137,6 @@ namespace minire::gui
         // TODO: why not glm::vec2 ?
         virtual std::optional<std::pair<float, float>> measureContent() const;
 
-        Area const & contentArea() const { return _contentArea; }
-
         void rearrange(bool force = false);
 
         void enqueueRaw(events::Controller &&);
@@ -115,14 +152,6 @@ namespace minire::gui
         void unfocus();
 
     protected:
-        virtual void onEvent(events::application::OnMouseWheel const &) {}
-        virtual void onEvent(events::application::OnMouseMove const &) {}
-        virtual void onEvent(events::application::OnMouseDown const &) {}
-        virtual void onEvent(events::application::OnMouseUp const &) {}
-        virtual void onEvent(events::application::OnKeyUp const &) {}
-        virtual void onEvent(events::application::OnKeyDown const &) {}
-        virtual void onEvent(events::application::OnTextInput const &) {}
-
         virtual void onMouseEnter(bool /*isClickReturn*/) {}
         virtual void onMouseLeave() {}  // will be delivered even to a non-visible one
 
@@ -142,6 +171,11 @@ namespace minire::gui
         std::pair<glm::vec2, bool> measure(utils::Patch const &,
                                            content::Id const & texture) const;
 
+        gui::components::Container & guiPush(std::string,
+            minire::models::InputHandler::Wptr = {});
+        std::string const & guiTopTag() const;
+        void guiPop();
+
     private:
         using ParentWptr = std::weak_ptr<components::Container>;
         using ZOrderBoundaries = std::pair<size_t, size_t>;
@@ -150,6 +184,9 @@ namespace minire::gui
         std::string const _id;
         std::any          _userData;
         ParentWptr        _parent;
+        DragBeginCallback _dragBeginCallback;
+        DragMoveCallback  _dragMoveCallback;
+        DragEndCallback   _dragEndCallback;
         Arrangers         _arrangers;
         Area              _clientArea;
         Area              _contentArea;
@@ -158,6 +195,8 @@ namespace minire::gui
         bool              _zOrderInvalidated = true;
         bool              _visible = true;
         bool              _isHovered = false;
+        bool              _isDragable = false;
+        bool              _isDragging = false;
 
         friend class components::Container;
         friend class ::minire::GuiController;
