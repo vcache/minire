@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdlib> // for std::abort
 #include <filesystem>
+#include <fstream>
 #include <new> // for std::bac_alloc
 
 namespace minire::content
@@ -283,6 +284,15 @@ namespace minire::content::readers
         else if (".bdf"  == ext)
         {
             return std::make_shared<formats::Bdf>(path);
+        }
+        else if (".txt" == ext)
+        {
+            auto size = std::filesystem::file_size(path);
+            std::string content(size, '\0');
+            std::ifstream in(path);
+            MINIRE_INVARIANT(in.is_open(), "failed to open: {}", path.string());
+            in.read(content.data(), content.size());
+            return content;
         }
         else
         {
