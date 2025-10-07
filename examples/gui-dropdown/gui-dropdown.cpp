@@ -218,7 +218,7 @@ namespace
                             });
                     });
                 dropdown->setSelectionChangedCallback(
-                    [](std::optional<size_t> previous, std::optional<size_t> current)
+                    [](Dropdown const &, std::optional<size_t> previous, std::optional<size_t> current)
                     {
                         MINIRE_INFO("Selection changed from {} to {}", previous, current);
                     });
@@ -262,7 +262,7 @@ namespace
                             });
                     });
                 dropdown->setSelectionChangedCallback(
-                    [](std::optional<size_t> previous, std::optional<size_t> current)
+                    [](Dropdown const &, std::optional<size_t> previous, std::optional<size_t> current)
                     {
                         MINIRE_INFO("Selection changed from {} to {}", previous, current);
                     });
@@ -306,7 +306,7 @@ namespace
                             });
                     });
                 dropdown->setSelectionChangedCallback(
-                    [](std::optional<size_t> previous, std::optional<size_t> current)
+                    [](Dropdown const &, std::optional<size_t> previous, std::optional<size_t> current)
                     {
                         MINIRE_INFO("Selection changed from {} to {}", previous, current);
                     });
@@ -349,7 +349,7 @@ namespace
                             });
                     });
                 dropdown->setSelectionChangedCallback(
-                    [](std::optional<size_t> previous, std::optional<size_t> current)
+                    [](Dropdown const &, std::optional<size_t> previous, std::optional<size_t> current)
                     {
                         MINIRE_INFO("Selection changed from {} to {}", previous, current);
                     });

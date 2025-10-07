@@ -506,7 +506,7 @@ namespace minire::gui::components
         _selectedIndex = index;
 
         if (_selectionChangedCallback)
-            _selectionChangedCallback(previous, _selectedIndex);
+            _selectionChangedCallback(*this, previous, _selectedIndex);
 
         revalidateContents();
     }

@@ -79,7 +79,8 @@ namespace minire::gui::components
         }
 
         using SelectionChangedCallback =
-            std::function<void(std::optional<size_t> previous,
+            std::function<void(Dropdown &,
+                               std::optional<size_t> previous,
                                std::optional<size_t> current)>;
 
         template<typename Callback>
