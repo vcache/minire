@@ -135,7 +135,7 @@ namespace minire::gui::components
         std::optional<size_t>    _constantLineHeight;
         Image::Sptr              _background;
         Button::Sptr             _dropButton;
-        Button::Sptr             _activeItem;
+        Button::Wptr             _activeItem;
         float                    _scrollbarWidth = 0;
         utils::Rect              _activeItemPaddings = utils::Rect(1.0f);
         utils::Rect              _tonguePaddings = utils::Rect(1.0f);

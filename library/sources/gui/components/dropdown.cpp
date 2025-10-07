@@ -451,9 +451,11 @@ namespace minire::gui::components
         }
 
         // actialize the active item
-        if (_activeItem)
+        if (auto activeItem = _activeItem.lock();
+            activeItem)
         {
-            erase(_activeItem->id());
+            erase(activeItem->id());
+            _activeItem.reset();
         }
 
         if (_selectedIndex)
@@ -461,25 +463,27 @@ namespace minire::gui::components
             assert(*_selectedIndex < _contents.size());
             if (_itemBuilderCallback)
             {
-                _activeItem = _itemBuilderCallback(_contents[*_selectedIndex],
-                                                   *_selectedIndex,
-                                                   true, Purpose::kActiveLine);
-                _activeItem->setClickCallback([this](Button const &){ buildOverlay(); });
+                auto activeItem = _itemBuilderCallback(_contents[*_selectedIndex],
+                                                       *_selectedIndex, true,
+                                                       Purpose::kActiveLine);
+                activeItem->setClickCallback([this](Button const &){ buildOverlay(); });
 
-                auto arrangers = _activeItem->arrangers();
+                auto arrangers = activeItem->arrangers();
                 arrangers._horizontal.setMarginMin(_activeItemPaddings._left);
                 arrangers._horizontal.setMarginMax(_activeItemPaddings._right);
                 arrangers._vertical.setMarginMin(_activeItemPaddings._top);
                 arrangers._vertical.setMarginMax(_activeItemPaddings._bottom);
-                _activeItem->setArrangers(arrangers);
+                activeItem->setArrangers(arrangers);
 
-                emplace(_activeItem);
-                if (_dropButton->zOrder() <= _activeItem->zOrder())
+                emplace(activeItem);
+                if (_dropButton->zOrder() <= activeItem->zOrder())
                 {
                     size_t tmp = _dropButton->zOrder();
-                    _dropButton->setZOrder(_activeItem->zOrder() + 1);
-                    _activeItem->setZOrder(tmp);
+                    _dropButton->setZOrder(activeItem->zOrder() + 1);
+                    activeItem->setZOrder(tmp);
                 }
+
+                _activeItem = activeItem;
             }
         }
 
