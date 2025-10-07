@@ -112,6 +112,15 @@ namespace minire::gui
         // Abosulute values
         Area const & clientArea() const { return _clientArea; }
 
+    public:
+        bool handle(events::application::OnMouseWheel const &) override { return true; }
+        bool handle(events::application::OnMouseMove const &) override  { return true; }
+        bool handle(events::application::OnMouseDown const &) override  { return true; }
+        bool handle(events::application::OnMouseUp const &) override    { return true; }
+        bool handle(events::application::OnKeyUp const &) override      { return true; }
+        bool handle(events::application::OnKeyDown const &) override    { return true; }
+        bool handle(events::application::OnTextInput const &) override  { return true; }
+
     protected:
         void invalidateZOrder();
 

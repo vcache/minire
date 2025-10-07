@@ -303,7 +303,17 @@ namespace minire::gui::components
 
         auto layout = std::make_shared<TongueLayout>(*this, _tongueMaxLines);
         auto itemsContainer = container.emplace<Container>("__items__", layout);
-
+#if 0
+    // TODO: implement this
+        itemsContainer->setMouseWheelCallback(
+            [this] (Image const &, events::application::OnMouseWheel const & e)
+            {
+                if (_tongue && _tongue->_defaultHandler)
+                {
+                    _tongue->_defaultHandler->handle(e);
+                }
+            });
+#endif
         if (_scrollbarBuilderCallback)
         {
             auto scrollbar = _scrollbarBuilderCallback();

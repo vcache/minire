@@ -310,9 +310,8 @@ namespace minire::gui::components
         if (_mouseWheelCallback)
         {
             _mouseWheelCallback(*this, e);
-            return true;
         }
-        return false;
+        return true;
     }
 
     void Button::onDragEnd(std::optional<events::application::OnMouseUp> const &)

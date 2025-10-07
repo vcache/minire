@@ -158,7 +158,7 @@ namespace minire
         }
         else if (auto sink = overlay._fallbackHandler.lock(); sink)
         {
-            sink->handle(e);
+            return sink->handle(e);
         }
 
         return false;
@@ -188,7 +188,7 @@ namespace minire
         }
         else if (auto sink = overlay._fallbackHandler.lock(); sink)
         {
-            sink->handle(e);
+            return sink->handle(e);
         }
 
         return false;
@@ -218,7 +218,7 @@ namespace minire
         }
         else if (auto sink = overlay._fallbackHandler.lock(); sink)
         {
-            sink->handle(e);
+            return sink->handle(e);
         }
 
         return false;
@@ -254,7 +254,7 @@ namespace minire
         }
         else if (auto sink = overlay._fallbackHandler.lock(); sink)
         {
-            sink->handle(e);
+            return sink->handle(e);
         }
 
         return false;
@@ -272,7 +272,7 @@ namespace minire
         }
         else if (auto sink = overlay._fallbackHandler.lock(); sink)
         {
-            sink->handle(e);
+            return sink->handle(e);
         }
 
         return false;
@@ -295,7 +295,7 @@ namespace minire
         }
         else if (auto sink = overlay._fallbackHandler.lock(); sink)
         {
-            sink->handle(e);
+            return sink->handle(e);
         }
 
         return false;
@@ -313,7 +313,7 @@ namespace minire
         }
         else if (auto sink = overlay._fallbackHandler.lock(); sink)
         {
-            sink->handle(e);
+            return sink->handle(e);
         }
 
         return false;
