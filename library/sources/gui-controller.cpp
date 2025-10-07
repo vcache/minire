@@ -246,6 +246,7 @@ namespace minire
                 e._mouseButton == overlay._clickButton)
             {
                 clickTarget->onClick();
+                overlay._toClick.reset();
             }
 
             overlay._clickButton = {};
