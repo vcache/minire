@@ -99,6 +99,8 @@ namespace minire::gui::components
                 revalidateContents();
         }
 
+        std::any const * selectedValue() const;
+
         std::optional<size_t> selectedIndex() const { return _selectedIndex; }
 
         void select(std::optional<size_t>);

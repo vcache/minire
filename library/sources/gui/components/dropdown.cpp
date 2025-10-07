@@ -501,6 +501,14 @@ namespace minire::gui::components
         }
     }
 
+    std::any const * Dropdown::selectedValue() const
+    {
+        if (!_selectedIndex)
+            return nullptr;
+        assert(*_selectedIndex < _contents.size());
+        return &_contents.at(*_selectedIndex);
+    }
+
     void Dropdown::select(std::optional<size_t> index)
     {
         if (_selectedIndex == index)
