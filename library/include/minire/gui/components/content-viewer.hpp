@@ -25,8 +25,12 @@ namespace minire::gui::components
         {
             MINIRE_INVARIANT(_content, "no Content provided");
 
-            horizontal()->_dimension = dimension::Content{};
-            vertical()->_dimension = dimension::Content{};
+            if (auto [_, isResizable] = _content->measure();
+                !isResizable)
+            {
+                horizontal()->_dimension = dimension::Content{};
+                vertical()->_dimension = dimension::Content{};
+            }
         }
 
         ContentView & content()

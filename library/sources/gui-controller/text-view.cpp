@@ -198,9 +198,9 @@ namespace minire::gui_controller
 
         if (_newFontFace)
         {
-            _fontFace = *_newFontFace;
             if (_fontFace != *_newFontFace)
             {
+                _fontFace = *_newFontFace;
                 assert(!_labelId.empty());
                 _controller.enqueue<SetLabelFontFace>(_labelId, _fontFace);
             }
@@ -209,9 +209,9 @@ namespace minire::gui_controller
 
         if (_newText)
         {
-            _text = *_newText;
             if (_text != *_newText)
             {
+                _text = *_newText;
                 assert(!_labelId.empty());
                 _controller.enqueue<SetLabelText>(_labelId, _text);
             }

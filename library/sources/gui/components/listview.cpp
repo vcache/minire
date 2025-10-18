@@ -494,7 +494,8 @@ namespace minire::gui::components
 
     void ListView::scrollToSelected()
     {
-        if (_scrollbar && _selected)
+        if (_scrollbar && _selected &&
+            (*_selected < _offset.get() || *_selected > _offset.get() + _showLines))
         {
             _scrollbar->setValue(static_cast<float>(*_selected) * _scrollbar->step().get());
         }

@@ -32,6 +32,10 @@ namespace
                 {
                     auto image = container->emplace<minire::gui::components::Image>(
                         fmt::format("cell-{}x{}", row, col), makeImageView("image.png"));
+                    image->vertical() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                              minire::gui::dimension::Content{});
+                    image->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                                minire::gui::dimension::Content{});
                     layout->set(row, col, image->id());
                 }
             }
