@@ -83,6 +83,20 @@ namespace minire::gui
         {
             _userData = std::forward<T>(userData);
         }
+
+        template<typename T, class... Args>
+        void emplaceUserData(Args && ... args)
+        {
+            _userData.emplace<T>(std::forward<Args>(args)...);
+        }
+
+        template<typename T, typename U, class... Args>
+        void emplaceUserData(std::initializer_list<U> il,
+                             Args && ... args)
+        {
+            _userData.emplace<T>(il, std::forward<Args>(args)...);
+        }
+
         std::any const & userData() const { return _userData; }
         std::any & userData() { return _userData; }
 
