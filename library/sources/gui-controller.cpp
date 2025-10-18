@@ -313,7 +313,10 @@ namespace minire
         if(BasicController::handle(e))
             return true;
 
-        if (_hotKeys.handle(e))
+        // Hotkeys are only applicable for the "__base__" overlay,
+        // TODO: maybe hotkeys should be stored in an Overlay and
+        //       be used on a per-Overlay manner.
+        if (_overlays.size() == 1 && _hotKeys.handle(e))
         {
             return true;
         }
