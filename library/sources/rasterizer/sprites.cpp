@@ -334,7 +334,7 @@ namespace minire::rasterizer
                TileInfo tileInfo,
                glm::vec2 const & position,
                glm::vec2 const & dimensions,
-               bool visible, int z,
+               bool visible, size_t z,
                Program const & program)
             : Drawable(z)
             , _texture(texture)
@@ -463,7 +463,7 @@ namespace minire::rasterizer
                          glm::vec2 const & position,
                          glm::vec2 const & dimensions,
                          bool const visible,
-                         int const zOrder)
+                         size_t const zOrder)
     {
         auto textureSptr = _textures.get(texture, {}, false /* no mipmap */);
         MINIRE_INVARIANT(textureSptr, "no texture found for \"{}\": {}", id, texture);
@@ -509,6 +509,15 @@ namespace minire::rasterizer
         find(id).setDimensions(dimensions);
     }
 
+    void Sprites::setArea(std::string const & id,
+                          glm::vec2 const & position,
+                          glm::vec2 const & dimensions)
+    {
+        Sprite & sprite = find(id);
+        sprite.setPosition(position);
+        sprite.setDimensions(dimensions);
+    }
+
     void Sprites::visible(std::string const & id,
                           bool visible)
     {
@@ -529,7 +538,7 @@ namespace minire::rasterizer
     Sprites::Sprite & Sprites::find(std::string const & id) const
     {
         auto it = _store.find(id);
-        if (it == _store.cend()) MINIRE_THROW("no such sprite: \"{}\"", id);
+        MINIRE_INVARIANT(it != _store.cend(), "no such sprite: \"{}\"", id);
         return *it->second;
     }
 

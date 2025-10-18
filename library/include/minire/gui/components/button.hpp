@@ -1,16 +1,11 @@
 #pragma once
 
 #include <minire/gui/component.hpp>
+#include <minire/gui/content-view.hpp>
 #include <minire/gui/models/checkable.hpp>
-#include <minire/text/formatted-string.hpp>
 #include <minire/utils/rect.hpp>
 
 #include <glm/vec2.hpp>
-
-#include <functional>
-#include <memory>
-#include <optional>
-#include <string>
 
 namespace minire::gui::components
 {
@@ -18,135 +13,85 @@ namespace minire::gui::components
         : public Component
         , public models::Checkable
     {
+    public:
+        Button(std::string const & id,
+               Theme const & theme,
+               OverlayController &);
+
+        using Sptr = std::shared_ptr<Button>;
+        using Wptr = std::weak_ptr<Button>;
+
+        using CommonCallbacks::handle;
+        using CommonCallbacks::setCallback;
+        using Checkable::handle;
+        using Checkable::setCallback;
+
+        Property<ImageView::Sptr> const & bgNormal() const { return _bgNormal; }
+        Property<ImageView::Sptr> & bgNormal() { return _bgNormal; }
+
+        Property<ImageView::Sptr> const & bgHovered() const { return _bgHovered; };
+        Property<ImageView::Sptr> & bgHovered() { return _bgHovered; };
+
+        Property<ImageView::Sptr> const & bgPressed() const { return _bgPressed; }
+        Property<ImageView::Sptr> & bgPressed() { return _bgPressed; }
+
+        Property<TextView::Sptr> const & text() const { return _text; }
+        Property<TextView::Sptr> & text() { return _text; }
+
+        Property<ImageView::Sptr> const & icon() const { return _icon; }
+        Property<ImageView::Sptr> & icon() { return _icon; }
+
+        Property<theme::Location> const & iconLocation() const { return _iconLocation; }
+        Property<theme::Location> & iconLocation() { return _iconLocation; }
+
+        Property<float> const & iconSpacing() const { return _iconSpacing; }
+        Property<float> & iconSpacing() { return _iconSpacing; }
+
+        Property<glm::vec2> const & pressOffset() const { return _pressOffset; }
+        Property<glm::vec2> & pressOffset() { return _pressOffset; }
+
+        std::optional<std::pair<float, float>> measureContent() const override;
+
+    protected:
+        size_t revalidateContent(size_t zOffset,
+                                 bool const effectiveVisible,
+                                 Area const & clientArea) override;
+
+        void handle(models::checkable::OnCheckedChanged const &) override;
+        void handle(minire::events::application::OnMouseDown const & e) override;
+        void handle(gui::events::OnDragEnd const &) override;
+        void handle(gui::events::OnMouseEnter const &) override;
+        void handle(gui::events::OnMouseLeave const &) override;
+        void handle(gui::events::OnClick const &) override;
+
+    private:
         enum State
         {
             kNormal, kHovered, kPressed,
         };
 
-    public:
-        // TODO: these items will be the same across
-        //       various instances of a Button, thus,
-        //       they can be cached and re-used.
-        struct Background
-        {
-            content::Id      _texture;
-            utils::NinePatch _normal;
-            utils::NinePatch _hovered;
-            utils::NinePatch _pressed;
-            // TODO: focused, hovered while pressed, and etc
-        };
+        ImageView::Sptr const & activeBackground() const;
+        void revalidatePositions(Area const & clientArea);
+        void setState(State state);
 
-        struct Icon
-        {
-            enum class Position
-            {
-                kLeft, kTop, kRight, kBottom,
-            };
-
-            content::Id      _texture;
-            utils::MaybeRect _rect;
-            float            _spacing = 5;
-            Position         _position = Position::kLeft;
-        };
-
-        using MaybeIcon = std::optional<Icon>;
-
-        struct Text
-        {
-            content::Id           _fontFace;
-            text::FormattedString _text;
-        };
-
-        using MaybeText = std::optional<Text>;
-
-    public:
-        using Sptr = std::shared_ptr<Button>;
-        using Wptr = std::weak_ptr<Button>;
-
-        Button(GuiController & controller,
-               std::string const & id,
-               std::shared_ptr<Container> const & parent,
-               Background const & background,
-               MaybeIcon const & icon = std::nullopt,
-               MaybeText const & text = std::nullopt,
-               Arrangers arrangers = Arrangers(),
-               bool const checkable = false);
-
-        ~Button() override;
-
-        utils::Rect const & contentMargin() const { return _contentMargin; }
-        void setContentMargin(utils::Rect const &);
-
-        glm::vec2 const & pressedContentDelta() const { return _pressedContentDelta; }
-        void setPressedContentDelta(glm::vec2 const & v) {_pressedContentDelta = v; }
-
-    public:
-        using ClickCallback = std::function<void(Button &)>;
-
-        template<typename Callback>
-        void setClickCallback(Callback clickCallback)
-        {
-            _clickCallback = clickCallback;
-        }
-
-        bool hasClickCallback() const { return _clickCallback.operator bool(); }
-
-    public:
-        using MouseWheelCallback =
-            std::function<void(Button &, events::application::OnMouseWheel const &)>;
-
-        template<typename Callback>
-        void setMouseWheelCallback(Callback callback)
-        {
-            _mouseWheelCallback = callback;
-        }
-
-        bool hasMouseWheelCallback() const { return _mouseWheelCallback.operator bool(); }
+        template<typename T>
+        void actualize(Property<std::shared_ptr<T>> & contentView);
 
     private:
-        void onVisibleChanged() override;
-        void onContentAreaChanged() override;
-        size_t onZOrderChanged(size_t offset, ZOrderUpdates & labels,
-                               ZOrderUpdates & sprites) override;
-        std::optional<std::pair<float, float>> measureContent() const override;
+        Property<ImageView::Sptr> _bgNormal;
+        Property<ImageView::Sptr> _bgHovered;
+        Property<ImageView::Sptr> _bgPressed;
+        // TODO: focused, hovered while pressed, and etc
 
-        void onCheckChanged() override;
+        Property<TextView::Sptr>  _text;
+        Property<ImageView::Sptr> _icon;
+        Property<theme::Location> _iconLocation;
+        Property<float>           _iconSpacing;
 
-        bool handle(events::application::OnMouseDown const &) override;
-        bool handle(events::application::OnMouseWheel const &) override;
+        Property<glm::vec2>       _pressOffset;
 
-        void onDragEnd(std::optional<events::application::OnMouseUp> const &) override;
-        void onMouseEnter(bool isClickReturn) override;
-        void onMouseLeave() override;
-        void onClick() override;
-
-        void setState(State);
-
-        std::string const & activeBackground() const;
-
-    private:
-        Background         _background;
-        MaybeIcon          _icon;
-        MaybeText          _text;
-        utils::Rect        _contentMargin = utils::Rect(0);
-        ClickCallback      _clickCallback;
-        MouseWheelCallback _mouseWheelCallback;
-        glm::vec2          _pressedContentDelta{2, 2};
-
-        State              _state = State::kNormal;
-
-        std::string        _normalSprite;
-        std::string        _hoveredSprite;
-        std::string        _pressedSprite;
-        std::string        _iconSprite;
-        std::string        _textLabel;
-
-        glm::vec2          _iconPosition{0, 0};
-        glm::vec2          _iconSize{0, 0};
-
-        glm::vec2          _textPosition{0, 0};
-        glm::vec2          _textSize{0, 0};
-
-        friend class Dropdown;
+        State                     _state = State::kNormal;
+        glm::vec2                 _textPosition{0, 0};
+        glm::vec2                 _iconPosition{0, 0};
     };
 }

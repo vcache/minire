@@ -2,7 +2,6 @@
 
 #include <minire/content/manager.hpp>
 #include <minire/gui-controller.hpp>
-#include <minire/gui/components/container.hpp>
 #include <minire/gui/components/image.hpp>
 #include <minire/logging.hpp>
 
@@ -20,24 +19,21 @@ namespace
         {
             GuiController::start();
 
-            namespace gui = minire::gui;
+            auto ninePatch = guiRoot().emplace<minire::gui::components::Image>(
+                "nine-patch-example",
+                makeImageView(
+                    "hud.png",
+                    minire::utils::NinePatch
+                    {
+                        ._boundary = minire::utils::Rect(8, 8, 111, 111),
+                        ._out = minire::utils::Rect(22, 22, 97, 97),
+                        ._in = minire::utils::Rect(25, 25, 94, 94),
+                    }));
 
-            auto ninePatch = guiRoot().emplace<gui::components::Image>(
-                "nine-patch-example", "hud.png",
-                minire::utils::NinePatch
-                {
-                    ._boundary = minire::utils::Rect(8, 8, 111, 111),
-                    ._out = minire::utils::Rect(22, 22, 97, 97),
-                    ._in = minire::utils::Rect(25, 25, 94, 94),
-                });
-
-            ninePatch->setArrangers(gui::Arrangers
-                {
-                    ._horizontal = gui::Arranger(gui::position::Center{},
-                                                 gui::dimension::Constant{100}),
-                    ._vertical = gui::Arranger(gui::position::Center{},
-                                               gui::dimension::Constant{100}),
-                });
+            ninePatch->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                             minire::gui::dimension::Constant{100});
+            ninePatch->vertical() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                           minire::gui::dimension::Constant{100});
         }
     };
 }

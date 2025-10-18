@@ -46,9 +46,6 @@ namespace minire::gui::layouts
         cell._id = id;
         auto [_, inserted] = _mapping.emplace(id, index);
         MINIRE_INVARIANT(inserted, "failed to insert {} into a grid", id);
-
-        // notify parent about a change
-        notify();
     }
 
     void Grid::unset(size_t row, size_t col)
@@ -62,11 +59,7 @@ namespace minire::gui::layouts
 
     void Grid::unset(std::string const & id)
     {
-        if (unsetImpl(id))
-        {
-            // notify parent about a change
-            notify();
-        }
+        unsetImpl(id);
     }
 
     bool Grid::unsetImpl(std::string const & id)

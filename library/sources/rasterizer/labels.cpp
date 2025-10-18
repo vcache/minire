@@ -11,7 +11,7 @@ namespace minire::rasterizer
     {}
 
     Label & Labels::allocate(std::string key, text::FormattedString const & text,
-                             int z, bool visible)
+                             size_t z, bool visible)
     {
         auto [it, inserted] = _store.emplace(
             key, std::make_unique<Label>(_fonts, text, z, visible));

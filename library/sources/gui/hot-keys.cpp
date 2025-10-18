@@ -23,7 +23,7 @@ namespace minire::gui
         }
     }
 
-    bool HotKeys::handle(events::application::OnKeyDown const & e) const
+    bool HotKeys::handle(minire::events::application::OnKeyDown const & e) const
     {
         if (auto it = _store.find(models::KeyCombo(e._code, e._mod));
             it != _store.cend()) 

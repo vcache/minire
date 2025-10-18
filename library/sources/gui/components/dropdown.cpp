@@ -1,81 +1,23 @@
 #include <minire/gui/components/dropdown.hpp>
 
-#include <utils/overloaded.hpp>
-
 #include <minire/errors.hpp>
+#include <minire/gui/components/scrollbar.hpp>
 #include <minire/gui/layout.hpp>
-#include <minire/gui/layouts/grid.hpp>
+#include <minire/gui/overlay-controller.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/input-handler.hpp>
 
-#include <fmt/format.h>
+#include <glm/common.hpp> // for glm::clamp
 
 #include <cassert>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace minire::gui::components
 {
-    class Dropdown::TongueLayout
-        : public Layout
-    {
-    public:
-        explicit TongueLayout(Dropdown & dropdown,
-                              size_t const rows)
-            : _dropdown(dropdown)
-            , _grid(rows, 1)
-        {
-            // NOTE: _grid doesn't need setParent() to be called,
-            //       because notification will be done manually.
-        }
-
-        Area evaluate(Area const & client,
-                      Component const & component) const override
-        {
-            auto scrollbar = _dropdown._tongue ? _dropdown._tongue->_scrollbar.lock()
-                                               : Scrollbar::Sptr();
-
-            if (scrollbar.get() == &component)
-            {
-                return Area
-                {
-                    ._left = client._left + client._width - _dropdown._scrollbarWidth,
-                    ._top = client._top,
-                    ._width = _dropdown._scrollbarWidth,
-                    ._height = client._height,
-                };
-            }
-            else
-            {
-                float const scrollbarWidth = scrollbar ? _dropdown._scrollbarWidth : 0;
-                Area const itemsArea
-                {
-                    ._left = client._left,
-                    ._top = client._top,
-                    ._width = client._width - scrollbarWidth,
-                    ._height = client._height,
-                };
-                return _grid.evaluate(itemsArea, component);
-            }
-        }
-
-        void set(size_t row, std::string const & id)
-        {
-            _grid.set(row, 0, id);
-        }
-
-        void unset(std::string const & id)
-        {
-            _grid.unset(id);
-        }
-
-        void notify()
-        {
-            Layout::notify();
-        }
-
-    private:
-        Dropdown    & _dropdown;
-        layouts::Grid _grid;
-    };
+    static std::string const kBaseItemId = "__baseItem__";
+    static std::string const kBaseDropButtonId = "__dropButton__";
 
     // TODO: instead of this, onUnfocus + conditional hotKeys can be used
     class Dropdown::DefaultHandler
@@ -86,20 +28,25 @@ namespace minire::gui::components
             : _dropdown(dropdown)
         {}
 
-        bool handle(events::application::OnMouseDown const &)  { exec(); return true; }
-        bool handle(events::application::OnMouseWheel const & e)
+        bool handle(minire::events::application::OnMouseDown const &)
+        {
+            _dropdown.closeTongue();
+            return true;
+        }
+
+        bool handle(minire::events::application::OnMouseWheel const & e)
         {
             _dropdown.wheelScroll(e._dy);
             return true;
         }
 
         // TODO: it will stop work if tongue would have a focus
-        bool handle(events::application::OnKeyDown const & e)
+        bool handle(minire::events::application::OnKeyDown const & e)
         {
             switch(e._key)
             {
                 case SDLK_ESCAPE:
-                    exec();
+                    _dropdown.closeTongue();
                     break;
 
                 case SDLK_UP:
@@ -111,24 +58,38 @@ namespace minire::gui::components
                     break;
 
                 case SDLK_PAGEUP:
-                    _dropdown.wheelScroll(_dropdown._tongueMaxLines);
+                    if (_dropdown._tongueOverlay)
+                    {
+                        assert(_dropdown._tongueOverlay->_listview);
+                        ListView & listview = *_dropdown._tongueOverlay->_listview;
+                        listview.scrollPageUp();
+                    }
                     break;
 
                 case SDLK_PAGEDOWN:
-                    _dropdown.wheelScroll(-_dropdown._tongueMaxLines);
+                    if (_dropdown._tongueOverlay)
+                    {
+                        assert(_dropdown._tongueOverlay->_listview);
+                        ListView & listview = *_dropdown._tongueOverlay->_listview;
+                        listview.scrollPageDown();
+                    }
                     break;
 
                 case SDLK_HOME:
-                    if (_dropdown._tongue)
+                    if (_dropdown._tongueOverlay)
                     {
-                        _dropdown.wheelScroll(_dropdown._tongue->_offset + 1);
+                        assert(_dropdown._tongueOverlay->_listview);
+                        ListView & listview = *_dropdown._tongueOverlay->_listview;
+                        listview.scrollHome();
                     }
                     break;
 
                 case SDLK_END:
-                    if (_dropdown._tongue)
+                    if (_dropdown._tongueOverlay)
                     {
-                        _dropdown.wheelScroll(-(_dropdown._contents.size() - _dropdown._tongue->_offset));
+                        assert(_dropdown._tongueOverlay->_listview);
+                        ListView & listview = *_dropdown._tongueOverlay->_listview;
+                        listview.scrollEnd();
                     }
                     break;
 
@@ -140,386 +101,236 @@ namespace minire::gui::components
             return true;
         }
 
-        void exec()
-        {
-            _dropdown.destroyOverlay();
-        }
-
     private:
         Dropdown & _dropdown;
     };
 
-    Dropdown::Dropdown(GuiController & controller,
-                       std::string const & id,
-                       std::shared_ptr<Container> const & parent)
-        : Container(controller, id, parent)
-    {}
-
-    void Dropdown::init(Background const & baseBackground,
-                        Background const & tongueBackground,
-                        Button::Background const & buttonBackground,
-                        Button::MaybeIcon const & buttonIcon,
-                        Button::MaybeText const & buttonText,
-                        Arrangers arrangers,
-                        float tongueMaxHeight,
-                        size_t tongueMaxLines,
-                        std::optional<size_t> constantLineHeight)
+    Dropdown::Dropdown(std::string const & id,
+                       Theme const & theme,
+                       OverlayController & overlayController,
+                       ItemBuilderCallback baseItemBuilder,
+                       ItemBuilderCallback tongueItemBuilder)
+        : Component(id, theme, overlayController)
+        , _background(*this, theme.dropdown().makeBackground())
+        , _tongue(*this, theme.dropdown().constants()._tongue)
+        , _contents(*this)
+        , _lineHeight(*this, 0)
+        , _dropButton(std::make_shared<Button>(kBaseDropButtonId, theme,
+                                               overlayController))
+        , _dropdownLayout(std::make_shared<layouts::VerticalTool>(
+            kBaseItemId, kBaseDropButtonId,
+            theme.dropdown().constants()._dropButtonWidth,
+            theme.dropdown().constants()._dropButtonAtLeft))
+        , _baseItemBuilderCallback(baseItemBuilder)
+        , _tongueItemBuilderCallback(tongueItemBuilder)
     {
-        MINIRE_INVARIANT(!_inited, "Dropdown cannot be initialized twice");
-
-        _background = emplace<Image>("__bg__", baseBackground._texture,
-            baseBackground._patch, Arrangers::fill());
-
-        _tongueBackground = tongueBackground;
-
-        _dropButton = emplace<Button>("__btn__", buttonBackground,
-            buttonIcon, buttonText,
-            Arrangers
-            {
-                ._horizontal = Arranger(position::More{},   dimension::Content{},
-                                        _activeItemPaddings._left, _activeItemPaddings._right),
-                ._vertical   = Arranger(position::Center{}, dimension::Content{},
-                                        _activeItemPaddings._top, _activeItemPaddings._bottom),
-            });
-        _dropButton->setClickCallback([this](Button const &) { buildOverlay(); });
-
-        _tongueMaxHeight = tongueMaxHeight;
-        _tongueMaxLines = tongueMaxLines;
-        _constantLineHeight = constantLineHeight;
-
-        setArrangers(arrangers);
-
-        _inited = true;
+        layout() = _dropdownLayout;
+        padding() = theme.dropdown().constants()._padding;
     }
 
-    void Dropdown::buildOverlay()
+    Dropdown::~Dropdown()
     {
-        assert(_inited);
-        assert(!_tongue);
-
-        _tongue = std::make_unique<Tongue>(Tongue
-        {
-            ._tag = fmt::format("__dropdown-{:#X}__",
-                                reinterpret_cast<std::uintptr_t>(this)),
-            ._defaultHandler = std::make_shared<DefaultHandler>(*this),
-            ._container = {},
-            ._scrollbar = {},
-            ._offset = _selectedIndex ? *_selectedIndex : 0,
-            ._subButtons = {},
-        });
-
-        gui::components::Container & overlay = guiPush(_tongue->_tag,
-                                                       _tongue->_defaultHandler);
-
-        _tongue->_container = overlay.emplace<Container>("__tongue__");
-        _tongue->_container->emplace<Image>("__bg__", _tongueBackground._texture,
-                                            _tongueBackground._patch, Arrangers::fill());
-        refillOverlay(); // will also call rearrangeTongue();
+        closeTongue();
     }
 
-    void Dropdown::rearrangeTongue()
+    void Dropdown::initialize()
     {
-        if (!_tongue) return;
-
-        Area const & area = contentArea();
-        assert(_tongue->_container);
-        _tongue->_container->setArrangers(Arrangers
-        {
-            ._horizontal = Arranger(position::Constant{area._left},
-                                    dimension::Constant{area._width}),
-            ._vertical   = Arranger(position::Constant{area._top + area._height},
-                                    dimension::Constant{_expectedTongueHeight > 0 ? _expectedTongueHeight
-                                                                                  : _tongueMaxHeight}),
-        });
+        _dropButton->setParent(shared_from_this());
+        _dropButton->icon() = theme().makeIcon(theme::Icon::kArrowDown);
+        _dropButton->setCallback(std::in_place_type<gui::events::OnClick>, "__open__",
+            [this](Component const &, gui::events::OnClick const &)
+            { openTongue(); });
     }
 
-    void Dropdown::refillOverlay()
+    void Dropdown::handle(gui::events::OnClick const & e)
     {
-        if (!_tongue) return;
+        openTongue();
+        Component::handle(e);
+    }
 
-        std::vector<Button::Sptr> items;
-        items.reserve(_contents.size());
+    void Dropdown::openTongue()
+    {
+        if (_tongueOverlay)
+            return;
 
-        // build item's components
-        if (_itemBuilderCallback)
-        {
-            for(size_t i = 0; i < _contents.size(); ++i)
+        _tongueOverlay = std::make_unique<TongueOverlay>(TongueOverlay
             {
-                auto item = _itemBuilderCallback(_contents[i], i,
-                                                 i == _selectedIndex,
-                                                 Purpose::kTongueLine);
-                if (item)
-                {
-                    items.push_back(item);
-                }
-            }
-        }
-
-        // calculate height
-        float totalHeight = 0;
-        if (_constantLineHeight)
-        {
-            totalHeight = (*_constantLineHeight) * items.size();
-        }
-        else
-        {
-            for(Button::Sptr const & item : items)
-            {
-                assert(item);
-
-                Dimension verticalDimension = item->arrangers()._vertical.dimension();
-                float const height = std::visit(utils::Overloaded
-                {
-                    [](dimension::Constant const & v) -> float { return v._dimension; },
-                    [&item](dimension::Fraction const &) -> float
-                    {
-                        MINIRE_THROW("Dropdown's item cannot be measured by a Fraction: {}", item->id());
-                    },
-                    [](dimension::Fill const &) -> float { return -1; },
-                    [&item](dimension::Content const &) -> float
-                    {
-                        std::optional<std::pair<float, float>> content = item->measureContent();
-                        MINIRE_INVARIANT(content, "no measurable content: {}", item->id());
-                        return content->second;
-                    },
-                }, verticalDimension);
-
-                if (height < 0)
-                {
-                    totalHeight = 0;
-                    break;
-                }
-
-                totalHeight += height;
-            }
-        }
-        totalHeight = std::min(totalHeight, _tongueMaxHeight);
-        _expectedTongueHeight = totalHeight;
-
-        // build a container
-        assert(_tongue->_container);
-        Container & container = *_tongue->_container;
-        container.erase("__items__");
-
-        auto layout = std::make_shared<TongueLayout>(*this, _tongueMaxLines);
-        auto itemsContainer = container.emplace<Container>("__items__", layout);
-#if 0
-    // TODO: implement this
-        itemsContainer->setMouseWheelCallback(
-            [this] (Image const &, events::application::OnMouseWheel const & e)
-            {
-                if (_tongue && _tongue->_defaultHandler)
-                {
-                    _tongue->_defaultHandler->handle(e);
-                }
-            });
-#endif
-        if (_scrollbarBuilderCallback)
-        {
-            auto scrollbar = _scrollbarBuilderCallback();
-            _tongue->_scrollbar = scrollbar;
-            if (scrollbar)
-            {
-                scrollbar->setArrangers(Arrangers::fill());
-                size_t const steps = _contents.size() > _tongueMaxLines ? _contents.size() - _tongueMaxLines : 0;
-                float const step = steps != 0 ? 1.0f / static_cast<float>(steps) : 1.0f;
-                scrollbar->setStep(step);
-                scrollbar->setValue(static_cast<float>(_tongue->_offset) * step);
-                itemsContainer->emplace(scrollbar);
-            }
-        }
-
-        itemsContainer->setArrangers(Arrangers
-            {
-                ._horizontal = Arranger(position::Center{}, dimension::Fill{},
-                                        _tonguePaddings._left, _tonguePaddings._right),
-                ._vertical   = Arranger(position::Center{}, dimension::Fill{},
-                                        _tonguePaddings._top, _tonguePaddings._bottom),
+                ._tag = fmt::format("__dropdown-{:#X}__",
+                                    reinterpret_cast<std::uintptr_t>(this)),
+                ._defaultHandler = std::make_shared<DefaultHandler>(*this),
+                ._listview = nullptr,
+                ._destroy = false,
             });
 
-        if (size_t lastIndex = _tongue->_offset + _tongueMaxLines;
-            lastIndex > _contents.size())
-        {
-            _tongue->_offset -= std::min(_tongue->_offset, lastIndex - _contents.size());
-        }
-
-        _tongue->_subButtons.clear();
-        for(size_t i = 0; i < items.size(); ++i)
-        {
-            Button::Sptr const & subButton = items[i];
-
-            MINIRE_INVARIANT(!subButton->hasClickCallback(),
-                             "Dropdown's button can't have a custom click callback");
-            subButton->setClickCallback([this, i](Button const &)
-                {
-                    select(i);
-                    destroyOverlay();
-                });
-
-            MINIRE_INVARIANT(!subButton->hasMouseWheelCallback(),
-                             "Dropdown's scrollbar can't have a custom mouse wheel callback");
-            subButton->setMouseWheelCallback(
-                [this] (Button const &, events::application::OnMouseWheel const & e)
-                {
-                    if (_tongue && _tongue->_defaultHandler)
-                    {
-                        _tongue->_defaultHandler->handle(e);
-                    }
-                });
-            itemsContainer->emplace(subButton);
-            _tongue->_subButtons.push_back(subButton);
-            if (_tongue->_offset <= i && i < (_tongue->_offset + _tongueMaxLines))
+        Component & overlay = overlayController().push(_tongueOverlay->_tag,
+                                                       _tongueOverlay->_defaultHandler);
+        _tongueOverlay->_listview = overlay.emplace<ListView>(
+            "__tongue__", _tongueItemBuilderCallback ? _tongueItemBuilderCallback
+                                                     : _baseItemBuilderCallback,
+            &(theme().dropdown().tongue()));
+        *(_tongueOverlay->_listview->contents()) = _contents.get();
+        _tongueOverlay->_listview->select(_selected);
+        _tongueOverlay->_listview->lineHeight() = _lineHeight;
+        _tongueOverlay->_listview->setCallback(
+            std::in_place_type<listview::OnSelectionChanged>, "__dropdown__",
+            [this] (Component const &, listview::OnSelectionChanged const & e)
             {
-                layout->set(i - _tongue->_offset, subButton->id());
-            }
-            else
-            {
-                subButton->setVisible(false);
-            }
-        }
-        layout->notify();
+                select(e._current);
+            });
 
-        if (auto scrollbar = _tongue->_scrollbar.lock(); scrollbar)
-        {
-            MINIRE_INVARIANT(!scrollbar->hasValueChangedCallback(),
-                             "Dropdown's scrollbar can't have custom valueChange callback");
-
-            scrollbar->setValueChangedCallback(
-                [this, wlayout = std::weak_ptr<TongueLayout>(layout)]
-                (Scrollbar const &, float, float value)
-                {
-                    auto layout = wlayout.lock();
-                    if (!_tongue || !layout) return;
-
-                    size_t const buttonsCnt = _tongue->_subButtons.size();
-                    size_t const boundary = std::min(buttonsCnt, _tongueMaxLines);
-                    size_t const newOffset =
-                        value * static_cast<float>(buttonsCnt - boundary);
-                    if (newOffset != _tongue->_offset)
-                    {
-                        for(size_t i = 0; i < boundary; ++i)
-                        {
-                            if (auto subButton = _tongue->_subButtons[_tongue->_offset + i].lock();
-                                subButton)
-                            {
-                                layout->unset(subButton->id());
-                                subButton->setVisible(false);
-                            }
-                        }
-
-                        _tongue->_offset = newOffset;
-
-                        for(size_t i = 0; i < boundary; ++i)
-                        {
-                            if (auto subButton = _tongue->_subButtons[_tongue->_offset + i].lock();
-                                subButton)
-                            {
-                                layout->set(i, subButton->id());
-                                subButton->setVisible(true);
-                            }
-                        }
-                    }
-
-                    layout->notify();
-                });
-        }
-
-        rearrangeTongue();
+        invalidate();
     }
 
-    void Dropdown::destroyOverlay()
+    size_t Dropdown::revalidateContent(size_t zOffset,
+                                       bool const effectiveVisible,
+                                       Area const & clientArea)
     {
-        assert(_tongue);                        // a tongue is created
-        assert(_tongue->_tag == guiTopTag());   // the top overlay is our
-        _tongue.reset();
-        guiPop();
-    }
-
-    void Dropdown::onContentAreaChanged()
-    {
-        Container::onContentAreaChanged();
-        rearrangeTongue();
-    }
-
-    void Dropdown::revalidateContents()
-    {
-        // ensure _selectedIndex sanity
-        if (_selectedIndex &&
-            *_selectedIndex >= _contents.size())
+        // maybe close the tongue
+        if (_tongueOverlay && _tongueOverlay->_destroy)
         {
-            _selectedIndex.reset();
+            closeTongue();
         }
 
-        // actialize the active item
-        if (auto activeItem = _activeItem.lock();
-            activeItem)
+        // perform consistency step
+        if (_selected && *_selected >= _contents.get().size())
         {
-            erase(activeItem->id());
+            auto previous = _selected;
+            _selected = std::nullopt;
+            handle(dropdown::OnSelectionChanged{previous, _selected});
             _activeItem.reset();
         }
 
-        if (_selectedIndex)
+        // revalidate background (if any)
+        if (auto background = _background.get(); background)
         {
-            assert(*_selectedIndex < _contents.size());
-            if (_itemBuilderCallback)
+            if (_background.isInvalidated())
             {
-                auto activeItem = _itemBuilderCallback(_contents[*_selectedIndex],
-                                                       *_selectedIndex, true,
-                                                       Purpose::kActiveLine);
-                activeItem->setClickCallback([this](Button const &){ buildOverlay(); });
+                background->setContentInvalidator(shared_from_this());
+            }
 
-                auto arrangers = activeItem->arrangers();
-                arrangers._horizontal.setMarginMin(_activeItemPaddings._left);
-                arrangers._horizontal.setMarginMax(_activeItemPaddings._right);
-                arrangers._vertical.setMarginMin(_activeItemPaddings._top);
-                arrangers._vertical.setMarginMax(_activeItemPaddings._bottom);
-                activeItem->setArrangers(arrangers);
+            background->setContentArea(clientArea);
+            background->setVisible(effectiveVisible);
+            zOffset = background->onZOrderChanged(zOffset);
+        }
 
-                emplace(activeItem);
-                if (_dropButton->zOrder() <= activeItem->zOrder())
-                {
-                    size_t tmp = _dropButton->zOrder();
-                    _dropButton->setZOrder(activeItem->zOrder() + 1);
-                    activeItem->setZOrder(tmp);
-                }
-
-                _activeItem = activeItem;
+        // actualize active element
+        if (_selected && (!_activeItem || _contents.isInvalidated()))
+        {
+            MINIRE_INVARIANT(_baseItemBuilderCallback, "no base item builder for \"{}\"", id());
+            _activeItem.reset();
+            if (*_selected < _contents.get().size())
+            {
+                _activeItem = _baseItemBuilderCallback(_contents.get().at(*_selected), *_selected);
+                _activeItem->setContentInvalidator(shared_from_this());
             }
         }
 
-        // actialize the tongue
-        refillOverlay();
+        if (_activeItem)
+        {
+            _activeItem->setContentArea(clientArea);
+            _activeItem->setVisible(effectiveVisible);
+            zOffset = _activeItem->onZOrderChanged(zOffset);
+        }
+
+        // rearrange a tongue (if any)
+        if (_tongueOverlay)
+        {
+            assert(_tongueOverlay->_listview);
+            ListView & listview = *(_tongueOverlay->_listview);
+
+            if (_contents.isInvalidated())
+            {
+                *(listview.contents()) = _contents.get();
+            }
+
+            Tongue const & tongue = _tongue.get();
+
+            float const tongueTop = clientArea._top + clientArea._height;
+            float const heightLimit = overlayController().topClientArea()._height - tongueTop;
+            size_t const shownLines = std::min(_contents.get().size(),
+                                               tongue._maxLines.value_or(0ULL));
+            float const lineHeight = listview.lineHeight().get();
+
+            float tongueHeight = static_cast<float>(shownLines) * lineHeight +
+                                 listview.padding().get()._top +
+                                 listview.padding().get()._bottom;
+            tongueHeight = glm::clamp(tongueHeight,
+                                      tongue._minHeight.value_or(.0f),
+                                      std::min(tongue._maxHeight.value_or(heightLimit), heightLimit));
+
+            listview.horizontal() = Arranger(position::Constant{clientArea._left},
+                                             dimension::Constant{clientArea._width}),
+            listview.vertical()   = Arranger(position::Constant{tongueTop},
+                                             dimension::Constant{tongueHeight});
+
+        }
+        // finish
+        _background.revalidate();
+        _tongue.revalidate();
+        _contents.revalidate();
+
+        return zOffset;
+    }
+
+
+    void Dropdown::closeTongue()
+    {
+        if (_tongueOverlay)
+        {
+            if(_tongueOverlay->_tag == overlayController().topTag())
+            {
+                overlayController().pop();
+            }
+            _tongueOverlay.reset();
+        }
     }
 
     void Dropdown::wheelScroll(int deltaY)
     {
-        if (auto scrollbar = _tongue ? _tongue->_scrollbar.lock() : Scrollbar::Sptr();
-            scrollbar)
+        if (_tongueOverlay)
         {
-            float const delta = static_cast<float>(deltaY) * scrollbar->step();
-            scrollbar->setValue(scrollbar->value() - delta);
+            assert(_tongueOverlay->_listview);
+            ListView & listview = *(_tongueOverlay->_listview);
+            listview.scroll(deltaY);
         }
     }
 
-    std::any const * Dropdown::selectedValue() const
+    void Dropdown::select(Selected selected)
     {
-        if (!_selectedIndex)
-            return nullptr;
-        assert(*_selectedIndex < _contents.size());
-        return &_contents.at(*_selectedIndex);
-    }
+        // close the tongue
+        if (_tongueOverlay)
+        {
+            _tongueOverlay->_destroy = true;
+            invalidate();
+        }
 
-    void Dropdown::select(std::optional<size_t> index)
-    {
-        if (_selectedIndex == index)
+        // ensure sanity
+        if (selected && *selected >= _contents.get().size())
+        {
+            selected = std::nullopt;
+        }
+
+        // avoid non-chagning calls
+        if (_selected == selected)
             return;
 
-        auto previous = _selectedIndex;
-        _selectedIndex = index;
+        // update the state
+        Selected previous = _selected;
+        _selected = selected;
 
-        if (_selectionChangedCallback)
-            _selectionChangedCallback(*this, previous, _selectedIndex);
+        // actialize an active item
+        _activeItem.reset();
+        invalidateContent();
 
-        revalidateContents();
+        // notify subscribers
+        handle(dropdown::OnSelectionChanged{previous, _selected});
+    }
+
+    Dropdown::Selected const & Dropdown::selected() const { return _selected; }
+
+    std::any const * Dropdown::current() const
+    {
+        return _selected ? &(_contents.get().at(*_selected)) : nullptr;
+
     }
 }

@@ -21,7 +21,7 @@ namespace minire::rasterizer
 
     public:
         Label & allocate(std::string, text::FormattedString const &,
-                         int z = 0, bool visible = true);
+                         size_t z = 0, bool visible = true);
 
         void deallocate(std::string const &);
 

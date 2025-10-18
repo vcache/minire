@@ -31,13 +31,17 @@ namespace minire::rasterizer
                     glm::vec2 const & position,
                     glm::vec2 const & dimensions,
                     bool const visible,
-                    int const zOrder);
+                    size_t const zOrder);
 
         void move(std::string const & id,
                   glm::vec2 const & position);
 
         void resize(std::string const & id,
                     glm::vec2 const & dimensions);
+
+        void setArea(std::string const & id,
+                     glm::vec2 const & position,
+                     glm::vec2 const & dimensions);
 
         void visible(std::string const & id,
                      bool visible);

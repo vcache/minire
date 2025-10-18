@@ -1,90 +1,94 @@
 #pragma once
 
+#include <minire/gui/component.hpp>
 #include <minire/gui/components/button.hpp>
-#include <minire/gui/components/container.hpp>
-#include <minire/gui/components/image.hpp>
-
-#include <functional>
-#include <memory>
-#include <string>
+#include <minire/gui/content-view.hpp>
 
 namespace minire::gui::components
 {
+    namespace scrollbar
+    {
+        struct OnValueChanged
+        {
+            float _previous;
+            float _current;
+        };
+    }
+
     class Scrollbar final
-        : public Container
+        : public Component
+        , public Callback<Scrollbar, scrollbar::OnValueChanged>
     {
     public:
+        Scrollbar(std::string const & id,
+                  Theme const & theme,
+                  OverlayController &,
+                  bool isVertical);
+
         using Sptr = std::shared_ptr<Scrollbar>;
         using Wptr = std::weak_ptr<Scrollbar>;
 
-        Scrollbar(GuiController & controller,
-                  std::string const & id,
-                  std::shared_ptr<Container> const & parent);
+        using CommonCallbacks::handle;
+        using CommonCallbacks::setCallback;
+        using Callback<Scrollbar, scrollbar::OnValueChanged>::handle;
+        using Callback<Scrollbar, scrollbar::OnValueChanged>::setCallback;
 
-        struct Background
-        {
-            content::Id      _texture;
-            utils::NinePatch _patch;
-        };
+        Button const & increaseButton() const;
+        Button const & decreaseButton() const;
+        Button const & slider() const;
 
-        // NOTE: It must be called right after a ctor.
-        //       This is workaround for shared_from_this() from a ctor
-        //       problem (cannot call this->emplace() from a ctor).
-        // TODO: fix it!!
-        void init(bool vertical,
-                  Background const & background,
-                  Button::Sptr const & increase,
-                  Button::Sptr const & decrease,
-                  Button::Sptr const & slider,
-                  Arrangers arrangers = Arrangers::fill());
+        Button & increaseButton();
+        Button & decreaseButton();
+        Button & slider();
 
-    public:
-        float value() const { return _currentValue; }
-        void setValue(float);
+        float value() const { return _value.get(); }
+        void setValue(float value);
 
-        float step() const { return _step; }
-        void setStep(float);
+        Property<ImageView::Sptr> const & background() const { return _background; }
+        Property<ImageView::Sptr> & background() { return _background; }
 
-        float minSliderSize() const { return _minSliderSize; }
-        void setMinSliderSize(float);
+        Property<float> const & step() const { return _step; }
+        Property<float> & step() { return _step; }
 
-    public:
-        using ValueChangedCallback =
-            std::function<void(Scrollbar &, float previous, float current)>;
+        Property<float> const & minSliderLength() const { return _minSliderLength; }
+        Property<float> & minSliderLength() { return _minSliderLength; }
 
-        template<typename Callback>
-        void setValueChangedCallback(Callback callback)
-        {
-            _valueChangedCallback = callback;
-        }
+        Property<bool> const & isVertical() const { return _isVertical; }
+        Property<bool> & isVertical() { return _isVertical; }
 
-        bool hasValueChangedCallback() const { return _valueChangedCallback.operator bool(); }
+        virtual void handle(minire::events::application::OnMouseWheel const &) override;
 
     protected:
-        void onContentAreaChanged() override;
+        void initialize() override;
+
+        size_t revalidateContent(size_t zOffset,
+                                 bool const effectiveVisible,
+                                 Area const & clientArea) override;
 
     private:
-        void updateArrangers();
-        void setSliderOfffset(float);
-        void setSliderAmplitude(float const);
-
-        float sliderSize() const;
+        void setValueFromPosition(float abs);
 
     private:
+        using Boundaries = std::pair<float, float>;
+
+        Property<ImageView::Sptr> _background;
+        Property<float>           _step;
+        Property<float>           _minSliderLength;
+        Property<bool>            _isVertical;
+        Property<float>           _value;
+
+        Button::Sptr              _increaseButton;
+        Button::Sptr              _decreaseButton;
+        Button::Sptr              _slider;
+
+        ImageView::Wptr           _defaultIncreaseIcon;
+        ImageView::Wptr           _defaultDecreaseIcon;
+
+        Boundaries                _sliderAreaBoundaries{0, 0};
+        float                     _sliderLength = 0;
+        float                     _dragInitialOffset = 0;
+
         class CustomLayout;
-
-        Button::Sptr         _background;
-        Button::Sptr         _increase;
-        Button::Sptr         _decrease;
-        Button::Sptr         _slider;
-        ValueChangedCallback _valueChangedCallback;
-        float                _currentValue = 0.0f;
-        float                _step = 0.1f;
-        float                _minSliderSize = 10.0f;
-        float                _sliderOffset = 0.0f;
-        float                _sliderAmplitude = 0.0f;
-        bool                 _vertical = false;
-
-        friend class Layout;
+        friend class CustomLayout;
     };
 }

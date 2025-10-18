@@ -70,10 +70,6 @@ namespace minire::gui::models
     void Checkable::setCheckedImpl(bool checked)
     {
         _checked = checked;
-        onCheckChanged();
-        if (_checkedCallback)
-        {
-            _checkedCallback(*this);
-        }
+        handle(checkable::OnCheckedChanged{_checked});
     }
 }

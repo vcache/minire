@@ -40,6 +40,8 @@ namespace minire::utils
             _bottom += offset;
             return *this;
         }
+
+        bool operator==(Rect const &) const = default;
     };
 
     using MaybeRect = std::optional<Rect>;

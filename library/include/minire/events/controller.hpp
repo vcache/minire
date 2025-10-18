@@ -23,7 +23,9 @@ namespace minire::events
                                     controller::CreateSprite,
                                     controller::ResizeSprite,
                                     controller::MoveSprite,
+                                    controller::SetSpriteArea,
                                     controller::SetSpriteVisible,
+                                    controller::SetSpriteZOrder,
                                     controller::RemoveSprite,
                                     controller::BulkSetSpriteZOrders,
 
@@ -33,6 +35,7 @@ namespace minire::events
                                     controller::SetLabelText,
                                     controller::SetLabelFontFace,
                                     controller::SetLabelClipping,
+                                    controller::SetLabelZOrder,
                                     controller::RemoveLabel,
                                     controller::BulkSetLabelZOrders,
 

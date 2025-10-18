@@ -2,7 +2,6 @@
 
 #include <minire/content/manager.hpp>
 #include <minire/gui-controller.hpp>
-#include <minire/gui/components/container.hpp>
 #include <minire/gui/components/image.hpp>
 #include <minire/gui/layouts/grid.hpp>
 #include <minire/logging.hpp>
@@ -24,16 +23,15 @@ namespace
             GuiController::start();
 
             auto layout = std::make_shared<minire::gui::layouts::Grid>(3, 4);
-
-            auto container = guiRoot().emplace<minire::gui::components::Container>(
-                "container", layout);
+            auto container = guiRoot().emplace<minire::gui::Component>("container");
+            container->layout() = layout;
 
             for(size_t row = 0; row < layout->rows(); row++)
             {
                 for(size_t col = 0; col < layout->cols(); col++)
                 {
                     auto image = container->emplace<minire::gui::components::Image>(
-                        fmt::format("cell-{}x{}", row, col), "image.png");
+                        fmt::format("cell-{}x{}", row, col), makeImageView("image.png"));
                     layout->set(row, col, image->id());
                 }
             }

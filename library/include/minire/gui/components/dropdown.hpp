@@ -1,158 +1,145 @@
 #pragma once
 
-#include <minire/gui/arranger.hpp>
+#include <minire/gui/callbacks.hpp>
 #include <minire/gui/component.hpp>
 #include <minire/gui/components/button.hpp>
-#include <minire/gui/components/container.hpp>
-#include <minire/gui/components/image.hpp>
-#include <minire/gui/components/scrollbar.hpp>
-#include <minire/utils/rect.hpp>
+#include <minire/gui/components/listview.hpp>
+#include <minire/gui/content-view.hpp>
+#include <minire/gui/layouts/vertical-tool.hpp>
 
 #include <any>
 #include <cassert>
 #include <functional>
-#include <memory>
 #include <optional>
-#include <string>
+#include <variant>
 #include <vector>
 
 namespace minire::gui::components
 {
+    namespace dropdown
+    {
+        struct OnSelectionChanged
+        {
+            std::optional<size_t> _previous;
+            std::optional<size_t> _current;
+        };
+    }
+
+    // TODO: dont' open tongue on empty list
     class Dropdown final
-        : public Container
+        : public Component
+        , public Callback<Dropdown, dropdown::OnSelectionChanged>
     {
     public:
+        using ItemBuilderCallback =
+            std::function<ContentView::Sptr(std::any const & value, size_t index)>;
+
+        Dropdown(std::string const & id,
+                 Theme const & theme,
+                 OverlayController &,
+                 ItemBuilderCallback baseItemBuilder = {},
+                 ItemBuilderCallback tongueItemBuilder = {});
+
+        ~Dropdown() override;
+
         using Sptr = std::shared_ptr<Dropdown>;
         using Wptr = std::weak_ptr<Dropdown>;
+        using Contents = std::vector<std::any>;
+        using Selected = std::optional<size_t>;
 
-        Dropdown(GuiController & controller,
-                 std::string const & id,
-                 std::shared_ptr<Container> const & parent);
+        using CommonCallbacks::handle;
+        using CommonCallbacks::setCallback;
+        using Callback<Dropdown, dropdown::OnSelectionChanged>::handle;
+        using Callback<Dropdown, dropdown::OnSelectionChanged>::setCallback;
 
-        struct Background
+        Button const & dropButton() const { assert(_dropButton); return *_dropButton; }
+        Button & dropButton() { assert(_dropButton); return *_dropButton; }
+
+        Property<ImageView::Sptr> const & background() const { return _background; }
+        Property<ImageView::Sptr> & background() { return _background; }
+
+        Property<theme::Dropdown::Constants::Tongue> const & tongue() const { return _tongue; }
+        Property<theme::Dropdown::Constants::Tongue> & tongue() { return _tongue; }
+
+        Property<Contents> const & contents() const { return _contents; }
+        Property<Contents> & contents() { return _contents; }
+
+        Property<float> const & lineHeight() const { return _lineHeight; }
+        Property<float> & lineHeight() { return _lineHeight; }
+
+        layouts::VerticalTool const & dropDownLayout() const
         {
-            content::Id      _texture;
-            utils::NinePatch _patch;
-        };
+            assert(_dropdownLayout);
+            return *_dropdownLayout;
+        }
 
-        // NOTE: It must be called right after a ctor.
-        //       This is workaround for shared_from_this() from a ctor
-        //       problem (cannot call this->emplace() from a ctor).
-        // TODO: fix it!!
-        void init(Background const & baseBackground,
-                  Background const & tongueBackground,
-                  Button::Background const & buttonBackground,
-                  Button::MaybeIcon const & buttonIcon = std::nullopt,
-                  Button::MaybeText const & buttonText = std::nullopt,
-                  Arrangers arrangers = Arrangers(),
-                  float tongueMaxHeight = 200,
-                  size_t tongueMaxLines = 5,
-                  std::optional<size_t> constantLineHeight = std::nullopt);
-
-    public:
-        Button & button() { assert(_dropButton); return *_dropButton; }
-        Button const & button() const { assert(_dropButton); return *_dropButton; }
-
-        enum class Purpose
+        layouts::VerticalTool & dropDownLayout()
         {
-            kActiveLine, kTongueLine
-        };
+            assert(_dropdownLayout);
+            return *_dropdownLayout;
+        }
 
-        using ItemBuilderCallback =
-            std::function<Button::Sptr(std::any const &, size_t, bool, Purpose)>;
+        void select(Selected);
+        Selected const & selected() const;
+        std::any const * current() const;
 
+        // This is is mandatory.
         template<typename Callback>
-        void setItemBuilderCallback(Callback callback)
+        void setBaseItemBuilder(Callback callback)
         {
-            _itemBuilderCallback = callback;
-            refillOverlay();
+            _baseItemBuilderCallback = callback;
+            invalidate();
         }
 
-        using ScrollbarBuilderCallback = std::function<Scrollbar::Sptr()>;
-
+        // This one is optional. When omitted,
+        // BaseItemBuilder will be used.
         template<typename Callback>
-        void setScrollbarBuilderCallback(float const width, Callback callback)
+        void setTongueItemBuilder(Callback callback)
         {
-            _scrollbarWidth = width;
-            _scrollbarBuilderCallback = callback;
-            refillOverlay();
+            _tongueItemBuilderCallback = callback;
+            invalidate();
         }
 
-        using SelectionChangedCallback =
-            std::function<void(Dropdown &,
-                               std::optional<size_t> previous,
-                               std::optional<size_t> current)>;
-
-        template<typename Callback>
-        void setSelectionChangedCallback(Callback callback)
-        {
-            _selectionChangedCallback = callback;
-        }
-
-    public:
-        std::vector<std::any> const & contents() const { return _contents; }
-
-        template<typename UnaryOp>
-        void editContents(UnaryOp unaryOp)
-        {
-            if (unaryOp(_contents))
-                revalidateContents();
-        }
-
-        std::any const * selectedValue() const;
-
-        std::optional<size_t> selectedIndex() const { return _selectedIndex; }
-
-        void select(std::optional<size_t>);
-
-        void destroyOverlay(); // close the tongue if any
+        void handle(gui::events::OnClick const &) override;
 
     protected:
-        void onContentAreaChanged() override;
+        void initialize() override;
 
+        size_t revalidateContent(size_t zOffset,
+                                 bool const effectiveVisible,
+                                 Area const & clientArea) override;
     private:
-        void buildOverlay();
-        void refillOverlay();
-        void rearrangeTongue();
-        void revalidateContents();
+        void openTongue();
+        void closeTongue();
         void wheelScroll(int deltaY);
 
-    private:
         class DefaultHandler;
-        class TongueLayout;
 
-        struct Tongue
+        struct TongueOverlay
         {
-            std::string                     _tag;
+            std::string const               _tag;
             std::shared_ptr<DefaultHandler> _defaultHandler;
-            Container::Sptr                 _container;
-            Scrollbar::Wptr                 _scrollbar;
-            size_t                          _offset;
-            std::vector<Component::Wptr>    _subButtons;
+            std::shared_ptr<ListView>       _listview;
+            bool                            _destroy;
         };
 
-        Background               _tongueBackground;
-        float                    _tongueMaxHeight = 0;
-        size_t                   _tongueMaxLines = 0;
-        std::optional<size_t>    _constantLineHeight;
-        Image::Sptr              _background;
-        Button::Sptr             _dropButton;
-        Button::Wptr             _activeItem;
-        float                    _scrollbarWidth = 0;
-        utils::Rect              _activeItemPaddings = utils::Rect(1.0f);
-        utils::Rect              _tonguePaddings = utils::Rect(1.0f);
-        std::unique_ptr<Tongue>  _tongue;
-        ItemBuilderCallback      _itemBuilderCallback;
-        SelectionChangedCallback _selectionChangedCallback;
-        ScrollbarBuilderCallback _scrollbarBuilderCallback;
+    private:
+        using Tongue = theme::Dropdown::Constants::Tongue;
 
-        std::vector<std::any>    _contents;
-        std::optional<size_t>    _selectedIndex;
+        Property<ImageView::Sptr>      _background;
+        Property<Tongue>               _tongue;
+        Property<Contents>             _contents;
+        Property<float>                _lineHeight;
 
-        float                    _expectedTongueHeight = 0;
-        bool                     _inited = false;
+        Button::Sptr                   _dropButton;
+        layouts::VerticalTool::Sptr    _dropdownLayout;
+        ItemBuilderCallback            _baseItemBuilderCallback;
+        ItemBuilderCallback            _tongueItemBuilderCallback;
+
+        std::unique_ptr<TongueOverlay> _tongueOverlay;
+        Selected                       _selected;
+        ContentView::Sptr              _activeItem;
 
         friend class DefaultHandler;
-        friend class TongueLayout;
     };
 }

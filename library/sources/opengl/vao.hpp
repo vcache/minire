@@ -23,16 +23,23 @@ namespace minire::opengl
 
             bind();
 
-            if (GL_FALSE == glIsVertexArray(_vaoId))
-            {
-                MINIRE_THROW("failed to generate VAO");
-            }
+            MINIRE_INVARIANT(GL_TRUE == glIsVertexArray(_vaoId),
+                             "failed to generate VAO: {}", _vaoId);
         }
+
+        VAO(VAO const &) = delete;
+        VAO(VAO &&) = delete;
+        VAO & operator=(VAO const &) = delete;
+        VAO & operator=(VAO &&) = delete;
 
         ~VAO()
         {
             if (glIsVertexArray(_vaoId))
             {
+                if (_vaoId == _used)
+                {
+                    _used = 0;
+                }
                 glDeleteVertexArrays(1, &_vaoId);
             }
         }

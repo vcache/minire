@@ -320,7 +320,7 @@ namespace minire::rasterizer
 
     Label::Label(Fonts const & fonts,
                  text::FormattedString const & text,
-                 int z, bool visible)
+                 size_t z, bool visible)
         : Drawable(z)
         , _fonts(fonts)
         , _text(text)

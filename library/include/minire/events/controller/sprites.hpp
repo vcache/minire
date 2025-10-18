@@ -39,10 +39,23 @@ namespace minire::events::controller
         glm::vec2   _position;
     };
 
+    struct SetSpriteArea
+    {
+        std::string _id;
+        glm::vec2   _position;
+        glm::vec2   _dimensions;
+    };
+
     struct SetSpriteVisible
     {
         std::string _id;
         bool        _visible;
+    };
+
+    struct SetSpriteZOrder
+    {
+        std::string _id;
+        size_t      _zOrder;
     };
 
     struct RemoveSprite

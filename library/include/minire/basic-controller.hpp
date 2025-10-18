@@ -16,7 +16,6 @@
 
 namespace minire::content { class Lease; }
 namespace minire::content { class Manager; }
-namespace minire::gui { class Component; }
 namespace minire::models { class FontFace; }
 namespace minire::text { class FormattedString; }
 
@@ -63,6 +62,9 @@ namespace minire
 
         std::unique_ptr<content::Lease> borrow(content::Id const &) const;
 
+        std::pair<glm::vec2 /* min size */, bool /* resizable */>
+        measure(utils::Patch const & patch, content::Id const & texture) const;
+
         glm::vec2 measure(text::FormattedString const &,
                           content::Id const &) const;
 
@@ -91,6 +93,10 @@ namespace minire
         {
             enqueueRaw(EventType(std::forward<Args>(args)...));
         }
+
+        content::Manager & contentManager() { return _contentManager; }
+
+        content::Manager const & contentManager() const { return _contentManager; }
 
         double frameTime() const { return _frameTime; }
 
@@ -145,9 +151,5 @@ namespace minire
 #       ifndef NDEBUG
         std::vector<size_t>      _eventsLatency;
 #       endif
-
-        // This helps to open access to enqueue() without
-        // making it public.
-        friend class gui::Component;
     };
 }

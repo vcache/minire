@@ -1,5 +1,6 @@
 #pragma once
 
+#include <minire/gui/callbacks.hpp>
 #include <minire/gui/models/checkable.hpp>
 
 #include <functional>
@@ -9,18 +10,21 @@
 
 namespace minire::gui::models
 {
+    namespace exclusive_group
+    {
+        struct OnChange
+        {
+            Checkable * _previous = nullptr;
+            Checkable * _current = nullptr;
+        };
+    }
+
     class ExclusiveGroup
+        : public Callback<ExclusiveGroup, exclusive_group::OnChange>
     {
     public:
         explicit ExclusiveGroup(bool allowUnselect = false)
             : _allowUnselect(allowUnselect)
-        {}
-
-        template<typename Callback>
-        explicit ExclusiveGroup(bool allowUnselect,
-                                Callback callback)
-            : _changeCallback(callback)
-            , _allowUnselect(allowUnselect)
         {}
 
         void select(Checkable *);
@@ -36,25 +40,15 @@ namespace minire::gui::models
 
         bool allowUnselect() const { return _allowUnselect; }
 
-    public:
-        template<typename T>
-        void setChangeCallback(T changeCallback)
-        {
-            _changeCallback = changeCallback;
-        }
-
     private:
         void add(Checkable *);
 
         void erase(Checkable *);
 
     private:
-        using ChangeCallback = std::function<void(Checkable * previous,
-                                                  Checkable * current)>;
         using Store = std::unordered_set<Checkable *>;
 
         Store          _store;
-        ChangeCallback _changeCallback;
         Checkable    * _selected = nullptr;
         bool           _allowUnselect = true;
 

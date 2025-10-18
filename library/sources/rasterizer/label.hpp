@@ -27,7 +27,7 @@ namespace minire::rasterizer
     public:
         explicit Label(Fonts const &,
                        text::FormattedString const & text,
-                       int z, bool visible);
+                       size_t z, bool visible);
 
         ~Label(); // because of std::unique_ptr<Buffer>
 

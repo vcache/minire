@@ -95,6 +95,9 @@ namespace minire::text
         }
 
     public:
+        bool operator==(FormattedString const &) const = default;
+
+    public:
         // TODO BUG: it will crash when fragment is an empty string.
         //           For example:
         //              FormattedString str;

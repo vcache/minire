@@ -323,9 +323,20 @@ namespace minire
         _rasterizer->sprites().move(e._id, e._position);
     }
 
+    void Application::handle(events::controller::SetSpriteArea const & e)
+    {
+        _rasterizer->sprites().setArea(e._id, e._position, e._dimensions);
+    }
+
     void Application::handle(events::controller::SetSpriteVisible const & e)
     {
         _rasterizer->sprites().visible(e._id, e._visible);
+    }
+
+    void Application::handle(events::controller::SetSpriteZOrder const & e)
+    {
+        MINIRE_DEBUG("setting Z for sprite \"{}\" to {}", e._id, e._zOrder);
+        _rasterizer->sprites().setZOrder(e._id, e._zOrder);
     }
 
     void Application::handle(events::controller::RemoveSprite const & e)
@@ -367,6 +378,12 @@ namespace minire
     void Application::handle(events::controller::SetLabelClipping const & e)
     {
         _rasterizer->labels().get(e._id).setMaxSize(e._maxSize);
+    }
+
+    void Application::handle(events::controller::SetLabelZOrder const & e)
+    {
+        MINIRE_DEBUG("setting Z for label \"{}\" to {}", e._id, e._zOrder);
+        _rasterizer->labels().get(e._id).setZOrder(e._zOrder);
     }
 
     void Application::handle(events::controller::SetLabelText const & e)

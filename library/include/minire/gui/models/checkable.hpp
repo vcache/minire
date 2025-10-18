@@ -1,13 +1,23 @@
 #pragma once
 
-#include <functional>
+#include <minire/gui/callbacks.hpp>
+
 #include <memory>
 
 namespace minire::gui::models
 {
+    namespace checkable
+    {
+        struct OnCheckedChanged
+        {
+            bool _checked = false;
+        };
+    }
+
     class ExclusiveGroup;
 
     class Checkable
+        : public Callback<Checkable, checkable::OnCheckedChanged>
     {
     public:
         explicit Checkable(bool checkable = false);
@@ -28,26 +38,13 @@ namespace minire::gui::models
         bool canUncheck() const;
 
     public:
-        template<typename T>
-        void setCheckedCallback(T checkedCallback)
-        {
-            _checkedCallback = checkedCallback;
-        }
-
-    public:
         using ExclusiveGroupSptr = std::shared_ptr<ExclusiveGroup>;
         void setExclusiveGroup(ExclusiveGroupSptr const &);
-
-    protected:
-        virtual void onCheckChanged() {}
 
     private:
         void setCheckedImpl(bool checked);
 
     private:
-        using CheckedCallback = std::function<void(Checkable &)>;
-
-        CheckedCallback    _checkedCallback;
         ExclusiveGroupSptr _exclusiveGroup;
         bool               _checkable = false;
         bool               _checked = false;

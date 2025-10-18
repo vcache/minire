@@ -67,7 +67,6 @@ namespace minire::gui::models
             _selected->setCheckedImpl(true);
         }
 
-        if (_changeCallback)
-            _changeCallback(previous, _selected);
+        handle(exclusive_group::OnChange{previous, _selected});
     }
 }

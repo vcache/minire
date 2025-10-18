@@ -70,6 +70,10 @@ namespace minire::opengl
     {
         if (_id != 0 && GL_TRUE == ::glIsProgram(_id))
         {
+            if (_used == _id)
+            {
+                _used = 0;
+            }
             ::glDeleteProgram(_id);
         }
     }

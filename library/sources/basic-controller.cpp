@@ -8,6 +8,7 @@
 #include <minire/utils/aabb-tools.hpp>
 #include <text/measurer.hpp>
 #include <utils/fps-counter.hpp>
+#include <utils/overloaded.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -36,7 +37,7 @@ namespace minire
         _working = false;
         _thread.join();
     }
-    
+
     void BasicController::run(events::application::OnResize const & initial)
     {
         _thread = std::thread(
@@ -231,6 +232,35 @@ namespace minire
     utils::Aabb BasicController::measure(content::Path const & path) const
     {
         return utils::buildAabb(_contentManager, path);
+    }
+
+    std::pair<glm::vec2, bool> BasicController::measure(utils::Patch const & patch,
+                                                        content::Id const & texture) const
+    {
+        return std::visit(utils::Overloaded
+        {
+            [this, &texture](std::monostate const &)
+            {
+                auto lease = borrow(texture);
+                assert(lease);
+                models::Image::Sptr image = lease->as<models::Image::Sptr>();
+                MINIRE_INVARIANT(image, "not a valid image: {}", texture);
+                return std::make_pair(glm::vec2(image->_width, image->_height),
+                                      false);
+            },
+
+            [this](utils::Rect const & tile)
+            {
+                return std::make_pair(glm::vec2(tile._right - tile._left + 1,
+                                                tile._bottom - tile._top + 1),
+                                      false);
+            },
+
+            [this](utils::NinePatch const & ninePatch)
+            {
+                return std::make_pair(utils::defaultSize(ninePatch), true);
+            },
+        }, patch);
     }
 
     void BasicController::setLowLatencyInput(bool enabled)

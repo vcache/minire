@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cassert>
-#include <cmath>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -17,9 +15,16 @@ namespace minire::gui
             bool operator==(Constant const &) const = default;
         };
 
-        struct Less
+        struct Fraction
         {
-            bool operator==(Less const &) const = default;
+            float _fraction;
+
+            bool operator==(Fraction const &) const = default;
+        };
+
+        struct Begin
+        {
+            bool operator==(Begin const &) const = default;
         };
 
         struct Center
@@ -27,16 +32,17 @@ namespace minire::gui
             bool operator==(Center const &) const = default;
         };
 
-        struct More
+        struct End
         {
-            bool operator==(More const &) const = default;
+            bool operator==(End const &) const = default;
         };
     }
 
     using Position = std::variant<position::Constant,
-                                  position::Less,
+                                  position::Fraction,
+                                  position::Begin,
                                   position::Center,
-                                  position::More>;
+                                  position::End>;
 
     namespace dimension
     {
@@ -70,52 +76,21 @@ namespace minire::gui
                                    dimension::Fill,
                                    dimension::Content>;
 
-    class Arranger
+    struct Arranger
     {
-    public:
-        explicit Arranger(Position const & position = position::Center{},
-                          Dimension const & dimension = dimension::Fill{},
-                          float marginMin = 0,
-                          float marginMax = 0)
-            : _position(position)
-            , _dimension(dimension)
-            , _marginMin(marginMin)
-            , _marginMax(marginMax)
-        {}
+        Position  _position = position::Center{};
+        Dimension _dimension = dimension::Fill{};
+        float     _marginMin = 0;
+        float     _marginMax = 0;
 
         // (position, dimension)
         std::pair<float, float> operator()(float clientPosition,
                                            float clientDimension,
                                            std::optional<float> contentDimension) const;
 
-        Position const & position() const { return _position; }
-        Dimension const & dimension() const { return _dimension; }
-        float marginMin() const { return _marginMin; }
-        float marginMax() const { return _marginMax; }
-
-        void setPosition(Position const & position) { _position = position; }
-        void setDimension(Dimension const & dimension) { _dimension = dimension; }
-        void setMarginMin(float marginMin) { _marginMin = marginMin; }
-        void setMarginMax(float marginMax) { _marginMax = marginMax; }
-
         bool operator==(Arranger const &) const = default;
 
-    private:
-        Position  _position;
-        Dimension _dimension;
-        float     _marginMin;
-        float     _marginMax;
-    };
-
-    struct Arrangers
-    {
-        Arranger _horizontal;
-        Arranger _vertical;
-
-        bool operator==(Arrangers const &) const = default;
-
-    public:
-        static Arrangers const & fill();
-        static Arrangers const & center();
+        static Arranger const & fill();
+        static Arranger const & center();
     };
 }

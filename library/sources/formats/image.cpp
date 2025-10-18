@@ -10,13 +10,34 @@ namespace minire::formats
         struct StbImage : public models::Image
         {
             explicit
-            StbImage(std::string const & filename) try
+            StbImage(std::string const & filename)
             {
                 int width = 0, height = 0;
                 int channels = 0; // 8-bit components per pixel
 
                 _data = ::stbi_load(filename.c_str(), &width, &height, &channels, 0);
+                postprocess(width, height, channels, filename);
+            }
 
+            explicit
+            StbImage(unsigned char const * buffer, size_t length)
+            {
+                int width = 0, height = 0;
+                int channels = 0; // 8-bit components per pixel
+
+                _data = ::stbi_load_from_memory(buffer, length, &width, &height, &channels, 0);
+                postprocess(width, height, channels, "(binary data)");
+            }
+
+            ~StbImage() override
+            {
+                free();
+            }
+
+        private:
+            void postprocess(int width, int height, int channels,
+                             std::string const & source) try
+            {
                 MINIRE_INVARIANT(_data, "no data loaded: {}", ::stbi_failure_reason());
                 MINIRE_INVARIANT(width > 0 && height > 0,
                                  "bad image size = {}x{}", width, height);
@@ -51,17 +72,12 @@ namespace minire::formats
             catch(std::exception & e)
             {
                 free();
-                MINIRE_THROW("failed to load image \"{}\": {}", filename, e.what());
+                MINIRE_THROW("failed to load image \"{}\": {}", source, e.what());
             }
             catch(...)
             {
                 free();
-                MINIRE_THROW("failed to load image \"{}\": (unknown expection)", filename);
-            }
-
-            ~StbImage() override
-            {
-                free();
+                MINIRE_THROW("failed to load image \"{}\": (unknown expection)", source);
             }
 
         private:
@@ -79,5 +95,10 @@ namespace minire::formats
     models::Image::Sptr loadImage(std::string const & filename)
     {
         return std::make_shared<StbImage>(filename);
+    }
+
+    models::Image::Sptr loadImage(unsigned char const * buffer, size_t length)
+    {
+        return std::make_shared<StbImage>(buffer, length);
     }
 }

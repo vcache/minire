@@ -9,6 +9,24 @@ namespace minire::gui
                                                  float clientDimension,
                                                  std::optional<float> contentDimension) const
     {
+        // Fixed position + Fill dimension
+        if (std::holds_alternative<position::Constant>(_position) &&
+            std::holds_alternative<dimension::Fill>(_dimension))
+        {
+            float const p = _marginMin + std::get<position::Constant>(_position)._position;
+            return std::make_pair(p, clientDimension - p - _marginMax);
+        }
+
+        if (std::holds_alternative<position::Fraction>(_position) &&
+            std::holds_alternative<dimension::Fill>(_dimension))
+        {
+            float const p = _marginMin +
+                std::get<position::Fraction>(_position)._fraction *
+                (clientDimension - _marginMin - _marginMax);
+            return std::make_pair(p, clientDimension - p - _marginMax);
+        }
+
+        // Floating position + Fixed dimension
         float dimension = std::visit(utils::Overloaded
         {
             [this](dimension::Constant const & v)
@@ -40,7 +58,13 @@ namespace minire::gui
                 return v._position + _marginMin;
             },
 
-            [this](position::Less const &)
+            [this, clientDimension]
+            (position::Fraction const & v)
+            {
+                return (clientDimension - _marginMin - _marginMax) * v._fraction + _marginMin;
+            },
+
+            [this](position::Begin const &)
             {
                 return _marginMin;
             },
@@ -52,7 +76,7 @@ namespace minire::gui
             },
 
             [this, clientDimension, dimension]
-            (position::More const &)
+            (position::End const &)
             {
                 return clientDimension - dimension;
             }
@@ -62,23 +86,15 @@ namespace minire::gui
                               std::floor(dimension - _marginMin - _marginMax));
     }
 
-    Arrangers const & Arrangers::fill()
+    Arranger const & Arranger::fill()
     {
-        static const Arrangers kResult
-        {
-            ._horizontal = Arranger(position::Less{}, dimension::Fill{}),
-            ._vertical   = Arranger(position::Less{}, dimension::Fill{}),
-        };
+        static const Arranger kResult(position::Begin{}, dimension::Fill{});
         return kResult;
     }
 
-    Arrangers const & Arrangers::center()
+    Arranger const & Arranger::center()
     {
-        static const Arrangers kResult
-        {
-            ._horizontal = Arranger(position::Center{}, dimension::Content{}),
-            ._vertical   = Arranger(position::Center{}, dimension::Content{}),
-        };
+        static const Arranger kResult(position::Center{}, dimension::Content{});
         return kResult;
     }
 }

@@ -1,219 +1,390 @@
 #include <minire/gui/component.hpp>
 
-#include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
-#include <minire/gui-controller.hpp>
-#include <minire/gui/components/container.hpp>
 
-#include <utils/overloaded.hpp>
-
+#include <algorithm>
 #include <cassert>
+#include <list>
 
 namespace minire::gui
 {
+    static constexpr size_t kExpectedChildren = 25;
+    static constexpr size_t kZOrderIndent = 1'000'000;
+
+    namespace
+    {
+        class RaiiFlag
+        {
+            RaiiFlag(RaiiFlag const &) = delete;
+            RaiiFlag(RaiiFlag &&) = delete;
+            RaiiFlag & operator=(RaiiFlag const &) = delete;
+            RaiiFlag & operator=(RaiiFlag &&) = delete;
+
+        public:
+            explicit RaiiFlag(bool & target)
+                : _target(target)
+            {
+                _target = true;
+            }
+
+            ~RaiiFlag()
+            {
+                _target = false;
+            }
+
+        private:
+            bool & _target;
+        };
+    }
+
+    class Component::Impl
+    {
+    public:
+        struct ComponentZCompare
+        {
+            bool operator()(Sptr const & lhs, Sptr const & rhs) const
+            {
+                assert(lhs);
+                assert(rhs);
+
+                if (lhs->_zOrder.get() < rhs->_zOrder.get()) return true;
+                if (lhs->_zOrder.get() > rhs->_zOrder.get()) return false;
+
+                return lhs.get() < rhs.get();
+            };
+        };
+
+        using ZOrderStore = std::list<Component::Sptr>;
+        using ZOrderBoundaries = std::pair<size_t, size_t>;
+
+    public:
+        Area             _clientArea;
+        Area             _contentArea;
+        ZOrderStore      _zOrderStore; // in an ascending zOrder
+        ZOrderBoundaries _zOrderBoundaries{0, 0};
+        size_t           _zOrder = 0;
+        bool             _zOrderInvalidated = true;
+        bool             _zOrderLocked = false;
+        bool             _effectiveVisible = true;
+        bool             _visible = true;
+        bool             _initialized = false;
+
+    public:
+        void eraseZOrderStore(Component::Sptr const & component)
+        {
+            MINIRE_INVARIANT(!_zOrderLocked, "attempt to modify zOrder while it is locked");
+            assert(component);
+            auto it = std::ranges::find(_zOrderStore, component);
+            MINIRE_INVARIANT(it != _zOrderStore.end(), "_zOrderStore don't contain \"{}\"",
+                             component->_id);
+
+            _zOrderStore.erase(it);
+            _zOrderInvalidated = true;
+        }
+
+        void insertZOrderStore(Component::Sptr const & component)
+        {
+            MINIRE_INVARIANT(!_zOrderLocked, "attempt to modify zOrder while it is locked");
+            assert(component);
+            assert(_zOrderStore.end() == std::ranges::find(_zOrderStore, component)); // test dups
+
+            _zOrderStore.emplace_back(component);
+            sortZOrderStore();
+
+            _zOrderInvalidated = true;
+        }
+
+        void sortZOrderStore()
+        {
+            MINIRE_INVARIANT(!_zOrderLocked, "attempt to modify zOrder while it is locked");
+            _zOrderStore.sort(ComponentZCompare{});
+        }
+
+        size_t getHighestZOrder() const
+        {
+            assert(_zOrderStore.empty() || _zOrderStore.back());
+            return !_zOrderStore.empty() ? _zOrderStore.back()->_zOrder.get() : 0;
+        }
+    };
+
+    Component::Component(std::string const & id,
+                         Theme const & theme,
+                         OverlayController & overlayController)
+        : _id(id)
+        , _theme(theme)
+        , _overlayController(overlayController)
+        , _visible(*this, true)
+        , _isDraggable(*this, false)
+        , _horizontal(*this)
+        , _vertical(*this)
+        , _padding(*this)
+        , _zOrder(*this)
+        , _layout(*this, std::make_shared<Layout>())
+        , _impl(std::make_unique<Impl>())
+        , _invalidated(false)
+        , _contentInvalidated(false)
+        , _hasFocus(false)
+        , _isHovered(false)
+        , _isDragging(false)
+    {
+        _children.reserve(kExpectedChildren);
+        invalidate();
+    }
 
     Component::~Component() = default;
 
-    void Component::setVisible(bool const visible)
+    void Component::setParent(Sptr const & newParent)
     {
-        if (visible == _visible)
-            return;
-
-        _visible = visible;
-        onVisibleChanged();
-
-        if (_visible)
+        // check preconditions
+        if (newParent && newParent->_children.contains(_id))
         {
-            if (auto p = parent(); p)
-            {
-                p->updateChildrenContentArea(shared_from_this());
-            }
-
-            rearrange(true);
+            MINIRE_THROW("Component \"{}\" already contains \"{}\"",
+                         newParent->_id, _id);
         }
-    }
 
-    // NOTE: std::set cannot be re-ordered automatically just by
-    //       changing result of Comp-function.
-    //       Instead, it should be recreated.
-    void Component::setZOrder(size_t const zOrder)
-    {
-        if (zOrder == _zOrder)
-            return;
-
-        auto parent = _parent.lock();
         auto sharedThis = shared_from_this();
 
-        if (parent)
+        // remove self from previous parent (if any)
+        if (auto oldParent = parent(); oldParent)
         {
-            parent->_zOrderStore.erase(sharedThis);
+            size_t const removed = oldParent->_children.erase(_id);
+            MINIRE_INVARIANT(removed == 1, "failed to remove \"{}\" from \"{}\"",
+                             _id, oldParent->_id);
+
+            // update zOrderStore
+            assert(oldParent->_impl);
+            oldParent->_impl->eraseZOrderStore(sharedThis);
+
+            // update Layout
+            Layout::Sptr & oldParentLayout = *(oldParent->_layout);
+            assert(oldParentLayout);
+            oldParentLayout->onErase(*this);
+
+            oldParent->invalidate();
         }
 
-        _zOrder = zOrder;
-
-        if (parent)
+        // insert into a new parent (id any)
+        if (newParent)
         {
-            parent->_zOrderStore.insert(sharedThis);
+            // insert self into a _children store
+            auto [_, inserted] = newParent->_children.emplace(_id, sharedThis);
+            MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"",
+                             _id, newParent->_id);
+
+            // recalc self's zOrder
+            assert(newParent->_impl);
+            _zOrder = newParent->_impl->getHighestZOrder() + 1;
+            newParent->_impl->insertZOrderStore(sharedThis);
+
+            // update layout
+            Layout::Sptr & newParentLayout = *(newParent->_layout);
+            assert(newParentLayout);
+            newParentLayout->onInsert(*this);
+
+            // invalidate parent's state
+            newParent->invalidate();
         }
 
-        invalidateZOrder();
+        _parent = newParent;
+        invalidate();
     }
 
-    void Component::invalidateZOrder()
+    void Component::invalidate()
     {
-        _zOrderInvalidated = true;
-        for(auto p = parent(); p && !p->_zOrderInvalidated; p = p->parent())
+        if (!_invalidated)
         {
-            p->invalidateZOrder();
-        }
-    }
-
-    void Component::onDragBegin(events::application::OnMouseDown const & e)
-    {
-        if (_dragBeginCallback)
-            _dragBeginCallback(*this, e);
-    }
-
-    void Component::onDragMove(events::application::OnMouseMove const & e)
-    {
-        if (_dragMoveCallback)
-            _dragMoveCallback(*this, e);
-    }
-
-    void Component::onDragEnd(std::optional<events::application::OnMouseUp> const & e)
-    {
-        if (_dragEndCallback)
-            _dragEndCallback(*this, e);
-    }
-
-    void Component::setClientArea(Area clientArea)
-    {
-        _clientArea = clientArea; 
-        rearrange();
-    }
-
-    void Component::setArrangers(Arrangers arrangers)
-    {
-        if (_arrangers == arrangers)
-            return;
-
-        _arrangers = std::move(arrangers);
-        rearrange();
-    }
-
-    void Component::rearrange(bool force)
-    {
-        if (!_visible)
-            return;
-
-        std::optional<std::pair<float, float>> contentRealSize = measureContent();
-        auto [left, width] = _arrangers._horizontal(_clientArea._left,
-                                                    _clientArea._width,
-                                                    contentRealSize ? std::optional<float>(contentRealSize->first)
-                                                                    : std::nullopt);
-        auto [top, height] = _arrangers._vertical(_clientArea._top,
-                                                  _clientArea._height,
-                                                  contentRealSize ? std::optional<float>(contentRealSize->second)
-                                                                  : std::nullopt);
-        Area const contentArea{._left = left,
-                               ._top = top,
-                               ._width = width,
-                               ._height = height};
-        if (contentArea != _contentArea || force)
-        {
-            _contentArea = contentArea;
-            onContentAreaChanged();
-        }
-    }
-
-    size_t Component::revalidateZOrder(size_t offset, ZOrderUpdates & labels,
-                                       ZOrderUpdates & sprites)
-    {
-        if (_zOrderInvalidated || offset > _zOrderBoundaries.first)
-        {
-            _zOrderBoundaries.first = offset;
-            _zOrderBoundaries.second = onZOrderChanged(offset, labels, sprites);
-            _zOrderInvalidated = false;
-        }
-        return _zOrderBoundaries.second;
-    }
-
-    void Component::enqueueRaw(events::Controller && event)
-    {
-        _controller.enqueueRaw(std::move(event));
-    }
-
-    void Component::focus()
-    {
-        _controller.setFocus(shared_from_this());
-    }
-
-    void Component::unfocus()
-    {
-        _controller.setFocus();
-    }
-
-    std::unique_ptr<content::Lease>
-    Component::borrow(content::Id const & id) const
-    {
-        return _controller.borrow(id);
-    }
-
-    glm::vec2 Component::measure(text::FormattedString const & text,
-                                 content::Id const & id) const
-    {
-        return _controller.measure(text, id);
-    }
-
-    std::pair<glm::vec2, bool>
-    Component::measure(utils::Patch const & patch,
-                       content::Id const & texture) const
-    {
-        return std::visit(utils::Overloaded
-        {
-            [this, &texture](std::monostate const &)
+            _invalidated = true;
+            if (auto p = parent(); p)
             {
-                auto lease = borrow(texture);
-                assert(lease);
-                models::Image::Sptr image = lease->as<models::Image::Sptr>();
-                MINIRE_INVARIANT(image, "not a valid image: {}", texture);
-                return std::make_pair(glm::vec2(image->_width, image->_height),
-                                      false);
-            },
+                p->invalidate();
+            }
+        }
+    }
 
-            [this](utils::Rect const & tile)
+    void Component::invalidateContent()
+    {
+        _contentInvalidated = true;
+        invalidate();
+    }
+
+    void Component::erase(std::string const & childId)
+    {
+        if (auto it = _children.find(childId);
+            it != _children.end())
+        {
+            Sptr child = it->second;
+            assert(child);
+            child->setParent(nullptr);
+        }
+    }
+
+    void Component::clear()
+    {
+        _impl = std::make_unique<Impl>();
+        assert(_layout.get());
+        _layout.get()->onClear();
+        _children.clear();
+        invalidate();
+    }
+
+    size_t Component::revalidate(size_t zOffset,
+                                 bool effectiveVisible,
+                                 Area const clientArea)
+    {
+        assert(zOffset != 0); // should start from 1
+        assert(_impl);
+
+        if (!_impl->_initialized)
+        {
+            initialize();
+            _impl->_initialized = true;
+        }
+
+        bool revalidateChildren = false;
+
+        // revalidate visibillity
+        if (_visible.isInvalidated() &&
+            _impl->_visible != _visible.get())
+        {
+            _impl->_visible = _visible.get();
+        }
+        _visible.revalidate();
+
+        effectiveVisible &= _impl->_visible;
+        bool const effectiveVisibleChanged = _impl->_effectiveVisible != effectiveVisible;
+        bool const effectiveVisibleEnabled = !_impl->_effectiveVisible && effectiveVisible;
+        _impl->_effectiveVisible = effectiveVisible;
+
+        // revalidate Component's arrangement
+        if (effectiveVisibleEnabled ||
+            clientArea != _impl->_clientArea ||
+            _horizontal.isInvalidated() ||
+            _vertical.isInvalidated() ||
+            _padding.isInvalidated() ||
+            _contentInvalidated)
+        {
+            if (_impl->_visible)
             {
-                return std::make_pair(glm::vec2(tile._right - tile._left + 1,
-                                                tile._bottom - tile._top + 1),
-                                      false);
-            },
+                std::optional<std::pair<float, float>> contentSize = measureContent();
 
-            [this](utils::NinePatch const & ninePatch)
+                auto [left, width] = _horizontal.get()(clientArea._left,
+                                                       clientArea._width,
+                                                       contentSize ? std::optional<float>(contentSize->first)
+                                                                   : std::nullopt);
+
+                auto [top, height] = _vertical.get()(clientArea._top,
+                                                     clientArea._height,
+                                                     contentSize ? std::optional<float>(contentSize->second)
+                                                                 : std::nullopt);
+
+                Area const & contentArea = Area
+                {
+                    ._left = left,
+                    ._top = top,
+                    ._width = width,
+                    ._height = height,
+                };
+                if (contentArea != _impl->_contentArea)
+                {
+                    _impl->_contentArea = contentArea;
+                    revalidateChildren = true;
+                }
+            }
+            _impl->_clientArea = clientArea;
+        }
+        _horizontal.revalidate();
+        _vertical.revalidate();
+        _padding.revalidate();
+        _contentInvalidated = false;
+
+        // maybe change zOrder
+        if (_zOrder.isInvalidated() &&
+            _impl->_zOrder != _zOrder.get())
+        {
+            _impl->_zOrder = _zOrder.get();
+            _impl->_zOrderInvalidated = true;
+        }
+        _zOrder.revalidate();
+
+        // revalidate z-order
+        if (_impl->_zOrderInvalidated ||
+            zOffset > _impl->_zOrderBoundaries.first)
+        {
+            _impl->_zOrderBoundaries.first = zOffset;
+            _impl->_zOrderInvalidated = false;
+        }
+
+        // revalidate derivated Component
+        zOffset = revalidateContent(zOffset, effectiveVisible, _impl->_contentArea);
+
+        // revalidate Layout
+        revalidateChildren |= _layout.isInvalidated();
+        _layout.revalidate();
+
+        // revalidate children
+        assert(_impl->_zOrderStore.size() == _children.size());
+
+        utils::Rect const padding = _padding.get();
+        Area const & childrenClientArea = Area
+        {
+            ._left = _impl->_contentArea._left + padding._left,
+            ._top = _impl->_contentArea._top + padding._top,
+            ._width = std::max(.0f, _impl->_contentArea._width - (padding._left + padding._right)),
+            ._height = std::max(.0f, _impl->_contentArea._height - (padding._top + padding._bottom)),
+        };
+
+        {
+            _impl->sortZOrderStore(); // TODO: don't resort every time (maybe use invalidation flags instead bool)
+            RaiiFlag zOrderStoreLock(_impl->_zOrderLocked);
+            for(Sptr const & child : _impl->_zOrderStore)
             {
-                return std::make_pair(utils::defaultSize(ninePatch), true);
-            },
-        }, patch);
+                assert(child);
+                assert(child->_impl);
+
+                size_t newOffset = child->_impl->_zOrderBoundaries.second;
+                bool const visibilityTest = effectiveVisibleChanged ||
+                                            child->_visible.isInvalidated() ||
+                                            child->_visible.get() ||
+                                            child->_visible.get() != child->_impl->_visible;
+                if (visibilityTest && (revalidateChildren || child->_invalidated))
+                {
+                    assert(_layout.get());
+                    Area const & childArea = _layout.get()->evaluate(childrenClientArea, *child);
+                    newOffset = child->revalidate(zOffset, effectiveVisible, childArea);
+                    assert(newOffset == child->_impl->_zOrderBoundaries.second);
+                }
+
+                zOffset = std::max(newOffset, zOffset + kZOrderIndent);
+            }
+        }
+
+        _impl->_zOrderBoundaries.second = zOffset;
+
+        // finish
+        _invalidated = false;
+        return _impl->_zOrderBoundaries.second;
     }
 
-    std::optional<std::pair<float, float>>
-    Component::measureContent() const
+    Component::Sptr Component::findUnderCursor(float x, float y) const
     {
-        return std::nullopt;
-    }
+        assert(_impl);
 
-    gui::components::Container & Component::guiPush(std::string tag,
-        minire::models::InputHandler::Wptr defaultHandler)
-    {
-        return _controller.guiPush(std::move(tag), defaultHandler);
-    }
+        if (!_visible.get() ||
+            !_impl->_contentArea.contains(x, y))
+        {
+            return Sptr();
+        }
 
-    std::string const & Component::guiTopTag() const
-    {
-        return _controller.guiTopTag();
-    }
+        Sptr result;
 
-    void Component::guiPop()
-    {
-        _controller.guiPop();
+        for(auto it = _impl->_zOrderStore.rbegin();
+            it != _impl->_zOrderStore.rend() && !result;
+            ++it)
+        {
+            assert(*it);
+            result = (*it)->findUnderCursor(x, y);
+        }
+
+        return result ? result : std::const_pointer_cast<Component>(shared_from_this());
     }
 }

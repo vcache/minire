@@ -42,6 +42,15 @@ add_definitions(
     -DSTBI_NO_PSD
     -DSTBI_WINDOWS_UTF8)
 
+# Build data directory
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp
+    COMMAND xxd -c 20 -n kBuiltinGuiAtlas -i ${CMAKE_CURRENT_SOURCE_DIR}/data/gui-atlas.png > ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/data/gui-atlas.png
+    COMMENT "Embedding gui-atlas into sources dir"
+)
+
 # Build the library
 
 file(GLOB_RECURSE MINIRE_SRCS
@@ -53,7 +62,7 @@ file(GLOB_RECURSE MINIRE_TESTS
      LIST_DIRECTORIES FALSE
      "${CMAKE_CURRENT_SOURCE_DIR}/sources/*_test.cpp")
 
-add_library(minire ${MINIRE_SRCS})
+add_library(minire ${MINIRE_SRCS} ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp)
 
 target_link_libraries(minire
     "${CMAKE_THREAD_LIBS_INIT}"

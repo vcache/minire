@@ -53,6 +53,12 @@ namespace minire::events::controller
         std::optional<glm::vec2> _maxSize;
     };
 
+    struct SetLabelZOrder
+    {
+        std::string _id;
+        size_t      _zOrder;
+    };
+
     struct RemoveLabel
     {
         std::string _id;

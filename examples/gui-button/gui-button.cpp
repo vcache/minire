@@ -3,7 +3,6 @@
 #include <minire/content/manager.hpp>
 #include <minire/gui-controller.hpp>
 #include <minire/gui/components/button.hpp>
-#include <minire/gui/components/container.hpp>
 #include <minire/gui/components/image.hpp>
 #include <minire/gui/layouts/grid.hpp>
 #include <minire/gui/models/exclusive-group.hpp>
@@ -35,97 +34,69 @@ namespace
 
             // create test cases
 
-            Button::Background const kBg
+            std::vector<std::pair<Arranger, Arranger>> const kArrangers
             {
-                ._texture = kAtlas,
-                ._normal = NinePatch
-                    {
-                        ._boundary = Rect(1, 1, 27, 26),
-                        ._out = Rect(3, 3, 25, 24),
-                        ._in = Rect(6, 6, 22, 21),
-                    },
-                ._hovered = NinePatch
-                    {
-                        ._boundary = Rect(1, 30, 27, 55),
-                        ._out = Rect(3, 32, 25, 53),
-                        ._in = Rect(6, 35, 22, 50),
-                    },
-                ._pressed = NinePatch
-                    {
-                        ._boundary = Rect(1, 59, 27, 84),
-                        ._out = Rect(3, 61, 25, 82),
-                        ._in = Rect(6, 64, 22, 79),
-                    },
-            };
-
-            std::vector<Arrangers> const kArrangers
-            {
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Constant{0}),
-                    ._vertical = Arranger(position::Center{}, dimension::Constant{0}),
+                    Arranger(position::Center{}, dimension::Constant{0}),
+                    Arranger(position::Center{}, dimension::Constant{0}),
                 },
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Constant{75}),
-                    ._vertical = Arranger(position::Center{}, dimension::Constant{45}),
+                    Arranger(position::Center{}, dimension::Constant{75}),
+                    Arranger(position::Center{}, dimension::Constant{45}),
                 },
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Constant{45}),
-                    ._vertical = Arranger(position::Center{}, dimension::Constant{75}),
+                    Arranger(position::Center{}, dimension::Constant{45}),
+                    Arranger(position::Center{}, dimension::Constant{75}),
                 },
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Fraction{.5f}),
-                    ._vertical = Arranger(position::Center{}, dimension::Fraction{.5f}),
+                    Arranger(position::Center{}, dimension::Fraction{.5f}),
+                    Arranger(position::Center{}, dimension::Fraction{.5f}),
                 },
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Fill{}),
-                    ._vertical = Arranger(position::Center{}, dimension::Fill{}),
+                    Arranger(position::Center{}, dimension::Fill{}),
+                    Arranger(position::Center{}, dimension::Fill{}),
                 },
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Content{}),
-                    ._vertical = Arranger(position::Center{}, dimension::Content{}),
+                    Arranger(position::Center{}, dimension::Content{}),
+                    Arranger(position::Center{}, dimension::Content{}),
                 },
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Fraction{.5}),
-                    ._vertical = Arranger(position::Center{}, dimension::Fraction{.5}),
+                    Arranger(position::Center{}, dimension::Fraction{.5}),
+                    Arranger(position::Center{}, dimension::Fraction{.5}),
                 },
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Fraction{.5}),
-                    ._vertical = Arranger(position::Center{}, dimension::Fraction{.5}),
+                    Arranger(position::Center{}, dimension::Fraction{.5}),
+                    Arranger(position::Center{}, dimension::Fraction{.5}),
                 },
-                Arrangers
                 {
-                    ._horizontal = Arranger(position::Center{}, dimension::Fraction{.5}),
-                    ._vertical = Arranger(position::Center{}, dimension::Fraction{.5}),
+                    Arranger(position::Center{}, dimension::Fraction{.5}),
+                    Arranger(position::Center{}, dimension::Fraction{.5}),
                 },
             };
 
             // build grid container
             auto layout = std::make_shared<layouts::Grid>(3 + 4*2, kArrangers.size());
-            auto container = guiRoot().emplace<Container>("container", layout);
+            auto container = guiRoot().emplace<Component>("container");
+            container->layout() = layout;
 
             for(size_t row = 0; row < layout->rows(); row++)
             {
                 for(size_t col = 0; col < layout->cols(); col++)
                 {
-                    auto subContainer = container->emplace<Container>(
+                    auto subContainer = container->emplace<Component>(
                         fmt::format("{}x{}", row, col));
 
-                    subContainer->emplace<Image>(
-                        fmt::format("bg", row, col), kAtlas,
-                        NinePatch
-                        {
-                            ._boundary = Rect(30, 36, 51, 57),
-                            ._out = Rect(33, 39, 48, 54),
-                            ._in = Rect(36, 42, 45, 51),
-                        });
+                    auto bg = subContainer->emplace<Image>(
+                        fmt::format("bg-{}x{}", row, col),
+                        makeImageView(kAtlas,
+                            NinePatch
+                            {
+                                ._boundary = Rect(30, 36, 51, 57),
+                                ._out = Rect(33, 39, 48, 54),
+                                ._in = Rect(36, 42, 45, 51),
+                            }));
+                    bg->horizontal()->_dimension = dimension::Fill{};
+                    bg->vertical()->_dimension = dimension::Fill{};
 
                     layout->set(row, col, subContainer->id());
                 }
@@ -139,19 +110,21 @@ namespace
 
             Rect const kIconRect(46, 7, 56, 19);
 
-            auto exclGroup1 = std::make_shared<minire::gui::models::ExclusiveGroup>(false);
-            auto exclGroup2 = std::make_shared<minire::gui::models::ExclusiveGroup>(true);
+            auto exclGroup1 = std::make_shared<models::ExclusiveGroup>(false);
+            auto exclGroup2 = std::make_shared<models::ExclusiveGroup>(true);
 
-            exclGroup1->setChangeCallback([](auto const * prev, auto const * curr)
+            exclGroup1->setCallback(std::in_place_type<models::exclusive_group::OnChange>, "foo",
+                [](models::ExclusiveGroup const &, models::exclusive_group::OnChange const & e)
                 {
                     MINIRE_INFO("ExclusiveGroup 1 selection changed from {} to {}",
-                                (void const *)prev, (void const *)curr);
+                                (void const *)e._previous, (void const *)e._current);
                 });
 
-            exclGroup2->setChangeCallback([](auto const * prev, auto const * curr)
+            exclGroup2->setCallback(std::in_place_type<models::exclusive_group::OnChange>, "foo",
+                [](models::ExclusiveGroup const &, models::exclusive_group::OnChange const & e)
                 {
                     MINIRE_INFO("ExclusiveGroup 2 selection changed from {} to {}",
-                                (void const *)prev, (void const *)curr);
+                                (void const *)e._previous, (void const *)e._current);
                 });
 
             for(size_t i = 0; i < kArrangers.size(); ++i)
@@ -164,73 +137,87 @@ namespace
                 // empty content
                 {
                     std::string cellId = fmt::format("{}x{}", row++, i);
-                    auto button = container->at<Container>(cellId)
-                        .emplace<Button>("btn", kBg, std::nullopt, std::nullopt, kArrangers[i], isCheckable);
-                    button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
-                    button->setCheckedCallback([cellId](models::Checkable & c)
-                                               { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                    auto button = container->at<Component>(cellId).emplace<Button>("btn");
+                    button->horizontal() = kArrangers[i].first;
+                    button->vertical() = kArrangers[i].second;
+                    button->setCheckable(isCheckable);
+
+                    button->setCallback(std::in_place_type<events::OnClick>, "foo",
+                                        [cellId](Component &, events::OnClick const &) { MINIRE_INFO("Clicked at {}", cellId); } );
+
+                    button->setCallback(std::in_place_type<models::checkable::OnCheckedChanged>, "foo",
+                        [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
+                        { MINIRE_INFO("Check at {}: {}, {}", cellId, c.checked(), e._checked); } );
+
                     button->setExclusiveGroup(exclGroup);
                     _buttons.push_back(button);
                 }
 
                 // icon only
                 {
-                    Button::Icon icon {kAtlas, kIconRect};
                     std::string cellId = fmt::format("{}x{}", row++, i);
-                    auto button = container->at<Container>(cellId)
-                        .emplace<Button>("btn", kBg, icon, std::nullopt, kArrangers[i], isCheckable);
-                    button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
-                    button->setCheckedCallback([cellId](models::Checkable & c)
-                                               { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                    auto button = container->at<Component>(cellId).emplace<Button>("btn");
+                    button->horizontal() = kArrangers[i].first;
+                    button->vertical() = kArrangers[i].second;
+                    button->icon() = makeImageView(kAtlas, kIconRect);
+                    button->setCheckable(isCheckable);
+
+                    button->setCallback(std::in_place_type<events::OnClick>, "foo",
+                                        [cellId](Component &, events::OnClick const &) { MINIRE_INFO("Clicked at {}", cellId); } );
+
+                    button->setCallback(std::in_place_type<models::checkable::OnCheckedChanged>, "foo",
+                        [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
+                        { MINIRE_INFO("Check at {}: {}, {}", cellId, c.checked(), e._checked); } );
+
                     button->setExclusiveGroup(exclGroup);
                     _buttons.push_back(button);
                 }
 
                 // text only
                 {
-                    Button::Text text
-                    {
-                        ._fontFace = kFontFace,
-                        ._text = caption,
-                    };
                     std::string cellId = fmt::format("{}x{}", row++, i);
-                    auto button = container->at<Container>(cellId)
-                        .emplace<Button>("btn", kBg, std::nullopt, text, kArrangers[i], isCheckable);
-                    button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
-                    button->setCheckedCallback([cellId](models::Checkable & c)
-                                               { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                    auto button = container->at<Component>(cellId).emplace<Button>("btn");
+                    button->horizontal() = kArrangers[i].first;
+                    button->vertical() = kArrangers[i].second;
+                    button->text() = makeTextView(caption, kFontFace);
+                    button->setCheckable(isCheckable);
+
+                    button->setCallback(std::in_place_type<events::OnClick>, "foo",
+                                        [cellId](Component &, events::OnClick const &) { MINIRE_INFO("Clicked at {}", cellId); } );
+
+                    button->setCallback(std::in_place_type<models::checkable::OnCheckedChanged>, "foo",
+                        [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
+                        { MINIRE_INFO("Check at {}: {}, {}", cellId, c.checked(), e._checked); } );
+
                     button->setExclusiveGroup(exclGroup);
                     _buttons.push_back(button);
                 }
 
                 // icon + text
-                for(Button::Icon::Position position : { Button::Icon::Position::kLeft,
-                                                        Button::Icon::Position::kTop,
-                                                        Button::Icon::Position::kRight,
-                                                        Button::Icon::Position::kBottom})
+                for(theme::Location location : { theme::Location::kLeft,
+                                                 theme::Location::kTop,
+                                                 theme::Location::kRight,
+                                                 theme::Location::kBottom})
                 {
                     for(float const spacing : {0.0f, 10.0f})
                     {
-                        Button::Icon icon
-                        {
-                            ._texture = kAtlas,
-                            ._rect = kIconRect,
-                            ._spacing = spacing,
-                            ._position = position,
-                        };
-
-                        Button::Text text
-                        {
-                            ._fontFace = kFontFace,
-                            ._text = caption,
-                        };
-
                         std::string cellId = fmt::format("{}x{}", row++, i);
-                        auto button = container->at<Container>(cellId)
-                            .emplace<Button>("btn", kBg, icon, text, kArrangers[i], isCheckable);
-                        button->setClickCallback([cellId](Button &) { MINIRE_INFO("Clicked at {}", cellId); } );
-                        button->setCheckedCallback([cellId](models::Checkable & c)
-                                                   { MINIRE_INFO("Check at {}: {}", cellId, c.checked()); } );
+                        auto button = container->at<Component>(cellId).emplace<Button>("btn");
+                        button->horizontal() = kArrangers[i].first;
+                        button->vertical() = kArrangers[i].second;
+                        button->text() = makeTextView(caption, kFontFace);
+                        button->icon() = makeImageView(kAtlas, kIconRect);
+                        button->iconLocation() = location;
+                        button->iconSpacing() = spacing;
+                        button->setCheckable(isCheckable);
+
+                        button->setCallback(std::in_place_type<events::OnClick>, "foo",
+                                            [cellId](Component &, events::OnClick const &) { MINIRE_INFO("Clicked at {}", cellId); } );
+
+                        button->setCallback(std::in_place_type<models::checkable::OnCheckedChanged>, "foo",
+                            [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
+                            { MINIRE_INFO("Check at {}: {}, {}", cellId, c.checked(), e._checked); } );
+
                         button->setExclusiveGroup(exclGroup);
                         _buttons.push_back(button);
                     }
@@ -241,17 +228,15 @@ namespace
 
             set(SDL_SCANCODE_TAB, 0, [this](::SDL_Scancode, uint16_t) -> bool
             {
-                using namespace minire::gui::components;
-                for(auto & component : _buttons)
+                for(auto const & button : _buttons)
                 {
-                    auto & button = component->as<minire::gui::components::Button>();
-                    if (button.contentMargin()._left == 0)
+                    if (button->padding()->_left == 0)
                     {
-                        button.setContentMargin(minire::utils::Rect(10.0f));
+                        button->padding() = minire::utils::Rect(10.0f);
                     }
                     else
                     {
-                        button.setContentMargin(minire::utils::Rect(0.0f));
+                        button->padding() = minire::utils::Rect(0.0f);
                     }
                 }
                 return true;
@@ -259,7 +244,7 @@ namespace
         }
 
     private:
-        std::vector<minire::gui::Component::Sptr> _buttons;
+        std::vector<minire::gui::components::Button::Sptr> _buttons;
     };
 }
 
@@ -285,6 +270,7 @@ int main()
 
         minire::Application application(1280, 720, "GUI Button", manager);
         application.setController<GuiButton>(kMaxCtrlFps);
+        application.setGlDebug(false);
         application.setVsync(true);
 
         // Main loop

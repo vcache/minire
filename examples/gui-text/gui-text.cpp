@@ -2,7 +2,6 @@
 
 #include <minire/content/manager.hpp>
 #include <minire/gui-controller.hpp>
-#include <minire/gui/arranger.hpp>
 #include <minire/gui/components/text.hpp>
 #include <minire/logging.hpp>
 #include <minire/text/formatted-string.hpp>
@@ -45,53 +44,52 @@ namespace
 
             glm::vec2 size = measure(loremIpsum, kFontFaceId);
 
-            guiRoot().emplace<minire::gui::components::Text>(
-                "content-size", loremIpsum, kFontFaceId, minire::gui::Arrangers
-                {
-                    ._horizontal = minire::gui::Arranger(minire::gui::position::Center{},
-                                                         minire::gui::dimension::Content{}),
-                    ._vertical = minire::gui::Arranger(minire::gui::position::Center{},
-                                                       minire::gui::dimension::Content{})
-                });
+            {
+                auto comp = guiRoot().emplace<minire::gui::components::Text>(
+                    "content-size", makeTextView(loremIpsum, kFontFaceId));
+                comp->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                            minire::gui::dimension::Content{});
+                comp->vertical() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                          minire::gui::dimension::Content{});
+            }
 
-            guiRoot().emplace<minire::gui::components::Text>(
-                "content-clipping-up", loremIpsum, kFontFaceId, minire::gui::Arrangers
-                {
-                    ._horizontal = minire::gui::Arranger(minire::gui::position::Center{},
-                                                         minire::gui::dimension::Constant{size.x / 2}),
-                    ._vertical = minire::gui::Arranger(minire::gui::position::Less{},
-                                                       minire::gui::dimension::Constant{size.y / 2})
-                });
+            {
+                auto comp = guiRoot().emplace<minire::gui::components::Text>(
+                    "content-clipping-up", makeTextView(loremIpsum, kFontFaceId, true));
+                comp->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                            minire::gui::dimension::Constant{size.x / 2});
+                comp->vertical() = minire::gui::Arranger(minire::gui::position::Begin{},
+                                                          minire::gui::dimension::Constant{size.y / 2});
+            }
 
-            guiRoot().emplace<minire::gui::components::Text>(
-                "content-clipping-down", loremIpsum, kFontFaceId, minire::gui::Arrangers
-                {
-                    ._horizontal = minire::gui::Arranger(minire::gui::position::Center{},
-                                                         minire::gui::dimension::Constant{size.x / 2}),
-                    ._vertical = minire::gui::Arranger(minire::gui::position::More{},
-                                                       minire::gui::dimension::Constant{size.y / 2})
-                });
+            {
+                auto comp = guiRoot().emplace<minire::gui::components::Text>(
+                    "content-clipping-down", makeTextView(loremIpsum, kFontFaceId, true));
+                comp->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                            minire::gui::dimension::Constant{size.x / 2});
+                comp->vertical() = minire::gui::Arranger(minire::gui::position::End{},
+                                                          minire::gui::dimension::Constant{size.y / 2});
+            }
 
             _animatedText = guiRoot().emplace<minire::gui::components::Text>(
-                "animated-text", L"adsfsadf", kFontFaceId, minire::gui::Arrangers
-                {
-                    ._horizontal = minire::gui::Arranger(minire::gui::position::Center{},
-                                                         minire::gui::dimension::Content{}),
-                    ._vertical = minire::gui::Arranger(minire::gui::position::Less{},
-                                                       minire::gui::dimension::Content{},
-                                                       200)
-                });
+                "animated-text", makeTextView(L"adsfsadf", kFontFaceId));
+            _animatedText->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                                 minire::gui::dimension::Content{});
+            _animatedText->vertical() = minire::gui::Arranger(minire::gui::position::Begin{},
+                                                               minire::gui::dimension::Content{}, 200);
         }
 
         void step()
         {
+            GuiController::step();
+
             size_t barSize = std::lround(20.0 * (1.0 + std::sin(_phase)));
 
             if (barSize != _barSize && barSize > 0)
             {
                 minire::text::FormattedString str;
                 str.append(std::wstring(barSize, L'='));
-                _animatedText->setText(str);
+                _animatedText->content().setText(str);
                 _barSize = barSize;
             }
 
@@ -123,6 +121,7 @@ int main()
             });
         minire::Application application(1280, 720, "GUI Text", manager);
         application.setController<GuiText>(kMaxCtrlFps);
+        application.setGlDebug(false);
         application.setVsync(true);
 
         // Main loop

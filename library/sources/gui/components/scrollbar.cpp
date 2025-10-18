@@ -4,6 +4,8 @@
 #include <minire/gui/layout.hpp>
 #include <minire/logging.hpp>
 
+#include <cassert>
+
 namespace minire::gui::components
 {
     class Scrollbar::CustomLayout
@@ -17,11 +19,12 @@ namespace minire::gui::components
         Area evaluate(Area const & client,
                       Component const & component) const override
         {
-            bool const vertical = _scrollbar._vertical;
-            bool const hasIncBtn = _scrollbar._increase.operator bool();
-            bool const hasDecBtn = _scrollbar._decrease.operator bool();
+            assert(_scrollbar._increaseButton);
+            assert(_scrollbar._decreaseButton);
 
-            if (&component == _scrollbar._increase.get())
+            bool const vertical = _scrollbar._isVertical.get();
+
+            if (&component == _scrollbar._increaseButton.get())
             {
                 float const size = vertical ? client._width : client._height;
                 return Area
@@ -32,7 +35,7 @@ namespace minire::gui::components
                     ._height = size,
                 };
             }
-            else if (&component == _scrollbar._decrease.get())
+            else if (&component == _scrollbar._decreaseButton.get())
             {
                 float const size = vertical ? client._width : client._height;
                 return Area
@@ -45,6 +48,9 @@ namespace minire::gui::components
             }
             else if (&component == _scrollbar._slider.get())
             {
+                bool const hasIncBtn = _scrollbar._increaseButton->visible().get();
+                bool const hasDecBtn = _scrollbar._decreaseButton->visible().get();
+
                 float const size = vertical ? client._width : client._height;
                 float const szFactor = (hasDecBtn ? 1 : 0) + (hasIncBtn ? 1 : 0);
                 return Area
@@ -54,10 +60,6 @@ namespace minire::gui::components
                     ._width = vertical  ? size                                 : client._width - szFactor*size,
                     ._height = vertical ? client._height - szFactor*size       : size,
                 };
-            }
-            else if (&component == _scrollbar._background.get())
-            {
-                return client;
             }
             else
             {
@@ -71,205 +73,243 @@ namespace minire::gui::components
         Scrollbar const & _scrollbar;
     };
 
-    Scrollbar::Scrollbar(GuiController & controller,
-                         std::string const & id,
-                         std::shared_ptr<Container> const & parent)
-        : Container(controller, id, parent,
-                    std::make_shared<Scrollbar::CustomLayout>(*this))
-    {}
-
-    void Scrollbar::onContentAreaChanged()
+    namespace
     {
-        Container::onContentAreaChanged();
+        float clip(float value, float lower, float upper)
+        {
+            return std::max(lower, std::min(value, upper));
+        }
 
-        Area const & area = contentArea();
-        float const buttonSize = _vertical ? area._width : area._height;
-        float const btnDeltas =  (_increase ? buttonSize : 0) + (_decrease ? buttonSize : 0);
-
-        float const newSliderAmplitude = _vertical ? area._height - btnDeltas
-                                                   : area._width - btnDeltas;
-
-        // NOTE: it _might_ cause an infinite recrusion
-        setSliderAmplitude(newSliderAmplitude);
+        float normify(float value)
+        {
+            return clip(value, 0.0f, 1.0f);
+        }
     }
 
-    void Scrollbar::init(bool vertical,
-                         Background const & background,
-                         Button::Sptr const & increase,
-                         Button::Sptr const & decrease,
-                         Button::Sptr const & slider,
-                         Arrangers arrangers)
+    Scrollbar::Scrollbar(std::string const & id,
+                         Theme const & theme,
+                         OverlayController & overlayController,
+                         bool isVertical)
+        : Component(id, theme, overlayController)
+        , _background(*this, theme.scrollbar().makeBackground())
+        , _step(*this, 0.1f)
+        , _minSliderLength(*this, theme.scrollbar().constants()._minSliderLength)
+        , _isVertical(*this, isVertical)
+        , _value(*this, 0.0f)
+        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, overlayController))
+        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, overlayController))
+        , _slider(std::make_shared<Button>("__slider__", theme, overlayController))
     {
-        _vertical = vertical;
+        layout() = std::make_shared<CustomLayout>(*this);
+    }
 
-        _background = emplace<Button>("__bg__", Button::Background{background._texture,
-                                                                   background._patch,
-                                                                   background._patch,
-                                                                   background._patch},
-                                      std::nullopt, std::nullopt, Arrangers::fill());
-        _background->setIsDragable(true);
-        _background->setDragMoveCallback(
-            [this](Component &, events::application::OnMouseMove const & e)
+    void Scrollbar::initialize()
+    {
+        auto sharedThis = shared_from_this();
+
+        // Increase button
+        assert(_increaseButton);
+        _increaseButton->setParent(sharedThis);
+        _increaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__scrollbar__",
+            [this](Component const &, gui::events::OnClick const &)
+            { setValue(_value.get() + _step.get()); });
+        _increaseButton->icon() = theme().makeIcon(_isVertical.get() ? theme::Icon::kArrowDown
+                                                                     : theme::Icon::kArrowRight);
+        _defaultIncreaseIcon = _increaseButton->icon().get();
+
+        // Decrease button
+        assert(_decreaseButton);
+        _decreaseButton->setParent(sharedThis);
+        _decreaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__scrollbar__",
+            [this](Component const &, gui::events::OnClick const &)
+            { setValue(_value.get() - _step.get()); });
+        _decreaseButton->icon() = theme().makeIcon(_isVertical.get() ? theme::Icon::kArrowUp
+                                                                     : theme::Icon::kArrowLeft);
+        _defaultDecreaseIcon = _decreaseButton->icon().get();
+
+        // Slider button
+        assert(_slider);
+        _slider->setParent(sharedThis);
+        _slider->isDraggable() = true;
+        _slider->setCallback(std::in_place_type<gui::events::OnDragBegin>, "__scrollbar__",
+            [this](Component const &, gui::events::OnDragBegin const &)
             {
-                Area const & area = _slider->clientArea();
-
-                float const abs = _vertical ? e._absY : e._absX;
-                float const rel = _vertical ? e._relY : e._relX;
-                float const activeAmplitude = _sliderAmplitude - sliderSize();
-                float const lowerBound = _vertical ? area._top : area._left;
-                float const upperBound = lowerBound + _sliderAmplitude;
-                float const newSliderOffset =
-                    abs < lowerBound ? 0 : (abs >= upperBound ? _sliderAmplitude - sliderSize()
-                                                              : _sliderOffset + rel);
-                if (activeAmplitude > 0)
-                    setValue(newSliderOffset / activeAmplitude);
+                _dragInitialOffset = _sliderAreaBoundaries.first +
+                    normify(_value.get()) * (_sliderAreaBoundaries.second - _sliderLength);
             });
 
-        _background->setDragBeginCallback(
-            [this](Component const &, events::application::OnMouseDown const & e)
+        _slider->setCallback(std::in_place_type<gui::events::OnDragMove>, "__scrollbar__",
+            [this](Component const &, gui::events::OnDragMove const & e)
             {
-                if (float const activeAmplitude = _sliderAmplitude - sliderSize();
-                    activeAmplitude > 0)
-                {
-                    Area const & area = _slider->clientArea();
-                    float const abs = _vertical ? e._y : e._x;
-                    float const lowerBound = _vertical ? area._top : area._left;
-                    float const upperBound = lowerBound + activeAmplitude;
-                    float const newSliderOffset = std::min(abs - lowerBound - sliderSize() * .5f, upperBound);
-                    setValue(newSliderOffset / activeAmplitude);
-                }
+                int const begin = _isVertical.get() ? e._begin._y
+                                                    : e._begin._x;
+                int const offset = _isVertical.get() ? e._event._absY
+                                                     : e._event._absX;
+                setValueFromPosition(static_cast<float>(
+                    _dragInitialOffset + (offset - begin)));
             });
 
-        _increase = increase;
-        _decrease = decrease;
-        _slider = slider;
+        _slider->setCallback(std::in_place_type<minire::events::application::OnMouseWheel>,
+            "__scrollbar__",
+            [this](Component const &, minire::events::application::OnMouseWheel const & e)
+            {
+                handle(e);
+            });
 
-        if (increase)
-        {
-            emplace(increase);
-            increase->setArrangers(Arrangers::fill());
-            MINIRE_INVARIANT(!increase->hasClickCallback(),
-                             "increase button cannot have a user's click callback");
-            increase->setClickCallback([this](Button const &){ setValue(_currentValue + _step); });
-        }
+        // Background interaction
+        this->isDraggable() = true;
+        this->setCallback(std::in_place_type<gui::events::OnDragBegin>, "__scrollbar__",
+            [this](Component const &, gui::events::OnDragBegin const & e)
+            {
+                int const abs = _isVertical.get() ? e._event._y
+                                                  : e._event._x;
+                setValueFromPosition(static_cast<float>(abs - _sliderLength/2));
+            });
 
-        if (decrease)
-        {
-            emplace(decrease);
-            decrease->setArrangers(Arrangers::fill());
-            MINIRE_INVARIANT(!decrease->hasClickCallback(),
-                             "decrease button cannot have a user's click callback");
-            decrease->setClickCallback([this](Button const &){ setValue(_currentValue - _step); });
-        }
-
-        if (slider)
-        {
-            emplace(slider);
-
-            slider->setIsDragable(true);
-            slider->setDragMoveCallback(
-                [this](Component &, events::application::OnMouseMove const & e)
-                {
-                    Area const & area = _slider->clientArea();
-
-                    float const abs = _vertical ? e._absY : e._absX;
-                    float const rel = _vertical ? e._relY : e._relX;
-                    float const activeAmplitude = _sliderAmplitude - sliderSize();
-                    float const lowerBound = _vertical ? area._top : area._left;
-                    float const upperBound = lowerBound + _sliderAmplitude;
-                    float const newSliderOffset = (
-                        abs < lowerBound ? 0 : (abs >= upperBound ? _sliderAmplitude - sliderSize()
-                                                                  : _sliderOffset + rel));
-                    if (activeAmplitude > 0)
-                        setValue(newSliderOffset / activeAmplitude);
-                });
-            updateArrangers();
-        }
-
-        setArrangers(arrangers);
+        this->setCallback(std::in_place_type<gui::events::OnDragMove>, "__scrollbar__",
+            [this](Component const &, gui::events::OnDragMove const & e)
+            {
+                int const abs = _isVertical.get() ? e._event._absY
+                                                  : e._event._absX;
+                setValueFromPosition(static_cast<float>(abs - _sliderLength/2));
+            });
     }
 
-    void Scrollbar::setValue(float newValue)
-    {
-        float const newSliderOffset = newValue * (_sliderAmplitude - sliderSize());
 
-        if (newValue == _currentValue &&
-            newSliderOffset == _sliderOffset)
+    void Scrollbar::setValueFromPosition(float abs)
+    {
+        float const lower = _sliderAreaBoundaries.first;
+        float const upper = _sliderAreaBoundaries.first + _sliderAreaBoundaries.second - _sliderLength;
+        abs = clip(abs, lower, upper);
+        float const previous = _value.get();
+        _value = normify((abs - lower) / (upper - lower));
+        if (_value.isInvalidated())
         {
-            return;
-        }
-
-        float const previousValue = _currentValue;
-        _currentValue = std::min(std::max(0.0f, newValue), 1.0f);
-
-        if (_valueChangedCallback &&
-            previousValue != _currentValue)
-        {
-            _valueChangedCallback(*this, previousValue, _currentValue);
-        }
-
-        setSliderOfffset(newSliderOffset);
-    }
-
-    void Scrollbar::setStep(float newStep)
-    {
-        if (_step == newStep)
-            return;
-        _step = std::max(0.0f, newStep);
-        setValue(_currentValue);
-    }
-
-    void Scrollbar::setMinSliderSize(float newMinSliderSize)
-    {
-        if (_minSliderSize == newMinSliderSize)
-            return;
-
-        _minSliderSize = newMinSliderSize;
-        setValue(_currentValue);
-    }
-
-    void Scrollbar::updateArrangers()
-    {
-        if (_slider)
-        {
-            Arranger hArranger(position::Less{}, dimension::Fill{});
-            Arranger vArranger(position::Constant{_sliderOffset},
-                               dimension::Constant{sliderSize()});
-
-            _slider->setArrangers(Arrangers
-                {
-                    ._horizontal = _vertical ? hArranger : vArranger,
-                    ._vertical   = _vertical ? vArranger : hArranger,
-                });
+            handle(scrollbar::OnValueChanged(previous, _value.get()));
         }
     }
 
-    void Scrollbar::setSliderOfffset(float newSliderOffset)
+    void Scrollbar::setValue(float value)
     {
-        newSliderOffset = std::max(0.0f, std::min(newSliderOffset, _sliderAmplitude - sliderSize()));
-
-        if (newSliderOffset == _sliderOffset)
-            return;
-
-        _sliderOffset = newSliderOffset;
-        updateArrangers();
+        float const previous = _value.get();
+        _value = normify(value);
+        if (_value.isInvalidated())
+        {
+            handle(scrollbar::OnValueChanged(previous, _value.get()));
+        }
     }
 
-    void Scrollbar::setSliderAmplitude(float const newSliderAmplitude)
+    size_t Scrollbar::revalidateContent(size_t zOffset,
+                                        bool const effectiveVisible,
+                                        Area const & clientArea)
     {
-        if (newSliderAmplitude == _sliderAmplitude ||
-            newSliderAmplitude <= 0)
+        // revalidate background (if any)
+        if (auto background = _background.get(); background)
         {
-            return;
+            if (_background.isInvalidated())
+            {
+                background->setContentInvalidator(shared_from_this());
+            }
+
+            background->setContentArea(clientArea);
+            background->setVisible(effectiveVisible);
+            zOffset = background->onZOrderChanged(zOffset);
         }
 
-        _sliderAmplitude = newSliderAmplitude;
-        setValue(_currentValue);
-        updateArrangers();
+        // revalidate icons
+        // (update only if it is a default one, it won't overwrite custom icon)
+        if (_isVertical.isInvalidated())
+        {
+            assert(_increaseButton);
+            if (_increaseButton->icon().get() == _defaultIncreaseIcon.lock())
+            {
+                _increaseButton->icon() = theme().makeIcon(_isVertical.get() ? theme::Icon::kArrowDown
+                                                                             : theme::Icon::kArrowRight);
+                _defaultIncreaseIcon = _increaseButton->icon().get();
+            }
+
+            assert(_decreaseButton);
+            if (_decreaseButton->icon().get() == _defaultDecreaseIcon.lock())
+            {
+                _decreaseButton->icon() = theme().makeIcon(_isVertical.get() ? theme::Icon::kArrowUp
+                                                                             : theme::Icon::kArrowLeft);
+                _defaultDecreaseIcon = _decreaseButton->icon().get();
+            }
+        }
+
+        // calculate slider's max offset
+        bool const hasIncBtn = _increaseButton->visible().get();
+        bool const hasDecBtn = _decreaseButton->visible().get();
+        float const buttonSize = _isVertical.get() ? clientArea._width : clientArea._height;
+        float const btnDeltas =  (hasIncBtn ? buttonSize : 0) + (hasDecBtn ? buttonSize : 0);
+        Boundaries const sliderAreaBoundaries
+        {
+            (_isVertical.get() ? clientArea._top    : clientArea._left)  + (hasDecBtn ? buttonSize : 0),
+            (_isVertical.get() ? clientArea._height : clientArea._width) - btnDeltas,
+        };
+
+        // revalidate slider size and position
+        assert(_slider);
+        if (_step.isInvalidated() ||
+            _value.isInvalidated() ||
+            _minSliderLength.isInvalidated() ||
+            sliderAreaBoundaries.second != _sliderAreaBoundaries.second)
+        {
+            float const sliderAreaLength = sliderAreaBoundaries.second;
+
+            _sliderLength = std::max(_minSliderLength.get(),
+                                     sliderAreaLength * _step.get());
+
+            float const sliderOffset = normify(_value.get()) * (sliderAreaLength - _sliderLength);
+
+            Arranger hArranger(position::Begin{}, dimension::Fill{});
+            Arranger vArranger(position::Constant{sliderOffset},
+                               dimension::Constant{_sliderLength});
+
+            _slider->horizontal() = _isVertical.get() ? hArranger : vArranger;
+            _slider->vertical() = _isVertical.get() ? vArranger : hArranger;
+        }
+
+        // finish
+
+        _sliderAreaBoundaries = sliderAreaBoundaries;
+
+        _background.revalidate();
+        _value.revalidate();
+        _step.revalidate();
+        _minSliderLength.revalidate();
+        _isVertical.revalidate();
+
+        return zOffset;
     }
 
-    float Scrollbar::sliderSize() const
+    Button const & Scrollbar::increaseButton() const
     {
-        return std::max(_minSliderSize, _sliderAmplitude * _step);
+        assert(_increaseButton);
+        return *_increaseButton;
+    }
+
+    Button const & Scrollbar::decreaseButton() const
+    {
+        assert(_decreaseButton);
+        return *_decreaseButton;
+    }
+
+    Button & Scrollbar::increaseButton()
+    {
+        assert(_increaseButton);
+        return *_increaseButton;
+    }
+
+    Button & Scrollbar::decreaseButton()
+    {
+        assert(_decreaseButton);
+        return *_decreaseButton;
+    }
+
+    void Scrollbar::handle(minire::events::application::OnMouseWheel const & e)
+    {
+        setValue(_value.get() + _step.get() * static_cast<float>(-e._dy));
+        Component::handle(e);
     }
 }

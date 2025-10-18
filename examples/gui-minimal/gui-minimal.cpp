@@ -20,107 +20,87 @@ namespace
             GuiController::start();
 
             guiRoot().emplace<minire::gui::components::Image>(
-                "center-center-example", "center-center.png");
+                "center-center-example", makeImageView("center-center.png"));
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "center-less-example", "center-less.png");
-                auto arrangers = comp->arrangers();
-                arrangers._horizontal.setPosition(minire::gui::position::Center{});
-                arrangers._vertical.setPosition(minire::gui::position::Less{});
-                arrangers._vertical.setMarginMin(10);
-                comp->setArrangers(arrangers);
+                    "center-less-example", makeImageView("center-less.png"));
+                comp->horizontal()->_position = minire::gui::position::Center{};
+                comp->vertical()->_position = minire::gui::position::Begin{};
+                comp->vertical()->_marginMin = 10;
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "center-more-example", "center-more.png");
-                auto arrangers = comp->arrangers();
-                arrangers._horizontal.setPosition(minire::gui::position::Center{});
-                arrangers._vertical.setPosition(minire::gui::position::More{});
-                arrangers._vertical.setMarginMax(10);
-                comp->setArrangers(arrangers);
+                    "center-more-example", makeImageView("center-more.png"));
+                comp->horizontal()->_position = minire::gui::position::Center{};
+                comp->vertical()->_position = minire::gui::position::End{};
+                comp->vertical()->_marginMax = 10;
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "less-center-example", "less-center.png");
-                auto arrangers = comp->arrangers();
-                arrangers._horizontal.setPosition(minire::gui::position::Less{});
-                arrangers._horizontal.setMarginMin(10);
-                arrangers._vertical.setPosition(minire::gui::position::Center{});
-                comp->setArrangers(arrangers);
+                    "less-center-example", makeImageView("less-center.png"));
+                comp->horizontal()->_position = minire::gui::position::Begin{};
+                comp->horizontal()->_marginMin = 10;
+                comp->vertical()->_position = minire::gui::position::Center{};
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "more-center-example", "more-center.png");
-                auto arrangers = comp->arrangers();
-                arrangers._horizontal.setPosition(minire::gui::position::More{});
-                arrangers._horizontal.setMarginMax(10);
-                arrangers._vertical.setPosition(minire::gui::position::Center{});
-                comp->setArrangers(arrangers);
+                    "more-center-example", makeImageView("more-center.png"));
+                comp->horizontal()->_position = minire::gui::position::End{};
+                comp->horizontal()->_marginMax = 10;
+                comp->vertical()->_position = minire::gui::position::Center{};
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "less-less-example", "less-less.png");
-                auto arrangers = comp->arrangers();
-                arrangers._horizontal.setPosition(minire::gui::position::Less{});
-                arrangers._horizontal.setMarginMin(100);
-                arrangers._vertical.setPosition(minire::gui::position::Less{});
-                arrangers._vertical.setMarginMin(100);
-                comp->setArrangers(arrangers);
+                    "less-less-example", makeImageView("less-less.png"));
+                comp->horizontal()->_position = minire::gui::position::Begin{};
+                comp->horizontal()->_marginMin = 100;
+                comp->vertical()->_position = minire::gui::position::Begin{};
+                comp->vertical()->_marginMin = 100;
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "less-more-example", "less-more.png");
-                auto arrangers = comp->arrangers();
-                arrangers._horizontal.setPosition(minire::gui::position::Less{});
-                arrangers._horizontal.setMarginMin(100);
-                arrangers._vertical.setPosition(minire::gui::position::More{});
-                arrangers._vertical.setMarginMax(100);
-                comp->setArrangers(arrangers);
+                    "less-more-example", makeImageView("less-more.png"));
+                comp->horizontal()->_position = minire::gui::position::Begin{};
+                comp->horizontal()->_marginMin = 100;
+                comp->vertical()->_position = minire::gui::position::End{};
+                comp->vertical()->_marginMax = 100;
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "more-less-example", "more-less.png");
-                auto arrangers = comp->arrangers();
-                arrangers._horizontal.setPosition(minire::gui::position::More{});
-                arrangers._horizontal.setMarginMax(100);
-                arrangers._vertical.setPosition(minire::gui::position::Less{});
-                arrangers._vertical.setMarginMin(100);
-                comp->setArrangers(arrangers);
+                    "more-less-example", makeImageView("more-less.png"));
+                comp->horizontal()->_position = minire::gui::position::End{};
+                comp->horizontal()->_marginMax = 100;
+                comp->vertical()->_position = minire::gui::position::Begin{};
+                comp->vertical()->_marginMin = 100;
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "more-more-example", "more-more.png");
-                auto arrangers = comp->arrangers();
-                arrangers._horizontal.setPosition(minire::gui::position::More{});
-                arrangers._horizontal.setMarginMax(100);
-                arrangers._vertical.setPosition(minire::gui::position::More{});
-                arrangers._vertical.setMarginMax(100);
-                comp->setArrangers(arrangers);
+                    "more-more-example", makeImageView("more-more.png"));
+                comp->horizontal()->_position = minire::gui::position::End{};
+                comp->horizontal()->_marginMax = 100;
+                comp->vertical()->_position = minire::gui::position::End{};
+                comp->vertical()->_marginMax = 100;
             }
 
-            guiRoot().emplace<minire::gui::components::Image>(
-                "origin-example", "origin.png", std::monostate(),
-                minire::gui::Arrangers
-                {
-                    ._horizontal = minire::gui::Arranger(minire::gui::position::Constant{0}),
-                    ._vertical = minire::gui::Arranger(minire::gui::position::Constant{0})
-                });
+            {
+                auto comp = guiRoot().emplace<minire::gui::components::Image>(
+                    "origin-example", makeImageView("origin.png"));
+                comp->horizontal() =  minire::gui::Arranger(minire::gui::position::Constant{0});
+                comp->vertical() = minire::gui::Arranger(minire::gui::position::Constant{0});
+            }
 
             _bottomRight = guiRoot().emplace<minire::gui::components::Image>(
-                "bottom-right-example", "bottom-right.png", std::monostate(),
-                minire::gui::Arrangers
-                {
-                    ._horizontal = minire::gui::Arranger(minire::gui::position::Constant{0}),
-                    ._vertical = minire::gui::Arranger(minire::gui::position::Constant{0})
-                });
+                "bottom-right-example", makeImageView("bottom-right.png"));
+            _bottomRight->horizontal() = minire::gui::Arranger(minire::gui::position::Constant{0});
+            _bottomRight->vertical() = minire::gui::Arranger(minire::gui::position::Constant{0});
         }
 
         void handle(minire::events::application::OnResize const & e) override
@@ -129,17 +109,14 @@ namespace
 
             assert(_bottomRight);
 
-            auto arrangers = _bottomRight->arrangers();
-            arrangers._horizontal.setPosition(
-                minire::gui::position::Constant{static_cast<float>(e._width - 50)});
-            arrangers._vertical.setPosition(
-                minire::gui::position::Constant{static_cast<float>(e._height - 50)});
-            _bottomRight->setArrangers(arrangers);
+            _bottomRight->horizontal()->_position =
+                minire::gui::position::Constant{static_cast<float>(e._width - 50)};
+            _bottomRight->vertical()->_position =
+                minire::gui::position::Constant{static_cast<float>(e._height - 50)};
         }
 
     private:
-        using ComponentSptr = minire::gui::Component::Sptr;
-        ComponentSptr _bottomRight;
+        minire::gui::Component::Sptr _bottomRight;
     };
 }
 
