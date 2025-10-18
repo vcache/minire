@@ -227,11 +227,6 @@ namespace minire::gui::components
         if (state == _state)
             return;
 
-        if (auto background = activeBackground(); background)
-        {
-            background->setVisible(false);
-        }
-
         if (_state == State::kPressed)
         {
             if (auto const & text = _text.get())
@@ -247,12 +242,7 @@ namespace minire::gui::components
 
         _state = state;
 
-        if (auto background = activeBackground(); background)
-        {
-            background->setVisible(visible().get());
-        }
-
-        if (_state == State::kPressed)
+       if (_state == State::kPressed)
         {
             if (auto const & text = _text.get())
             {
@@ -266,6 +256,8 @@ namespace minire::gui::components
                 icon->setContentPosition(iconPosition.x, iconPosition.y);
             }
         }
+
+        invalidateContent();
     }
 
     void Button::handle(models::checkable::OnCheckedChanged const & e)

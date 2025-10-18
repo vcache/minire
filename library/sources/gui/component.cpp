@@ -346,7 +346,9 @@ namespace minire::gui
                                             child->_visible.isInvalidated() ||
                                             child->_visible.get() ||
                                             child->_visible.get() != child->_impl->_visible;
-                if (visibilityTest && (revalidateChildren || child->_invalidated))
+                if (visibilityTest && (revalidateChildren ||
+                                       child->_invalidated ||
+                                       effectiveVisibleChanged))
                 {
                     assert(_layout.get());
                     Area const & childArea = _layout.get()->evaluate(childrenClientArea, *child);
