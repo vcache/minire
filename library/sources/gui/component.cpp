@@ -277,7 +277,7 @@ namespace minire::gui
                                                      contentSize ? std::optional<float>(contentSize->second)
                                                                  : std::nullopt);
 
-                Area const & contentArea = Area
+                Area contentArea
                 {
                     ._left = left,
                     ._top = top,
