@@ -12,6 +12,8 @@ namespace minire::gui
 {
     class Component;
 
+    // TODO: Styles into a Theme (i.e. different styles of buttons, scrollbars, etc)
+
     namespace theme
     {
         enum class Location

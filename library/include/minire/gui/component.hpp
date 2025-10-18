@@ -78,6 +78,11 @@ namespace minire::gui
         Property<Layout::Sptr> & layout() { return _layout; }
 
         // User's opaque data
+        template<typename T>
+        void setUserData(T && userData)
+        {
+            _userData = std::forward<T>(userData);
+        }
         std::any const & userData() const { return _userData; }
         std::any & userData() { return _userData; }
 
