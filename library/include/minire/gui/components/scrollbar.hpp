@@ -30,8 +30,10 @@ namespace minire::gui::components
 
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
+        using CommonCallbacks::eraseCallback;
         using Callback<Scrollbar, scrollbar::OnValueChanged>::handle;
         using Callback<Scrollbar, scrollbar::OnValueChanged>::setCallback;
+        using Callback<Scrollbar, scrollbar::OnValueChanged>::eraseCallback;
 
         Button const & increaseButton() const;
         Button const & decreaseButton() const;

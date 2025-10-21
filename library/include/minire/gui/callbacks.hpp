@@ -88,6 +88,7 @@ namespace minire::gui
     public:
         using Callback<Derived, Ts>::handle...;
         using Callback<Derived, Ts>::setCallback...;
+        using Callback<Derived, Ts>::eraseCallback...;
     };
 
     template<typename Derived>
@@ -109,4 +110,73 @@ namespace minire::gui
                                   gui::events::OnUnfocus,
                                   gui::events::OnClick>
     {};
+
+    // A RAII-like handler for a Callback.
+    // Must be when a Callback captures objects that might become
+    // dangling.
+
+    class GenericCallbackHolder
+    {
+    public:
+        using Uptr = std::unique_ptr<GenericCallbackHolder>;
+        virtual ~GenericCallbackHolder() = default;
+    };
+
+    template<typename Owner,
+             typename Event>
+    class CallbackHolder final
+        : public GenericCallbackHolder
+    {
+        CallbackHolder(CallbackHolder const &) = delete;
+        CallbackHolder & operator=(CallbackHolder const &) = delete;
+
+    public:
+        explicit CallbackHolder(std::shared_ptr<Owner> const & owner,
+                                std::string const & name)
+            : _owner(owner)
+            , _name(name)
+        {}
+
+        explicit CallbackHolder(CallbackHolder && other)
+            : _owner(std::move(other._owner))
+            , _name(std::move(other._name))
+        {}
+
+        CallbackHolder & operator=(CallbackHolder && other)
+        {
+            CallbackHolder tmp(std::move(other));
+            std::swap(_owner, tmp._owner);
+            std::swap(_name, tmp._name);
+            return *this;
+        }
+
+        ~CallbackHolder()
+        {
+            if (std::shared_ptr<Owner> owner = _owner.lock(); owner)
+            {
+                owner->eraseCallback(std::in_place_type<Event>, _name);
+            }
+        }
+
+    private:
+        std::weak_ptr<Owner> _owner;
+        std::string          _name;
+    };
+
+    template<typename Event,
+             typename Owner,
+             typename Callback>
+    std::unique_ptr<CallbackHolder<Owner, Event>>
+    registerCallback(std::shared_ptr<Owner> const & owner,
+                     std::string const & name,
+                     Callback callback)
+    {
+        if (owner)
+        {
+            owner->setCallback(std::in_place_type<Event>, name,
+                               std::forward<Callback>(callback));
+            return std::make_unique<CallbackHolder<Owner, Event>>(owner, name);
+        }
+        return {};
+    }
 }

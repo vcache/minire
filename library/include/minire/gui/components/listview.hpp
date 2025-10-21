@@ -46,8 +46,10 @@ namespace minire::gui::components
 
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
+        using CommonCallbacks::eraseCallback;
         using Callback<ListView, listview::OnSelectionChanged>::handle;
         using Callback<ListView, listview::OnSelectionChanged>::setCallback;
+        using Callback<ListView, listview::OnSelectionChanged>::eraseCallback;
 
         Scrollbar const & scrollbar() const { assert(_scrollbar); return *_scrollbar; }
         Scrollbar & scrollbar() { assert(_scrollbar); return *_scrollbar; }

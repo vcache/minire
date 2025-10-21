@@ -49,8 +49,10 @@ namespace minire::gui::components
 
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
+        using CommonCallbacks::eraseCallback;
         using Callback<Dropdown, dropdown::OnSelectionChanged>::handle;
         using Callback<Dropdown, dropdown::OnSelectionChanged>::setCallback;
+        using Callback<Dropdown, dropdown::OnSelectionChanged>::eraseCallback;
 
         Button const & dropButton() const { assert(_dropButton); return *_dropButton; }
         Button & dropButton() { assert(_dropButton); return *_dropButton; }

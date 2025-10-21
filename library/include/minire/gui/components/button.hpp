@@ -23,8 +23,10 @@ namespace minire::gui::components
 
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
+        using CommonCallbacks::eraseCallback;
         using Checkable::handle;
         using Checkable::setCallback;
+        using Checkable::eraseCallback;
 
         Property<ImageView::Sptr> const & bgNormal() const { return _bgNormal; }
         Property<ImageView::Sptr> & bgNormal() { return _bgNormal; }
