@@ -37,9 +37,9 @@ namespace minire::gui_controller
         enqueueUncommited();
     }
 
-    std::pair<float, float> TextViewImpl::measure() const
+    std::pair<glm::vec2, bool> TextViewImpl::measure() const
     {
-        return std::make_pair(_textSize.x, _textSize.y);
+        return std::make_pair(_textSize, false);
     }
 
     void TextViewImpl::setContentPosition(float left, float top)

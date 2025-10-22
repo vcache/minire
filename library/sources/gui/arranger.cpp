@@ -27,11 +27,11 @@ namespace minire::gui
         }
 
         // Floating position + Fixed dimension
-        float dimension = std::visit(utils::Overloaded
+        float visibleDimension = std::visit(utils::Overloaded
         {
             [this](dimension::Constant const & v)
             {
-                return v._dimension + _marginMin + _marginMax;
+                return v._dimension;
             },
 
             [this, clientDimension](dimension::Fraction const & v)
@@ -47,7 +47,7 @@ namespace minire::gui
             [this, &contentDimension](dimension::Content const &)
             {
                 MINIRE_INVARIANT(contentDimension, "content size is immesuarable");
-                return *contentDimension + _marginMin + _marginMax;
+                return *contentDimension;
             }
         }, _dimension);
 
@@ -69,21 +69,22 @@ namespace minire::gui
                 return _marginMin;
             },
 
-            [this, clientDimension, dimension]
+            [this, clientDimension, visibleDimension]
             (position::Center const &)
             {
-                return _marginMin + (clientDimension - dimension) / 2.0f;
+                float const fullDimension = visibleDimension + _marginMin + _marginMax;
+                return _marginMin + (clientDimension - fullDimension) / 2.0f;
             },
 
-            [this, clientDimension, dimension]
+            [this, clientDimension, visibleDimension]
             (position::End const &)
             {
-                return clientDimension - dimension;
+                return clientDimension - visibleDimension - _marginMax;
             }
         }, _position);
 
         return std::make_pair(std::floor(position),
-                              std::floor(dimension - _marginMin - _marginMax));
+                              std::floor(visibleDimension));
     }
 
     Arranger const & Arranger::fill()

@@ -5,6 +5,8 @@
 #include <minire/text/formatted-string.hpp>
 #include <minire/utils/rect.hpp>
 
+#include <glm/vec2.hpp>
+
 #include <memory>
 #include <utility>
 #include <vector>
@@ -33,7 +35,7 @@ namespace minire::gui
 
         virtual void initialize() = 0;
 
-        virtual std::pair<float, float> measure() const = 0;
+        virtual std::pair<glm::vec2, bool> measure() const = 0;
 
         virtual void setContentPosition(float left, float top) = 0;
 

@@ -28,7 +28,7 @@ namespace minire::gui::components
             : _dropdown(dropdown)
         {}
 
-        bool handle(minire::events::application::OnMouseDown const &)
+        bool handle(minire::events::application::OnMouseUp const &)
         {
             _dropdown.closeTongue();
             return true;

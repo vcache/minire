@@ -38,9 +38,9 @@ namespace minire::gui_controller
         enqueueUncommited();
     }
 
-    std::pair<float, float> ImageViewImpl::measure() const
+    std::pair<glm::vec2, bool> ImageViewImpl::measure() const
     {
-        return std::make_pair(_imageSize.x, _imageSize.y);
+        return std::make_pair(_imageSize, _resizable);
     }
 
     void ImageViewImpl::setContentPosition(float left, float top)

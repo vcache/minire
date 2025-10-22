@@ -250,7 +250,8 @@ namespace minire::gui::components
             std::optional<std::pair<float, float>> measureContent() const override
             {
                 if (!_contents.get()) return std::nullopt;
-                return _contents.get()->measure();
+                auto [size, _] = _contents.get()->measure();
+                return std::make_pair(size.x, size.y);
             }
 
         private:
@@ -366,7 +367,8 @@ namespace minire::gui::components
                 {
                     if (_lineHeight.get() <= 0)
                     {
-                        _lineHeight = itemContent->measure().second;
+                        auto [size, _] = itemContent->measure();
+                        _lineHeight = size.y;
                     }
                     auto listViewItem = _contentContainer->emplace<ListViewItem>(
                         fmt::format("__item/{}__", index), itemContent, *this, index);

@@ -21,7 +21,7 @@ namespace minire::gui_controller
 
         void initialize() override;
 
-        std::pair<float, float> measure() const override;
+        std::pair<glm::vec2, bool> measure() const override;
 
         void setContentPosition(float left, float top) override;
 

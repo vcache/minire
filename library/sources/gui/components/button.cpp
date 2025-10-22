@@ -96,34 +96,34 @@ namespace minire::gui::components
         {
             // only a text
             assert(hasText);
-            auto [w, h] = (*_text)->measure();
-            return std::make_pair(w + extraWidth, h + extraHeight);
+            auto [size, _] = (*_text)->measure();
+            return std::make_pair(size.x + extraWidth, size.y + extraHeight);
         }
         else if (!hasText)
         {
             // only an icon
             assert(hasIcon);
-            auto [w, h] = (*_icon)->measure();
-            return std::make_pair(w + extraWidth, h + extraHeight);
+            auto [size, _] = (*_icon)->measure();
+            return std::make_pair(size.x + extraWidth, size.y + extraHeight);
         }
         else
         {
             // an icon and a text
             assert(hasIcon);
             assert(hasText);
-            auto [textWidth, textHeight] = (*_text)->measure();
-            auto [iconWidth, iconHeight] = (*_icon)->measure();
+            auto [textSize, _] = (*_text)->measure();
+            auto [iconSize, __] = (*_icon)->measure();
             switch(_iconLocation.get())
             {
                 case theme::Location::kLeft:
                 case theme::Location::kRight:
-                    return std::make_pair(iconWidth + textWidth + _iconSpacing.get() + extraWidth,
-                                          std::max(iconHeight, textHeight) + extraHeight);
+                    return std::make_pair(iconSize.x + textSize.x + _iconSpacing.get() + extraWidth,
+                                          std::max(iconSize.y, textSize.y) + extraHeight);
 
                 case theme::Location::kTop:
                 case theme::Location::kBottom:
-                    return std::make_pair(std::max(iconWidth, textWidth) + extraWidth,
-                                          iconHeight + textHeight + _iconSpacing.get() + extraHeight);
+                    return std::make_pair(std::max(iconSize.x, textSize.x) + extraWidth,
+                                          iconSize.y + textSize.y + _iconSpacing.get() + extraHeight);
             }
 
             MINIRE_THROW("unknown icon position: {}", static_cast<int>(_iconLocation.get()));
@@ -161,18 +161,18 @@ namespace minire::gui::components
         {
             // only a text
             assert(hasText);
-            auto [w, h] = (*_text)->measure();
-            _textPosition.x = area._left + (area._width - w) / 2.0f;
-            _textPosition.y = area._top + (area._height - h) / 2.0f;
+            auto [size, _] = (*_text)->measure();
+            _textPosition.x = area._left + (area._width - size.x) / 2.0f;
+            _textPosition.y = area._top + (area._height - size.y) / 2.0f;
             (*_text)->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
         }
         else if (!hasText)
         {
             // only an icon
             assert(hasIcon);
-            auto [w, h] = (*_icon)->measure();
-            _iconPosition.x = area._left + (area._width - w) / 2.0f;
-            _iconPosition.y = area._top + (area._height - h) / 2.0f;
+            auto [size, _] = (*_icon)->measure();
+            _iconPosition.x = area._left + (area._width - size.x) / 2.0f;
+            _iconPosition.y = area._top + (area._height - size.y) / 2.0f;
             (*_icon)->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
         }
         else
@@ -180,40 +180,40 @@ namespace minire::gui::components
             // an icon and a text
             assert(hasIcon);
             assert(hasText);
-            auto [textWidth, textHeight] = (*_text)->measure();
-            auto [iconWidth, iconHeight] = (*_icon)->measure();
+            auto [textSize, _] = (*_text)->measure();
+            auto [iconSize, __] = (*_icon)->measure();
 
-            float const totalWidth = iconWidth + textWidth + _iconSpacing.get();
-            float const totalHeight = iconHeight + textHeight + _iconSpacing.get();
+            float const totalWidth = iconSize.x + textSize.x + _iconSpacing.get();
+            float const totalHeight = iconSize.y + textSize.y + _iconSpacing.get();
 
             switch(_iconLocation.get())
             {
                 case theme::Location::kLeft:
                     _iconPosition.x = area._left + (area._width - totalWidth) / 2.0f;
-                    _textPosition.x = _iconPosition.x + iconWidth + _iconSpacing.get();
-                    _iconPosition.y = area._top + (area._height - iconHeight) / 2.0f;
-                    _textPosition.y = area._top + (area._height - textHeight) / 2.0f;
+                    _textPosition.x = _iconPosition.x + iconSize.x + _iconSpacing.get();
+                    _iconPosition.y = area._top + (area._height - iconSize.y) / 2.0f;
+                    _textPosition.y = area._top + (area._height - textSize.y) / 2.0f;
                     break;
 
                 case theme::Location::kTop:
-                    _iconPosition.x = area._left + (area._width - iconWidth) / 2.0f;
-                    _textPosition.x = area._left + (area._width - textWidth) / 2.0f;
+                    _iconPosition.x = area._left + (area._width - iconSize.x) / 2.0f;
+                    _textPosition.x = area._left + (area._width - textSize.x) / 2.0f;
                     _iconPosition.y = area._top + (area._height - totalHeight) / 2.0f;
-                    _textPosition.y = _iconPosition.y + iconHeight + _iconSpacing.get();
+                    _textPosition.y = _iconPosition.y + iconSize.y + _iconSpacing.get();
                     break;
 
                 case theme::Location::kRight:
                     _textPosition.x = area._left + (area._width - totalWidth) / 2.0f;
-                    _iconPosition.x = _textPosition.x + textWidth + _iconSpacing.get();
-                    _iconPosition.y = area._top + (area._height - iconHeight) / 2.0f;
-                    _textPosition.y = area._top + (area._height - textHeight) / 2.0f;
+                    _iconPosition.x = _textPosition.x + textSize.x + _iconSpacing.get();
+                    _iconPosition.y = area._top + (area._height - iconSize.y) / 2.0f;
+                    _textPosition.y = area._top + (area._height - textSize.y) / 2.0f;
                     break;
 
                 case theme::Location::kBottom:
-                    _iconPosition.x = area._left + (area._width - iconWidth) / 2.0f;
-                    _textPosition.x = area._left + (area._width - textWidth) / 2.0f;
+                    _iconPosition.x = area._left + (area._width - iconSize.x) / 2.0f;
+                    _textPosition.x = area._left + (area._width - textSize.x) / 2.0f;
                     _textPosition.y = area._top + (area._height - totalHeight) / 2.0f;
-                    _iconPosition.y = _textPosition.y + textHeight + _iconSpacing.get();
+                    _iconPosition.y = _textPosition.y + textSize.y + _iconSpacing.get();
                     break;
             }
 

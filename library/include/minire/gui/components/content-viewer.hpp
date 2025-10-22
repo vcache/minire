@@ -48,7 +48,8 @@ namespace minire::gui::components
         std::optional<std::pair<float, float>> measureContent() const override
         {
             assert(_content);
-            return _content->measure();
+            auto [size, _] = _content->measure();
+            return std::make_pair(size.x, size.y);
         }
 
     protected:
