@@ -15,7 +15,7 @@ namespace minire::grips
     class Panning
     {
     public:
-        void start(size_t mouseX, size_t mouseY)
+        void start(int mouseX, int mouseY)
         {
             assert(!isActive());
             if (!isActive())
@@ -28,8 +28,8 @@ namespace minire::grips
         }
 
         template<typename Camera>
-        glm::vec3 update(size_t const mouseX,
-                         size_t const mouseY,
+        glm::vec3 update(int const mouseX,
+                         int const mouseY,
                          glm::mat4 const & matrix,
                          glm::vec3 const & target,
                          Camera const & camera,
