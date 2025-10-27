@@ -46,7 +46,9 @@ namespace minire::sdl
         virtual void onFps(size_t fps, double mft);
 
     protected:
-        bool grabMouse(bool const grab);
+        bool setMouseMode(bool const windowGrab,
+                          bool const showCursor,
+                          bool const relativeMode);
 
     protected:
         uint32_t ticks() const { return _frameTicks; } // milliseconds, msec

@@ -82,12 +82,16 @@ namespace minire::sdl
 
     void Application::onFps(size_t, double) {}
 
-    bool Application::grabMouse(bool const grab)
+    bool Application::setMouseMode(bool const windowGrab,
+                                   bool const showCursor,
+                                   bool const relativeMode)
     {
-        ::SDL_SetWindowGrab(_window, grab ? SDL_TRUE : SDL_FALSE);
-        ::SDL_ShowCursor(grab ? SDL_DISABLE : SDL_ENABLE);
+        ::SDL_SetWindowGrab(_window, windowGrab ? SDL_TRUE : SDL_FALSE);
 
-        if (0 != ::SDL_SetRelativeMouseMode(grab ? SDL_TRUE : SDL_FALSE))
+        ::SDL_ShowCursor(showCursor ? SDL_ENABLE : SDL_DISABLE);
+        ::SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_CURSOR_VISIBLE, showCursor ? "1" : "0");
+
+        if (0 != ::SDL_SetRelativeMouseMode(relativeMode ? SDL_TRUE : SDL_FALSE))
         {
             return false;
         }

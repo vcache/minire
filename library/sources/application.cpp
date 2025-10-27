@@ -257,10 +257,15 @@ namespace minire
         MINIRE_THROW("TODO: not implemented");
     }
 
-    void Application::handle(events::controller::MouseGrab const & e)
+    void Application::handle(events::controller::SetMouseMode const & e)
     {
-        MINIRE_DEBUG("mouse grab event = {}", e._grab);
-        grabMouse(e._grab);
+        MINIRE_DEBUG("set mouse mode: grab: {}, show: {}, relative: {}",
+                     e._windowGrab, e._showCursor, e._relativeMode);
+        bool const result = setMouseMode(e._windowGrab, e._showCursor, e._relativeMode);
+        if (!result)
+        {
+            MINIRE_ERROR("failed to set mouse mode");
+        }
     }
 
     void Application::handle(events::controller::DebugDrawsUpdate const & e)

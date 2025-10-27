@@ -69,7 +69,7 @@ namespace minire
         void handle(BasicController::Batch const &);
 
         void handle(events::controller::Quit const &);
-        void handle(events::controller::MouseGrab const &);
+        void handle(events::controller::SetMouseMode const &);
         void handle(events::controller::DebugDrawsUpdate const &);
         void handle(events::controller::SetInstrumentation const &);
         void handle(events::controller::NewResourceLayer const &);

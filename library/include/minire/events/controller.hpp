@@ -11,7 +11,7 @@
 namespace minire::events
 {
     using Controller = std::variant<controller::Quit,
-                                    controller::MouseGrab,
+                                    controller::SetMouseMode,
                                     controller::DebugDrawsUpdate,
                                     controller::SetInstrumentation,
                                     controller::NewResourceLayer,

@@ -12,9 +12,11 @@ namespace minire::events::controller
     struct Quit
     {};
 
-    struct MouseGrab
+    struct SetMouseMode
     {
-        bool _grab;
+        bool _windowGrab;
+        bool _showCursor;
+        bool _relativeMode;
     };
 
     struct DebugDrawsUpdate
