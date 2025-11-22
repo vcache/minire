@@ -470,6 +470,11 @@ namespace minire
         _scene->handle(e);
     }
 
+    void Application::handle(events::controller::SceneNewBillboard const & e)
+    {
+        _scene->handle(e);
+    }
+
     void Application::handle(events::controller::SceneSetMeshEmissiveFactor const & e)
     {
         _scene->handle(e);

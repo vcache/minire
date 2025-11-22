@@ -18,6 +18,7 @@
 #include <variant>
 
 namespace minire::content { class Manager; }
+namespace minire::rasterizer { class Billboard; }
 namespace minire::rasterizer { class Mesh; }
 
 namespace minire
@@ -48,6 +49,7 @@ namespace minire
         void handle(events::controller::SceneNewPointLight const &);
         void handle(events::controller::SceneNewPerspectiveCamera const &);
         void handle(events::controller::SceneNewOrthographicCamera const &);
+        void handle(events::controller::SceneNewBillboard const &);
         void handle(events::controller::SceneSetParent const &);
         void handle(events::controller::SceneSetVisibility const &);
         void handle(events::controller::SceneSetTransform const &, size_t epochNumber);
@@ -95,6 +97,33 @@ namespace minire
                 else
                 {
                     it = _meshLeaves.erase(it);
+                }
+            }
+        }
+
+        template<typename Callable>
+        void cullBillboards(Callable callable) const
+        {
+            auto it = _billboardsLeaves.begin();
+            while(it != _billboardsLeaves.end())
+            {
+                if (auto billboard = it->second.lock();
+                    billboard)
+                {
+                    if (billboard->_visible)
+                    {
+                        auto parent = billboard->_parent.lock();
+                        MINIRE_INVARIANT(parent, "a billboard doesn't have a parent");
+                        assert(parent->hasGlobalTransform());
+                        assert(billboard->_billboard);
+                        callable(*billboard->_billboard, parent->_globalTransform);
+                    }
+
+                    ++it;
+                }
+                else
+                {
+                    it = _billboardsLeaves.erase(it);
                 }
             }
         }
@@ -152,9 +181,9 @@ namespace minire
             using Sptr = std::shared_ptr<Leaf>;
             using Wptr = std::weak_ptr<Leaf>;
 
-            Leaf(typename T::ElementType const & init,
-                 std::weak_ptr<Node> parent,
-                 bool visible)
+            explicit Leaf(typename T::ElementType const & init,
+                          std::weak_ptr<Node> parent,
+                          bool visible)
                 : T(init)
                 , _parent(parent)
                 , _visible(visible)
@@ -168,8 +197,21 @@ namespace minire
             ElementType _mesh;
             glm::vec3   _emissiveFactor = glm::vec3(0); // TODO: is not lerpable?
 
-            explicit Mesh(ElementType mesh)
+            explicit Mesh(ElementType const & mesh)
                 : _mesh(mesh)
+            {}
+
+            bool lerp(float, size_t) { return false; } // just for compatibility
+        };
+
+        struct Billboard
+        {
+            using ElementType = std::shared_ptr<rasterizer::Billboard>;
+
+            ElementType _billboard;
+
+            explicit Billboard(ElementType const & billboard)
+                : _billboard(billboard)
             {}
 
             bool lerp(float, size_t) { return false; } // just for compatibility
@@ -179,6 +221,7 @@ namespace minire
         using PointLightLeaf = Leaf<utils::Lerpable<models::PointLight>>;
         using PerspectiveCameraLeaf = Leaf<utils::Lerpable<models::PerspectiveCamera>>;
         using OrthographicCameraLeaf = Leaf<utils::Lerpable<models::OrthographicCamera>>;
+        using BillboardLeaf = Leaf<Billboard>;
 
         struct AnimationTrack
         {
@@ -222,7 +265,8 @@ namespace minire
                                        MeshLeaf::Sptr,
                                        PointLightLeaf::Sptr,
                                        PerspectiveCameraLeaf::Sptr,
-                                       OrthographicCameraLeaf::Sptr>;
+                                       OrthographicCameraLeaf::Sptr,
+                                       BillboardLeaf::Sptr>;
 
             using ChildrenMap = std::unordered_map<std::string, Child>;
             using LerpableTransform = utils::Lerpable<models::Transform>;
@@ -266,8 +310,12 @@ namespace minire
                                           OrthographicCameraLeaf::Wptr>;
 
     private:
-        using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
+        using BillboardsLeafRecord = std::pair<size_t, BillboardLeaf::Wptr>;
+
         using MeshLeaves = std::list<MeshLeaf::Wptr>;
+        using BillboardsLeaves = std::list<BillboardsLeafRecord>;
+        using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
+
         using ChildIterator = std::pair<Node::Sptr, Node::ChildrenMap::iterator>;
 
         // NOTE: empty path points to the _root,
@@ -293,8 +341,9 @@ namespace minire
         size_t           _nodesEstimate = 1;
         glm::vec3        _ambientLight = glm::vec3(0.03f);
 
-mutable PointLightLeaves _pointLightLeaves;
 mutable MeshLeaves       _meshLeaves;
+mutable BillboardsLeaves _billboardsLeaves;
+mutable PointLightLeaves _pointLightLeaves;
 
         friend class Node;
     };

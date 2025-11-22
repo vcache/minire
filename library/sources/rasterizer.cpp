@@ -27,6 +27,7 @@ namespace minire
         , _fonts(_contentManager, fontsPreload)
         , _labels(_fonts)
         , _sprites(_textures)
+        , _billboards(_contentManager, _fonts, _textures)
         , _2dProjection(1.0)
     {
         // TODO: preload textures for sprites
@@ -63,10 +64,11 @@ namespace minire
     {
         // setup state for 3d mode
         MINIRE_GL(glEnable, GL_CULL_FACE);
-        MINIRE_GL(glEnable, GL_DEPTH_TEST);
-        MINIRE_GL(glEnable, GL_MULTISAMPLE);
-        MINIRE_GL(glDepthFunc, GL_LESS);
         //MINIRE_GL(glCullFace, GL_FRONT);
+        MINIRE_GL(glEnable, GL_MULTISAMPLE);
+        MINIRE_GL(glEnable, GL_DEPTH_TEST);
+        MINIRE_GL(glDepthFunc, GL_LESS);
+        MINIRE_GL(glDepthMask, GL_TRUE);
         MINIRE_GL(glDisable, GL_BLEND);
         MINIRE_GL(glBlendFunc, GL_ONE, GL_ZERO);
 
@@ -78,6 +80,14 @@ namespace minire
 
         // draw entries
         _meshes.draw(scene);
+
+        // draw billboards
+        MINIRE_GL(glDisable, GL_CULL_FACE);
+        MINIRE_GL(glDepthFunc, GL_LEQUAL);
+        // TODO: fix alpha blending for billboards
+        //MINIRE_GL(glEnable, GL_BLEND);
+        //MINIRE_GL(glBlendFunc, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        _billboards.draw(scene);
     }
 
     void Rasterizer::draw2d()

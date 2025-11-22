@@ -51,7 +51,8 @@ namespace minire::rasterizer
         }
     )";
 
-    static const float kVbo[] = {
+    static const float kVbo[] =
+    {
         0.0, 0.0, 0.0,  1.0, 0.0, 0.0, // x
         1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
 

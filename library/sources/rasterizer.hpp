@@ -1,5 +1,6 @@
 #pragma once
 
+#include <rasterizer/billboards.hpp>
 #include <rasterizer/coordinates.hpp>
 #include <rasterizer/drawable.hpp>
 #include <rasterizer/fonts.hpp>
@@ -38,6 +39,7 @@ namespace minire
         rasterizer::Meshes & meshes() { return _meshes; }
         rasterizer::Lines & lines() { return _lines; }
         rasterizer::VertexBuffers & vertexBuffers() { return _vertexBuffers; }
+        rasterizer::Billboards & billboards() { return _billboards; }
 
     public:
         void newResourceLayer(rasterizer::Resources::LayerId const & layerId) { _resources.newLayer(layerId); }
@@ -53,6 +55,7 @@ namespace minire
 
         // NOTE: the order of these is ridiculously vital (see ctor)
         rasterizer::Ubo                _ubo;
+
         rasterizer::Coordinates        _coordinates;
         rasterizer::Lines              _lines;
         rasterizer::Textures           _textures;
@@ -62,6 +65,7 @@ namespace minire
         rasterizer::Fonts              _fonts;
         rasterizer::Labels             _labels;
         rasterizer::Sprites            _sprites;
+        rasterizer::Billboards         _billboards;
 
         rasterizer::Resources          _resources;
 

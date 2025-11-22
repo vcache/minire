@@ -171,7 +171,7 @@ namespace minire
         invalidateGlobalTransform(node);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
     }
-    
+
     void Scene::handle(events::controller::SceneNewMesh const & e)
     {
         auto mesh = _rasterizer.meshes().getMesh(e._data._source,
@@ -213,7 +213,25 @@ namespace minire
             e._id, std::make_shared<OrthographicCameraLeaf>(e._data, parent, e._visible));
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
     }
-    
+
+    void Scene::handle(events::controller::SceneNewBillboard const & e)
+    {
+        auto billboard = _rasterizer.billboards().create(e._data);
+        assert(billboard);
+
+        Node::Sptr parent = find<Node::Sptr>(e._parent);
+        assert(parent);
+        auto billboardLeaf = std::make_shared<BillboardLeaf>(billboard, parent, e._visible);
+        auto [_, inserted] = parent->_children.emplace(e._id, billboardLeaf);
+        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
+
+        _billboardsLeaves.emplace_back(e._data._zOrder, billboardLeaf);
+        _billboardsLeaves.sort([](auto const & a, auto const & b)
+            {
+                return a.first < b.first;
+            });
+    }
+
     void Scene::handle(events::controller::SceneSetParent const & e)
     {
         // Find an item's iterator and its parent
@@ -250,7 +268,7 @@ namespace minire
         // Erase the element from an old parent
         oldParent->_children.erase(oldIterator);
     }
-    
+
     void Scene::handle(events::controller::SceneSetVisibility const & e)
     {
         Node::Child item = find<Node::Child>(e._item);
@@ -269,7 +287,7 @@ namespace minire
         node->_localTransform.update(epochNumber, e._attribute);
         activate(*node); // NOTE: will also invalidate global transform
     }
-    
+
     void Scene::handle(events::controller::SceneSetPointLight const & e,
                        size_t epochNumber)
     {
@@ -395,6 +413,7 @@ namespace minire
                       std::is_same_v<T, PointLightLeaf::Sptr> ||
                       std::is_same_v<T, PerspectiveCameraLeaf::Sptr> ||
                       std::is_same_v<T, OrthographicCameraLeaf::Sptr> ||
+                      std::is_same_v<T, BillboardLeaf::Sptr> ||
                       std::is_same_v<T, ChildIterator>,
                       "unexpected result type");
         T result;
@@ -433,7 +452,8 @@ namespace minire
                      std::is_same_v<T, MeshLeaf::Sptr> ||
                      std::is_same_v<T, PointLightLeaf::Sptr> ||
                      std::is_same_v<T, PerspectiveCameraLeaf::Sptr> ||
-                     std::is_same_v<T, OrthographicCameraLeaf::Sptr>)
+                     std::is_same_v<T, OrthographicCameraLeaf::Sptr> ||
+                     std::is_same_v<T, BillboardLeaf::Sptr>)
         {
             T * fetched = std::get_if<T>(&current);
             MINIRE_INVARIANT(fetched, "unexpected element at path \"{}\": {}",

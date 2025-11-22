@@ -3,6 +3,7 @@
 #include <minire/content/id.hpp>
 #include <minire/content/path.hpp>
 #include <minire/models/animations.hpp>
+#include <minire/models/billboard.hpp>
 #include <minire/models/camera.hpp>
 #include <minire/models/mesh.hpp>
 #include <minire/models/point-light.hpp>
@@ -64,6 +65,7 @@ namespace minire::events::controller
     using SceneNewPointLight = impl::SceneNewLeaf<models::PointLight>;
     using SceneNewPerspectiveCamera = impl::SceneNewLeaf<models::PerspectiveCamera>;
     using SceneNewOrthographicCamera = impl::SceneNewLeaf<models::OrthographicCamera>;
+    using SceneNewBillboard = impl::SceneNewLeaf<models::Billboard>;
 
     struct SceneNewFromSource
     {

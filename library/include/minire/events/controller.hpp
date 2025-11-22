@@ -52,6 +52,7 @@ namespace minire::events
                                     controller::SceneNewPointLight,
                                     controller::SceneNewPerspectiveCamera,
                                     controller::SceneNewOrthographicCamera,
+                                    controller::SceneNewBillboard,
                                     controller::SceneSetParent,
                                     controller::SceneSetVisibility,
                                     controller::SceneSetTransform,

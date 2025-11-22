@@ -7,6 +7,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/gtc/type_ptr.hpp> // for gln::value_ptr
 
+#include <array>
 #include <cassert>
 #include <vector>
 #include <memory>
@@ -78,6 +79,12 @@ namespace minire::opengl
             MINIRE_GL(glUniform1f, location, value);
         }
 
+        void setUniform(GLint location, glm::vec2 const & value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniform2f, location, value.x, value.y);
+        }
+
         void setUniform(GLint location, glm::vec3 const & value) const
         {
             assert(isUsing());
@@ -88,6 +95,13 @@ namespace minire::opengl
         {
             assert(isUsing());
             MINIRE_GL(glUniformMatrix4fv, location, 1, GL_FALSE, glm::value_ptr(value));
+        }
+
+        template<size_t kItems>
+        void setUniform(GLint location, std::array<GLint, kItems> const & value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniform1iv, location, value.size(), value.data());
         }
 
     private:

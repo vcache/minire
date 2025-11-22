@@ -13,7 +13,7 @@
 #include <opengl/vbo.hpp>
 #include <rasterizer/font.hpp>
 #include <rasterizer/fonts.hpp>
-#include <text/iterator.hpp>
+#include <rasterizer/labels/vertex-buffer.hpp>
 
 #include <glm/common.hpp> // for gln::value_ptr
 
@@ -132,192 +132,6 @@ namespace minire::rasterizer
         GLint           _positionUniform;
     };
 
-    // NOTE: Clients must align data elements consistent with the 
-    //       requirements of the client platform, with an additional
-    //       base-level requirement that an offset within a buffer to
-    //       a datum comprising N be a multiple of N.        
-    struct Vertex
-    {
-        glm::vec2 _pos;
-        glm::vec2 _uv;
-        glm::vec4 _fgColor;
-        glm::vec4 _bgColor;
-        uint32_t  _font;
-    };
-
-    class Label::Buffer
-    {
-        size_t append(size_t disp,
-                      float gx, float gy,
-                      float gw, float gh,
-                      text::TextFormat const & format,
-                      wchar_t codePoint,
-                      Font const & font,
-                      glm::vec2 const & clip,
-                      std::vector<Vertex> & out)
-        {
-            uint32_t const fontCode = fontCodeOf(format);
-            utils::Rect uv = font.uvRect(codePoint, L'?');
-            uv += .5f; // TODO: move that into rasterizer::Font::Font
-
-            glm::vec4 bg(0), fg(0);
-            if (!format.blank())
-            {
-                fg = format.foreground();
-                bg = format.background();
-                if (format.invertColors())
-                {
-                    std::swap(fg, bg);
-                }
-            }
-
-            gw -= .5f;
-            gh -= .5f;
-
-            uv._right -= clip.x;
-            uv._bottom -= clip.y;
-            gw -= clip.x;
-            gh -= clip.y;
-
-            out[disp + 0] = Vertex{ glm::vec2(gx, gy + gh),
-                                    glm::vec2(uv._left, uv._bottom),
-                                    fg, bg, fontCode};
-            out[disp + 1] = Vertex{ glm::vec2(gx, gy), 
-                                    glm::vec2(uv._left, uv._top),
-                                    fg, bg, fontCode};
-            out[disp + 2] = Vertex{ glm::vec2(gx + gw, gy),
-                                    glm::vec2(uv._right, uv._top),
-                                    fg, bg, fontCode};
-            out[disp + 3] = Vertex{ glm::vec2(gx, gy + gh),
-                                    glm::vec2(uv._left, uv._bottom),
-                                    fg, bg, fontCode};
-            out[disp + 4] = Vertex{ glm::vec2(gx + gw, gy),
-                                    glm::vec2(uv._right, uv._top),
-                                    fg, bg, fontCode};
-            out[disp + 5] = Vertex{ glm::vec2(gx + gw, gy + gh),
-                                    glm::vec2(uv._right, uv._bottom),
-                                    fg, bg, fontCode};
-
-            return 6;
-        }
-
-        static uint32_t fontCodeOf(text::TextFormat const & s)
-        {
-            if (s.bold()) return 1;
-            if (s.italic()) return 2;
-            return 0;
-        }
-
-        static Font const & selectFont(wchar_t codePoint,
-                                       text::TextFormat const & format,
-                                       Font const & fontRegular,
-                                       Font const & fontBold,
-                                       Font const & fontItalic)
-        {
-            if (format.bold())
-            {
-                if (fontBold.loaded(codePoint))
-                {
-                    return fontBold;
-                }
-            }
-            else if (format.italic())
-            {
-                if (fontItalic.loaded(codePoint))
-                {
-                    return fontItalic;
-                }
-            }
-            return fontRegular;
-        }
-
-    public:
-        void update(text::FormattedString const & text,
-                    Font const & fontRegular,
-                    Font const & fontBold,
-                    Font const & fontItalic,
-                    std::optional<glm::vec2> const & maxSize)
-        {
-            _vao->bind();
-
-            assert(fontRegular.glyphSize() == fontBold.glyphSize());
-            assert(fontRegular.glyphSize() == fontItalic.glyphSize());
-            glm::vec2 const & glyphSize = fontRegular.glyphSize();
-
-            _vertices.resize(text.size() * 6);
-            size_t offset = 0;
-
-            text::iterate(text, glyphSize,
-                [&offset, this, &fontRegular, &fontBold, &fontItalic, &maxSize]
-                (text::TextFormat const & format, wchar_t codePoint,
-                 glm::vec2 const & position, glm::vec2 const & glyphSize)
-                {
-                    glm::vec2 clip(0);
-                    if (maxSize)
-                    {
-                        if (position.y >= maxSize->y) return false;
-                        if (position.x >= maxSize->x) return true;
-
-                        assert(position.x < maxSize->x);
-                        clip = glm::max(glm::vec2(0), position + glyphSize - *maxSize);
-                    }
-
-                    Font const & font = selectFont(codePoint, format, fontRegular, fontBold, fontItalic);
-                    offset += append(offset, position.x, position.y, glyphSize.x, glyphSize.y,
-                                     format, codePoint, font, clip, _vertices);
-                    return true;
-                });
-            _vertices.resize(offset);
-
-            _vbo.bufferData(_vertices.size() * sizeof(Vertex),
-                            _vertices.data(), GL_STATIC_DRAW);
-        }
-
-        void draw() const
-        {
-            _vao->bind();
-            MINIRE_GL(glDrawArrays, GL_TRIANGLES, 0, _vertices.size());
-        }
-
-        Buffer()
-            : _vao(std::make_shared<opengl::VAO>())
-            , _vbo(_vao, GL_ARRAY_BUFFER)
-        {
-            size_t const stride = sizeof(Vertex);
-            size_t pointer = 0;
-
-            // layout(location = 0) in vec2 bznkPos;
-            _vao->enableAttrib(0);
-            _vao->attribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, pointer);
-            pointer += sizeof(Vertex::_pos);
-
-            // layout(location = 1) in vec2 bznkUv;
-            _vao->enableAttrib(1);
-            _vao->attribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, pointer);
-            pointer += sizeof(Vertex::_uv);
-
-            // layout(location = 2) in vec4 bznkFgColor;
-            _vao->enableAttrib(2);
-            _vao->attribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, pointer);
-            pointer += sizeof(Vertex::_fgColor);
-
-            // layout(location = 3) in vec4 bznkBgColor;
-            _vao->enableAttrib(3);
-            _vao->attribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, pointer);
-            pointer += sizeof(Vertex::_bgColor);
-
-            // layout(location = 4) in uint bznkFont;
-            _vao->enableAttrib(4);
-            _vao->attribIPointer(4, 1, GL_UNSIGNED_INT, stride, pointer);
-            pointer += sizeof(Vertex::_font);
-        }
-
-    private:
-        opengl::VAO::Sptr   _vao;
-        opengl::VBO         _vbo;
-        std::vector<Vertex> _vertices;
-    };
-
     Label::Label(Fonts const & fonts,
                  text::FormattedString const & text,
                  size_t z, bool visible)
@@ -326,7 +140,7 @@ namespace minire::rasterizer
         , _text(text)
         , _position(0.0)
         , _program(Program::instance())
-        , _buffer(std::make_unique<Buffer>())
+        , _vertexBuffer()
         , _invalidated(true)
         , _visible(visible)
     {}
@@ -395,7 +209,7 @@ namespace minire::rasterizer
             revalidate();
         }
 
-        assert(_buffer);
+        assert(_vertexBuffer);
         assert(_fontRegular);
         assert(_fontBold);
         assert(_fontItalic);
@@ -415,7 +229,7 @@ namespace minire::rasterizer
         _program.setProjUniform(projection);
         _program.setPositionUniform(_position);
 
-        _buffer->draw();
+        _vertexBuffer->draw();
     }
 
     void Label::setPosition(glm::vec2 position)
@@ -425,16 +239,14 @@ namespace minire::rasterizer
 
     void Label::revalidate() const
     {
-        assert(_buffer);
         assert(_fontRegular);
         assert(_fontBold);
         assert(_fontItalic);
 
-        _buffer->update(_text,
-                        *_fontRegular,
-                        *_fontBold,
-                        *_fontItalic,
-                        _maxSize);
+        // TODO: don't re-create VAO/VBO, but update the existing ones
+        auto const & vertices = labels::buildMesh(
+            _text, *_fontRegular, *_fontBold, *_fontItalic, _maxSize);
+        _vertexBuffer = std::make_unique<labels::VertexBuffer>(vertices);
 
         _invalidated = false;
     }

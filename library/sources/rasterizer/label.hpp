@@ -16,6 +16,7 @@
 
 namespace minire::content { class Manager; }
 namespace minire::models { class FontFace; }
+namespace minire::rasterizer::labels { class VertexBuffer; }
 
 namespace minire::rasterizer
 {
@@ -60,11 +61,9 @@ namespace minire::rasterizer
 
     private:
         class Program;
-        class Buffer;
-
-        friend class Buffer; // to access to Cursor
 
         using FontPtr = std::shared_ptr<Font const>;
+        using VertexBufferUptr = std::unique_ptr<labels::VertexBuffer>;
 
         Fonts const &            _fonts;
         FontPtr                  _fontRegular;
@@ -75,7 +74,7 @@ namespace minire::rasterizer
         std::optional<glm::vec2> _maxSize;     
 
         Program const &          _program;
-        std::unique_ptr<Buffer>  _buffer;
+        mutable VertexBufferUptr _vertexBuffer;
         mutable bool             _invalidated = true;
 
         bool                     _visible;
