@@ -596,33 +596,33 @@ namespace minire
             if (_batchPlayed < 0)
             {
                 // very first batch and very slow controller case
-                handle(_controllerEvents[0]);
+                handle(_controllerEvents.front());
                 _batchPlayed = 0;
                 performLerp = true;
             }
-            else if (_batchPlayed < _controllerEvents[0]._duration)
+            else if (_batchPlayed < _controllerEvents.front()._duration)
             {
                 // middle of a batch
                 assert(_batchPlayed >= 0);
-                assert(_controllerEvents[0]._duration != 0);
+                assert(_controllerEvents.front()._duration != 0);
                 performLerp = true;
             }
             else
             {
-                assert(_batchPlayed >= _controllerEvents[0]._duration);
+                assert(_batchPlayed >= _controllerEvents.front()._duration);
 
                 // purge currently played batch
-                _batchPlayed -= _controllerEvents[0]._duration;
-                _controllerEvents.erase(_controllerEvents.begin());
+                _batchPlayed -= _controllerEvents.front()._duration;
+                _controllerEvents.pop_front();
 
                 // fast-forward hidden ones (they will be invisible,
                 // but they might containt important events)
                 while(!_controllerEvents.empty() &&
-                      _batchPlayed >= _controllerEvents[0]._duration)
+                      _batchPlayed >= _controllerEvents.front()._duration)
                 {
-                    handle(_controllerEvents[0]);
-                    _batchPlayed -= _controllerEvents[0]._duration;
-                    _controllerEvents.erase(_controllerEvents.begin());
+                    handle(_controllerEvents.front());
+                    _batchPlayed -= _controllerEvents.front()._duration;
+                    _controllerEvents.pop_front();
                 }
 
                 _epochNumber++;
@@ -635,7 +635,7 @@ namespace minire
                 else
                 {
                     assert(_batchPlayed >= 0);
-                    handle(_controllerEvents[0]);
+                    handle(_controllerEvents.front());
                     performLerp = true;
                 }
             }
@@ -651,7 +651,10 @@ namespace minire
         if (performLerp)
         {
             instrumentation::Stopwatch<> stopwatch("scene-lerping", _timekeeper);
-            double const weight = _batchPlayed / _controllerEvents[0]._duration;
+            assert(!_controllerEvents.empty());
+            double const duration = _controllerEvents.front()._duration;
+            double const weight = duration != 0 ? _batchPlayed / duration : 1.0;
+            assert(weight >= 0);
             _scene->lerp(weight, _epochNumber);
         }
 

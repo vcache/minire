@@ -68,6 +68,11 @@ namespace minire
         _initBarrier.wait();
     }
 
+    double BasicController::maxFrameTime() const
+    {
+        return 1e6 / static_cast<double>(_maxFps);
+    }
+
     void BasicController::worker(events::application::OnResize const & initial)
     {
         MINIRE_INVARIANT(initial._width > 0 && initial._height > 0,
@@ -79,7 +84,7 @@ namespace minire
         _initBarrier.notify();
 
         size_t frameBegin = utils::uNow(), frameEnd; // microseconds
-        size_t const frameQuant = size_t(1e6 / static_cast<double>(_maxFps));
+        size_t const frameQuant = size_t(maxFrameTime());
         _frameTime = static_cast<double>(frameQuant) / 1e6;
 
         utils::FpsCounter fpsCounter(2); (void) fpsCounter;
@@ -176,7 +181,7 @@ namespace minire
 
     void BasicController::finishCurrentBatch(double duration)
     {
-        _currentEventsBatch._duration = duration;
+        _currentEventsBatch._duration = std::min(duration, maxFrameTime());
         {
             std::lock_guard<std::mutex> lock(_pendedControllerEventsMutex);
             _pendedControllerEvents.emplace_back(std::move(_currentEventsBatch));

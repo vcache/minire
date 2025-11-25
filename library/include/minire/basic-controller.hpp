@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -35,7 +36,7 @@ namespace minire
             double                          _duration = 0;
         };
 
-        using BatchQueue = std::vector<Batch>;
+        using BatchQueue = std::list<Batch>;
 
     public:
         using Uptr = std::unique_ptr<BasicController>;
@@ -127,6 +128,8 @@ namespace minire
         void worker(events::application::OnResize const & initial);
         void handle(events::ApplicationQueue const &);
         void finishCurrentBatch(double);
+
+        double maxFrameTime() const;
 
     private:
         content::Manager       & _contentManager;
