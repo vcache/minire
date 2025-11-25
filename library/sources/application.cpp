@@ -22,8 +22,8 @@
 namespace minire
 {
     // TODO: read them from Camera
-    static const float kNear = 0.001f;
-    static const float kFar = 1000.0f;
+    static const float kNear = 0.0f;
+    static const float kFar = 1.0f;
 
 #   ifdef NDEBUG
     constexpr static bool kDebug = false;
