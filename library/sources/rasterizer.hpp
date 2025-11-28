@@ -31,7 +31,8 @@ namespace minire
 
         void draw(Scene const & scene);
 
-        void setScreenSize(float w, float h);
+        void setScreenSize(size_t const width,
+                           size_t const height);
 
     public:
         rasterizer::Labels & labels() { return _labels; }
@@ -47,6 +48,7 @@ namespace minire
         rasterizer::Resources::LayerId const & currentResourceLayer() const { return _resources.current(); }
 
     private:
+        void forwardPass(Scene const & scene);
         void draw3d(Scene const & scene);
         void draw2d();
 
@@ -72,5 +74,8 @@ namespace minire
         glm::mat4                      _2dProjection;
         rasterizer::Drawable::PtrsList _drawables;
         size_t                         _modelsUsage;
+
+        size_t                         _screenWidth;
+        size_t                         _screenHeight;
     };
 }

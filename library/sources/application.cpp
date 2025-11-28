@@ -192,16 +192,11 @@ namespace minire
 
     void Application::onResize(size_t width, size_t height)
     {
-        MINIRE_GL(glViewport, 0, 0, width, height);
-
-        float const fWidth = static_cast<float>(width);
-        float const fHeight = static_cast<float>(height);
-
         // required for a Projection matrix
         _scene->setViewport(width, height);
 
         // projection for 2D gui
-        _rasterizer->setScreenSize(fWidth, fHeight);
+        _rasterizer->setScreenSize(width, height);
 
         // send event to controller
         if (auto * last = findEventToSquash<events::application::OnResize>(); last)
@@ -676,7 +671,6 @@ namespace minire
         // draw a frame
         {
             instrumentation::Stopwatch<> stopwatch("scene-rendering", _timekeeper);
-            MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             _rasterizer->draw(*_scene);
             ::SDL_GL_SwapWindow(window());
         }

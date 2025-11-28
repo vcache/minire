@@ -29,6 +29,8 @@ namespace minire
         , _sprites(_textures)
         , _billboards(_contentManager, _fonts, _textures)
         , _2dProjection(1.0)
+        , _screenWidth(0)
+        , _screenHeight(0)
     {
         // TODO: preload textures for sprites
 
@@ -36,18 +38,39 @@ namespace minire
                        std::make_unique<rasterizer::materials::PbrFactory>(_textures));
    }
 
-    void Rasterizer::setScreenSize(float w, float h)
+    void Rasterizer::setScreenSize(size_t const width,
+                                   size_t const height)
     {
         //_2dProjection = glm::ortho(0.0f, w, 0.0f, h);
-        _2dProjection = glm::ortho(0.0f, w, h, 0.0f);
+        _2dProjection = glm::ortho(0.0f,
+                                   static_cast<float>(width),
+                                   static_cast<float>(height),
+                                   0.0f);
+        _screenWidth = width;
+        _screenHeight = height;
     }
 
     void Rasterizer::draw(Scene const & scene)
     {
+        forwardPass(scene);
+    }
+
+    void Rasterizer::forwardPass(Scene const & scene)
+    {
+        // initial setup
+        assert(_screenWidth != 0);
+        assert(_screenHeight != 0);
+        MINIRE_GL(glBindFramebuffer, GL_FRAMEBUFFER, 0);
+        MINIRE_GL(glViewport, 0, 0, _screenWidth, _screenHeight);
+        MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         // 3D part
         if (scene::Viewpoint const & viewpoint = scene.viewpoint();
             viewpoint.hasCamera())
         {
+            assert(viewpoint.width() == _screenWidth);
+            assert(viewpoint.height() == _screenHeight);
+
             auto const & [mvp, revision] = viewpoint.mvp();
             _ubo.setViewProjection(mvp, revision);
             _ubo.setViewPosition(glm::vec4(viewpoint.position(), 1.0f));
