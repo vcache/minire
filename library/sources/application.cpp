@@ -455,6 +455,11 @@ namespace minire
         _scene->handle(e);
     }
 
+    void Application::handle(events::controller::SceneNewDirectionalLight const & e)
+    {
+        _scene->handle(e);
+    }
+
     void Application::handle(events::controller::SceneNewPointLight const & e)
     {
         _scene->handle(e);
@@ -491,6 +496,11 @@ namespace minire
     }
 
     void Application::handle(events::controller::SceneSetTransform const & e)
+    {
+        _scene->handle(e, _epochNumber);
+    }
+
+    void Application::handle(events::controller::SceneSetDirectionalLight const & e)
     {
         _scene->handle(e, _epochNumber);
     }

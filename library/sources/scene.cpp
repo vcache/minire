@@ -186,6 +186,16 @@ namespace minire
         _meshLeaves.push_back(meshLeaf);
     }
 
+    void Scene::handle(events::controller::SceneNewDirectionalLight const & e)
+    {
+        Node::Sptr parent = find<Node::Sptr>(e._parent);
+        assert(parent);
+        auto directionalLightLeaf = std::make_shared<DirectionalLightLeaf>(e._data, parent, e._visible);
+        auto [_, inserted] = parent->_children.emplace(e._id, directionalLightLeaf);
+        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
+        _directionalLightLeaves.push_back(directionalLightLeaf);
+    }
+
     void Scene::handle(events::controller::SceneNewPointLight const & e)
     {
         Node::Sptr parent = find<Node::Sptr>(e._parent);
@@ -286,6 +296,15 @@ namespace minire
         assert(node);
         node->_localTransform.update(epochNumber, e._attribute);
         activate(*node); // NOTE: will also invalidate global transform
+    }
+
+    void Scene::handle(events::controller::SceneSetDirectionalLight const & e,
+                       size_t epochNumber)
+    {
+        auto directionalLight = find<DirectionalLightLeaf::Sptr>(e._item);
+        assert(directionalLight);
+        directionalLight->update(epochNumber, e._attribute);
+        activate(*directionalLight);
     }
 
     void Scene::handle(events::controller::SceneSetPointLight const & e,
@@ -410,6 +429,7 @@ namespace minire
         static_assert(std::is_same_v<T, Node::Child> ||
                       std::is_same_v<T, Node::Sptr> ||
                       std::is_same_v<T, MeshLeaf::Sptr> ||
+                      std::is_same_v<T, DirectionalLightLeaf::Sptr> ||
                       std::is_same_v<T, PointLightLeaf::Sptr> ||
                       std::is_same_v<T, PerspectiveCameraLeaf::Sptr> ||
                       std::is_same_v<T, OrthographicCameraLeaf::Sptr> ||
@@ -450,6 +470,7 @@ namespace minire
 
         if constexpr(std::is_same_v<T, Node::Sptr> ||
                      std::is_same_v<T, MeshLeaf::Sptr> ||
+                     std::is_same_v<T, DirectionalLightLeaf::Sptr> ||
                      std::is_same_v<T, PointLightLeaf::Sptr> ||
                      std::is_same_v<T, PerspectiveCameraLeaf::Sptr> ||
                      std::is_same_v<T, OrthographicCameraLeaf::Sptr> ||

@@ -67,13 +67,26 @@ namespace minire::rasterizer
     // TODO: try to minimize changes (esp. when nothing changed)
     void Ubo::setLights(Scene const & scene)
     {
-        _datablock._lightsCount = scene.cullPointLights(
-            maxLights(),
+        _datablock._directionalLightsCount = scene.cullDirectionalLights(
+            maxDirectionalLights(),
+            [this](size_t index,
+                   glm::vec3 const & direction,
+                   glm::vec3 const & color)
+            {
+                assert(index < maxDirectionalLights());
+                auto & dst = _datablock._directionalLights[index];
+                dst._direction = direction;
+                dst._color = color;
+            });
+
+        _datablock._pointLightsCount = scene.cullPointLights(
+            maxPointLights(),
             [this](size_t index,
                    glm::vec3 const & position,
                    glm::vec4 const & color,
                    glm::vec4 const & attenuation)
             {
+                assert(index < maxPointLights());
                 auto & dst = _datablock._pointLights[index];
                 dst._position = glm::vec4(position, 1.0);
                 dst._color = color;

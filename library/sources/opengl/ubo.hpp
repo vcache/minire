@@ -11,10 +11,11 @@ namespace minire::opengl
         UBO & operator=(UBO const &) = delete;
 
     public:
-        UBO() : _buffer(0)
+        UBO()
+            : _buffer(0)
         {
             static_assert((sizeof(Struct) % 4) == 0,
-                          "UBO data must be divisabe by 4");
+                          "UBO data must be dividable by 4");
 
             MINIRE_GL(glGenBuffers, 1, &_buffer);
             MINIRE_GL(glBindBuffer, GL_UNIFORM_BUFFER, _buffer);
@@ -25,7 +26,8 @@ namespace minire::opengl
                       GL_STATIC_DRAW);
         }
 
-        UBO(UBO && other) : _buffer(other._buffer)
+        UBO(UBO && other)
+            : _buffer(other._buffer)
         {
             other._buffer = 0;
         }
@@ -61,6 +63,6 @@ namespace minire::opengl
         }
 
     private:
-        GLuint _buffer;
+        GLuint _buffer = 0;
     };
 }

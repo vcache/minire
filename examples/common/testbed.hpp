@@ -11,6 +11,8 @@
 #include <minire/models/point-light.hpp>
 #include <minire/models/transform.hpp>
 
+#include <glm/gtc/quaternion.hpp> // for quatLookAt
+
 namespace minire::examples
 {
     static constexpr auto kFontFace = "ucs-6x13-example";
@@ -18,6 +20,14 @@ namespace minire::examples
     class TestbedController
         : public minire::BasicController
     {
+        glm::quat lookAt(glm::vec3 lookFrom, glm::vec3 lookTo,
+                         glm::vec3 worldUp =  glm::vec3(0.0f, 1.0f, 0.0f))
+        {
+            // TODO: why lookFrom and lookTo are flipped? Isnt' is should be (lookTo - lookFrom)
+            glm::vec3 const direction = glm::normalize(lookFrom - lookTo);
+            return glm::quatLookAt(direction, worldUp);
+        }
+
     public:
         explicit TestbedController(minire::content::Manager & contentManager)
             : BasicController(contentManager, 30 /* controller fps */)
@@ -31,6 +41,8 @@ namespace minire::examples
                                  ._zNear = 0.001f,
                                  ._zFar = 1000.0f,
                                  ._aspectRatio = std::nullopt}
+            , _isDirectLightEnabled(false)
+            , _isPointLightEnabled(true)
             , _isPerspective(true)
         {}
 
@@ -46,10 +58,16 @@ namespace minire::examples
             enqueue<SceneNewOrthographicCamera>("ortho-cam", ScenePath{"cam-node"}, _orthographicCamera, true);
             enqueue<SceneActivateCamera>(ScenePath{"cam-node", "persp-cam"});
 
-            enqueue<SceneNewNode>("light-node", ScenePath(),
+            enqueue<SceneNewNode>("directlight-node", ScenePath(),
+                                  Transform(glm::vec3(0), lookAt(glm::vec3(1, 1, 1), glm::vec3(0, 0, 0))),
+                                  true);
+            enqueue<SceneNewDirectionalLight>("sun", ScenePath{"directlight-node"},
+                                              DirectionalLight(glm::vec3(0, 10, 0)), _isDirectLightEnabled);
+
+            enqueue<SceneNewNode>("pointlight-node", ScenePath(),
                                   Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
-            enqueue<SceneNewPointLight>("bulb", ScenePath{"light-node"},
-                                        PointLight(glm::vec4(1, 1, 1, 500), 2), true);
+            enqueue<SceneNewPointLight>("bulb", ScenePath{"pointlight-node"},
+                                        PointLight(glm::vec4(1, 1, 1, 500), 2), _isPointLightEnabled);
         }
 
         bool handle(minire::events::application::OnMouseMove const & event) override
@@ -134,14 +152,28 @@ namespace minire::examples
 
         bool handle(minire::events::application::OnKeyDown const & e)
         {
-            if (e._key == SDLK_c)
+            using namespace minire::events::controller;
+            using namespace minire::models;
+            switch(e._key)
             {
-                _isPerspective = !_isPerspective;
-                MINIRE_INFO("Camera is switched to {}", _isPerspective ? "PERSPECTIVE"
-                                                                       : "ORTHOGRAPHIC");
-                using namespace minire::events::controller;
-                using namespace minire::models;
-                enqueue<SceneActivateCamera>(ScenePath{"cam-node", _isPerspective ? "persp-cam" : "ortho-cam"});
+                case SDLK_c:
+                    _isPerspective = !_isPerspective;
+                    MINIRE_INFO("Camera is switched to {}", _isPerspective ? "PERSPECTIVE"
+                                                                           : "ORTHOGRAPHIC");
+                    enqueue<SceneActivateCamera>(ScenePath{"cam-node", _isPerspective ? "persp-cam" : "ortho-cam"});
+                    break;
+
+                case SDLK_d:
+                    _isDirectLightEnabled = !_isDirectLightEnabled;
+                    MINIRE_INFO("Toggle direct light: {}", _isDirectLightEnabled);
+                    enqueue<SceneSetVisibility>(ScenePath{"directlight-node", "sun"}, _isDirectLightEnabled);
+                    break;
+
+                case SDLK_p:
+                    _isPointLightEnabled = !_isPointLightEnabled;
+                    MINIRE_INFO("Toggle point light: {}", _isPointLightEnabled);
+                    enqueue<SceneSetVisibility>(ScenePath{"pointlight-node", "bulb"}, _isPointLightEnabled);
+                    break;
             }
             return true;
         }
@@ -154,6 +186,8 @@ namespace minire::examples
         minire::models::Transform          _cameraTransform;
         minire::grips::Panning<false>      _panning;
         glm::vec2                          _windowSize;
+        bool                               _isDirectLightEnabled;
+        bool                               _isPointLightEnabled;
         bool                               _isPerspective;
     };
 

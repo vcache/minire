@@ -5,6 +5,7 @@
 #include <minire/models/animations.hpp>
 #include <minire/models/billboard.hpp>
 #include <minire/models/camera.hpp>
+#include <minire/models/directional-light.hpp>
 #include <minire/models/mesh.hpp>
 #include <minire/models/point-light.hpp>
 #include <minire/models/scene-path.hpp>
@@ -62,6 +63,7 @@ namespace minire::events::controller
     }
 
     using SceneNewMesh = impl::SceneNewLeaf<models::Mesh>;
+    using SceneNewDirectionalLight = impl::SceneNewLeaf<models::DirectionalLight>;
     using SceneNewPointLight = impl::SceneNewLeaf<models::PointLight>;
     using SceneNewPerspectiveCamera = impl::SceneNewLeaf<models::PerspectiveCamera>;
     using SceneNewOrthographicCamera = impl::SceneNewLeaf<models::OrthographicCamera>;
@@ -89,6 +91,7 @@ namespace minire::events::controller
     using SceneSetParent = impl::SceneItemModifier<models::ScenePath>;
     using SceneSetVisibility = impl::SceneItemModifier<bool>;   // TODO: recursive version
     using SceneSetTransform = impl::SceneItemModifier<models::Transform>;
+    using SceneSetDirectionalLight = impl::SceneItemModifier<models::DirectionalLight>;
     using SceneSetPointLight = impl::SceneItemModifier<models::PointLight>;
     using SceneSetPerspectiveCamera = impl::SceneItemModifier<models::PerspectiveCamera>;
     using SceneSetOrthographicCamera = impl::SceneItemModifier<models::OrthographicCamera>;

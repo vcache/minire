@@ -46,6 +46,7 @@ namespace minire
         void handle(events::controller::SceneSetAmbientLight const &);
         void handle(events::controller::SceneNewNode const &);
         void handle(events::controller::SceneNewMesh const &);
+        void handle(events::controller::SceneNewDirectionalLight const &);
         void handle(events::controller::SceneNewPointLight const &);
         void handle(events::controller::SceneNewPerspectiveCamera const &);
         void handle(events::controller::SceneNewOrthographicCamera const &);
@@ -53,6 +54,7 @@ namespace minire
         void handle(events::controller::SceneSetParent const &);
         void handle(events::controller::SceneSetVisibility const &);
         void handle(events::controller::SceneSetTransform const &, size_t epochNumber);
+        void handle(events::controller::SceneSetDirectionalLight const &, size_t epochNumber);
         void handle(events::controller::SceneSetPointLight const &, size_t epochNumber);
         void handle(events::controller::SceneSetPerspectiveCamera const &, size_t epochNumber);
         void handle(events::controller::SceneSetOrthographicCamera const &, size_t epochNumber);
@@ -129,6 +131,41 @@ namespace minire
         }
 
         template<typename Callable>
+        size_t cullDirectionalLights(size_t limit, Callable callable) const
+        {
+            // TODO: sort by "front-to-back"
+            // TODO: sort by distance and cull the farest
+
+            size_t index = 0;
+            auto it = _directionalLightLeaves.begin();
+            while(it != _directionalLightLeaves.end() && index < limit)
+            {
+                if (auto directionalLight = it->lock();
+                    directionalLight)
+                {
+                    if (directionalLight->_visible)
+                    {
+                        auto parent = directionalLight->_parent.lock();
+                        MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
+                        assert(parent->hasGlobalTransform());
+                        // NOTE: 3-rd column of transform matrix is a z-axis direction
+                        glm::vec3 const direction = glm::vec3(parent->_globalTransform[2]);
+                        callable(index,
+                                 glm::normalize(direction),
+                                 directionalLight->current()._color);
+                        ++index;
+                    }
+                    ++it;
+                }
+                else
+                {
+                    it = _directionalLightLeaves.erase(it);
+                }
+            }
+            return index;
+        }
+
+        template<typename Callable>
         size_t cullPointLights(size_t limit, Callable callable) const
         {
             // TODO: sort by "front-to-back"
@@ -147,7 +184,7 @@ namespace minire
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
                         assert(parent->hasGlobalTransform());
                         callable(index,
-                                 parent->_globalPosition,
+                                 parent->_globalPosition, // TODO: it could be taken from _globalTransform
                                  pointLight->current()._color,
                                  pointLight->current()._attenuation);
                         ++index;
@@ -218,6 +255,7 @@ namespace minire
         };
 
         using MeshLeaf = Leaf<Mesh>;
+        using DirectionalLightLeaf = Leaf<utils::Lerpable<models::DirectionalLight>>;
         using PointLightLeaf = Leaf<utils::Lerpable<models::PointLight>>;
         using PerspectiveCameraLeaf = Leaf<utils::Lerpable<models::PerspectiveCamera>>;
         using OrthographicCameraLeaf = Leaf<utils::Lerpable<models::OrthographicCamera>>;
@@ -263,6 +301,7 @@ namespace minire
 
             using Child = std::variant<Node::Sptr,
                                        MeshLeaf::Sptr,
+                                       DirectionalLightLeaf::Sptr,
                                        PointLightLeaf::Sptr,
                                        PerspectiveCameraLeaf::Sptr,
                                        OrthographicCameraLeaf::Sptr,
@@ -314,6 +353,7 @@ namespace minire
 
         using MeshLeaves = std::list<MeshLeaf::Wptr>;
         using BillboardsLeaves = std::list<BillboardsLeafRecord>;
+        using DirectionalLightLeaves = std::list<DirectionalLightLeaf::Wptr>;
         using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
 
         using ChildIterator = std::pair<Node::Sptr, Node::ChildrenMap::iterator>;
@@ -334,16 +374,17 @@ namespace minire
         void invalidateGlobalTransform(Node::Sptr);
 
     private:
-        Rasterizer     & _rasterizer;
-        Node::Sptr       _root;
-        ActiveCamera     _activeCamera;
-        scene::Viewpoint _viewpoint;
-        size_t           _nodesEstimate = 1;
-        glm::vec3        _ambientLight = glm::vec3(0.03f);
+        Rasterizer                   & _rasterizer;
+        Node::Sptr                     _root;
+        ActiveCamera                   _activeCamera;
+        scene::Viewpoint               _viewpoint;
+        size_t                         _nodesEstimate = 1;
+        glm::vec3                      _ambientLight = glm::vec3(0.03f);
 
-mutable MeshLeaves       _meshLeaves;
-mutable BillboardsLeaves _billboardsLeaves;
-mutable PointLightLeaves _pointLightLeaves;
+        mutable MeshLeaves             _meshLeaves;
+        mutable BillboardsLeaves       _billboardsLeaves;
+        mutable DirectionalLightLeaves _directionalLightLeaves;
+        mutable PointLightLeaves       _pointLightLeaves;
 
         friend class Node;
     };

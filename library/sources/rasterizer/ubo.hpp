@@ -21,7 +21,9 @@ namespace minire::rasterizer
 
         static std::string interfaceBlock();
 
-        static size_t maxLights() { return ubo::Datablock::kMaxLights; }
+        static size_t maxDirectionalLights() { return ubo::Datablock::kMaxDirectionalLights; }
+
+        static size_t maxPointLights() { return ubo::Datablock::kMaxPointLights; }
 
     public:
         void setViewProjection(glm::mat4 const &, size_t);
