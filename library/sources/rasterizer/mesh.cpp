@@ -49,6 +49,9 @@ namespace minire::rasterizer
 
             // Create or make opengl::VertexBuffer for a given Locations
             material::Program::Locations const & locations = matProgram->locations();
+            MINIRE_INVARIANT(locations._vertexAttribute == 0,
+                             "by convention, vertex attrib MUST have index 0, while actual value is {}",
+                             locations._vertexAttribute);
             auto openglVertexBuffer = vertexBuffers.build(vertexBufferId, locations);
             assert(openglVertexBuffer);
 
@@ -90,6 +93,9 @@ namespace minire::rasterizer
                 MINIRE_INVARIANT(matInstance, "no material instance for {}", source);
 
                 material::Program::Locations const & locations = matProgram->locations();
+                MINIRE_INVARIANT(locations._vertexAttribute == 0,
+                                 "by convention, vertex attrib MUST have index 0, while actual value is {}",
+                                 locations._vertexAttribute);
                 opengl::VertexBuffer vertexBuffer = utils::createVertexBuffer(
                     obj,
                     locations._vertexAttribute,
@@ -174,7 +180,12 @@ namespace minire::rasterizer
                     assert(it != materialsMap.cend());
                     it->second._primitives.emplace_back(primIndex);
                     assert(it->second._matProgram);
-                    locationsForPrims.emplace_back(it->second._matProgram->locations());
+
+                    material::Program::Locations const & locations = it->second._matProgram->locations();
+                    MINIRE_INVARIANT(locations._vertexAttribute == 0,
+                                     "by convention, vertex attrib MUST have index 0, while actual value is {}",
+                                     locations._vertexAttribute);
+                    locationsForPrims.emplace_back(locations);
                 }
 
                 for(auto & [_, material] : materialsMap)
@@ -213,21 +224,31 @@ namespace minire::rasterizer
 
     void Mesh::draw(glm::mat4 const & modelTransform,
                     glm::vec3 const & ambientLight,
-                    glm::vec3 const & emissiveFactor) const
+                    glm::vec3 const & emissiveFactor,
+                    material::TextureRefs const & directionalLightsShadowMaps) const
     {
         for(Material const & material : _materials)
         {
             assert(material._matProgram);
             assert(material._matInstance);
             material._matProgram->prepareDrawing(*(material._matInstance),
-                                                   modelTransform,
-                                                   ambientLight,
-                                                   emissiveFactor);
+                                                 modelTransform,
+                                                 ambientLight,
+                                                 emissiveFactor,
+                                                 directionalLightsShadowMaps);
             for(size_t const primIndex : material._primitives)
             {
                 assert(primIndex < _primitives.size());
                 _primitives[primIndex]._buffer->drawElements();
             }
+        }
+    }
+
+    void Mesh::drawBare() const
+    {
+        for(Primitive const & primitive : _primitives)
+        {
+            primitive._buffer->drawElements();
         }
     }
 }

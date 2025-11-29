@@ -14,6 +14,7 @@
 
 #include <fmt/format.h>
 
+#include <array>
 #include <cassert>
 
 namespace minire::rasterizer::materials
@@ -108,7 +109,8 @@ namespace minire::rasterizer::materials
     void PbrProgram::prepareDrawing(material::Instance const & instance,
                                     glm::mat4 const & modelTransform,
                                     glm::vec3 const & ambientLight,
-                                    glm::vec3 const & emissiveFactor) const
+                                    glm::vec3 const & emissiveFactor,
+                                    material::TextureRefs const & directionalLightsShadowMaps) const
     {
         _program.use();
 
@@ -144,6 +146,27 @@ namespace minire::rasterizer::materials
 
         texUnit += PbrInstance::setUniform(pbrInstance._emissiveTexture, _program, _emissiveTexture, texUnit);
         PbrInstance::setUniform(pbrInstance._emissiveFactor + emissiveFactor, _program, _emissiveFactor);
+
+        MINIRE_INVARIANT(directionalLightsShadowMaps.size() <= Ubo::maxDirectionalLights(),
+                         "provided {} shadow maps for directional lights, while limit is {}",
+                         directionalLightsShadowMaps.size(), Ubo::maxDirectionalLights());
+        std::array<GLint, Ubo::maxDirectionalLights()> directionalLightsSamplers;
+        for(size_t i = 0; i < directionalLightsSamplers.size(); ++i)
+        {
+            MINIRE_GL(glActiveTexture, GL_TEXTURE0 + texUnit);
+            if (i < directionalLightsShadowMaps.size() &&
+                directionalLightsShadowMaps[i])
+            {
+                directionalLightsShadowMaps[i]->bind();
+            }
+            else
+            {
+                MINIRE_GL(glBindTexture, GL_TEXTURE_2D, 0);
+            }
+            directionalLightsSamplers[i] = texUnit;
+            texUnit++;
+        }
+        _program.setUniform(_directionalLightsShadowMaps, directionalLightsSamplers);
     }
 
     material::Program::Locations PbrProgram::locations() const
@@ -200,6 +223,7 @@ namespace minire::rasterizer::materials
             {"kAoTexComp",           toString(pbrModel._aoTextureComonent)},
 
             {"kUboDatablock",        Ubo::interfaceBlock()},
+            {"kMaxDirectionalLights",Ubo::maxDirectionalLights()},
         };
 
         // Init template render
@@ -244,6 +268,8 @@ namespace minire::rasterizer::materials
         result->_emissiveTexture = result->_program.getUniformLocation("bznkEmissiveTexture");
         result->_emissiveFactor = result->_program.getUniformLocation("bznkEmissiveFactor");
 
+        result->_directionalLightsShadowMaps = result->_program.getUniformLocation("bznkDirectionalLightsShadowMaps");
+
         result->_modelUniformLocation = result->_program.getUniformLocation("bznkModel");
         assert(result->_modelUniformLocation != -1);
 
@@ -251,6 +277,9 @@ namespace minire::rasterizer::materials
         assert(result->_ambientLightUniformLocation != -1);
 
         result->_positionAttribute = result->_program.getAttribLocation("bznkVertex");
+        MINIRE_INVARIANT(result->_positionAttribute == 0,
+                         "by convention, bznkVertex's attrib MUST have index 0, while actual value is {}",
+                         result->_positionAttribute);
         assert(result->_positionAttribute != -1);
 
         result->_uvAttribute = features.hasUv() ? result->_program.getAttribLocation("bznkUv") : -1;

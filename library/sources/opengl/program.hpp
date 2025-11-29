@@ -55,7 +55,7 @@ namespace minire::opengl
             return res;
         }
 
-        GLuint getUniformBlockIndex(const GLchar * uniformBlockName) const
+        GLuint getUniformBlockIndex(GLchar const * uniformBlockName) const
         {
             GLuint result = ::glGetUniformBlockIndex(_id, uniformBlockName);
             MINIRE_MAYBE_THROW_GL(glGetUniformBlockIndex);

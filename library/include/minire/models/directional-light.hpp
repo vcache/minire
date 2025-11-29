@@ -7,9 +7,12 @@ namespace minire::models
     struct DirectionalLight
     {
         glm::vec3 _color;
+        bool      _enableShadows;
 
-        DirectionalLight(glm::vec3 const & color)
+        DirectionalLight(glm::vec3 const & color,
+                         bool const enableShadows = false)
             : _color(color)
+            , _enableShadows(enableShadows)
         {}
 
          void lerp(DirectionalLight const & prev,

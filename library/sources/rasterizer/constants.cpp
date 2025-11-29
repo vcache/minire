@@ -96,6 +96,34 @@ namespace minire::rasterizer
             return (kD * albedo / PI + specular) * radiance * NdotL;
         }
 
+        float shadowFactor(const vec4 lightSpaceFragPos,
+                           const sampler2D shadowMap,
+                           const float bias)
+        {
+            vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
+            if (projCoords.z > 1.0)
+            {
+                return 0.0;
+            }
+
+            projCoords = projCoords * 0.5 + 0.5;
+            float currentDepth = projCoords.z;
+
+            float shadow = 0.0;
+            vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+            for(int x = -1; x <= 1; ++x)
+            {
+                for(int y = -1; y <= 1; ++y)
+                {
+                    float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+                    shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+                }
+            }
+            shadow /= 9.0;
+
+            return shadow;
+        }
+
         vec3 pbrFragColor(const vec3 albedo,
                           const float metallic,
                           const float roughness,
@@ -125,7 +153,15 @@ namespace minire::rasterizer
                 vec3 H = normalize(V + L);
                 vec3 radiance = _directionalLights[i]._color;
 
-                Lo += calcLo(N, V, L, H, F0, radiance, albedo, roughness, metallic);
+                float shadow = 1.0;
+                if (_directionalLights[i]._hasShadows)
+                {
+                    //float bias = 0.001 * (1.0 - dot(normal, _directionalLights[i]._direction));
+                    shadow = 1.0 - shadowFactor(bznkDirectionalLightPos[i],
+                                                bznkDirectionalLightsShadowMaps[i],
+                                                0.005);
+                }
+                Lo += shadow * calcLo(N, V, L, H, F0, radiance, albedo, roughness, metallic);
             }
 
             // ... for point lights
@@ -170,7 +206,10 @@ namespace minire::rasterizer
     std::string Constants::kPbrVertShader = R"(
         #version 330 core
 
-        in vec3 bznkVertex;
+        // NOTE: position attrib must ALWAYS be 0-th,
+        //       otherwise, shadow mapping pass will fail
+        //       (because it expects this exact index).
+        layout (location = 0) in vec3 bznkVertex;
 
         {% if kHasUvs %}
         in vec2 bznkUv;
@@ -186,6 +225,7 @@ namespace minire::rasterizer
         {% endif %}
 
         out vec4 bznkWorldPos;
+        out vec4 bznkDirectionalLightPos[{{ kMaxDirectionalLights }}];
 
         uniform mat4 bznkModel;
 
@@ -209,6 +249,12 @@ namespace minire::rasterizer
             vec3 B = cross(N, T);
             bznkTbn = mat3(T, B, N);
             {% endif %}
+
+            for(uint i = 0U; i < _directionalLightsCount; ++i)
+            {
+                bznkDirectionalLightPos[i] =
+                    _directionalLights[i]._viewProjection * bznkWorldPos;
+            }
         }
     )";
 
@@ -232,6 +278,7 @@ namespace minire::rasterizer
         {% endif %}
 
         in vec4 bznkWorldPos;
+        in vec4 bznkDirectionalLightPos[{{ kMaxDirectionalLights }}];
 
         // uniforms //
 
@@ -265,6 +312,8 @@ namespace minire::rasterizer
         {% if kHasEmissiveTexture %}
         uniform sampler2D bznkEmissiveTexture;
         {% endif %}
+
+        uniform sampler2D bznkDirectionalLightsShadowMaps[{{ kMaxDirectionalLights }}];
 
         uniform vec3 bznkEmissiveFactor = vec3(0.0, 0.0, 0.0);
 

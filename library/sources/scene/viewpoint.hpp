@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utils/frustum.hpp>
+
 #include <minire/models/camera.hpp>
 #include <minire/models/transform.hpp>
 
@@ -47,6 +49,8 @@ namespace minire::scene
         glm::mat4 const & projection() const { return _projection; }
 
         size_t revision() const { revalidate(); return _revision; }
+
+        utils::FrustumVertices frustumVertices() const;
 
     private:
         bool isSame(models::PerspectiveCamera const &) const;

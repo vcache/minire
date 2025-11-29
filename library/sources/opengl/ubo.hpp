@@ -2,6 +2,8 @@
 
 #include <opengl.hpp>
 
+#include <utility>
+
 namespace minire::opengl
 {
     template<typename Struct>

@@ -151,8 +151,10 @@ namespace minire
                         // NOTE: 3-rd column of transform matrix is a z-axis direction
                         glm::vec3 const direction = glm::vec3(parent->_globalTransform[2]);
                         callable(index,
+                                 parent->_globalPosition, // TODO: it could be taken from _globalTransform
                                  glm::normalize(direction),
-                                 directionalLight->current()._color);
+                                 directionalLight->current()._color,
+                                 directionalLight->current()._enableShadows);
                         ++index;
                     }
                     ++it;

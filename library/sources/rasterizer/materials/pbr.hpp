@@ -58,7 +58,8 @@ namespace minire::rasterizer::materials
         void prepareDrawing(material::Instance const &,
                             glm::mat4 const & modelTransform,
                             glm::vec3 const & ambientLight,
-                            glm::vec3 const & emissiveFactor) const override;
+                            glm::vec3 const & emissiveFactor,
+                            material::TextureRefs const & directionalLightsShadowMaps) const override;
 
         opengl::Program const & glProgram() const override { return _program; }
 
@@ -95,6 +96,8 @@ namespace minire::rasterizer::materials
 
         GLint _emissiveTexture = -1;
         GLint _emissiveFactor = -1;
+
+        GLint _directionalLightsShadowMaps = -1;
 
         GLint _positionAttribute = -1;
         GLint _uvAttribute = -1;

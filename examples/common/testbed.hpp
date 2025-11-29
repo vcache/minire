@@ -8,6 +8,7 @@
 #include <minire/logging.hpp>
 #include <minire/models/camera.hpp>
 #include <minire/models/font-face.hpp>
+#include <minire/models/pbr-material.hpp>
 #include <minire/models/point-light.hpp>
 #include <minire/models/transform.hpp>
 
@@ -35,14 +36,15 @@ namespace minire::examples
             , _orbiting(_target, 10)
             , _orthographicCamera{._xMag = _orbiting.distance() / 2,
                                   ._yMag = _orbiting.distance() / 2,
-                                  ._zNear = 0.001f,
-                                  ._zFar = 1000.0f}
+                                  ._zNear = 0.1f,
+                                  ._zFar = 100.0f}
             , _perspectiveCamera{._yFov = glm::radians(45.0f),
-                                 ._zNear = 0.001f,
-                                 ._zFar = 1000.0f,
+                                 ._zNear = 0.1f,
+                                 ._zFar = 100.0f,
                                  ._aspectRatio = std::nullopt}
             , _isDirectLightEnabled(false)
             , _isPointLightEnabled(true)
+            , _isFloorPlaneEnabled(true)
             , _isPerspective(true)
         {}
 
@@ -58,11 +60,28 @@ namespace minire::examples
             enqueue<SceneNewOrthographicCamera>("ortho-cam", ScenePath{"cam-node"}, _orthographicCamera, true);
             enqueue<SceneActivateCamera>(ScenePath{"cam-node", "persp-cam"});
 
+            enqueue<SceneNewNode>("floor-node", ScenePath(), Transform(glm::vec3(0, -.5, 0)), true);
+            enqueue<SceneNewMesh>("floor-plane", ScenePath{"floor-node"},
+                Mesh
+                {
+                    ._source = mkPath("../common/floor-plane.glb", path::Special::kMeshes, path::Index(0)),
+                    ._defaultMaterial = [this]
+                    {
+                        auto result = std::make_shared<PbrMaterial>();
+                        result->_albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f);
+                        result->_metallicFactor = 0.0f;
+                        result->_roughnessFactor = 1.0f;
+                        return result;
+                    }()
+                },
+                _isFloorPlaneEnabled);
+
+
             enqueue<SceneNewNode>("directlight-node", ScenePath(),
-                                  Transform(glm::vec3(0), lookAt(glm::vec3(1, 1, 1), glm::vec3(0, 0, 0))),
+                                  Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))),
                                   true);
             enqueue<SceneNewDirectionalLight>("sun", ScenePath{"directlight-node"},
-                                              DirectionalLight(glm::vec3(0, 10, 0)), _isDirectLightEnabled);
+                                              DirectionalLight(glm::vec3(0, 10, 0), true), _isDirectLightEnabled);
 
             enqueue<SceneNewNode>("pointlight-node", ScenePath(),
                                   Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
@@ -174,6 +193,12 @@ namespace minire::examples
                     MINIRE_INFO("Toggle point light: {}", _isPointLightEnabled);
                     enqueue<SceneSetVisibility>(ScenePath{"pointlight-node", "bulb"}, _isPointLightEnabled);
                     break;
+
+                case SDLK_f:
+                    _isFloorPlaneEnabled = !_isFloorPlaneEnabled;
+                    MINIRE_INFO("Toggle floor plane: {}", _isFloorPlaneEnabled);
+                    enqueue<SceneSetVisibility>(ScenePath{"floor-node", "floor-plane"}, _isFloorPlaneEnabled);
+                    break;
             }
             return true;
         }
@@ -188,6 +213,7 @@ namespace minire::examples
         glm::vec2                          _windowSize;
         bool                               _isDirectLightEnabled;
         bool                               _isPointLightEnabled;
+        bool                               _isFloorPlaneEnabled;
         bool                               _isPerspective;
     };
 

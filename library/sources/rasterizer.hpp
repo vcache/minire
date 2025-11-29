@@ -2,7 +2,9 @@
 
 #include <rasterizer/billboards.hpp>
 #include <rasterizer/coordinates.hpp>
+#include <rasterizer/culled-objects.hpp>
 #include <rasterizer/drawable.hpp>
+#include <rasterizer/flat-shadow-map.hpp>
 #include <rasterizer/fonts.hpp>
 #include <rasterizer/label.hpp>
 #include <rasterizer/labels.hpp>
@@ -14,6 +16,8 @@
 #include <rasterizer/textures.hpp>
 #include <rasterizer/ubo.hpp>
 #include <rasterizer/vertex-buffers.hpp>
+
+#include <minire/material.hpp>
 
 #include <glm/mat4x4.hpp>
 
@@ -29,7 +33,7 @@ namespace minire
         explicit Rasterizer(content::Manager &,
                             content::Ids const & fontsPreload = {});
 
-        void draw(Scene const & scene);
+        void draw(Scene const &);
 
         void setScreenSize(size_t const width,
                            size_t const height);
@@ -48,9 +52,17 @@ namespace minire
         rasterizer::Resources::LayerId const & currentResourceLayer() const { return _resources.current(); }
 
     private:
-        void forwardPass(Scene const & scene);
-        void draw3d(Scene const & scene);
+        rasterizer::CulledDirectionalLights cullDirectionalLights(Scene const &);
+
+    private:
+        void shadowPass(Scene const &, rasterizer::CulledDirectionalLights &);
+
+        void colorPass(Scene const &, rasterizer::CulledDirectionalLights &);
+        void draw3d(Scene const &, material::TextureRefs const &);
         void draw2d();
+
+    private:
+        using FlatShadowMaps = std::vector<rasterizer::FlatShadowMap::Sptr>;
 
     private:
         content::Manager             & _contentManager;
@@ -68,6 +80,9 @@ namespace minire
         rasterizer::Labels             _labels;
         rasterizer::Sprites            _sprites;
         rasterizer::Billboards         _billboards;
+
+        FlatShadowMaps                 _flatShadowMaps;
+        material::TextureRefs          _directionalLightsShadowMaps;
 
         rasterizer::Resources          _resources;
 

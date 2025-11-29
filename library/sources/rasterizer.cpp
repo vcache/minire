@@ -6,6 +6,7 @@
 #include <opengl.hpp>
 #include <rasterizer/materials/pbr.hpp>
 #include <scene.hpp>
+#include <utils/frustum.hpp>
 
 #include <glm/gtx/transform.hpp>
 
@@ -28,6 +29,7 @@ namespace minire
         , _labels(_fonts)
         , _sprites(_textures)
         , _billboards(_contentManager, _fonts, _textures)
+        , _directionalLightsShadowMaps(rasterizer::Ubo::maxDirectionalLights(), nullptr)
         , _2dProjection(1.0)
         , _screenWidth(0)
         , _screenHeight(0)
@@ -50,12 +52,72 @@ namespace minire
         _screenHeight = height;
     }
 
-    void Rasterizer::draw(Scene const & scene)
+    rasterizer::CulledDirectionalLights
+    Rasterizer::cullDirectionalLights(Scene const & scene)
     {
-        forwardPass(scene);
+        rasterizer::CulledDirectionalLights result;
+        result.reserve(rasterizer::Ubo::maxDirectionalLights());
+        size_t shadowMapIndex = 0;
+        scene.cullDirectionalLights(
+            rasterizer::Ubo::maxDirectionalLights(),
+            [this, &result, &shadowMapIndex](size_t const /*index*/,
+                                             glm::vec3 const & position,
+                                             glm::vec3 const & direction,
+                                             glm::vec3 const & color,
+                                             bool const enableShadows)
+            {
+                rasterizer::FlatShadowMap::Sptr shadowMap;
+
+                if (enableShadows)
+                {
+                    if (shadowMapIndex >= _flatShadowMaps.size())
+                    {
+                        _flatShadowMaps.push_back(std::make_shared<rasterizer::FlatShadowMap>());
+                    }
+                    shadowMap = _flatShadowMaps[shadowMapIndex++];
+                }
+
+                result.emplace_back(rasterizer::CulledDirectionalLight
+                {
+                    ._position = position,
+                    ._direction = direction,
+                    ._color = color,
+                    ._shadowMap = shadowMap,
+                    ._viewProjection = glm::identity<glm::mat4>(),
+                });
+            });
+        return result;
     }
 
-    void Rasterizer::forwardPass(Scene const & scene)
+    void Rasterizer::draw(Scene const & scene)
+    {
+        auto directionalLights = cullDirectionalLights(scene);
+        shadowPass(scene, directionalLights);
+        colorPass(scene, directionalLights);
+    }
+
+    void Rasterizer::shadowPass(Scene const & scene,
+                                rasterizer::CulledDirectionalLights & culledDirectionalLights)
+    {
+        // TODO: maybe do min/max w/ scene AABB?
+        utils::FrustumVertices const & frustumVertices = scene.viewpoint().frustumVertices();
+
+        for(rasterizer::CulledDirectionalLight & light : culledDirectionalLights)
+        {
+            if (light._shadowMap)
+            {
+                light._viewProjection = light._shadowMap->perform(
+                    scene, light._position, light._direction, frustumVertices);
+            }
+            else
+            {
+                light._viewProjection = glm::identity<glm::mat4>();
+            }
+        }
+    }
+
+    void Rasterizer::colorPass(Scene const & scene,
+                               rasterizer::CulledDirectionalLights & culledDirectionalLights)
     {
         // initial setup
         assert(_screenWidth != 0);
@@ -63,6 +125,21 @@ namespace minire
         MINIRE_GL(glBindFramebuffer, GL_FRAMEBUFFER, 0);
         MINIRE_GL(glViewport, 0, 0, _screenWidth, _screenHeight);
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // actualize shadow maps vector
+        _directionalLightsShadowMaps.resize(culledDirectionalLights.size());
+        for(size_t i = 0; i < _directionalLightsShadowMaps.size(); i++)
+        {
+            if (culledDirectionalLights[i]._shadowMap)
+            {
+                auto const & flatShadowMap = *culledDirectionalLights[i]._shadowMap;
+                _directionalLightsShadowMaps[i] = &flatShadowMap.texture();
+            }
+            else
+            {
+                _directionalLightsShadowMaps[i] = nullptr;
+            }
+        }
 
         // 3D part
         if (scene::Viewpoint const & viewpoint = scene.viewpoint();
@@ -74,20 +151,21 @@ namespace minire
             auto const & [mvp, revision] = viewpoint.mvp();
             _ubo.setViewProjection(mvp, revision);
             _ubo.setViewPosition(glm::vec4(viewpoint.position(), 1.0f));
-            _ubo.setLights(scene);
+            _ubo.setLights(culledDirectionalLights, scene);
             _ubo.bind();
-            draw3d(scene);
+            draw3d(scene, _directionalLightsShadowMaps);
         }
 
         // 2D layer
         draw2d();
     }
 
-    void Rasterizer::draw3d(Scene const & scene)
+    void Rasterizer::draw3d(Scene const & scene,
+                            material::TextureRefs const & directionalLightsShadowMaps)
     {
         // setup state for 3d mode
         MINIRE_GL(glEnable, GL_CULL_FACE);
-        //MINIRE_GL(glCullFace, GL_FRONT);
+        MINIRE_GL(glCullFace, GL_BACK);
         MINIRE_GL(glEnable, GL_MULTISAMPLE);
         MINIRE_GL(glEnable, GL_DEPTH_TEST);
         MINIRE_GL(glDepthFunc, GL_LESS);
@@ -102,7 +180,7 @@ namespace minire
         _lines.draw();
 
         // draw entries
-        _meshes.draw(scene);
+        _meshes.draw(scene, directionalLightsShadowMaps);
 
         // draw billboards
         MINIRE_GL(glDisable, GL_CULL_FACE);

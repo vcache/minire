@@ -1,5 +1,6 @@
 #pragma once
 
+#include <rasterizer/culled-objects.hpp>
 #include <rasterizer/ubo/datablock.hpp>
 
 #include <opengl/ubo.hpp>
@@ -21,16 +22,17 @@ namespace minire::rasterizer
 
         static std::string interfaceBlock();
 
-        static size_t maxDirectionalLights() { return ubo::Datablock::kMaxDirectionalLights; }
+        static constexpr size_t maxDirectionalLights() { return ubo::Datablock::kMaxDirectionalLights; }
 
-        static size_t maxPointLights() { return ubo::Datablock::kMaxPointLights; }
+        static constexpr size_t maxPointLights() { return ubo::Datablock::kMaxPointLights; }
 
     public:
         void setViewProjection(glm::mat4 const &, size_t);
 
         void setViewPosition(glm::vec4 const &);
 
-        void setLights(Scene const &);
+        void setLights(CulledDirectionalLights const &,
+                       Scene const &);
 
     private:
         using GlUbo = opengl::UBO<ubo::Datablock>;

@@ -34,10 +34,13 @@ namespace minire::rasterizer
                       Ubo const &,
                       VertexBuffers const &);
 
-        // assuming that caller will "use" gl's program!
-        void draw(glm::mat4 const &,
+        void draw(glm::mat4 const & transform,
                   glm::vec3 const & ambientLight,
-                  glm::vec3 const & emissiveFactor) const;
+                  glm::vec3 const & emissiveFactor,
+                  material::TextureRefs const &) const;
+
+        // Position attrib is guaranteed to be at index 0.
+        void drawBare() const;
 
         utils::Aabb const & aabb() const { return _aabb; }
 

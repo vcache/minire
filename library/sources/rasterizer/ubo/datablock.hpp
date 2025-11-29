@@ -37,6 +37,12 @@ namespace minire::rasterizer::ubo
 
         // linear values, for higher intesity should be >1.0
         alignas(4 * kStd140N) glm::vec3 _color = glm::vec3(0);
+
+        // light-space transform matrix
+        alignas(4 * kStd140N) glm::mat4 _viewProjection = glm::mat4(1.0f);
+
+        // has shadows
+        alignas(1 * kStd140N) bool _hasShadows = false;
     };
 
     struct PointLight
@@ -74,6 +80,20 @@ namespace minire::rasterizer::ubo
     }
 
     template<>
+    inline std::string makeInterfaceBlock<DirectionalLight>()
+    {
+        return R"(
+        struct BznkDirectionalLight
+        {
+            vec3 _direction;
+            vec3 _color;
+            mat4 _viewProjection;
+            bool _hasShadows;
+        };
+        )";
+    }
+
+    template<>
     inline std::string makeInterfaceBlock<PointLight>()
     {
         return R"(
@@ -82,18 +102,6 @@ namespace minire::rasterizer::ubo
             vec4 _position;
             vec4 _color;
             vec4 _attenuation;
-        };
-        )";
-    }
-
-    template<>
-    inline std::string makeInterfaceBlock<DirectionalLight>()
-    {
-        return R"(
-        struct BznkDirectionalLight
-        {
-            vec3 _direction;
-            vec3 _color;
         };
         )";
     }

@@ -81,6 +81,36 @@ namespace minire::scene
         }
     }
 
+    utils::FrustumVertices Viewpoint::frustumVertices() const
+    {
+        revalidate();
+
+        glm::mat4 const inversed = glm::inverse(_projection * _view);
+        auto invProject = [&inversed](glm::vec4 const & ndcVertex)
+        {
+            // TODO: what if worldVertex.w == 0
+            glm::vec4 worldVertex = inversed * ndcVertex;
+            return glm::vec3(worldVertex.x / worldVertex.w,
+                             worldVertex.y / worldVertex.w,
+                             worldVertex.z / worldVertex.w);
+        };
+
+        return utils::FrustumVertices
+        {
+            // Near
+            invProject(glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-left
+            invProject(glm::vec4(-1.0f,  1.0f, -1.0f, 1.0f)),   // top-left
+            invProject(glm::vec4( 1.0f,  1.0f, -1.0f, 1.0f)),   // top-right
+            invProject(glm::vec4( 1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-right
+
+            // Far
+            invProject(glm::vec4(-1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-left
+            invProject(glm::vec4(-1.0f,  1.0f,  1.0f, 1.0f)),   // top-left
+            invProject(glm::vec4( 1.0f,  1.0f,  1.0f, 1.0f)),   // top-right
+            invProject(glm::vec4( 1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-right
+        };
+    }
+
     void Viewpoint::invalidate()
     {
         _invalidated = true;

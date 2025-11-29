@@ -50,15 +50,17 @@ namespace minire::rasterizer
                                       _vertexBuffers);
     }
 
-    void Meshes::draw(Scene const & scene) const
+    void Meshes::draw(Scene const & scene,
+                      material::TextureRefs const & directionalLightsShadowMaps) const
     {
         // TODO: group models by a material signature (to avoid frequent program switch)
         scene.cullModels(
-            [&ambientLight = scene.ambientLight()]
+            [&ambientLight = scene.ambientLight(), &directionalLightsShadowMaps]
             (Mesh const & mesh, glm::vec3 const & emissiveFactor,
              glm::mat4 const & transform)
             {
-                mesh.draw(transform, ambientLight, emissiveFactor);
+                mesh.draw(transform, ambientLight, emissiveFactor,
+                          directionalLightsShadowMaps);
             }
         );
     }

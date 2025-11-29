@@ -9,9 +9,11 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
-namespace minire::opengl { class Program; }
 namespace minire::models { class MeshFeatures; };
+namespace minire::opengl { class Program; }
+namespace minire::opengl { class Texture; }
 
 // TODO: this abstraction is pretty shitty actually,
 //       because it cannot be implemented w/o access
@@ -20,6 +22,8 @@ namespace minire::models { class MeshFeatures; };
 
 namespace minire::material
 {
+    using TextureRefs = std::vector<opengl::Texture const *>;
+
     /**
      * This class is exposed to the user and it contains
      * material-specific parameters, such as texture, colors, and so on.
@@ -68,14 +72,15 @@ namespace minire::material
         virtual void prepareDrawing(Instance const &,
                                     glm::mat4 const & modelTransform,
                                     glm::vec3 const & ambientLight,
-                                    glm::vec3 const & emissiveFactor) const = 0;
+                                    glm::vec3 const & emissiveFactor,
+                                    TextureRefs const & directionalLightsShadowMaps) const = 0;
 
         virtual opengl::Program const & glProgram() const = 0;
 
         // TODO: assert int == GLint
         struct Locations
         {
-            int _vertexAttribute;
+            int _vertexAttribute; // NOTE: must always be 0
             int _uvAttribute;
             int _normalAttribute;
             int _tangentAttribute;

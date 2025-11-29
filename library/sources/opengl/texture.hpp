@@ -48,6 +48,8 @@ namespace minire::opengl
     public:
         GLuint id() const { return _id; }
 
+        GLenum target() const { return _target; }
+
         void bind() const { MINIRE_GL(glBindTexture, _target, _id); }
 
         void parameteri(GLenum pname, GLint param) const

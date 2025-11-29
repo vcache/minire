@@ -1,5 +1,6 @@
 #pragma once
 
+#include <minire/material.hpp>
 #include <minire/utils/aabb.hpp>
 
 #include <rasterizer/mesh.hpp>
@@ -26,7 +27,7 @@ namespace minire::rasterizer
                         content::Manager &,
                         Resources &);
 
-        void draw(Scene const &) const;
+        void draw(Scene const &, material::TextureRefs const &) const;
 
         std::shared_ptr<Mesh> getMesh(meshes::Id const &);
 
