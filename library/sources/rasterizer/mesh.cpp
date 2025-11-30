@@ -225,7 +225,8 @@ namespace minire::rasterizer
     void Mesh::draw(glm::mat4 const & modelTransform,
                     glm::vec3 const & ambientLight,
                     glm::vec3 const & emissiveFactor,
-                    material::TextureRefs const & directionalLightsShadowMaps) const
+                    material::TextureRefs const & directionalLightsShadowMaps,
+                    material::TextureRefs const & pointLightsShadowMaps) const
     {
         for(Material const & material : _materials)
         {
@@ -235,7 +236,8 @@ namespace minire::rasterizer
                                                  modelTransform,
                                                  ambientLight,
                                                  emissiveFactor,
-                                                 directionalLightsShadowMaps);
+                                                 directionalLightsShadowMaps,
+                                                 pointLightsShadowMaps);
             for(size_t const primIndex : material._primitives)
             {
                 assert(primIndex < _primitives.size());

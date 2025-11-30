@@ -57,6 +57,14 @@ namespace minire::opengl
                     GLenum attachment) const
         {
             bind();
+            MINIRE_GL(glFramebufferTexture, GL_FRAMEBUFFER, attachment,
+                      depthTexture.id(), 0);
+        }
+
+        void attach2D(Texture const & depthTexture,
+                      GLenum attachment) const
+        {
+            bind();
             MINIRE_GL(glFramebufferTexture2D, GL_FRAMEBUFFER, attachment,
                       depthTexture.target(), depthTexture.id(), 0);
         }

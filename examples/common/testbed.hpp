@@ -81,12 +81,14 @@ namespace minire::examples
                                   Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))),
                                   true);
             enqueue<SceneNewDirectionalLight>("sun", ScenePath{"directlight-node"},
-                                              DirectionalLight(glm::vec3(0, 10, 0), true), _isDirectLightEnabled);
+                                              DirectionalLight(glm::vec3(0, 10, 0), ShadowParams{}),
+                                              _isDirectLightEnabled);
 
             enqueue<SceneNewNode>("pointlight-node", ScenePath(),
                                   Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
             enqueue<SceneNewPointLight>("bulb", ScenePath{"pointlight-node"},
-                                        PointLight(glm::vec4(1, 1, 1, 500), 2), _isPointLightEnabled);
+                                        PointLight(glm::vec4(1, 1, 1, 500), 2, ShadowParams{}),
+                                        _isPointLightEnabled);
         }
 
         bool handle(minire::events::application::OnMouseMove const & event) override

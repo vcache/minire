@@ -7,6 +7,4 @@
 namespace minire::utils
 {
     using FrustumVertices = std::array<glm::vec3, 8>;
-
-    // TODO: add FrustumPlanes
 }

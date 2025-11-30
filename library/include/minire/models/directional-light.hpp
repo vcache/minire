@@ -1,18 +1,20 @@
 #pragma once
 
+#include <minire/models/shadow-params.hpp>
+
 #include <glm/vec4.hpp>
 
 namespace minire::models
 {
     struct DirectionalLight
     {
-        glm::vec3 _color;
-        bool      _enableShadows;
+        glm::vec3         _color;
+        MaybeShadowParams _shadowParams;
 
         DirectionalLight(glm::vec3 const & color,
-                         bool const enableShadows = false)
+                         MaybeShadowParams shadowParams = std::nullopt)
             : _color(color)
-            , _enableShadows(enableShadows)
+            , _shadowParams(shadowParams)
         {}
 
          void lerp(DirectionalLight const & prev,

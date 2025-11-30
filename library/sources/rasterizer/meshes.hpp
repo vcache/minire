@@ -27,7 +27,9 @@ namespace minire::rasterizer
                         content::Manager &,
                         Resources &);
 
-        void draw(Scene const &, material::TextureRefs const &) const;
+        void draw(Scene const &,
+                  material::TextureRefs const & directionalLightsShadowMaps,
+                  material::TextureRefs const & pointLightsShadowMaps) const;
 
         std::shared_ptr<Mesh> getMesh(meshes::Id const &);
 

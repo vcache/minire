@@ -98,8 +98,17 @@ namespace minire::opengl
         }
 
         template<size_t kItems>
+        void setUniform(GLint location, std::array<glm::mat4, kItems> const & value) const
+        {
+            static_assert(kItems > 0, "number of matrices must be non-zero");
+            assert(isUsing());
+            MINIRE_GL(glUniformMatrix4fv, location, kItems, GL_FALSE, glm::value_ptr(value[0]));
+        }
+
+        template<size_t kItems>
         void setUniform(GLint location, std::array<GLint, kItems> const & value) const
         {
+            static_assert(kItems > 0, "number of items must be non-zero");
             assert(isUsing());
             MINIRE_GL(glUniform1iv, location, value.size(), value.data());
         }

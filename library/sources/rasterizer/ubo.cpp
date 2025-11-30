@@ -2,7 +2,6 @@
 
 #include <opengl.hpp>
 #include <opengl/program.hpp>
-#include <scene.hpp>
 
 #include <cassert>
 
@@ -66,7 +65,7 @@ namespace minire::rasterizer
 
     // TODO: try to minimize changes (esp. when nothing changed)
     void Ubo::setLights(CulledDirectionalLights const & culledDirectionalLights,
-                        Scene const & scene)
+                        CulledPointLights const & culledPointLights)
     {
         {
             assert(culledDirectionalLights.size() <= maxDirectionalLights());
@@ -78,23 +77,26 @@ namespace minire::rasterizer
                 dst._color = light._color;
                 dst._viewProjection = light._viewProjection;
                 dst._hasShadows = light._shadowMap.operator bool();
+                dst._shadowUsePCF = light._shadowUsePCF;
                 _datablock._directionalLightsCount++;
             }
         }
 
-        _datablock._pointLightsCount = scene.cullPointLights(
-            maxPointLights(),
-            [this](size_t index,
-                   glm::vec3 const & position,
-                   glm::vec4 const & color,
-                   glm::vec4 const & attenuation)
+        {
+            assert(culledPointLights.size() <= maxPointLights());
+            _datablock._pointLightsCount = 0;
+            for(CulledPointLight const & light : culledPointLights)
             {
-                assert(index < maxPointLights());
-                auto & dst = _datablock._pointLights[index];
-                dst._position = glm::vec4(position, 1.0);
-                dst._color = color;
-                dst._attenuation = attenuation;
-            });
+                auto & dst = _datablock._pointLights[_datablock._pointLightsCount];
+                dst._position = glm::vec4(light._position, 1.0);
+                dst._color = light._color;
+                dst._attenuation = light._attenuation;
+                dst._shadowMapFarPlane = light._shadowMapFarPlane;
+                dst._hasShadows = light._shadowMap.operator bool();
+                dst._shadowUsePCF = light._shadowUsePCF;
+                _datablock._pointLightsCount++;
+            }
+        }
 
         _invalidated = true; // TODO: do only when changed
     }

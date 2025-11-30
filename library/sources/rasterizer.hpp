@@ -2,6 +2,7 @@
 
 #include <rasterizer/billboards.hpp>
 #include <rasterizer/coordinates.hpp>
+#include <rasterizer/cube-shadow-map.hpp>
 #include <rasterizer/culled-objects.hpp>
 #include <rasterizer/drawable.hpp>
 #include <rasterizer/flat-shadow-map.hpp>
@@ -53,16 +54,23 @@ namespace minire
 
     private:
         rasterizer::CulledDirectionalLights cullDirectionalLights(Scene const &);
+        rasterizer::CulledPointLights cullPointLights(Scene const &);
 
     private:
-        void shadowPass(Scene const &, rasterizer::CulledDirectionalLights &);
+        void shadowPass(Scene const &,
+                        rasterizer::CulledDirectionalLights &,
+                        rasterizer::CulledPointLights &);
 
-        void colorPass(Scene const &, rasterizer::CulledDirectionalLights &);
-        void draw3d(Scene const &, material::TextureRefs const &);
+        void colorPass(Scene const &,
+                       rasterizer::CulledDirectionalLights const &,
+                       rasterizer::CulledPointLights const &);
+        void draw3d(Scene const &, material::TextureRefs const &,
+                    material::TextureRefs const &);
         void draw2d();
 
     private:
         using FlatShadowMaps = std::vector<rasterizer::FlatShadowMap::Sptr>;
+        using CubeShadowMaps = std::vector<rasterizer::CubeShadowMap::Sptr>;
 
     private:
         content::Manager             & _contentManager;
@@ -83,6 +91,9 @@ namespace minire
 
         FlatShadowMaps                 _flatShadowMaps;
         material::TextureRefs          _directionalLightsShadowMaps;
+
+        CubeShadowMaps                 _cubeShadowMaps;
+        material::TextureRefs          _pointLightsShadowMaps;
 
         rasterizer::Resources          _resources;
 

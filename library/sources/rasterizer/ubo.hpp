@@ -5,8 +5,6 @@
 
 #include <opengl/ubo.hpp>
 
-namespace minire { class Scene; }
-
 namespace minire::opengl { class Program; }
 
 namespace minire::rasterizer
@@ -32,7 +30,7 @@ namespace minire::rasterizer
         void setViewPosition(glm::vec4 const &);
 
         void setLights(CulledDirectionalLights const &,
-                       Scene const &);
+                       CulledPointLights const & culledPointLights);
 
     private:
         using GlUbo = opengl::UBO<ubo::Datablock>;

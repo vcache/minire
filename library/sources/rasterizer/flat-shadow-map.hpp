@@ -6,6 +6,7 @@
 #include <utils/frustum.hpp>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 
 #include <memory>
 
@@ -13,7 +14,7 @@ namespace minire { class Scene; }
 
 namespace minire::rasterizer
 {
-    // Can be used only for Directional Lights (all rays are parallel).
+    // Can be used for directional lights (all rays are parallel).
     class FlatShadowMap
     {
         FlatShadowMap(FlatShadowMap const &) = delete;
@@ -22,6 +23,8 @@ namespace minire::rasterizer
         FlatShadowMap & operator=(FlatShadowMap &&) = delete;
 
     public:
+        using Sptr = std::shared_ptr<FlatShadowMap>;
+
         explicit FlatShadowMap(size_t size = 4096);
 
         // Returns light-space VP-matrix
@@ -32,7 +35,7 @@ namespace minire::rasterizer
 
         opengl::Texture const & texture() const { return _texture; }
 
-        using Sptr = std::shared_ptr<FlatShadowMap>;
+        size_t size() const { return _size; }
 
     private:
         glm::mat4 buildVP(glm::vec3 const & lightPosition,

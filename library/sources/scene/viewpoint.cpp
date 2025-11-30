@@ -81,6 +81,7 @@ namespace minire::scene
         }
     }
 
+    // TODO: calculate it lazily
     utils::FrustumVertices Viewpoint::frustumVertices() const
     {
         revalidate();

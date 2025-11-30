@@ -8,14 +8,6 @@
 
 #include <minire/errors.hpp>
 
-
-
-#include <minire/logging/formatters.hpp>
-#include <minire/logging.hpp>
-
-
-
-
 #include <glm/gtx/transform.hpp>
 
 #include <limits>
@@ -114,6 +106,7 @@ namespace minire::rasterizer
                                      glm::vec3 const & lightDirection,
                                      utils::FrustumVertices const & frustumVertices)
     {
+        // setup GL mode flags
         MINIRE_GL(glEnable, GL_DEPTH_TEST);
         MINIRE_GL(glDepthFunc, GL_LESS);
         MINIRE_GL(glDepthMask, GL_TRUE);
@@ -126,7 +119,7 @@ namespace minire::rasterizer
 #       endif
 
         // bind texture to the depth framebuffer
-        _fbo.attach(_texture, GL_DEPTH_ATTACHMENT);
+        _fbo.attach2D(_texture, GL_DEPTH_ATTACHMENT);
         MINIRE_GL(glDrawBuffer, GL_NONE);
         MINIRE_GL(glReadBuffer, GL_NONE);
 
@@ -134,11 +127,14 @@ namespace minire::rasterizer
         MINIRE_GL(glViewport, 0, 0, _size, _size);
         MINIRE_GL(glClear, GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 const lightVP = buildVP(lightPosition, glm::normalize(lightDirection),
+        // setup program
+        glm::mat4 const lightVP = buildVP(lightPosition,
+                                          glm::normalize(lightDirection),
                                           frustumVertices);
         _program.use();
         _program.setUniform(_bznkLightMatrix, lightVP);
 
+        // perform drawing commands
         scene.cullModels(
             [this] (Mesh const & mesh, glm::vec3 const & /*emissiveFactor*/,
                     glm::mat4 const & transform)
@@ -147,6 +143,7 @@ namespace minire::rasterizer
                 mesh.drawBare();
             });
 
+        // tidy up
         _fbo.unbind();
         return lightVP;
     }

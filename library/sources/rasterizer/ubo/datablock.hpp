@@ -43,6 +43,9 @@ namespace minire::rasterizer::ubo
 
         // has shadows
         alignas(1 * kStd140N) bool _hasShadows = false;
+
+        // apply PCF for a shadow (ignored if !_hasShadows)
+        alignas(1 * kStd140N) bool _shadowUsePCF = false;
     };
 
     struct PointLight
@@ -55,6 +58,15 @@ namespace minire::rasterizer::ubo
 
         // x - constant, y - linear, z - quadratic
         alignas(4 * kStd140N) glm::vec4 _attenuation = glm::vec4(0);
+
+        // far plane used in a projection matrix of a light map
+        alignas(1 * kStd140N) float _shadowMapFarPlane = 0;
+
+        // has shadows
+        alignas(1 * kStd140N) bool _hasShadows = false;
+
+        // apply PCF for a shadow (ignored if !_hasShadows)
+        alignas(1 * kStd140N) bool _shadowUsePCF = false;
     };
 
     struct Datablock
@@ -89,6 +101,7 @@ namespace minire::rasterizer::ubo
             vec3 _color;
             mat4 _viewProjection;
             bool _hasShadows;
+            bool _shadowUsePCF;
         };
         )";
     }
@@ -99,9 +112,12 @@ namespace minire::rasterizer::ubo
         return R"(
         struct BznkPointLight
         {
-            vec4 _position;
-            vec4 _color;
-            vec4 _attenuation;
+            vec4  _position;
+            vec4  _color;
+            vec4  _attenuation;
+            float _shadowMapFarPlane;
+            bool  _hasShadows;
+            bool  _shadowUsePCF;
         };
         )";
     }

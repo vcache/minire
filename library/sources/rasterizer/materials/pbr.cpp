@@ -110,7 +110,8 @@ namespace minire::rasterizer::materials
                                     glm::mat4 const & modelTransform,
                                     glm::vec3 const & ambientLight,
                                     glm::vec3 const & emissiveFactor,
-                                    material::TextureRefs const & directionalLightsShadowMaps) const
+                                    material::TextureRefs const & directionalLightsShadowMaps,
+                                    material::TextureRefs const & pointLightsShadowMaps) const
     {
         _program.use();
 
@@ -126,12 +127,15 @@ namespace minire::rasterizer::materials
 
         GLint texUnit = 0;
 
+        // albedo
         PbrInstance::setUniform(pbrInstance._albedoFactor, _program, _albedoFactor);
         texUnit += PbrInstance::setUniform(pbrInstance._albedoTexture, _program, _albedoTexture, texUnit);
 
+        // metallic
         PbrInstance::setUniform(pbrInstance._metallicFactor, _program, _metallicFactor);
         texUnit += PbrInstance::setUniform(pbrInstance._metallicTexture, _program, _metallicTexture, texUnit);
 
+        // roughness
         PbrInstance::setUniform(pbrInstance._roughnessFactor, _program, _roughnessFactor);
         texUnit += PbrInstance::setUniform(pbrInstance._roughnessTexture, _program, _roughnessTexture, texUnit);
 
@@ -141,12 +145,15 @@ namespace minire::rasterizer::materials
             PbrInstance::setUniform(pbrInstance._normalScale, _program, _normalScale);
         }
 
+        // AO
         texUnit += PbrInstance::setUniform(pbrInstance._aoTexture, _program, _aoTexture, texUnit);
         PbrInstance::setUniform(pbrInstance._aoStrength, _program, _aoStrength);
 
+        // emissive
         texUnit += PbrInstance::setUniform(pbrInstance._emissiveTexture, _program, _emissiveTexture, texUnit);
         PbrInstance::setUniform(pbrInstance._emissiveFactor + emissiveFactor, _program, _emissiveFactor);
 
+        // directional lights shadow maps
         MINIRE_INVARIANT(directionalLightsShadowMaps.size() <= Ubo::maxDirectionalLights(),
                          "provided {} shadow maps for directional lights, while limit is {}",
                          directionalLightsShadowMaps.size(), Ubo::maxDirectionalLights());
@@ -167,6 +174,33 @@ namespace minire::rasterizer::materials
             texUnit++;
         }
         _program.setUniform(_directionalLightsShadowMaps, directionalLightsSamplers);
+
+        // point lights shadow maps
+        MINIRE_INVARIANT(pointLightsShadowMaps.size() <= Ubo::maxPointLights(),
+                         "provided {} shadow maps for point lights, while limit is {}",
+                         pointLightsShadowMaps.size(), Ubo::maxPointLights());
+        std::array<GLint, Ubo::maxPointLights()> pointLightsSamplers;
+        for(size_t i = 0; i < pointLightsSamplers.size(); ++i)
+        {
+            MINIRE_GL(glActiveTexture, GL_TEXTURE0 + texUnit);
+            if (i < pointLightsShadowMaps.size() &&
+                pointLightsShadowMaps[i])
+            {
+                pointLightsShadowMaps[i]->bind();
+            }
+            else
+            {
+                MINIRE_GL(glBindTexture, GL_TEXTURE_2D, 0);
+            }
+            pointLightsSamplers[i] = texUnit;
+            texUnit++;
+        }
+        _program.setUniform(_pointLightsShadowMaps, pointLightsSamplers);
+
+        // sanity check
+        MINIRE_INVARIANT(texUnit <= GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS,
+                         "rendering required {} texture units, while only {} avalilable",
+                         texUnit, GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
     }
 
     material::Program::Locations PbrProgram::locations() const
@@ -224,6 +258,7 @@ namespace minire::rasterizer::materials
 
             {"kUboDatablock",        Ubo::interfaceBlock()},
             {"kMaxDirectionalLights",Ubo::maxDirectionalLights()},
+            {"kMaxPointLights",      Ubo::maxPointLights()},
         };
 
         // Init template render
@@ -269,6 +304,7 @@ namespace minire::rasterizer::materials
         result->_emissiveFactor = result->_program.getUniformLocation("bznkEmissiveFactor");
 
         result->_directionalLightsShadowMaps = result->_program.getUniformLocation("bznkDirectionalLightsShadowMaps");
+        result->_pointLightsShadowMaps = result->_program.getUniformLocation("bznkPointLightsShadowMaps");
 
         result->_modelUniformLocation = result->_program.getUniformLocation("bznkModel");
         assert(result->_modelUniformLocation != -1);

@@ -73,7 +73,8 @@ namespace minire::material
                                     glm::mat4 const & modelTransform,
                                     glm::vec3 const & ambientLight,
                                     glm::vec3 const & emissiveFactor,
-                                    TextureRefs const & directionalLightsShadowMaps) const = 0;
+                                    TextureRefs const & directionalLightsShadowMaps,
+                                    TextureRefs const & pointLightsShadowMaps) const = 0;
 
         virtual opengl::Program const & glProgram() const = 0;
 

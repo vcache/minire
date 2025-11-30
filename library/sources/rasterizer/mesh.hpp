@@ -37,7 +37,8 @@ namespace minire::rasterizer
         void draw(glm::mat4 const & transform,
                   glm::vec3 const & ambientLight,
                   glm::vec3 const & emissiveFactor,
-                  material::TextureRefs const &) const;
+                  material::TextureRefs const & directionalLightsShadowMaps,
+                  material::TextureRefs const & pointLightsShadowMaps) const;
 
         // Position attrib is guaranteed to be at index 0.
         void drawBare() const;

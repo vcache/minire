@@ -1,5 +1,7 @@
 #pragma once
 
+#include <minire/models/shadow-params.hpp>
+
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
@@ -23,19 +25,24 @@ namespace minire::models
 
     struct PointLight
     {
-        glm::vec4 _color; // rgb + w is intesity
-        glm::vec4 _attenuation;
+        glm::vec4         _color; // rgb + w is intesity
+        glm::vec4         _attenuation;
+        MaybeShadowParams _shadowParams;
 
         PointLight(glm::vec4 const & color,
-                   glm::vec3 const & attenuation)
+                   glm::vec3 const & attenuation,
+                   MaybeShadowParams shadowParams = std::nullopt)
             : _color(color)
             , _attenuation(attenuation, 0.0f)
+            , _shadowParams(shadowParams)
         {}
 
         PointLight(glm::vec4 const & color,
-                   float range)
+                   float const range,
+                   MaybeShadowParams shadowParams = std::nullopt)
             : _color(color)
             , _attenuation(attFromRange(range), 0.0f)
+            , _shadowParams(shadowParams)
         {}
 
         static glm::vec3 attFromRange(float range)
