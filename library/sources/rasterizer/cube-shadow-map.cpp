@@ -162,7 +162,7 @@ namespace minire::rasterizer
                 max = glm::max(max, vertex);
             }
 
-            float const far = glm::compMax(max - min);  // TODO: maybe it shoulbe a diagonal?
+            float const far = glm::compMax(max - min);
             return std::make_pair(kNear, far);
         }
     }
