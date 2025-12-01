@@ -187,7 +187,6 @@ namespace minire
             _pendedControllerEvents.emplace_back(std::move(_currentEventsBatch));
         }
         _currentEventsBatch = Batch();
-        // TODO: reserve max() or p99 of known events amount _currentEventsBatch._events.reserve()
     }
 
     void BasicController::push(events::ApplicationQueue && applicationQueue)

@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <deque>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -32,8 +33,8 @@ namespace minire
         // TODO: maybe use std::list for faster pop_front() in the Application
         struct Batch
         {
-            std::vector<events::Controller> _events;
-            double                          _duration = 0;
+            std::deque<events::Controller> _events;
+            double                         _duration = 0;
         };
 
         using BatchQueue = std::list<Batch>;

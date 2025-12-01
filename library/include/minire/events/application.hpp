@@ -28,5 +28,6 @@ namespace minire::events
                                      application::OnRayCaster>;
 
     // TODO: move this to minire/events/application.hpp
+    // TODO: maybe deque?
     using ApplicationQueue = std::vector<Application>;
 }
