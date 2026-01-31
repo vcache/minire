@@ -4,6 +4,7 @@
 #include <minire/content/path.hpp>
 #include <minire/errors.hpp>
 #include <minire/events/controller/scene.hpp>
+#include <minire/material.hpp>
 #include <minire/models/scene-path.hpp>
 #include <minire/models/transform.hpp>
 
@@ -59,6 +60,7 @@ namespace minire
         void handle(events::controller::SceneSetPerspectiveCamera const &, size_t epochNumber);
         void handle(events::controller::SceneSetOrthographicCamera const &, size_t epochNumber);
         void handle(events::controller::SceneSetMeshEmissiveFactor const &);
+        void handle(events::controller::SceneSetMeshSkin const &);
         void handle(events::controller::SceneNewAnimationSet const &);
         void handle(events::controller::ScenePlayAnimation const &);
         void handle(events::controller::SceneStopAnimation const &);
@@ -86,12 +88,17 @@ namespace minire
                 {
                     if (mesh->_visible)
                     {
-                        auto parent = mesh->_parent.lock();
-                        MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
+                        // estimate a pivot (origin) point of a model
+                        auto parent = mesh->_skinOrigin.lock();
+                        if (!parent) parent = mesh->_parent.lock();
+                        MINIRE_INVARIANT(parent, "a mesh doesn't have a parent");
                         assert(parent->hasGlobalTransform());
+
+                        // perform rendering
                         assert(mesh->_mesh);
                         callable(*mesh->_mesh, mesh->_emissiveFactor,
-                                 parent->_globalTransform);
+                                 parent->_globalTransform,
+                                 makeSkinningVector(*mesh));
                     }
 
                     ++it;
@@ -236,8 +243,17 @@ namespace minire
         {
             using ElementType = std::shared_ptr<rasterizer::Mesh>;
 
-            ElementType _mesh;
-            glm::vec3   _emissiveFactor = glm::vec3(0); // TODO: is not lerpable?
+            struct SkinBone
+            {
+                glm::mat4 const     _inverseBindMatrix;
+                std::weak_ptr<Node> _node;
+            };
+            using SkinBones = std::vector<SkinBone>;
+
+            ElementType         _mesh;
+            SkinBones           _skinBones;
+            std::weak_ptr<Node> _skinOrigin;
+            glm::vec3           _emissiveFactor = glm::vec3(0); // TODO: is not lerpable?
 
             explicit Mesh(ElementType const & mesh)
                 : _mesh(mesh)
@@ -377,6 +393,10 @@ namespace minire
         void deactiveChildrenAnimation(Node::Sptr);
 
         void invalidateGlobalTransform(Node::Sptr);
+
+        material::SkinningVector makeSkinningVector(Mesh const &) const;
+
+        void dump(Node const &, std::string const &, size_t = 0) const;
 
     private:
         Rasterizer                   & _rasterizer;

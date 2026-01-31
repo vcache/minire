@@ -67,7 +67,8 @@ namespace minire::utils
             MINIRE_INVARIANT((*_inputs)[index + 1] != (*_inputs)[index],
                              "bad keyframe with same inputs: {}", (*_inputs)[index]);
             float const duration = (*_inputs)[index + 1] - (*_inputs)[index];
-            float const normalTs = timestamp - (*_inputs)[index] / duration;
+            float const normalTs = (timestamp - (*_inputs)[index]) / duration;
+            assert(0.0f <= normalTs && normalTs <= 1.0f);
 
             switch(_interpolation)
             {

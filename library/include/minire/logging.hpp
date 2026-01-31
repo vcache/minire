@@ -1,10 +1,11 @@
 #pragma once
 
-#include <iostream> // for std::cout
-
 #include <minire/logging/formatters.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
+
+#include <iostream> // for std::cout
 
 namespace minire::logging
 {

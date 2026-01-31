@@ -1,16 +1,15 @@
 #pragma once
 
 #include <opengl/fbo.hpp>
-#include <opengl/program.hpp>
+#include <opengl/program-cache.hpp>
 #include <opengl/texture.hpp>
+#include <rasterizer/culled-objects.hpp>
 #include <utils/frustum.hpp>
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 #include <memory>
-
-namespace minire { class Scene; }
 
 namespace minire::rasterizer
 {
@@ -26,12 +25,13 @@ namespace minire::rasterizer
         using Sptr = std::shared_ptr<FlatShadowMap>;
 
         explicit FlatShadowMap(size_t size = 4096);
+        ~FlatShadowMap();
 
         // Returns light-space VP-matrix
-        glm::mat4 perform(Scene const &,
+        glm::mat4 perform(CulledPrimitives const &,
                           glm::vec3 const & lightPosition,
                           glm::vec3 const & lightDirection,
-                          utils::FrustumVertices const &); // TODO: FrustumVertices can be taken directly from Scene (just make it lazy)
+                          utils::FrustumVertices const &);
 
         opengl::Texture const & texture() const { return _texture; }
 
@@ -43,11 +43,12 @@ namespace minire::rasterizer
                           utils::FrustumVertices const &) const;
 
     private:
+        class Programs;
+        using ProgramsUptr = std::unique_ptr<Programs>;
+
         size_t const    _size;
+        ProgramsUptr    _programs;
         opengl::Texture _texture;
-        opengl::Program _program;
         opengl::FBO     _fbo;
-        GLint           _bznkLightMatrix = 0;
-        GLint           _bznkModelMatrix = 0;
     };
 }

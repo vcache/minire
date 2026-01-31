@@ -12,6 +12,7 @@
 
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace minire::content { class Manager; }
@@ -38,12 +39,23 @@ namespace minire::rasterizer
                   glm::vec3 const & ambientLight,
                   glm::vec3 const & emissiveFactor,
                   material::TextureRefs const & directionalLightsShadowMaps,
-                  material::TextureRefs const & pointLightsShadowMaps) const;
+                  material::TextureRefs const & pointLightsShadowMaps,
+                  material::SkinningVector const & skinningVector) const;
 
         // Position attrib is guaranteed to be at index 0.
         void drawBare() const;
 
         utils::Aabb const & aabb() const { return _aabb; }
+
+    public:
+        using PrimitiveTraits = std::tuple<models::MeshFeatures const &,
+                                           material::Program::Locations const &>;
+
+        size_t primitives() const { return _primitives.size(); }
+
+        PrimitiveTraits primitiveTraits(size_t const primitiveIndex) const;
+
+        void drawBare(size_t const primitiveIndex) const;
 
     private:
         struct Material
@@ -63,9 +75,15 @@ namespace minire::rasterizer
             // (!) Despite that, other owners  MUST  guarantee, that mesh alternations
             // will be done in a compatible with an initially given attrib locations way!
             std::shared_ptr<opengl::VertexBuffer> _buffer;
+            models::MeshFeatures const            _meshFeatures;
+            material::Program::Locations const    _attribLocations;
 
-            explicit Primitive(std::shared_ptr<opengl::VertexBuffer> buffer)
+            explicit Primitive(std::shared_ptr<opengl::VertexBuffer> buffer,
+                               models::MeshFeatures const & meshFeatures,
+                               material::Program::Locations const & attribLocations)
                 : _buffer(std::move(buffer))
+                , _meshFeatures(meshFeatures)
+                , _attribLocations(attribLocations)
             {}
         };
 

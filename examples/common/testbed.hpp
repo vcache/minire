@@ -14,6 +14,8 @@
 
 #include <glm/gtc/quaternion.hpp> // for quatLookAt
 
+#include <cstdlib> // for EXIT_SUCCESS
+
 namespace minire::examples
 {
     static constexpr auto kFontFace = "ucs-6x13-example";
@@ -81,7 +83,7 @@ namespace minire::examples
                                   Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))),
                                   true);
             enqueue<SceneNewDirectionalLight>("sun", ScenePath{"directlight-node"},
-                                              DirectionalLight(glm::vec3(0, 10, 0), ShadowParams{}),
+                                              DirectionalLight(glm::vec3(0, 10, 0), ShadowParams{4096, false}),
                                               _isDirectLightEnabled);
 
             enqueue<SceneNewNode>("pointlight-node", ScenePath(),

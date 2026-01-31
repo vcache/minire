@@ -62,6 +62,7 @@ namespace minire::events
                                     controller::SceneSetPerspectiveCamera,
                                     controller::SceneSetOrthographicCamera,
                                     controller::SceneSetMeshEmissiveFactor,
+                                    controller::SceneSetMeshSkin,
                                     controller::SceneNewAnimationSet,
                                     controller::ScenePlayAnimation,
                                     controller::SceneStopAnimation,

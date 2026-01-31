@@ -16,6 +16,7 @@
 
 #include <array>
 #include <cassert>
+#include <limits>
 
 namespace minire::rasterizer::materials
 {
@@ -42,6 +43,7 @@ namespace minire::rasterizer::materials
             result += features.hasUv() ? "UV/" : "";
             result += features.hasNormal() ? "N/" : "";
             result += features.hasTangent() ? "T/" : "";
+            result += features.hasSkin() ? "S/" : "";
 
             result += pbrModel._albedoTexture ? "A:TF/" : "A:F/";
             result += pbrModel._metallicTexture ? fmt::format("M:T{}F/", static_cast<int>(pbrModel._metallicTextureComponent))
@@ -75,6 +77,14 @@ namespace minire::rasterizer::materials
         , _emissiveTexture(textures.get(pbrModel._emissiveTexture, pbrModel._emissiveSampler))
         , _emissiveFactor(pbrModel._emissiveFactor)
     {}
+
+    void PbrInstance::setUniform(size_t value, opengl::Program const & glProgram,
+                                 GLint location)
+    {
+        assert(location != -1);
+        assert(value <= std::numeric_limits<GLuint>::max());
+        glProgram.setUniform(location, static_cast<GLuint>(value));
+    }
 
     void PbrInstance::setUniform(float value, opengl::Program const & glProgram,
                                  GLint location)
@@ -111,13 +121,23 @@ namespace minire::rasterizer::materials
                                     glm::vec3 const & ambientLight,
                                     glm::vec3 const & emissiveFactor,
                                     material::TextureRefs const & directionalLightsShadowMaps,
-                                    material::TextureRefs const & pointLightsShadowMaps) const
+                                    material::TextureRefs const & pointLightsShadowMaps,
+                                    material::SkinningVector const & skinningVector) const
     {
         _program.use();
 
         // setup global states
 
-        _program.setUniform(_modelUniformLocation, modelTransform);
+        MINIRE_INVARIANT(skinningVector.empty() || (_bonesLocation >= 0 && _jointsAttribute >= 0),
+                         "mesh providev skinningVector while mesh's program doesn't");
+
+        if (_modelUniformLocation != -1)
+        {
+            assert(skinningVector.empty());
+            assert(_bonesLocation == -1);
+            _program.setUniform(_modelUniformLocation, modelTransform);
+        }
+
         _program.setUniform(_ambientLightUniformLocation, ambientLight);
 
         // setup mappers
@@ -197,6 +217,15 @@ namespace minire::rasterizer::materials
         }
         _program.setUniform(_pointLightsShadowMaps, pointLightsSamplers);
 
+        // data for skinning
+        if (!skinningVector.empty())
+        {
+            assert(skinningVector.size() <= rasterizer::Constants::kMaxBones);
+            assert(_bonesLocation != -1);
+            assert(_modelUniformLocation == -1);
+            _program.setUniform(_bonesLocation, skinningVector);
+        }
+
         // sanity check
         MINIRE_INVARIANT(texUnit <= GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS,
                          "rendering required {} texture units, while only {} avalilable",
@@ -211,6 +240,8 @@ namespace minire::rasterizer::materials
             ._uvAttribute = _uvAttribute,
             ._normalAttribute = _normalAttribute,
             ._tangentAttribute = _tangentAttribute,
+            ._jointsAttribute = _jointsAttribute,
+            ._weightsAttribute = _weightsAttribute,
         };
     }
 
@@ -244,6 +275,7 @@ namespace minire::rasterizer::materials
         {
             {"kHasUvs",              features.hasUv()},
             {"kHasTangents",         features.hasTangent()},
+            {"kHasSkins",            features.hasSkin()},
 
             {"kHasAlbedoTexture",    pbrModel._albedoTexture.has_value()},
             {"kHasMetallicTexture",  pbrModel._metallicTexture.has_value()},
@@ -259,6 +291,8 @@ namespace minire::rasterizer::materials
             {"kUboDatablock",        Ubo::interfaceBlock()},
             {"kMaxDirectionalLights",Ubo::maxDirectionalLights()},
             {"kMaxPointLights",      Ubo::maxPointLights()},
+
+            {"kMaxBones",            rasterizer::Constants::kMaxBones},
         };
 
         // Init template render
@@ -266,6 +300,8 @@ namespace minire::rasterizer::materials
         inja::Environment env;
         env.include_template("shaders/pbr-kit.incl",
                              env.parse(Constants::kPbrKit));
+        env.include_template("shaders/model-skinning-kit.incl",
+                             env.parse(Constants::kModelSkinningKit));
 
         // Render the shaders
 
@@ -306,21 +342,24 @@ namespace minire::rasterizer::materials
         result->_directionalLightsShadowMaps = result->_program.getUniformLocation("bznkDirectionalLightsShadowMaps");
         result->_pointLightsShadowMaps = result->_program.getUniformLocation("bznkPointLightsShadowMaps");
 
-        result->_modelUniformLocation = result->_program.getUniformLocation("bznkModel");
-        assert(result->_modelUniformLocation != -1);
+        result->_modelUniformLocation = !features.hasSkin() ? result->_program.getUniformLocation("bznkModel") : -1;
+        assert(features.hasSkin() || result->_modelUniformLocation != -1);
 
         result->_ambientLightUniformLocation = result->_program.getUniformLocation("bznkAmbientLight");
         assert(result->_ambientLightUniformLocation != -1);
 
+        result->_bonesLocation = features.hasSkin() ? result->_program.getUniformLocation("bznkBones") : -1;
+        assert(!features.hasSkin() || result->_bonesLocation != -1);
+
         result->_positionAttribute = result->_program.getAttribLocation("bznkVertex");
-        MINIRE_INVARIANT(result->_positionAttribute == 0,
-                         "by convention, bznkVertex's attrib MUST have index 0, while actual value is {}",
-                         result->_positionAttribute);
         assert(result->_positionAttribute != -1);
 
         result->_uvAttribute = features.hasUv() ? result->_program.getAttribLocation("bznkUv") : -1;
         result->_normalAttribute = features.hasNormal() ? result->_program.getAttribLocation("bznkNormal") : -1;
         result->_tangentAttribute = features.hasTangent() ? result->_program.getAttribLocation("bznkTangent") : -1;
+        result->_jointsAttribute = features.hasSkin() ? result->_program.getAttribLocation("bznkJoints") : -1;
+        result->_weightsAttribute = features.hasSkin() ? result->_program.getAttribLocation("bznkWeights") : -1;
+        assert(!features.hasSkin() || (result->_jointsAttribute >= 0 && result->_weightsAttribute >= 0));
 
         return result;
     }

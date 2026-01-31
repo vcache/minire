@@ -9,7 +9,8 @@ namespace minire::opengl
 {
     GLuint Program::_used = 0;
 
-    Program::Program(std::vector<Shader::Sptr> shaders)
+    Program::Program(std::vector<Shader::Sptr> shaders,
+                     AttribLocations const & bindAttribLocations)
         : _shaders(std::move(shaders))
         , _id(0)
     {
@@ -37,6 +38,12 @@ namespace minire::opengl
                 }
 
                 MINIRE_GL(glAttachShader, _id, shaderId);
+            }
+
+            // Maybe bind attrib locations (if any)
+            for(auto const & [name, location] : bindAttribLocations)
+            {
+                MINIRE_GL(glBindAttribLocation, _id, location, name.c_str());
             }
 
             // Link the program

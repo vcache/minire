@@ -40,6 +40,7 @@ namespace minire::scene
             using BufferData = std::variant<
                 std::shared_ptr<std::vector<float> const>,
                 std::shared_ptr<std::vector<glm::vec3> const>,
+                std::shared_ptr<std::vector<glm::mat4> const>,
                 std::shared_ptr<std::vector<glm::quat> const>
             >;
 
@@ -47,9 +48,12 @@ namespace minire::scene
                                                             models::ScenePath>;
             using BufferDataCache = std::unordered_map<size_t /* accessor index */,
                                                        BufferData>;
+            using PendedSkins = std::unordered_map<models::ScenePath, /* mesh */
+                                                   size_t /* skin index in the glTF Model */>;
 
             NodeIndexToScenePath _nodeIndexToScenePath;
             BufferDataCache      _bufferDataCache;
+            PendedSkins          _pendedSkins;
         };
 
         models::Interpolation readInterpolation(std::string const & in)
@@ -136,14 +140,14 @@ namespace minire::scene
             }
         }
 
-        void instantiateGltfMesh(Scene & scene,
-                                 events::controller::SceneNewFromSource const & e,
-                                 ::tinygltf::Model const & model,
-                                 content::path::Component const & meshId)
+        models::ScenePath instantiateGltfMesh(Scene & scene,
+                                              events::controller::SceneNewFromSource const & e,
+                                              ::tinygltf::Model const & model,
+                                              content::path::Component const & meshId)
         {
             size_t const meshIndex = utils::getElementIndex(meshId, model.meshes, "mesh");
             ::tinygltf::Mesh const & mesh = model.meshes[meshIndex];
-            scene.handle(events::controller::SceneNewMesh
+            events::controller::SceneNewMesh const event
             {
                 ._id = mesh.name.empty() ? utils::newUuid() : mesh.name,
                 ._parent = e._parent,
@@ -155,7 +159,9 @@ namespace minire::scene
                     ._defaultMaterial = {},
                 },
                 ._visible = e._visible,
-            });
+            };
+            scene.handle(event);
+            return models::concat(event._parent, event._id);
         }
 
         // see ref at:
@@ -225,9 +231,11 @@ namespace minire::scene
                 ._visible = e._visible,
             };
             scene.handle(newNode);
-            auto [_, inserted] = context._nodeIndexToScenePath.emplace(
-                nodeIndex, models::concat(newNode._parent, newNode._id));
-            MINIRE_INVARIANT(inserted, "broken nodes network ({})", nodeIndex);
+            {
+                auto [_, inserted] = context._nodeIndexToScenePath.emplace(
+                    nodeIndex, models::concat(newNode._parent, newNode._id));
+                MINIRE_INVARIANT(inserted, "broken nodes network ({})", nodeIndex);
+            }
 
             // fill it with leafs
 
@@ -244,16 +252,25 @@ namespace minire::scene
                                       static_cast<size_t>(node.camera));
             }
 
+            models::ScenePath meshPath;
             if (node.mesh >= 0)
             {
-                instantiateGltfMesh(scene, subSource, model,
-                                    static_cast<size_t>(node.mesh));
+                meshPath = instantiateGltfMesh(scene, subSource, model,
+                                               static_cast<size_t>(node.mesh));
             }
 
             if (node.light >= 0)
             {
                 instantiateGltfLight(scene, subSource, model,
                                      static_cast<size_t>(node.light));
+            }
+
+            if (node.skin >= 0)
+            {
+                MINIRE_INVARIANT(node.mesh >= 0, "cannot have a Skin without a Mesh");
+                MINIRE_INVARIANT(!meshPath.empty(), "expected to have a valid mesh path");
+                auto [_, inserted] = context._pendedSkins.emplace(meshPath, static_cast<size_t>(node.skin));
+                MINIRE_INVARIANT(inserted, "failed to enqueue skin #{} for {}", node.skin, meshPath);
             }
 
             // fill it with subnode
@@ -368,7 +385,8 @@ namespace minire::scene
 
                 // upload animations
                 scene.handle(events::controller::SceneNewAnimationSet{
-                    subSource._parent, std::move(animationSet)});
+                    subSource._parent, std::move(animationSet)
+                });
             }
         }
 
@@ -391,6 +409,76 @@ namespace minire::scene
             {
                 MINIRE_INVARIANT(nodeIndex >= 0, "bad node index ({}): {}", nodeIndex, e._source);
                 instantiateGltfNode(scene, e, model, static_cast<size_t>(nodeIndex), true, context);
+            }
+        }
+
+        void attachPendedSkins(Scene & scene, ::tinygltf::Model const & model,
+                               Context & context)
+        {
+            for (auto const & [meshPath, skinIndex] : context._pendedSkins)
+            {
+                // fetch the skin data
+                MINIRE_INVARIANT(skinIndex < model.skins.size(), "bad skin index ({} >= {})",
+                                 skinIndex, model.skins.size());
+                ::tinygltf::Skin const & skin = model.skins[skinIndex];
+
+                // find a 'skeleton' node (if any)
+                std::optional<models::ScenePath> origin;
+                if (skin.skeleton >= 0)
+                {
+                    auto it = context._nodeIndexToScenePath.find(static_cast<size_t>(skin.skeleton));
+                    MINIRE_INVARIANT(it != context._nodeIndexToScenePath.cend(),
+                                     "skeleton node #{} of Skin \"{}\" isn't instantiated",
+                                     skin.skeleton, skin.name);
+                    origin = it->second;
+                }
+
+                // fetch a list of Inverse Bind Matrices
+                std::shared_ptr<std::vector<glm::mat4> const> inverseBindMatrices;
+                if (skin.inverseBindMatrices >= 0)
+                {
+                    inverseBindMatrices = readAccessor<glm::mat4>(skin.inverseBindMatrices, model, context);
+                    MINIRE_INVARIANT(inverseBindMatrices, "inverseBindMatrices is broken");
+                    // NOTE: The number of elements of the accessor referenced
+                    //       by inverseBindMatrices MUST greater than or equal
+                    //       to the number of joints elements.
+                    MINIRE_INVARIANT(inverseBindMatrices->size() >= skin.joints.size(),
+                                     "inverseBindMatrices too short ({} < {})",
+                                     inverseBindMatrices->size(), skin.joints.size());
+                }
+
+                // load skin's bones
+                models::MeshSkin::Bones bones;
+                bones.reserve(skin.joints.size());
+                for(size_t i = 0; i < skin.joints.size(); ++i)
+                {
+                    MINIRE_INVARIANT(skin.joints[i] >= 0, "bad joint index: #{}: {}",
+                                     i, skin.joints[i]);
+                    size_t const jointIndex = static_cast<size_t>(skin.joints[i]);
+                    auto it = context._nodeIndexToScenePath.find(jointIndex);
+                    MINIRE_INVARIANT(it != context._nodeIndexToScenePath.cend(),
+                                     "joint node (id = {}) of Skin \"{}\" isn't instantiated",
+                                     jointIndex, skin.name);
+
+                    // NOTE: it is essential to keep bones order as in skins.joints!
+                    bones.emplace_back(models::MeshSkin::Bone
+                    {
+                        ._inverseBindMatrix = inverseBindMatrices ? (*inverseBindMatrices)[i]
+                                                                  : glm::identity<glm::mat4>(), // TODO: maybe mat4(0)?
+                        ._jointNode = it->second,
+                    });
+                }
+
+                // upload to the scene
+                scene.handle(events::controller::SceneSetMeshSkin
+                {
+                    ._item = meshPath,
+                    ._attribute = models::MeshSkin
+                    {
+                        ._origin = origin,
+                        ._bones = bones,
+                    },
+                });
             }
         }
     }
@@ -459,5 +547,7 @@ namespace minire::scene
                     MINIRE_THROW("vertex-buffer cannot be a part of gLTF collection: {}", path);
             }
         }
+
+        attachPendedSkins(scene, *gltf, context);
     }
 }

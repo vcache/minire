@@ -20,6 +20,9 @@ namespace minire::rasterizer::materials
         explicit PbrInstance(models::PbrMaterial const &,
                              Textures const & textures);
 
+        static void setUniform(size_t, opengl::Program const &,
+                               GLint location);
+
         static void setUniform(float, opengl::Program const &,
                                GLint location);
 
@@ -60,7 +63,8 @@ namespace minire::rasterizer::materials
                             glm::vec3 const & ambientLight,
                             glm::vec3 const & emissiveFactor,
                             material::TextureRefs const & directionalLightsShadowMaps,
-                            material::TextureRefs const & pointLightsShadowMaps) const override;
+                            material::TextureRefs const & pointLightsShadowMaps,
+                            material::SkinningVector const & skinningVector) const override;
 
         opengl::Program const & glProgram() const override { return _program; }
 
@@ -101,13 +105,19 @@ namespace minire::rasterizer::materials
         GLint _directionalLightsShadowMaps = -1;
         GLint _pointLightsShadowMaps = -1;
 
+        GLint _modelUniformLocation = -1;
+        GLint _ambientLightUniformLocation = -1;
+
+        GLint _bonesLocation = -1;
+
+        // Attributes
+
         GLint _positionAttribute = -1;
         GLint _uvAttribute = -1;
         GLint _normalAttribute = -1;
         GLint _tangentAttribute = -1;
-
-        GLint _modelUniformLocation = -1;
-        GLint _ambientLightUniformLocation = -1;
+        GLint _jointsAttribute = -1;
+        GLint _weightsAttribute = -1;
 
         friend class PbrFactory;
     };

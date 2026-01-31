@@ -23,6 +23,7 @@ namespace minire::opengl { class Texture; }
 namespace minire::material
 {
     using TextureRefs = std::vector<opengl::Texture const *>;
+    using SkinningVector = std::vector<glm::mat4>;
 
     /**
      * This class is exposed to the user and it contains
@@ -74,24 +75,29 @@ namespace minire::material
                                     glm::vec3 const & ambientLight,
                                     glm::vec3 const & emissiveFactor,
                                     TextureRefs const & directionalLightsShadowMaps,
-                                    TextureRefs const & pointLightsShadowMaps) const = 0;
+                                    TextureRefs const & pointLightsShadowMaps,
+                                    SkinningVector const & skinningVector) const = 0;
 
         virtual opengl::Program const & glProgram() const = 0;
 
         // TODO: assert int == GLint
         struct Locations
         {
-            int _vertexAttribute; // NOTE: must always be 0
-            int _uvAttribute;
-            int _normalAttribute;
-            int _tangentAttribute;
+            int _vertexAttribute  = -1;
+            int _uvAttribute      = -1;
+            int _normalAttribute  = -1;
+            int _tangentAttribute = -1;
+            int _jointsAttribute  = -1;
+            int _weightsAttribute = -1;
 
             // NOTE: note the std::hash<Locations>
 
             bool operator==(Locations const & o) const
             {
-                return std::tie(  _vertexAttribute,   _uvAttribute,   _normalAttribute,   _tangentAttribute)
-                    == std::tie(o._vertexAttribute, o._uvAttribute, o._normalAttribute, o._tangentAttribute);
+                return std::tie(  _vertexAttribute,    _uvAttribute,       _normalAttribute,
+                                  _tangentAttribute,   _jointsAttribute,   _weightsAttribute)
+                    == std::tie(o._vertexAttribute,  o._uvAttribute,     o._normalAttribute,
+                                o._tangentAttribute, o._jointsAttribute, o._weightsAttribute);
             }
         };
 
@@ -126,10 +132,12 @@ namespace std
         size_t operator()(::minire::material::Program::Locations const & v) const
         {
             size_t result = 0;
-            boost::hash_combine(result, std::hash<int>{}(v._vertexAttribute));
-            boost::hash_combine(result, std::hash<int>{}(v._uvAttribute));
-            boost::hash_combine(result, std::hash<int>{}(v._normalAttribute));
-            boost::hash_combine(result, std::hash<int>{}(v._tangentAttribute));
+            boost::hash_combine(result, v._vertexAttribute);
+            boost::hash_combine(result, v._uvAttribute);
+            boost::hash_combine(result, v._normalAttribute);
+            boost::hash_combine(result, v._tangentAttribute);
+            boost::hash_combine(result, v._jointsAttribute);
+            boost::hash_combine(result, v._weightsAttribute);
             return result;
         }
     };

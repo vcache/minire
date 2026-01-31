@@ -1,12 +1,13 @@
 #include <scene.hpp>
 
 #include <rasterizer.hpp>
+#include <rasterizer/constants.hpp>
+#include <utils/overloaded.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 #include <minire/utils/demangle.hpp>
 #include <minire/utils/geometry.hpp>
-#include <utils/overloaded.hpp>
 
 #include <fmt/ranges.h>
 
@@ -341,6 +342,33 @@ namespace minire
         mesh->_emissiveFactor = e._attribute;
     }
 
+    void Scene::handle(events::controller::SceneSetMeshSkin const & e)
+    {
+        auto mesh = find<MeshLeaf::Sptr>(e._item);
+        assert(mesh);
+
+        models::MeshSkin::Bones const & bones = e._attribute._bones;
+        mesh->_skinBones.clear();
+        mesh->_skinBones.reserve(bones.size());
+
+        MINIRE_INVARIANT(bones.size() <= rasterizer::Constants::kMaxBones,
+                         "a mesh {} contains to many bones: {}, limit is {}",
+                         e._item, bones.size(), rasterizer::Constants::kMaxBones);
+
+        for(models::MeshSkin::Bone const & boneModel : bones)
+        {
+            mesh->_skinBones.emplace_back(Mesh::SkinBone
+            {
+                ._inverseBindMatrix = boneModel._inverseBindMatrix,
+                ._node = find<Node::Sptr>(boneModel._jointNode),
+            });
+            assert(!mesh->_skinBones.back()._node.expired());
+        }
+
+        mesh->_skinOrigin = e._attribute._origin ? find<Node::Sptr>(*e._attribute._origin)
+                                                 : Node::Wptr();
+    }
+
     void Scene::handle(events::controller::SceneNewAnimationSet const & e)
     {
         Node::Sptr containerNode = find<Node::Sptr>(e._containerNode);
@@ -362,7 +390,8 @@ namespace minire
             animationTracksSptr->reserve(animationTracks.size());
             for(auto const & [targetScenePath, keyframeAnimation] : animationTracks)
             {
-                Node::Sptr targetNode = find<Node::Sptr>(models::concat(e._containerNode, targetScenePath));
+                models::ScenePath targetNodePath = models::concat(e._containerNode, targetScenePath);
+                Node::Sptr targetNode = find<Node::Sptr>(targetNodePath);
                 assert(targetNode);
                 animationTracksSptr->emplace_back(AnimationTrack
                 {
@@ -576,7 +605,6 @@ namespace minire
                 // update transformation
                 assert(activeAnimation._animationTracks);
                 assert(activeAnimation._animationSequencers.size() == activeAnimation._animationTracks->size());
-
                 for(size_t i = 0; i < activeAnimation._animationTracks->size(); ++i)
                 {
                     AnimationTrack const & animationTrack = (*activeAnimation._animationTracks)[i];
@@ -793,6 +821,21 @@ namespace minire
             // mark node as clean
             node->_globalTransformState = Node::GlobalTransformState::kClean;
         }
+
+        //dump(*_root, "(root)");
+    }
+
+    void Scene::dump(Scene::Node const & node, std::string const & id, size_t level) const
+    {
+        MINIRE_INFO(">{}{}: {}", std::string(level*2, ' '), id, node._globalTransform);
+        for(auto const & [childId, child] : node._children)
+        {
+            if (auto const * childSptr = std::get_if<Node::Sptr>(&child);
+                childSptr && *childSptr)
+            {
+                dump(**childSptr, childId, level + 1);
+            }
+        }
     }
 
     void Scene::actualizeViewpoint()
@@ -824,5 +867,31 @@ namespace minire
                 }
             },
         }, _activeCamera);
+    }
+
+    material::SkinningVector Scene::makeSkinningVector(Mesh const & mesh) const
+    {
+        static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
+
+        material::SkinningVector result;
+        result.reserve(mesh._skinBones.size());
+
+        for(Mesh::SkinBone const & skinBone : mesh._skinBones)
+        {
+            if (Node::Sptr node = skinBone._node.lock();
+                node && node->hasGlobalTransform())
+            {
+                result.emplace_back(node->_globalTransform * skinBone._inverseBindMatrix);
+            }
+            else
+            {
+                // TODO: add more debug info
+                result.emplace_back(kIdentityMatrix);
+                MINIRE_WARNING("skinBone refers to a non-existing Node or "
+                               "its's global transform isn't clear");
+            }
+        }
+
+        return result;
     }
 }

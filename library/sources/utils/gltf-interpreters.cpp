@@ -31,7 +31,12 @@ namespace minire::utils
         constexpr static std::string kTexCoord0 = "TEXCOORD_0";
         constexpr static std::string kTexCoord1 = "TEXCOORD_1";
         constexpr static std::string kColor0 = "COLOR_0";
-        // TODO: JOINTS_n, and WEIGHTS_n.
+        constexpr static std::string kJoints0 = "JOINTS_0";
+        constexpr static std::string kWeights0 = "WEIGHTS_0";
+        constexpr static std::string kJoints1 = "JOINTS_1";
+        constexpr static std::string kWeights1 = "WEIGHTS_1";
+
+        //  TODO: support TEXCOORD_n, COLOR_n, JOINTS_n, WEIGHTS_n for n > 0
 
         GLenum gltfModeToGlMode(int gltfMode)
         {
@@ -401,7 +406,9 @@ namespace minire::utils
                                                 int vtxAttribIndex,
                                                 int uvAttribIndx,
                                                 int normAttrib,
-                                                int tangentAttrib)
+                                                int tangentAttrib,
+                                                int jointsAttribute,
+                                                int weightsAttribute)
         {
             opengl::VertexBuffer result;
 
@@ -423,11 +430,14 @@ namespace minire::utils
 
             // Vertex buffer and attributes
 
-            using Attribs = std::initializer_list<std::tuple<std::string const &, int>>;
-            for(auto const & [accessorName, attribIndex] : Attribs {{kPosition, vtxAttribIndex},
-                                                                    {kTexCoord0, uvAttribIndx},
-                                                                    {kNormal, normAttrib},
-                                                                    {kTangent, tangentAttrib}})
+            using Attribs = std::initializer_list<std::tuple<std::string const &, int, bool>>;
+            for(auto const & [accessorName, attribIndex, isIntegerType] : Attribs {
+                {kPosition, vtxAttribIndex, false},
+                {kTexCoord0, uvAttribIndx, false},
+                {kNormal, normAttrib, false},
+                {kTangent, tangentAttrib, false},
+                {kJoints0, jointsAttribute, true},
+                {kWeights0, weightsAttribute, false}})
             {
                 if (attribIndex == -1) continue;
 
@@ -435,7 +445,7 @@ namespace minire::utils
                 auto const & [accessor, bufferView] = createVbo(model, accessorIndex, GL_ARRAY_BUFFER, result, false);
 
                 MINIRE_INVARIANT(accessor.sparse.count == 0 && !accessor.sparse.isSparse,
-                                "sparse accessors aren't yet supported");
+                                 "sparse accessors aren't yet supported");
 
                 if (accessorName == kPosition)
                 {
@@ -443,11 +453,21 @@ namespace minire::utils
                 }
 
                 result._vao->enableAttrib(attribIndex);
-                result._vao->attribPointer(attribIndex,
-                                           ::tinygltf::GetNumComponentsInType(accessor.type),
-                                           gltfComponentTypeToGlType(accessor.componentType),
-                                           accessor.normalized ? GL_TRUE : GL_FALSE,
-                                           bufferView.byteStride, accessor.byteOffset);
+                if (isIntegerType)
+                {
+                    result._vao->attribIPointer(attribIndex,
+                                                ::tinygltf::GetNumComponentsInType(accessor.type),
+                                                gltfComponentTypeToGlType(accessor.componentType),
+                                                bufferView.byteStride, accessor.byteOffset);
+                }
+                else
+                {
+                    result._vao->attribPointer(attribIndex,
+                                               ::tinygltf::GetNumComponentsInType(accessor.type),
+                                               gltfComponentTypeToGlType(accessor.componentType),
+                                               accessor.normalized ? GL_TRUE : GL_FALSE,
+                                               bufferView.byteStride, accessor.byteOffset);
+                }
             }
 
             result._drawMode = gltfModeToGlMode(primitive.mode);
@@ -484,18 +504,29 @@ namespace minire::utils
 
             // TODO: (from a gLTF spec) When normals are not specified, client implementations MUST
             //       calculate flat normals and the provided tangents (if present) MUST be ignored.
-            MINIRE_INVARIANT(primitive.attributes.contains(kNormal),
+            auto const & attributes = primitive.attributes;
+            MINIRE_INVARIANT(attributes.contains(kNormal),
                              "Meshes without normals are not yet supported.");
 
-            MINIRE_INVARIANT(!primitive.attributes.contains(kTexCoord1),
+            MINIRE_INVARIANT(!attributes.contains(kTexCoord1),
                              "the support of TEXCOORD_1 and more isn't yet implemented");
 
-            MINIRE_INVARIANT(!primitive.attributes.contains(kColor0),
+            MINIRE_INVARIANT(!attributes.contains(kColor0),
                              "the support of COLOR_* attributes aren't yet implemented");
 
-            models::MeshFeatures meshFeatures(primitive.attributes.contains(kTexCoord0),
-                                              primitive.attributes.contains(kNormal),
-                                              primitive.attributes.contains(kTangent));
+            MINIRE_INVARIANT(!attributes.contains(kJoints1),
+                             "the support of JOINTS_1 and more isn't yet implemented");
+
+            MINIRE_INVARIANT(!attributes.contains(kWeights1),
+                             "the support of WEIGHTS_1 and more isn't yet implemented");
+
+            MINIRE_INVARIANT(attributes.contains(kJoints0) == attributes.contains(kWeights0),
+                             "JOINTS_0 cannot persists without WEIGHTS_0 (and vice-versa)");
+
+            models::MeshFeatures meshFeatures(attributes.contains(kTexCoord0),
+                                              attributes.contains(kNormal),
+                                              attributes.contains(kTangent),
+                                              attributes.contains(kJoints0));
 
             bool const hasMaterial = primitive.material >= 0;
             size_t materialIndex = hasMaterial ? static_cast<size_t>(primitive.material)
@@ -547,7 +578,9 @@ namespace minire::utils
                                                    locations._vertexAttribute,
                                                    locations._uvAttribute,
                                                    locations._normalAttribute,
-                                                   locations._tangentAttribute));
+                                                   locations._tangentAttribute,
+                                                   locations._jointsAttribute,
+                                                   locations._weightsAttribute));
         }
 
         return result;

@@ -9,7 +9,7 @@ namespace minire::models
     ScenePath concat(ScenePath const & a, ScenePath const & b)
     {
         ScenePath result = a;
-        result.insert(a.end(), b.begin(), b.end());
+        result.insert(result.end(), b.begin(), b.end());
         return result;
     }
 

@@ -21,7 +21,7 @@ namespace minire::rasterizer
             bool const hasUv = !std::holds_alternative<std::monostate>(vertexBuffer._uvs);
             bool const hasNormal = !std::holds_alternative<std::monostate>(vertexBuffer._normals);
             bool const hasTangent = !std::holds_alternative<std::monostate>(vertexBuffer._tangents);
-            return models::MeshFeatures(hasUv, hasNormal, hasTangent);
+            return models::MeshFeatures(hasUv, hasNormal, hasTangent, false);
         }
 
         struct VertexBufferData

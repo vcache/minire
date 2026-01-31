@@ -39,7 +39,7 @@ namespace minire::utils
 
     models::MeshFeatures getMeshFeatures(formats::Obj const & obj)
     {
-        return models::MeshFeatures(obj.haveUvs(), obj.haveNormals(), false);
+        return models::MeshFeatures(obj.haveUvs(), obj.haveNormals(), false, false);
     }
 
     opengl::VertexBuffer createVertexBuffer(formats::Obj const & mesh,

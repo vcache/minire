@@ -480,6 +480,11 @@ namespace minire
         _scene->handle(e);
     }
 
+    void Application::handle(events::controller::SceneSetMeshSkin const & e)
+    {
+        _scene->handle(e);
+    }
+
     void Application::handle(events::controller::SceneSetParent const & e)
     {
         _scene->handle(e);
@@ -656,8 +661,7 @@ namespace minire
         if (performLerp)
         {
             instrumentation::Stopwatch<> stopwatch("scene-lerping", _timekeeper);
-            assert(!_controllerEvents.empty());
-            double const duration = _controllerEvents.front()._duration;
+            double const duration = !_controllerEvents.empty() ? _controllerEvents.front()._duration : 0;
             double const weight = duration != 0 ? _batchPlayed / duration : 1.0;
             assert(weight >= 0);
             _scene->lerp(weight, _epochNumber);

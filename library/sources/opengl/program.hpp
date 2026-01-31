@@ -9,8 +9,10 @@
 
 #include <array>
 #include <cassert>
-#include <vector>
 #include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace minire::opengl
 {
@@ -22,7 +24,10 @@ namespace minire::opengl
     public:
         using Sptr = std::shared_ptr<Program>;
 
-        explicit Program(std::vector<Shader::Sptr>);
+        using AttribLocations = std::unordered_map<std::string, GLuint>;
+
+        explicit Program(std::vector<Shader::Sptr>,
+                         AttribLocations const & bindAttribLocations = {});
         ~Program();
 
         Program(Program &&);
@@ -73,6 +78,12 @@ namespace minire::opengl
             MINIRE_GL(glUniform1i, location, value);
         }
 
+        void setUniform(GLint location, GLuint value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniform1ui, location, value);
+        }
+
         void setUniform(GLint location, float value) const
         {
             assert(isUsing());
@@ -98,11 +109,21 @@ namespace minire::opengl
         }
 
         template<size_t kItems>
-        void setUniform(GLint location, std::array<glm::mat4, kItems> const & value) const
+        void setUniform(GLint location, std::array<glm::mat4, kItems> const & value,
+                        GLsizei const count = kItems) const
         {
             static_assert(kItems > 0, "number of matrices must be non-zero");
             assert(isUsing());
-            MINIRE_GL(glUniformMatrix4fv, location, kItems, GL_FALSE, glm::value_ptr(value[0]));
+            assert(count >= 0);
+            assert(static_cast<size_t>(count) <= kItems);
+            MINIRE_GL(glUniformMatrix4fv, location, count, GL_FALSE, glm::value_ptr(value[0]));
+        }
+
+        void setUniform(GLint location, std::vector<glm::mat4> const & value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniformMatrix4fv, location, value.size(), GL_FALSE,
+                      glm::value_ptr(value[0]));
         }
 
         template<size_t kItems>

@@ -96,9 +96,10 @@ namespace minire::events::controller
     using SceneSetPerspectiveCamera = impl::SceneItemModifier<models::PerspectiveCamera>;
     using SceneSetOrthographicCamera = impl::SceneItemModifier<models::OrthographicCamera>;
 
-    // Special effects
+    // Mesh attributes
 
     using SceneSetMeshEmissiveFactor = impl::SceneItemModifier<glm::vec3>;
+    using SceneSetMeshSkin = impl::SceneItemModifier<models::MeshSkin>;
 
     // Animations
 

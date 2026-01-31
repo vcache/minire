@@ -2,33 +2,52 @@
 
 #include <opengl.hpp>
 #include <opengl/shader.hpp>
+#include <rasterizer/constants.hpp>
 #include <rasterizer/mesh.hpp>
+#include <rasterizer/shadow-map-program-key.hpp>
 #include <scene.hpp>
 
 #include <minire/errors.hpp>
 
 #include <glm/gtx/transform.hpp>
 #include <glm/mat4x4.hpp>
+#include <inja/inja.hpp>
 
 #include <array>
 #include <limits>
+#include <tuple>
 
 namespace minire::rasterizer
 {
-    namespace
+    class CubeShadowMap::Programs
+        : public opengl::ProgramCache<ShadowMapProgramKey>
     {
+    public:
+        constexpr static size_t kLightMatrix = 0;
+        constexpr static size_t kModelMatrix = 1;
+        constexpr static size_t kBonesMatrices = 2;
+        constexpr static size_t kShadowMatrices = 3;
+        constexpr static size_t kLightPos = 4;
+        constexpr static size_t kFarPlane = 5;
+
+        Programs()
+            : ProgramCache({kLightMatrix, kModelMatrix, kBonesMatrices,
+                            kShadowMatrices, kLightPos, kFarPlane})
+        {}
+
+    private:
         static constexpr auto kVertShader =
         R"(
             #version 330 core
 
-            // The location of this attrib is guaranteed by an internal convention.
-            layout (location = 0) in vec3 bznkVertex;
+            in vec3 bznkVertex;
 
-            uniform mat4 bznkModelMatrix;
+            {% include "shaders/model-skinning-kit.incl" %}
 
             void main()
             {
-                gl_Position = bznkModelMatrix * vec4(bznkVertex, 1.0);
+                mat4 effectiveModel = getEffectiveModelMatrix();
+                gl_Position = effectiveModel * vec4(bznkVertex, 1.0);
             }
         )";
 
@@ -56,7 +75,7 @@ namespace minire::rasterizer
                     }
                     EndPrimitive();
                 }
-            }  
+            }
         )";
 
         static constexpr auto kFragShader =
@@ -80,19 +99,67 @@ namespace minire::rasterizer
                 gl_FragDepth = lightDistance;
             }
         )";
-    }
+
+        Shaders renderShaders(ShadowMapProgramKey const & programKey) const override
+        {
+            inja::Environment env;
+            env.include_template("shaders/model-skinning-kit.incl",
+                                 env.parse(Constants::kModelSkinningKit));
+            nlohmann::json vars
+            {
+                {"kHasSkins", programKey.hasSkin()},
+                {"kMaxBones", rasterizer::Constants::kMaxBones},
+            };
+            std::string vertShader = env.render(kVertShader, vars);
+
+            Shaders::UniformCodes uniformCodes{kLightMatrix, kShadowMatrices, kLightPos, kFarPlane};
+            uniformCodes.emplace(programKey.hasSkin() ? kBonesMatrices : kModelMatrix);
+
+            assert(programKey._vertexLocation >= 0);
+            Shaders::AttribLocations attribLocations{{"bznkVertex", programKey._vertexLocation}};
+            if (programKey.hasSkin())
+            {
+                assert(programKey._jointsLocation >= 0);
+                assert(programKey._weightsLocation >= 0);
+                attribLocations.emplace("bznkJoints", programKey._jointsLocation);
+                attribLocations.emplace("bznkWeights", programKey._weightsLocation);
+            }
+
+            return Shaders
+            {
+                ._sources = Shaders::Sources
+                {
+                    {GL_VERTEX_SHADER, vertShader},
+                    {GL_FRAGMENT_SHADER, kFragShader},
+                    {GL_GEOMETRY_SHADER, kGeomShader},
+                },
+                ._uniformCodes = uniformCodes,
+                ._attribLocations = attribLocations,
+            };
+        }
+
+        std::string getUniformName(size_t const code) const override
+        {
+            switch(code)
+            {
+                case kLightMatrix: return "bznkLightMatrix";
+                case kModelMatrix: return "bznkModel";
+                case kBonesMatrices: return "bznkBones";
+                case kShadowMatrices: return "bznkShadowMatrices";
+                case kLightPos: return "bznkLightPos";
+                case kFarPlane: return "bznkFarPlane";
+                default: MINIRE_THROW("bad uniform code: {}", code);
+            }
+        }
+    };
+
+    // CubeShadowMap //
 
     CubeShadowMap::CubeShadowMap(size_t size)
         : _size(size)
+        , _programs(std::make_unique<Programs>())
         , _texture(GL_TEXTURE_CUBE_MAP)
-        , _program({std::make_shared<opengl::Shader>(GL_VERTEX_SHADER, kVertShader),
-                    std::make_shared<opengl::Shader>(GL_GEOMETRY_SHADER, kGeomShader),
-                    std::make_shared<opengl::Shader>(GL_FRAGMENT_SHADER, kFragShader)})
         , _fbo()
-        , _bznkModelMatrix(_program.getUniformLocation("bznkModelMatrix"))
-        , _bznkShadowMatrices(_program.getUniformLocation("bznkShadowMatrices"))
-        , _bznkLightPos(_program.getUniformLocation("bznkLightPos"))
-        , _bznkFarPlane(_program.getUniformLocation("bznkFarPlane"))
     {
         MINIRE_INVARIANT(size <= std::numeric_limits<GLsizei>::max(),
                          "too huge size: {}", size);
@@ -110,6 +177,8 @@ namespace minire::rasterizer
         MINIRE_GL(glTexParameteri, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         MINIRE_GL(glTexParameteri, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     }
+
+    CubeShadowMap::~CubeShadowMap() = default;
 
     namespace
     {
@@ -167,7 +236,7 @@ namespace minire::rasterizer
         }
     }
 
-    float CubeShadowMap::perform(Scene const & scene,
+    float CubeShadowMap::perform(CulledPrimitives const & primitives,
                                  glm::vec3 const & lightPosition,
                                  utils::FrustumVertices const & frustumVertices)
     {
@@ -185,25 +254,46 @@ namespace minire::rasterizer
         MINIRE_GL(glViewport, 0, 0, _size, _size);
         MINIRE_GL(glClear, GL_DEPTH_BUFFER_BIT);
 
-        // setup program and it's uniforms
+        // calculate planes and light VP
         auto const [near, far] = calcNearFar(frustumVertices);
         CubeVPs const lightVPs = buildVPs(lightPosition, near, far);
-        _program.use();
-        _program.setUniform(_bznkShadowMatrices, lightVPs);
-        _program.setUniform(_bznkLightPos, lightPosition);
-        _program.setUniform(_bznkFarPlane, far);
 
+        // collect programs
+        std::unordered_map<ShadowMapProgramKey, std::vector<CulledPrimitive const *>> drawQueue;
+        for(CulledPrimitive const & primitive : primitives)
+        {
+            auto const & [meshFeatures, attribLocations] =
+                primitive._mesh.primitiveTraits(primitive._primitiveIndex);
+            ShadowMapProgramKey programKey(meshFeatures, attribLocations);
+            drawQueue[programKey].emplace_back(&primitive);
+        }
+
+        // perform drawing commands
         MINIRE_GL(glActiveTexture, GL_TEXTURE0);
         _texture.bind();
 
-        // perform drawing commands
-        scene.cullModels(
-            [this] (Mesh const & mesh, glm::vec3 const & /*emissiveFactor*/,
-                    glm::mat4 const & transform)
+        for(auto const & [programKey, primitives] : drawQueue)
+        {
+            auto const & program = _programs->getUsingProgram(programKey);
+            program.setUniformByCode(Programs::kShadowMatrices, lightVPs);
+            program.setUniformByCode(Programs::kLightPos, lightPosition);
+            program.setUniformByCode(Programs::kFarPlane, far);
+
+            for(CulledPrimitive const * primitive : primitives)
             {
-                _program.setUniform(_bznkModelMatrix, transform);
-                mesh.drawBare();
-            });
+                assert(primitive);
+                if (programKey.hasSkin())
+                {
+                    assert(primitive->_skinningVector.size() <= rasterizer::Constants::kMaxBones);
+                    program.setUniformByCode(Programs::kBonesMatrices, primitive->_skinningVector);
+                }
+                else
+                {
+                    program.setUniformByCode(Programs::kModelMatrix, primitive->_transform);
+                }
+                primitive->_mesh.drawBare(primitive->_primitiveIndex);
+            }
+        }
 
         // tidy up
         _fbo.unbind();

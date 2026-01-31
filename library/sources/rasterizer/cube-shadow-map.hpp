@@ -1,15 +1,14 @@
 #pragma once
 
 #include <opengl/fbo.hpp>
-#include <opengl/program.hpp>
+#include <opengl/program-cache.hpp>
 #include <opengl/texture.hpp>
+#include <rasterizer/culled-objects.hpp>
 #include <utils/frustum.hpp>
 
 #include <glm/vec3.hpp>
 
 #include <memory>
-
-namespace minire { class Scene; }
 
 namespace minire::rasterizer
 {
@@ -26,19 +25,24 @@ namespace minire::rasterizer
 
         explicit CubeShadowMap(size_t size = 1024);
 
+        ~CubeShadowMap();
+
         // Return far plane value
-        float perform(Scene const &,
-                        glm::vec3 const & lightPosition,
-                        utils::FrustumVertices const &); // TODO: FrustumVertices can be taken directly from Scene (just make it lazy)
+        float perform(CulledPrimitives const &,
+                      glm::vec3 const & lightPosition,
+                      utils::FrustumVertices const &);
 
         opengl::Texture const & texture() const { return _texture; }
 
         size_t size() const { return _size; }
 
     private:
+        class Programs;
+        using ProgramsUptr = std::unique_ptr<Programs>;
+
         size_t const    _size;
+        ProgramsUptr    _programs;
         opengl::Texture _texture;
-        opengl::Program _program;
         opengl::FBO     _fbo;
         GLint           _bznkModelMatrix = 0;
         GLint           _bznkShadowMatrices = 0;

@@ -298,13 +298,34 @@ namespace minire::rasterizer
 
     )";
 
+    std::string Constants::kModelSkinningKit = R"(
+        {% if kHasSkins %}
+        in uvec4 bznkJoints;
+        in vec4 bznkWeights;
+
+        // pre-multiplied: globalTransform * inverseBindMatrix
+        uniform mat4 bznkBones[{{ kMaxBones }}];
+
+        mat4 getEffectiveModelMatrix()
+        {
+            return bznkWeights.x * bznkBones[bznkJoints.x]
+                 + bznkWeights.y * bznkBones[bznkJoints.y]
+                 + bznkWeights.z * bznkBones[bznkJoints.z]
+                 + bznkWeights.w * bznkBones[bznkJoints.w];
+        }
+        {% else %}
+        uniform mat4 bznkModel;
+        mat4 getEffectiveModelMatrix()
+        {
+            return bznkModel;
+        }
+        {% endif %}
+    )";
+
     std::string Constants::kPbrVertShader = R"(
         #version 330 core
 
-        // NOTE: position attrib must ALWAYS be 0-th,
-        //       otherwise, shadow mapping pass will fail
-        //       (because it expects this exact index).
-        layout (location = 0) in vec3 bznkVertex;
+        in vec3 bznkVertex;
 
         {% if kHasUvs %}
         in vec2 bznkUv;
@@ -319,27 +340,29 @@ namespace minire::rasterizer
         out mat3 bznkTbn;
         {% endif %}
 
+        {% include "shaders/model-skinning-kit.incl" %}
+
         out vec4 bznkWorldPos;
         out vec4 bznkDirectionalLightPos[{{ kMaxDirectionalLights }}];
-
-        uniform mat4 bznkModel;
 
         {{ kUboDatablock }}
 
         void main()
         {
-            bznkWorldPos = bznkModel * vec4(bznkVertex, 1.0);
+            mat4 effectiveModel = getEffectiveModelMatrix();
+
+            bznkWorldPos = effectiveModel * vec4(bznkVertex, 1.0);
             gl_Position = _viewProjection * bznkWorldPos;
 
             {% if kHasUvs %}
             bznkFragUv = bznkUv;
             {% endif %}
 
-            vec3 N = normalize(vec3(bznkModel * vec4(bznkNormal, 0.0)));
+            vec3 N = normalize(vec3(effectiveModel * vec4(bznkNormal, 0.0)));
             bznkFragNormal = N;
 
             {% if kHasTangents %}
-            vec3 T = normalize(vec3(bznkModel * vec4(bznkTangent, 0.0)));
+            vec3 T = normalize(vec3(effectiveModel * vec4(bznkTangent, 0.0)));
             T = normalize(T - dot(T, N) * N);
             vec3 B = cross(N, T);
             bznkTbn = mat3(T, B, N);

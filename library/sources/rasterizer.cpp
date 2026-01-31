@@ -161,15 +161,43 @@ namespace minire
         return result;
     }
 
+    rasterizer::CulledPrimitives
+    Rasterizer::cullPrimitives(Scene const & scene)
+    {
+        rasterizer::CulledPrimitives result;
+        // TODO: result.reserve
+        scene.cullModels(
+            [&result] (rasterizer::Mesh const & mesh,
+                       glm::vec3 const & emissiveFactor,
+                       glm::mat4 const & transform,
+                       material::SkinningVector && skinningVector)
+            {
+                for(size_t i = 0; i < mesh.primitives(); ++i)
+                {
+                    result.emplace_back(rasterizer::CulledPrimitive
+                    {
+                        ._mesh = mesh,
+                        ._primitiveIndex = i,
+                        ._emissiveFactor = emissiveFactor,
+                        ._transform = transform,
+                        ._skinningVector = std::move(skinningVector),
+                    });
+                }
+            });
+        return result;
+    }
+
     void Rasterizer::draw(Scene const & scene)
     {
         auto directionalLights = cullDirectionalLights(scene);
         auto pointLights = cullPointLights(scene);
-        shadowPass(scene, directionalLights, pointLights);
+        auto primitives = cullPrimitives(scene);
+        shadowPass(scene, primitives, directionalLights, pointLights);
         colorPass(scene, directionalLights, pointLights);
     }
 
     void Rasterizer::shadowPass(Scene const & scene,
+                                rasterizer::CulledPrimitives const & culledPrimitives,
                                 rasterizer::CulledDirectionalLights & culledDirectionalLights,
                                 rasterizer::CulledPointLights & culledPointLights)
     {
@@ -182,7 +210,8 @@ namespace minire
             if (light._shadowMap)
             {
                 light._viewProjection = light._shadowMap->perform(
-                    scene, light._position, light._direction, frustumVertices);
+                    culledPrimitives, light._position, light._direction,
+                    frustumVertices);
             }
             else
             {
@@ -196,7 +225,7 @@ namespace minire
             if (light._shadowMap)
             {
                 light._shadowMapFarPlane = light._shadowMap->perform(
-                    scene, light._position, frustumVertices);
+                    culledPrimitives, light._position, frustumVertices);
             }
             else
             {

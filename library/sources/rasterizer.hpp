@@ -55,9 +55,11 @@ namespace minire
     private:
         rasterizer::CulledDirectionalLights cullDirectionalLights(Scene const &);
         rasterizer::CulledPointLights cullPointLights(Scene const &);
+        rasterizer::CulledPrimitives cullPrimitives(Scene const &);
 
     private:
         void shadowPass(Scene const &,
+                        rasterizer::CulledPrimitives const &,
                         rasterizer::CulledDirectionalLights &,
                         rasterizer::CulledPointLights &);
 

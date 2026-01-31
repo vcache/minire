@@ -11,6 +11,8 @@
 #include <minire/utils/demangle.hpp>
 
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <tinygltf/tiny_gltf.h>
 
@@ -63,6 +65,8 @@ namespace minire::utils
                       ::tinygltf::Buffer const & buffer,
                       std::vector<DstType> & output)
     {
+        assert(sizeof(SrcType) == ::tinygltf::GetComponentSizeInBytes(accessor.componentType));
+
         bool isTightlyPacked = false;
         if constexpr (std::is_same_v<SrcType, DstType>)
         {
@@ -113,6 +117,8 @@ namespace minire::utils
                       ::tinygltf::Buffer const & buffer,
                       std::vector<glm::vec3> & output)
     {
+        assert(sizeof(SrcType) == ::tinygltf::GetComponentSizeInBytes(accessor.componentType));
+
         using DstType = glm::vec3::value_type;
         using Converter = std::conditional_t<kIsNormalized, DenormCast<DstType>,
                                                             StaticCast<DstType>>;
@@ -147,6 +153,8 @@ namespace minire::utils
                       ::tinygltf::Buffer const & buffer,
                       std::vector<glm::quat> & output)
     {
+        assert(sizeof(SrcType) == ::tinygltf::GetComponentSizeInBytes(accessor.componentType));
+
         using DstType = glm::quat::value_type;
         using Converter = std::conditional_t<kIsNormalized, DenormCast<DstType>,
                                                             StaticCast<DstType>>;
@@ -177,8 +185,43 @@ namespace minire::utils
         }
     }
 
+    template<typename SrcType, bool kIsNormalized>
+    void readElements(::tinygltf::Accessor const & accessor,
+                      ::tinygltf::BufferView const & bufferView,
+                      ::tinygltf::Buffer const & buffer,
+                      std::vector<glm::mat4> & output)
+    {
+        assert(sizeof(SrcType) == ::tinygltf::GetComponentSizeInBytes(accessor.componentType));
+
+        static_assert(std::is_same_v<SrcType, float>,
+                      "only FLOAT component type is allowed for MAT4");
+        static_assert(!kIsNormalized, "MAT4 cannot be normalized");
+
+        uint8_t const * byteBuffer = buffer.data.data() + bufferView.byteOffset + accessor.byteOffset;
+        uint8_t const * byteBufferEnd = buffer.data.data() + bufferView.byteOffset + bufferView.byteLength;
+        output.resize(accessor.count);
+
+        size_t const byteStride = bufferView.byteStride > 0 ? bufferView.byteStride
+                                                            : sizeof(SrcType) * 16;
+        MINIRE_INVARIANT(byteStride >= sizeof(SrcType) * 16,
+                         "too short stride ({}) for MAT4 of {}", byteStride,
+                         utils::demangle<SrcType>());
+
+        for(size_t i = 0; i < accessor.count; ++i)
+        {
+            MINIRE_INVARIANT(byteBuffer < byteBufferEnd, "buffer overflow: i={} at {}/{}/{}",
+                             i, accessor.name, bufferView.name, buffer.uri);
+
+            SrcType const * srcPtr = reinterpret_cast<SrcType const *>(byteBuffer);
+            output[i] = glm::make_mat4x4(srcPtr); // a column-major order is in both glTF and GLM
+            byteBuffer += byteStride;
+        }
+
+        assert(byteBuffer == byteBufferEnd);
+    }
+
     template<typename T>
-    int expectedAccessType()
+    constexpr int expectedAccessType()
     {
         if constexpr(std::is_same_v<T, float>)
         {
@@ -191,6 +234,10 @@ namespace minire::utils
         else if constexpr(std::is_same_v<T, glm::quat>)
         {
             return TINYGLTF_TYPE_VEC4;
+        }
+        else if constexpr(std::is_same_v<T, glm::mat4>)
+        {
+            return TINYGLTF_TYPE_MAT4;
         }
         else
         {
@@ -205,50 +252,65 @@ namespace minire::utils
                   ::tinygltf::Buffer const & buffer,
                   std::vector<T> & output)
     {
-        static_assert(std::is_same_v<T, float> || std::is_same_v<T, glm::vec3> ||
-                      std::is_same_v<T, glm::quat>,
-                      "no reader for a requested type");
-
         MINIRE_INVARIANT(accessor.type == expectedAccessType<T>(), "unexpected accessor type ({}) for {}",
                          accessor.type, utils::demangle<T>());
 
-        switch(accessor.componentType)
+        if constexpr(std::is_same_v<T, float> ||
+                     std::is_same_v<T, glm::vec3> ||
+                     std::is_same_v<T, glm::quat>)
         {
-            case TINYGLTF_COMPONENT_TYPE_BYTE:
-                return accessor.normalized ? readElements<int8_t, true>(accessor, bufferView, buffer, output)
-                                           : readElements<int8_t, false>(accessor, bufferView, buffer, output);
+            switch(accessor.componentType)
+            {
+                case TINYGLTF_COMPONENT_TYPE_BYTE:
+                    return accessor.normalized ? readElements<int8_t, true>(accessor, bufferView, buffer, output)
+                                               : readElements<int8_t, false>(accessor, bufferView, buffer, output);
 
-            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
-                return accessor.normalized ? readElements<uint8_t, true>(accessor, bufferView, buffer, output)
-                                           : readElements<uint8_t, false>(accessor, bufferView, buffer, output);
+                case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                    return accessor.normalized ? readElements<uint8_t, true>(accessor, bufferView, buffer, output)
+                                               : readElements<uint8_t, false>(accessor, bufferView, buffer, output);
 
-            case TINYGLTF_COMPONENT_TYPE_SHORT:
-                return accessor.normalized ? readElements<int16_t, true>(accessor, bufferView, buffer, output)
-                                           : readElements<int16_t, false>(accessor, bufferView, buffer, output);
+                case TINYGLTF_COMPONENT_TYPE_SHORT:
+                    return accessor.normalized ? readElements<int16_t, true>(accessor, bufferView, buffer, output)
+                                               : readElements<int16_t, false>(accessor, bufferView, buffer, output);
 
-            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
-                return accessor.normalized ? readElements<uint16_t, true>(accessor, bufferView, buffer, output)
-                                           : readElements<uint16_t, false>(accessor, bufferView, buffer, output);
+                case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                    return accessor.normalized ? readElements<uint16_t, true>(accessor, bufferView, buffer, output)
+                                               : readElements<uint16_t, false>(accessor, bufferView, buffer, output);
 
-            case TINYGLTF_COMPONENT_TYPE_INT:
-                MINIRE_THROW("INT accessor component type isn't implemented for animation");
+                case TINYGLTF_COMPONENT_TYPE_INT:
+                    MINIRE_THROW("INT accessor component type isn't implemented for animation");
 
-            case TINYGLTF_COMPONENT_TYPE_FLOAT:
-                MINIRE_INVARIANT(!accessor.normalized,
-                                 "FLOAT accessor component type cannot be normalized (see 5.1.4)");
-                readElements<float, false>(accessor, bufferView, buffer, output);
-                break;
+                case TINYGLTF_COMPONENT_TYPE_FLOAT:
+                    MINIRE_INVARIANT(!accessor.normalized,
+                                     "FLOAT accessor component type cannot be normalized (see 5.1.4)");
+                    readElements<float, false>(accessor, bufferView, buffer, output);
+                    break;
 
-            case TINYGLTF_COMPONENT_TYPE_DOUBLE:
-                MINIRE_THROW("DOUBLE accessor component type isn't implemented for animation");
+                case TINYGLTF_COMPONENT_TYPE_DOUBLE:
+                    MINIRE_THROW("DOUBLE accessor component type isn't implemented for animation");
 
-            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-                MINIRE_THROW("UNSIGNED_INT accessor component type cannot "
-                             "be used for animation (see 5.1.3)");
+                case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                    MINIRE_THROW("UNSIGNED_INT accessor component type cannot "
+                                 "be used for animation (see 5.1.3)");
 
-            default:
-                MINIRE_THROW("unknown animation accessor component type: {}, {}",
-                             accessor.componentType, accessor.name);
+                default:
+                    MINIRE_THROW("unknown animation accessor component type: {}, {}",
+                                 accessor.componentType, accessor.name);
+            }
+        }
+        else if constexpr(std::is_same_v<T, glm::mat4>)
+        {
+            MINIRE_INVARIANT(TINYGLTF_COMPONENT_TYPE_FLOAT == accessor.componentType,
+                             "FLOAT component type expected for {} accessor, but got {}",
+                             utils::demangle<T>(), accessor.componentType);
+            MINIRE_INVARIANT(!accessor.normalized,
+                             "FLOAT accessor component type cannot be normalized (see 5.1.4)");
+            readElements<float, false>(accessor, bufferView, buffer, output);
+        }
+        else
+        {
+            static_assert(utils::kAlwaysFalse<T>::value,
+                          "no reader for a requested type");
         }
     }
 

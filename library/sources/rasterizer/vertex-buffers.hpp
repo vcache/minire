@@ -13,6 +13,7 @@ namespace minire::rasterizer
 {
     class Resources;
 
+    // TODO: support skinning for vertex buffers
     class VertexBuffers
     {
     public:
