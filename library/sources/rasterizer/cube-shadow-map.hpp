@@ -1,7 +1,6 @@
 #pragma once
 
 #include <opengl/fbo.hpp>
-#include <opengl/program-cache.hpp>
 #include <opengl/texture.hpp>
 #include <rasterizer/culled-objects.hpp>
 #include <utils/frustum.hpp>
@@ -37,11 +36,11 @@ namespace minire::rasterizer
         size_t size() const { return _size; }
 
     private:
-        class Programs;
-        using ProgramsUptr = std::unique_ptr<Programs>;
+        class Factory;
+        using FactoryUptr = std::unique_ptr<Factory>;
 
         size_t const    _size;
-        ProgramsUptr    _programs;
+        FactoryUptr     _factory;
         opengl::Texture _texture;
         opengl::FBO     _fbo;
         GLint           _bznkModelMatrix = 0;

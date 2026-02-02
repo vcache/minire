@@ -14,6 +14,8 @@
 
 namespace minire::opengl
 {
+    // TODO: this code isn't used anymore, consider getting rid of it
+
     template<typename ProgramKey,
              typename ProgramKeyHash = std::hash<ProgramKey>>
     class ProgramCache

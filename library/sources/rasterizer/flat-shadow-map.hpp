@@ -1,7 +1,6 @@
 #pragma once
 
 #include <opengl/fbo.hpp>
-#include <opengl/program-cache.hpp>
 #include <opengl/texture.hpp>
 #include <rasterizer/culled-objects.hpp>
 #include <utils/frustum.hpp>
@@ -43,11 +42,11 @@ namespace minire::rasterizer
                           utils::FrustumVertices const &) const;
 
     private:
-        class Programs;
-        using ProgramsUptr = std::unique_ptr<Programs>;
+        class Factory;
+        using FactoryUptr = std::unique_ptr<Factory>;
 
         size_t const    _size;
-        ProgramsUptr    _programs;
+        FactoryUptr     _factory;
         opengl::Texture _texture;
         opengl::FBO     _fbo;
     };
