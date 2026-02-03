@@ -90,14 +90,14 @@ namespace minire::rasterizer
                 MINIRE_INVARIANT(matInstance, "no material instance for {}", source);
 
                 material::Program::Locations const & locations = matProgram->locations();
-                MINIRE_INVARIANT(locations._tangentAttribute == -1, "OBJ doesn't support tangents");
-                MINIRE_INVARIANT(locations._jointsAttribute == -1, "OBJ doesn't support skining");
-                MINIRE_INVARIANT(locations._weightsAttribute == -1, "OBJ doesn't support skining");
+                MINIRE_INVARIANT(locations.tangentAttribute() == -1, "OBJ doesn't support tangents");
+                MINIRE_INVARIANT(locations.jointsAttribute() == -1, "OBJ doesn't support skining");
+                MINIRE_INVARIANT(locations.weightsAttribute() == -1, "OBJ doesn't support skining");
                 opengl::VertexBuffer vertexBuffer = utils::createVertexBuffer(
                     obj,
-                    locations._vertexAttribute,
-                    locations._uvAttribute,
-                    locations._normalAttribute);
+                    locations.vertexAttribute(),
+                    locations.uvAttribute(),
+                    locations.normalAttribute());
 
                 _aabb.extend(vertexBuffer._aabb);
 

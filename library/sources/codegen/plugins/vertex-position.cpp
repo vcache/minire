@@ -25,9 +25,9 @@ namespace minire::codegen::plugins
         }
 
         {
-            assert(traits._attribLocations._vertexAttribute >= 0);
+            assert(traits._attribLocations.vertexAttribute() >= 0);
             auto [_, inserted] = attribs.emplace("bznkVertex",
-                                                 traits._attribLocations._vertexAttribute);
+                                                 traits._attribLocations.vertexAttribute());
             MINIRE_INVARIANT(inserted, "failed to insert bznkVertex attrib");
         }
     }

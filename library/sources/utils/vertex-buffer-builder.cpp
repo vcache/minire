@@ -179,10 +179,10 @@ namespace minire::utils
             }, buffer);
         };
 
-        loadVertexBuffer(vertexBuffer._vertices, locations._vertexAttribute, "vertices");
-        loadVertexBuffer(vertexBuffer._normals, locations._normalAttribute, "normals");
-        loadVertexBuffer(vertexBuffer._tangents, locations._tangentAttribute, "tangents");
-        loadVertexBuffer(vertexBuffer._uvs, locations._uvAttribute, "uvs");
+        loadVertexBuffer(vertexBuffer._vertices, locations.vertexAttribute(), "vertices");
+        loadVertexBuffer(vertexBuffer._normals, locations.normalAttribute(), "normals");
+        loadVertexBuffer(vertexBuffer._tangents, locations.tangentAttribute(), "tangents");
+        loadVertexBuffer(vertexBuffer._uvs, locations.uvAttribute(), "uvs");
 
         result->_aabb = vertexBuffer._aabb;
 

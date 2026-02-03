@@ -8,9 +8,9 @@ namespace minire::codegen::plugins
 {
     bool Skinning::getHasSkins(Traits const & traits)
     {
-        assert((traits._attribLocations._jointsAttribute >= 0) ==
-               (traits._attribLocations._weightsAttribute >= 0));
-        return traits._attribLocations._jointsAttribute >= 0;
+        assert((traits._attribLocations.jointsAttribute() >= 0) ==
+               (traits._attribLocations.weightsAttribute() >= 0));
+        return traits._attribLocations.jointsAttribute() >= 0;
     }
 
     std::vector<std::string> const & Skinning::uniforms() const
@@ -45,8 +45,8 @@ namespace minire::codegen::plugins
 
         if (hasSkins)
         {
-            attribLocations.emplace("bznkJoints", traits._attribLocations._jointsAttribute);
-            attribLocations.emplace("bznkWeights", traits._attribLocations._weightsAttribute);
+            attribLocations.emplace("bznkJoints", traits._attribLocations.jointsAttribute());
+            attribLocations.emplace("bznkWeights", traits._attribLocations.weightsAttribute());
         }
     }
 }

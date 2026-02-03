@@ -234,15 +234,12 @@ namespace minire::rasterizer::materials
 
     material::Program::Locations PbrProgram::locations() const
     {
-        return material::Program::Locations
-        {
-            ._vertexAttribute = _positionAttribute,
-            ._uvAttribute = _uvAttribute,
-            ._normalAttribute = _normalAttribute,
-            ._tangentAttribute = _tangentAttribute,
-            ._jointsAttribute = _jointsAttribute,
-            ._weightsAttribute = _weightsAttribute,
-        };
+        return material::Program::Locations(_positionAttribute,
+                                            _uvAttribute,
+                                            _normalAttribute,
+                                            _tangentAttribute,
+                                            _jointsAttribute,
+                                            _weightsAttribute);
     }
 
     // PbrFactory //

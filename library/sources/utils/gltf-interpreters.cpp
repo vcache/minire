@@ -575,12 +575,12 @@ namespace minire::utils
             ::tinygltf::Primitive const & primitive = mesh.primitives[primitiveIndex];
             material::Program::Locations const & locations = locationsForPrims[primitiveIndex];
             result.emplace_back(createVertexBuffer(model, mesh, primitive,
-                                                   locations._vertexAttribute,
-                                                   locations._uvAttribute,
-                                                   locations._normalAttribute,
-                                                   locations._tangentAttribute,
-                                                   locations._jointsAttribute,
-                                                   locations._weightsAttribute));
+                                                   locations.vertexAttribute(),
+                                                   locations.uvAttribute(),
+                                                   locations.normalAttribute(),
+                                                   locations.tangentAttribute(),
+                                                   locations.jointsAttribute(),
+                                                   locations.weightsAttribute()));
         }
 
         return result;
