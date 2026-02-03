@@ -137,6 +137,10 @@ namespace minire::rasterizer::materials
             assert(_bonesLocation == -1);
             _program.setUniform(_modelUniformLocation, modelTransform);
         }
+        else
+        {
+            assert(!skinningVector.empty());
+        }
 
         _program.setUniform(_ambientLightUniformLocation, ambientLight);
 
@@ -224,6 +228,10 @@ namespace minire::rasterizer::materials
             assert(_bonesLocation != -1);
             assert(_modelUniformLocation == -1);
             _program.setUniform(_bonesLocation, skinningVector);
+        }
+        else
+        {
+            assert(_modelUniformLocation != -1);
         }
 
         // sanity check
