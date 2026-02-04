@@ -25,6 +25,12 @@ namespace minire::models
             std::shared_ptr<std::vector<T> const> _keyframes;
             models::Interpolation                 _interpolation;
 
+            Track(std::initializer_list<T> && keyframes,
+                  models::Interpolation interpolation)
+                : _keyframes(std::make_shared<std::vector<T> const>(std::move(keyframes)))
+                , _interpolation(interpolation)
+            {}
+
             Track(std::shared_ptr<std::vector<T> const> keyframes,
                   models::Interpolation                 interpolation)
                 : _keyframes(keyframes)
@@ -53,7 +59,8 @@ namespace minire::models
         //       can be playing at any given moment.
     };
 
-    /* NOTE: the path is relative to a node with AnimationSet */
+    // NOTE: the ScenePath is relative to a node with AnimationSet,
+    //       and can be empty (to affect a container node itself).
     using AnimationTracks = std::unordered_map<ScenePath,
                                                KeyframeAnimation>;
 

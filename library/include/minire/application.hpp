@@ -120,6 +120,7 @@ namespace minire
         void handle(events::controller::SceneNewAnimationSet const &);
         void handle(events::controller::ScenePlayAnimation const &);
         void handle(events::controller::SceneStopAnimation const &);
+        void handle(events::controller::SceneInlineAnimation const &);
         void handle(events::controller::SetRayCaster const &);
 
         template<typename Event, typename... Args>

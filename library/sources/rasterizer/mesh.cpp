@@ -24,7 +24,6 @@ namespace minire::rasterizer
                               Ubo const & ubo,
                               VertexBuffers const & vertexBuffers)
     {
-        MINIRE_INFO("Loading a mesh into a GPU: {}", source);
         MINIRE_INVARIANT(!source.empty(), "source path is empty");
 
         // Special case, loading from VertexBuffers

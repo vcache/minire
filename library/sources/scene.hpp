@@ -64,6 +64,7 @@ namespace minire
         void handle(events::controller::SceneNewAnimationSet const &);
         void handle(events::controller::ScenePlayAnimation const &);
         void handle(events::controller::SceneStopAnimation const &);
+        void handle(events::controller::SceneInlineAnimation const &);
 
     public:
         void setViewport(size_t width, size_t height);

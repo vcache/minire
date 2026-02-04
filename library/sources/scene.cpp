@@ -403,19 +403,6 @@ namespace minire
         }
 
         containerNode->_animationSet = std::move(newAnimationSet);
-
-        /*
-            PLAN 2:
-                - add an AnimationSet (Animations tokes, Channels mapping, Sequencer) into a Node
-                    - Anims will be targeted only to the underlying Nodes (children)
-                - preload node's animations (AnimationSet) at glTF instantiator (w/ optional flag)
-                - SceneAnimationPlay will be targeter by a node w/ AnimationSet
-                    - exluclusive for now, but in future may be added
-                      several Sequencers w/ Mixers and Transitions
-                - Maybe add ShortCut (size_t)
-                - Only Duplication instancing mode
-                - Spare buffers?
-        */
     }
 
     void Scene::handle(events::controller::ScenePlayAnimation const & e)
@@ -441,6 +428,33 @@ namespace minire
             node->_activeAnimation.reset();
             deactiveChildrenAnimation(node->_parent.lock());
         }
+    }
+
+    void Scene::handle(events::controller::SceneInlineAnimation const & e)
+    {
+        // find a node to contain an animation
+        Node::Sptr containerNode = find<Node::Sptr>(e._containerNode);
+        assert(containerNode);
+
+        // transform animation set from abstract (model) into a concrete one
+        AnimationTracksSptr animationTracksSptr = std::make_shared<AnimationTracks>();
+        animationTracksSptr->reserve(e._animationTracks.size());
+        for(auto const & [targetScenePath, keyframeAnimation] : e._animationTracks)
+        {
+            models::ScenePath targetNodePath = models::concat(e._containerNode, targetScenePath);
+            Node::Sptr targetNode = find<Node::Sptr>(targetNodePath);
+            assert(targetNode);
+            animationTracksSptr->emplace_back(AnimationTrack
+            {
+                ._target = targetNode,
+                ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
+            });
+        }
+
+        // activate this animation
+        containerNode->_activeAnimation = std::make_unique<ActiveAnimation>(
+            animationTracksSptr, e._repeats, e._speedScale);
+        activeChildrenAnimation(containerNode->_parent.lock());
     }
 
     // TODO: cover with tests
@@ -506,7 +520,7 @@ namespace minire
                      std::is_same_v<T, BillboardLeaf::Sptr>)
         {
             T * fetched = std::get_if<T>(&current);
-            MINIRE_INVARIANT(fetched, "unexpected element at path \"{}\": {}",
+            MINIRE_INVARIANT(fetched, "element at path \"{}\" is not {}",
                              path, utils::demangle<T>());
             result = *fetched;
             assert(result);
@@ -564,7 +578,12 @@ namespace minire
                 {
                     return std::visit(utils::Overloaded
                     {
-                        [](Node::Sptr const & i) { return i->_activeAnimation.operator bool(); },
+                        [](Node::Sptr const & i)
+                        {
+                            assert(i);
+                            return i->_hasActiveChildrenAnimation ||
+                                   i->_activeAnimation.operator bool();
+                        },
                         [](auto const &) { return false; },
                     }, pair.second);
                 });

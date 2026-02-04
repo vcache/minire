@@ -535,6 +535,11 @@ namespace minire
         _scene->handle(e);
     }
 
+    void Application::handle(events::controller::SceneInlineAnimation const & e)
+    {
+        _scene->handle(e);
+    }
+
     void Application::handle(events::controller::SetRayCaster const & e)
     {
         _rayCasterEnabled = e._enabled;

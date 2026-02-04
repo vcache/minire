@@ -130,6 +130,15 @@ namespace minire::events::controller
         models::ScenePath _containerNode;
     };
 
+    struct SceneInlineAnimation
+    {
+        // Params semantics as in ScenePlayAnimation and SceneNewAnimationSet
+        models::ScenePath       _containerNode;
+        models::AnimationTracks _animationTracks;
+        size_t                  _repeats; // or ScenePlayAnimation::kInfinitely
+        float                   _speedScale;
+    };
+
     // Scene queries
 
     struct SetRayCaster
