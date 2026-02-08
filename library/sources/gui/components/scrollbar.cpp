@@ -201,7 +201,8 @@ namespace minire::gui::components
 
     size_t Scrollbar::revalidateContent(size_t zOffset,
                                         bool const effectiveVisible,
-                                        Area const & clientArea)
+                                        Area const & contentArea,
+                                        Area const & /* clippingWindow */)
     {
         // revalidate background (if any)
         if (auto background = _background.get(); background)
@@ -211,7 +212,8 @@ namespace minire::gui::components
                 background->setContentInvalidator(shared_from_this());
             }
 
-            background->setContentArea(clientArea);
+            background->setContentArea(contentArea);
+            background->setClippingWindow(contentArea);
             background->setVisible(effectiveVisible);
             zOffset = background->onZOrderChanged(zOffset);
         }
@@ -240,12 +242,12 @@ namespace minire::gui::components
         // calculate slider's max offset
         bool const hasIncBtn = _increaseButton->visible().get();
         bool const hasDecBtn = _decreaseButton->visible().get();
-        float const buttonSize = _isVertical.get() ? clientArea._width : clientArea._height;
+        float const buttonSize = _isVertical.get() ? contentArea._width : contentArea._height;
         float const btnDeltas =  (hasIncBtn ? buttonSize : 0) + (hasDecBtn ? buttonSize : 0);
         Boundaries const sliderAreaBoundaries
         {
-            (_isVertical.get() ? clientArea._top    : clientArea._left)  + (hasDecBtn ? buttonSize : 0),
-            (_isVertical.get() ? clientArea._height : clientArea._width) - btnDeltas,
+            (_isVertical.get() ? contentArea._top    : contentArea._left)  + (hasDecBtn ? buttonSize : 0),
+            (_isVertical.get() ? contentArea._height : contentArea._width) - btnDeltas,
         };
 
         // revalidate slider size and position

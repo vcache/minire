@@ -33,7 +33,8 @@ namespace minire::gui::components
 
     size_t Button::revalidateContent(size_t zOffset,
                                      bool const effectiveVisible,
-                                     Area const & clientArea)
+                                     Area const & contentArea,
+                                     Area const & clippingWindow)
     {
         // update content invalidator
         actualize(_bgNormal);
@@ -59,7 +60,7 @@ namespace minire::gui::components
         }
 
         // revalidate positions
-        revalidatePositions(clientArea);
+        revalidatePositions(contentArea, clippingWindow);
 
         // revalidate zOrder
         if (_bgNormal.get()) zOffset = (*_bgNormal)->onZOrderChanged(zOffset);
@@ -141,11 +142,15 @@ namespace minire::gui::components
         MINIRE_THROW("unknown button state: {}", static_cast<int>(_state));
     }
 
-    void Button::revalidatePositions(Area const & area)
+    void Button::revalidatePositions(Area const & contentArea,
+                                     Area const & clippingWindow)
     {
-        if (_bgNormal.get()) (*_bgNormal)->setContentArea(area);
-        if (_bgHovered.get()) (*_bgHovered)->setContentArea(area);
-        if (_bgPressed.get()) (*_bgPressed)->setContentArea(area);
+        for (auto const & bg : {_bgNormal.get(), _bgHovered.get(), _bgPressed.get()})
+        {
+            if (!bg) continue;
+            bg->setContentArea(contentArea);
+            bg->setClippingWindow(clippingWindow);
+        }
 
         bool const hasIcon = _icon.get().operator bool();
         bool const hasText = _text.get().operator bool();
@@ -162,18 +167,20 @@ namespace minire::gui::components
             // only a text
             assert(hasText);
             auto [size, _] = (*_text)->measure();
-            _textPosition.x = area._left + (area._width - size.x) / 2.0f;
-            _textPosition.y = area._top + (area._height - size.y) / 2.0f;
+            _textPosition.x = contentArea._left + (contentArea._width - size.x) / 2.0f;
+            _textPosition.y = contentArea._top + (contentArea._height - size.y) / 2.0f;
             (*_text)->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
+            (*_text)->setClippingWindow(clippingWindow);
         }
         else if (!hasText)
         {
             // only an icon
             assert(hasIcon);
             auto [size, _] = (*_icon)->measure();
-            _iconPosition.x = area._left + (area._width - size.x) / 2.0f;
-            _iconPosition.y = area._top + (area._height - size.y) / 2.0f;
+            _iconPosition.x = contentArea._left + (contentArea._width - size.x) / 2.0f;
+            _iconPosition.y = contentArea._top + (contentArea._height - size.y) / 2.0f;
             (*_icon)->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
+            (*_icon)->setClippingWindow(clippingWindow);
         }
         else
         {
@@ -189,36 +196,38 @@ namespace minire::gui::components
             switch(_iconLocation.get())
             {
                 case theme::Location::kLeft:
-                    _iconPosition.x = area._left + (area._width - totalWidth) / 2.0f;
+                    _iconPosition.x = contentArea._left + (contentArea._width - totalWidth) / 2.0f;
                     _textPosition.x = _iconPosition.x + iconSize.x + _iconSpacing.get();
-                    _iconPosition.y = area._top + (area._height - iconSize.y) / 2.0f;
-                    _textPosition.y = area._top + (area._height - textSize.y) / 2.0f;
+                    _iconPosition.y = contentArea._top + (contentArea._height - iconSize.y) / 2.0f;
+                    _textPosition.y = contentArea._top + (contentArea._height - textSize.y) / 2.0f;
                     break;
 
                 case theme::Location::kTop:
-                    _iconPosition.x = area._left + (area._width - iconSize.x) / 2.0f;
-                    _textPosition.x = area._left + (area._width - textSize.x) / 2.0f;
-                    _iconPosition.y = area._top + (area._height - totalHeight) / 2.0f;
+                    _iconPosition.x = contentArea._left + (contentArea._width - iconSize.x) / 2.0f;
+                    _textPosition.x = contentArea._left + (contentArea._width - textSize.x) / 2.0f;
+                    _iconPosition.y = contentArea._top + (contentArea._height - totalHeight) / 2.0f;
                     _textPosition.y = _iconPosition.y + iconSize.y + _iconSpacing.get();
                     break;
 
                 case theme::Location::kRight:
-                    _textPosition.x = area._left + (area._width - totalWidth) / 2.0f;
+                    _textPosition.x = contentArea._left + (contentArea._width - totalWidth) / 2.0f;
                     _iconPosition.x = _textPosition.x + textSize.x + _iconSpacing.get();
-                    _iconPosition.y = area._top + (area._height - iconSize.y) / 2.0f;
-                    _textPosition.y = area._top + (area._height - textSize.y) / 2.0f;
+                    _iconPosition.y = contentArea._top + (contentArea._height - iconSize.y) / 2.0f;
+                    _textPosition.y = contentArea._top + (contentArea._height - textSize.y) / 2.0f;
                     break;
 
                 case theme::Location::kBottom:
-                    _iconPosition.x = area._left + (area._width - iconSize.x) / 2.0f;
-                    _textPosition.x = area._left + (area._width - textSize.x) / 2.0f;
-                    _textPosition.y = area._top + (area._height - totalHeight) / 2.0f;
+                    _iconPosition.x = contentArea._left + (contentArea._width - iconSize.x) / 2.0f;
+                    _textPosition.x = contentArea._left + (contentArea._width - textSize.x) / 2.0f;
+                    _textPosition.y = contentArea._top + (contentArea._height - totalHeight) / 2.0f;
                     _iconPosition.y = _textPosition.y + textSize.y + _iconSpacing.get();
                     break;
             }
 
             (*_text)->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
+            (*_text)->setClippingWindow(clippingWindow);
             (*_icon)->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
+            (*_icon)->setClippingWindow(clippingWindow);
         }
     }
 

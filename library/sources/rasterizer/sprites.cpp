@@ -49,7 +49,10 @@ namespace minire::rasterizer
         flat in vec2 bznkFragRep;
         flat in vec2 bznkFragDims;
         uniform sampler2D bznkTexture;
+        uniform vec4 bznkClippingWindow;  // (left, top, right, bottom)
         out vec4 bznkOutColor;
+
+        layout(origin_upper_left) in vec4 gl_FragCoord;
 
         vec2 sawtooth(vec2 t)
         {
@@ -58,11 +61,19 @@ namespace minire::rasterizer
 
         void main()
         {
-            ivec2 offset = ivec2(floor(bznkFragRep + bznkFragDims * sawtooth(bznkFragUv)));
-            
-            bznkOutColor = texelFetch(bznkTexture, offset, 0);
+            if (bznkClippingWindow.x <= gl_FragCoord.x && gl_FragCoord.x <= bznkClippingWindow.z
+             && bznkClippingWindow.y <= gl_FragCoord.y && gl_FragCoord.y <= bznkClippingWindow.w)
+            {
+                ivec2 offset = ivec2(floor(bznkFragRep + bznkFragDims * sawtooth(bznkFragUv)));
 
-            //bznkOutColor = vec4(fract(bznkFragUv.y), 0, 0, 1);
+                bznkOutColor = texelFetch(bznkTexture, offset, 0);
+
+                //bznkOutColor = vec4(fract(bznkFragUv.y), 0, 0, 1);
+            }
+            else
+            {
+                discard;
+            }
         }
     )";
 
@@ -76,6 +87,7 @@ namespace minire::rasterizer
             })
             , _projUniform(_program.getUniformLocation("bznkProj"))
             , _textureUniform(_program.getUniformLocation("bznkTexture"))
+            , _clippingWindow(_program.getUniformLocation("bznkClippingWindow"))
         {}
 
         void use() const { _program.use(); }
@@ -91,10 +103,25 @@ namespace minire::rasterizer
             MINIRE_GL(glUniform1i, _textureUniform, v);
         }
 
+        void setClippingWindow(utils::MaybeRect const & clippingWindow) const
+        {
+            glm::vec4 value(std::numeric_limits<float>::min(),
+                            std::numeric_limits<float>::min(),
+                            std::numeric_limits<float>::max(),
+                            std::numeric_limits<float>::max());
+            if (clippingWindow)
+            {
+                value = glm::vec4(clippingWindow->_left,  clippingWindow->_top,
+                                  clippingWindow->_right, clippingWindow->_bottom);
+            }
+            _program.setUniform(_clippingWindow, value);
+        }
+
     private:
         opengl::Program _program;
         GLint           _projUniform;
         GLint           _textureUniform;
+        GLint           _clippingWindow;
     };
 
     // Sprites::Sprite //
@@ -106,6 +133,7 @@ namespace minire::rasterizer
                utils::Patch patch,
                glm::vec2 const & position,
                glm::vec2 const & dimensions,
+               utils::MaybeRect const & clippingWindow,
                bool visible, size_t z,
                Program const & program)
             : Drawable(z)
@@ -113,6 +141,7 @@ namespace minire::rasterizer
             , _patch(patch)
             , _position(position)
             , _dimensions(dimensions)
+            , _clippingWindow(clippingWindow)
             , _visible(visible)
             , _program(program)
             , _vertexBuffer(sprites::buildMesh(_patch, _position, _dimensions,
@@ -142,6 +171,11 @@ namespace minire::rasterizer
             _invalidated = true;
         }
 
+        void setClippingWindow(utils::MaybeRect const & clippingWindow)
+        {
+            _clippingWindow = clippingWindow;
+        }
+
         void setVisible(bool visible)
         {
             _visible = visible;
@@ -154,6 +188,7 @@ namespace minire::rasterizer
             _program.use();
             _program.setProjUniform(projection);
             _program.setTextureUniform(0);
+            _program.setClippingWindow(_clippingWindow);
 
             MINIRE_GL(glActiveTexture, GL_TEXTURE0);
             _texture->bind();
@@ -179,6 +214,7 @@ namespace minire::rasterizer
         utils::Patch                  _patch;
         glm::vec2                     _position;
         glm::vec2                     _dimensions;
+        utils::MaybeRect              _clippingWindow;
         bool                          _visible;
         Program const &               _program;
 
@@ -200,6 +236,7 @@ namespace minire::rasterizer
                          utils::Patch const & patch,
                          glm::vec2 const & position,
                          glm::vec2 const & dimensions,
+                         utils::MaybeRect const & clippingWindow,
                          bool const visible,
                          size_t const zOrder)
     {
@@ -207,31 +244,47 @@ namespace minire::rasterizer
         MINIRE_INVARIANT(textureSptr, "no texture found for \"{}\": {}", id, texture);
 
         auto sprite = std::make_unique<Sprite>(
-            textureSptr, patch, position, dimensions, visible, zOrder, *_program);
+            textureSptr, patch, position, dimensions,
+            clippingWindow, visible, zOrder, *_program);
 
         auto [_, inserted] = _store.emplace(id, std::move(sprite));
         MINIRE_INVARIANT(inserted, "sprite already exists: \"{}\"", id);
     }
 
     void Sprites::move(std::string const & id,
-                       glm::vec2 const & position)
+                       glm::vec2 const & position,
+                       utils::MaybeRect const & clippingWindow)
     {
-        find(id).setPosition(position);
+        Sprite & sprite = find(id);
+        sprite.setPosition(position);
+        sprite.setClippingWindow(clippingWindow);
     }
 
     void Sprites::resize(std::string const & id,
-                         glm::vec2 const & dimensions)
+                         glm::vec2 const & dimensions,
+                         utils::MaybeRect const & clippingWindow)
     {
-        find(id).setDimensions(dimensions);
+        Sprite & sprite = find(id);
+        sprite.setDimensions(dimensions);
+        sprite.setClippingWindow(clippingWindow);
     }
 
     void Sprites::setArea(std::string const & id,
                           glm::vec2 const & position,
-                          glm::vec2 const & dimensions)
+                          glm::vec2 const & dimensions,
+                          utils::MaybeRect const & clippingWindow)
     {
         Sprite & sprite = find(id);
         sprite.setPosition(position);
         sprite.setDimensions(dimensions);
+        sprite.setClippingWindow(clippingWindow);
+    }
+
+    void Sprites::setClippingWindow(std::string const & id,
+                                    utils::MaybeRect const & clippingWindow)
+    {
+        Sprite & sprite = find(id);
+        sprite.setClippingWindow(clippingWindow);
     }
 
     void Sprites::visible(std::string const & id,

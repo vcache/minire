@@ -229,7 +229,8 @@ namespace minire::gui
 
     size_t Component::revalidate(size_t zOffset,
                                  bool effectiveVisible,
-                                 Area const clientArea)
+                                 Area const & clientArea,
+                                 Area const & clippingWindow)
     {
         assert(zOffset != 0); // should start from 1
         assert(_impl);
@@ -315,7 +316,9 @@ namespace minire::gui
         }
 
         // revalidate derivated Component
-        zOffset = revalidateContent(zOffset, effectiveVisible, _impl->_contentArea);
+        Area const & clientClippingWindow = intersection(clippingWindow, _impl->_clientArea);
+        Area const & contentClippingWindow = intersection(clientClippingWindow, _impl->_contentArea);
+        zOffset = revalidateContent(zOffset, effectiveVisible, _impl->_contentArea, contentClippingWindow);
 
         // revalidate Layout
         revalidateChildren |= _layout.isInvalidated();
@@ -324,7 +327,8 @@ namespace minire::gui
         // revalidate children
         assert(_impl->_zOrderStore.size() == _children.size());
 
-        utils::Rect const padding = _padding.get();
+        utils::Rect const padding = _padding.get(); //  TODO: maybe padding should affect _contentArea instead?
+                                                    //        (or just decrease clientArea)
         Area const & childrenClientArea = Area
         {
             ._left = _impl->_contentArea._left + padding._left,
@@ -332,6 +336,8 @@ namespace minire::gui
             ._width = std::max(.0f, _impl->_contentArea._width - (padding._left + padding._right)),
             ._height = std::max(.0f, _impl->_contentArea._height - (padding._top + padding._bottom)),
         };
+
+        Area const & childrenClientClippingWindow = intersection(contentClippingWindow, childrenClientArea);
 
         {
             _impl->sortZOrderStore(); // TODO: don't resort every time (maybe use invalidation flags instead bool)
@@ -352,7 +358,8 @@ namespace minire::gui
                 {
                     assert(_layout.get());
                     Area const & childArea = _layout.get()->evaluate(childrenClientArea, *child);
-                    newOffset = child->revalidate(zOffset, effectiveVisible, childArea);
+                    Area const & childClippingWindow = intersection(childrenClientClippingWindow, childArea);
+                    newOffset = child->revalidate(zOffset, effectiveVisible, childArea, childClippingWindow);
                     assert(newOffset == child->_impl->_zOrderBoundaries.second);
                 }
 

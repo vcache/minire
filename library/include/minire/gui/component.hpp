@@ -166,6 +166,7 @@ namespace minire::gui
 
         void invalidate();
 
+        // By default, it will also call invalidate().
         void invalidateContent() override;
 
         void erase(std::string const &);
@@ -177,7 +178,8 @@ namespace minire::gui
 
         virtual size_t revalidateContent(size_t zOffset,
                                          bool const /*effectiveVisible*/,
-                                         Area const & /*clientArea*/)
+                                         Area const & /*contentArea*/,
+                                         Area const & /*clippingWindow*/)
         {
             return zOffset;
         }
@@ -189,7 +191,8 @@ namespace minire::gui
     private:
         size_t revalidate(size_t zOffset,
                           bool effectiveVisible,
-                          Area const clientArea);
+                          Area const & clientArea,
+                          Area const & clippingWindow);
 
         // NOTE: Since this method can return a pointer to "this" w/o a const-qualifier,
         //       this method implicitly works as a "const cast" (TODO: it is not good probably?).

@@ -34,6 +34,11 @@ namespace
                 std::vector<std::any>{},
                 std::vector<std::any>
                 {
+                    std::string("very long ling that should "
+                                "demonstrate clipping window"),
+                },
+                std::vector<std::any>
+                {
                     std::string("foo"),
                     std::string("buz"),
                     std::string("bar"),

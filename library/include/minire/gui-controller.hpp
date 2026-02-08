@@ -41,8 +41,7 @@ namespace minire
                                             utils::Patch const & patch = std::monostate()) override;
 
         gui::TextView::Sptr makeTextView(text::FormattedString const & text,
-                                          content::Id const & fontFace,
-                                          bool const enableClipping = false) override;
+                                          content::Id const & fontFace) override;
 
     protected:
         void step() override;

@@ -310,22 +310,29 @@ namespace minire
     void Application::handle(events::controller::CreateSprite const & e)
     {
         _rasterizer->sprites().create(e._id, e._texture, e._source, e._position,
-                                      e._dimensions, e._visible, e._zOrder);
+                                      e._dimensions, e._clippingWindow, e._visible,
+                                      e._zOrder);
     }
 
     void Application::handle(events::controller::ResizeSprite const & e)
     {
-        _rasterizer->sprites().resize(e._id, e._dimensions);
+        _rasterizer->sprites().resize(e._id, e._dimensions, e._clippingWindow);
     }
 
     void Application::handle(events::controller::MoveSprite const & e)
     {
-        _rasterizer->sprites().move(e._id, e._position);
+        _rasterizer->sprites().move(e._id, e._position, e._clippingWindow);
     }
 
     void Application::handle(events::controller::SetSpriteArea const & e)
     {
-        _rasterizer->sprites().setArea(e._id, e._position, e._dimensions);
+        _rasterizer->sprites().setArea(e._id, e._position, e._dimensions,
+                                       e._clippingWindow);
+    }
+
+    void Application::handle(events::controller::SetSpriteClippingWindow const & e)
+    {
+        _rasterizer->sprites().setClippingWindow(e._id, e._clippingWindow);
     }
 
     void Application::handle(events::controller::SetSpriteVisible const & e)
@@ -375,9 +382,9 @@ namespace minire
         _rasterizer->labels().get(e._id).setFontFace(e._fontFace, _contentManager);
     }
 
-    void Application::handle(events::controller::SetLabelClipping const & e)
+    void Application::handle(events::controller::SetLabelClippingWindow const & e)
     {
-        _rasterizer->labels().get(e._id).setMaxSize(e._maxSize);
+        _rasterizer->labels().get(e._id).setClippingWindow(e._clippingWindow);
     }
 
     void Application::handle(events::controller::SetLabelZOrder const & e)

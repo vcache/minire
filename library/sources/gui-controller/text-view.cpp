@@ -14,12 +14,10 @@ namespace minire::gui_controller
 
     TextViewImpl::TextViewImpl(text::FormattedString const & text,
                                content::Id const & fontFace,
-                               bool const enableClipping,
                                GuiController & controller)
         : _controller(controller)
         , _fontFace(fontFace)
         , _text(text)
-        , _enableClipping(enableClipping)
     {
         _textSize = _controller.measure(_text, _fontFace);
     }
@@ -69,6 +67,24 @@ namespace minire::gui_controller
         setContentSize(area._width, area._height);
     }
 
+    void TextViewImpl::setClippingWindow(gui::MaybeArea const & area)
+    {
+        utils::MaybeRect rect;
+        if (area)
+        {
+            rect.emplace(area->_left,
+                         area->_top,
+                         area->_left + area->_width,
+                         area->_top + area->_height);
+        }
+
+        if (rect != _clippingWindow)
+        {
+            _newClippingWindow = rect;
+            enqueueUncommited();
+        }
+    }
+
     size_t TextViewImpl::onZOrderChanged(size_t zOffset)
     {
         if (_zOrder != zOffset || _newZOrder)
@@ -89,12 +105,10 @@ namespace minire::gui_controller
     }
 
     void TextViewImpl::setContent(content::Id const & fontFace,
-                                  text::FormattedString const & text,
-                                  bool enableClipping)
+                                  text::FormattedString const & text)
     {
         setFontFace(fontFace);
         setText(text);
-        setEnableClipping(enableClipping);
     }
 
     void TextViewImpl::setText(text::FormattedString const & text)
@@ -119,30 +133,9 @@ namespace minire::gui_controller
         }
     }
 
-    void TextViewImpl::setEnableClipping(bool const enableClipping)
-    {
-        if (enableClipping != _enableClipping || _newEnableClipping)
-        {
-            _newEnableClipping = enableClipping;
-            enqueueUncommited();
-        }
-    }
-
-    void TextViewImpl::setClippingArea()
-    {
-        if (_enableClipping)
-        {
-            _controller.enqueue<SetLabelClipping>(_labelId, _contentSize);
-        }
-        else
-        {
-            _controller.enqueue<SetLabelClipping>(_labelId, std::nullopt);
-        }
-    }
-
     void TextViewImpl::commit()
     {
-        bool updateClippingArea = false;
+        bool updateClippingWindow = false;
 
         if (_labelId.empty())
         {
@@ -185,15 +178,15 @@ namespace minire::gui_controller
                 _newVisible.reset();
             }
 
-            if (_newEnableClipping)
+            if (_newClippingWindow)
             {
-                _enableClipping = *_newEnableClipping;
-                _newEnableClipping.reset();
+                _clippingWindow = *_newClippingWindow;
+                _newClippingWindow.reset();
             }
 
             _controller.enqueue<CreateLabel>(
                 _labelId, _text, _fontFace, _contentPosition, _visible, _zOrder);
-            updateClippingArea = true;
+            updateClippingWindow = true;
         }
 
         if (_newFontFace)
@@ -234,7 +227,7 @@ namespace minire::gui_controller
             if (_contentSize != *_newContentSize)
             {
                 _contentSize = *_newContentSize;
-                updateClippingArea = true;
+                updateClippingWindow = true;
             }
             _newContentSize.reset();
         }
@@ -261,19 +254,20 @@ namespace minire::gui_controller
             _newVisible.reset();
         }
 
-        if (_newEnableClipping)
+        if (_newClippingWindow)
         {
-            if (_enableClipping != *_newEnableClipping)
+            if (_clippingWindow != *_newClippingWindow)
             {
-                _enableClipping = *_newEnableClipping;
-                updateClippingArea = true;
+                _clippingWindow = *_newClippingWindow;
+                updateClippingWindow = true;
             }
-            _newEnableClipping.reset();
+            _newClippingWindow.reset();
         }
 
-        if (updateClippingArea)
+        if (updateClippingWindow)
         {
-            setClippingArea();
+            assert(!_labelId.empty());
+            _controller.enqueue<SetLabelClippingWindow>(_labelId, _clippingWindow);
         }
     }
 

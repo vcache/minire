@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 namespace minire::gui
 {
     struct Area
@@ -17,4 +19,8 @@ namespace minire::gui
                 && _top <= y && y < _top + _height;
         }
     };
+
+    Area intersection(Area const &, Area const &);
+
+    using MaybeArea = std::optional<Area>;
 }

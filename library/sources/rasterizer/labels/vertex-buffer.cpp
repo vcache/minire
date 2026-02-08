@@ -24,7 +24,6 @@ namespace minire::rasterizer::labels
                       text::TextFormat const & format,
                       wchar_t codePoint,
                       Font const & font,
-                      glm::vec2 const & clip,
                       std::vector<Vertex> & out)
         {
             uint32_t const fontCode = fontCodeOf(format);
@@ -44,11 +43,6 @@ namespace minire::rasterizer::labels
 
             gw -= .5f;
             gh -= .5f;
-
-            uv._right -= clip.x;
-            uv._bottom -= clip.y;
-            gw -= clip.x;
-            gh -= clip.y;
 
             out[disp + 0] = Vertex{ glm::vec2(gx, gy + gh),
                                     glm::vec2(uv._left, uv._bottom),
@@ -99,8 +93,7 @@ namespace minire::rasterizer::labels
     std::vector<Vertex> buildMesh(text::FormattedString const & text,
                                   Font const & fontRegular,
                                   Font const & fontBold,
-                                  Font const & fontItalic,
-                                  std::optional<glm::vec2> const & maxSize)
+                                  Font const & fontItalic)
     {
         assert(fontRegular.glyphSize() == fontBold.glyphSize());
         assert(fontRegular.glyphSize() == fontItalic.glyphSize());
@@ -108,24 +101,13 @@ namespace minire::rasterizer::labels
 
         std::vector<Vertex> result(text.size() * 6);
         size_t offset = 0;
-
         text::iterate(text, glyphSize,
             [&](text::TextFormat const & format, wchar_t codePoint,
-                glm::vec2 const & position, glm::vec2 const & glyphSize)
+                glm::vec2 const & positionMin, glm::vec2 const & glyphSize)
             {
-                glm::vec2 clip(0);
-                if (maxSize)
-                {
-                    if (position.y >= maxSize->y) return false;
-                    if (position.x >= maxSize->x) return true;
-
-                    assert(position.x < maxSize->x);
-                    clip = glm::max(glm::vec2(0), position + glyphSize - *maxSize);
-                }
-
                 Font const & font = selectFont(codePoint, format, fontRegular, fontBold, fontItalic);
-                offset += append(offset, position.x, position.y, glyphSize.x, glyphSize.y,
-                                 format, codePoint, font, clip, result);
+                offset += append(offset, positionMin.x, positionMin.y, glyphSize.x, glyphSize.y,
+                                 format, codePoint, font, result);
                 return true;
             });
         result.resize(offset);

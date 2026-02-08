@@ -65,7 +65,8 @@ namespace minire::gui::components
 
         size_t revalidateContent(size_t zOffset,
                                  bool const effectiveVisible,
-                                 Area const & clientArea) override;
+                                 Area const & contentArea,
+                                 Area const & clippingWindow) override;
 
     private:
         void setValueFromPosition(float abs);

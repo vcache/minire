@@ -64,10 +64,12 @@ namespace
 
         void step()
         {
-            glm::vec2 clipping(
-                _clipping._size.x * (1.0 + std::cos(_clipPhase)) / 2.0f,
-                _clipping._size.y * (1.0 + std::cos(_clipPhase / 2.0f)) / 2.0f);
-            enqueue<minire::events::controller::SetLabelClipping>(
+            minire::utils::Rect clipping(
+                _clipping._position.x,
+                _clipping._position.y,
+                _clipping._position.x + _clipping._size.x * (1.0 + std::cos(_clipPhase)) / 2.0f,
+                _clipping._position.y + _clipping._size.y * (1.0 + std::cos(_clipPhase / 2.0f)) / 2.0f);
+            enqueue<minire::events::controller::SetLabelClippingWindow>(
                 _clipping._id, clipping);
             _clipPhase += frameTime();
         }

@@ -43,6 +43,8 @@ namespace minire::gui
 
         virtual void setContentArea(Area const &) = 0;
 
+        virtual void setClippingWindow(MaybeArea const &) = 0;
+
         virtual size_t onZOrderChanged(size_t zOffset) = 0;
 
         virtual void setVisible(bool) = 0;
@@ -88,14 +90,11 @@ namespace minire::gui
         using Wptr = std::weak_ptr<TextView>;
 
         virtual void setContent(content::Id const & fontFace,
-                                text::FormattedString const & text,
-                                bool enableClipping = false) = 0;
+                                text::FormattedString const & text) = 0;
 
         virtual void setText(text::FormattedString const & text) = 0;
 
         virtual void setFontFace(content::Id const & fontFace) = 0;
-
-        virtual void setEnableClipping(bool const enableClipping) = 0;
     };
 
     class ContentViewFactory
@@ -107,7 +106,6 @@ namespace minire::gui
                                               utils::Patch const & patch) = 0;
 
         virtual TextView::Sptr makeTextView(text::FormattedString const & text,
-                                            content::Id const & fontFace,
-                                            bool const enableClipping = false) = 0;
+                                            content::Id const & fontFace) = 0;
     };
 }

@@ -61,12 +61,14 @@ namespace minire::gui::components
 
         size_t revalidateContent(size_t zOffset,
                                  bool const effectiveVisible,
-                                 Area const & clientArea) override
+                                 Area const & contentArea,
+                                 Area const & clippingWindow) override
         {
             assert(_content);
 
             _content->setVisible(effectiveVisible);
-            _content->setContentArea(clientArea);
+            _content->setContentArea(contentArea);
+            _content->setClippingWindow(clippingWindow);
 
             return _content->onZOrderChanged(zOffset);
         }

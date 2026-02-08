@@ -24,11 +24,10 @@ namespace minire
 
     gui::TextView::Sptr
     GuiController::makeTextView(text::FormattedString const & text,
-                                content::Id const & fontFace,
-                                bool const enableClipping)
+                                content::Id const & fontFace)
     {
         auto result = std::make_shared<gui_controller::TextViewImpl>(
-            text, fontFace, enableClipping, *this);
+            text, fontFace, *this);
         result->initialize();
         return result;
     }
@@ -130,7 +129,7 @@ namespace minire
         {
             assert(overlay._root);
             offset = std::max(offset, i * 10'000'000'000);
-            offset = overlay._root->revalidate(offset, true, _windowArea);
+            offset = overlay._root->revalidate(offset, true, _windowArea, _windowArea);
             i++;
         }
 

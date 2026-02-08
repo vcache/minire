@@ -25,6 +25,8 @@ namespace minire::gui::components
     // TODO: optional scrollbar
     // TODO: empty list placeholder content
     // TODO: allow unselect flag
+    // TODO: implement smooth scrolling
+
     class ListView final
         : public Component
         , public Callback<ListView, listview::OnSelectionChanged>
@@ -99,7 +101,8 @@ namespace minire::gui::components
 
         size_t revalidateContent(size_t zOffset,
                                  bool const effectiveVisible,
-                                 Area const & clientArea) override;
+                                 Area const & contentArea,
+                                 Area const & clippingWindow) override;
 
     private:
         class ListViewLayout;

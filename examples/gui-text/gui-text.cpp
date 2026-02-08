@@ -48,35 +48,35 @@ namespace
                 auto comp = guiRoot().emplace<minire::gui::components::Text>(
                     "content-size", makeTextView(loremIpsum, kFontFaceId));
                 comp->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
-                                                            minire::gui::dimension::Content{});
+                                                           minire::gui::dimension::Content{});
                 comp->vertical() = minire::gui::Arranger(minire::gui::position::Center{},
-                                                          minire::gui::dimension::Content{});
+                                                         minire::gui::dimension::Content{});
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Text>(
-                    "content-clipping-up", makeTextView(loremIpsum, kFontFaceId, true));
+                    "content-clipping-up", makeTextView(loremIpsum, kFontFaceId));
                 comp->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
-                                                            minire::gui::dimension::Constant{size.x / 2});
+                                                           minire::gui::dimension::Constant{size.x / 2});
                 comp->vertical() = minire::gui::Arranger(minire::gui::position::Begin{},
-                                                          minire::gui::dimension::Constant{size.y / 2});
+                                                         minire::gui::dimension::Constant{size.y / 2});
             }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Text>(
-                    "content-clipping-down", makeTextView(loremIpsum, kFontFaceId, true));
+                    "content-clipping-down", makeTextView(loremIpsum, kFontFaceId));
                 comp->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
-                                                            minire::gui::dimension::Constant{size.x / 2});
+                                                           minire::gui::dimension::Constant{size.x / 2});
                 comp->vertical() = minire::gui::Arranger(minire::gui::position::End{},
-                                                          minire::gui::dimension::Constant{size.y / 2});
+                                                         minire::gui::dimension::Constant{size.y / 2});
             }
 
             _animatedText = guiRoot().emplace<minire::gui::components::Text>(
                 "animated-text", makeTextView(L"adsfsadf", kFontFaceId));
             _animatedText->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
-                                                                 minire::gui::dimension::Content{});
+                                                                minire::gui::dimension::Content{});
             _animatedText->vertical() = minire::gui::Arranger(minire::gui::position::Begin{},
-                                                               minire::gui::dimension::Content{}, 200);
+                                                              minire::gui::dimension::Content{}, 200);
         }
 
         void step()

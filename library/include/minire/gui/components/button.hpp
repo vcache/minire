@@ -57,7 +57,8 @@ namespace minire::gui::components
     protected:
         size_t revalidateContent(size_t zOffset,
                                  bool const effectiveVisible,
-                                 Area const & clientArea) override;
+                                 Area const & contentArea,
+                                 Area const & clippingWindow) override;
 
         void handle(models::checkable::OnCheckedChanged const &) override;
         void handle(minire::events::application::OnMouseDown const & e) override;
@@ -73,7 +74,8 @@ namespace minire::gui::components
         };
 
         ImageView::Sptr const & activeBackground() const;
-        void revalidatePositions(Area const & clientArea);
+        void revalidatePositions(Area const & contentArea,
+                                 Area const & clippingWindow);
         void setState(State state);
 
         template<typename T>

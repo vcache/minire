@@ -33,8 +33,7 @@ namespace minire::rasterizer::labels
     std::vector<Vertex> buildMesh(text::FormattedString const & text,
                                   Font const & fontRegular,
                                   Font const & fontBold,
-                                  Font const & fontItalic,
-                                  std::optional<glm::vec2> const & maxSize);
+                                  Font const & fontItalic);
 
     // In Vertex shader:
     //    layout(location = 0) in vec2 bznkPos;

@@ -16,7 +16,7 @@
 
 namespace minire::gui::components
 {
-    static std::string const kBaseItemId = "__baseItem__";
+    static std::string const kActiveItemContainerId = "__baseItem__";
     static std::string const kBaseDropButtonId = "__dropButton__";
 
     // TODO: instead of this, onUnfocus + conditional hotKeys can be used
@@ -105,6 +105,59 @@ namespace minire::gui::components
         Dropdown & _dropdown;
     };
 
+    class Dropdown::ActiveItemContainer
+        : public Component
+    {
+    public:
+        using Component::Component;
+
+        size_t revalidateContent(size_t zOffset,
+                                 bool const effectiveVisible,
+                                 Area const & contentArea,
+                                 Area const & clippingWindow) override
+        {
+            if (_activeItem)
+            {
+                auto [size, isResizable] = _activeItem->measure();
+                if (!isResizable && size.y < contentArea._height)
+                {
+                    Area itemContentArea
+                    {
+                        ._left = contentArea._left,
+                        ._top = contentArea._top + (contentArea._height - size.y) * 0.5f,
+                        ._width = contentArea._width,
+                        ._height = contentArea._height,
+                    };
+                    _activeItem->setContentArea(itemContentArea);
+                }
+                else
+                {
+                    _activeItem->setContentArea(contentArea);
+                }
+
+                _activeItem->setClippingWindow(clippingWindow);
+                _activeItem->setVisible(effectiveVisible);
+                zOffset = _activeItem->onZOrderChanged(zOffset);
+            }
+            return zOffset;
+        }
+
+        void setActiveItem(ContentView::Sptr const & activeItem)
+        {
+            _activeItem = activeItem;
+            if (_activeItem)
+            {
+                _activeItem->setContentInvalidator(shared_from_this());
+            }
+            invalidateContent();
+        }
+
+        bool hasActiveItem() const { return _activeItem.operator bool(); }
+
+    private:
+        ContentView::Sptr _activeItem;
+    };
+
     Dropdown::Dropdown(std::string const & id,
                        Theme const & theme,
                        OverlayController & overlayController,
@@ -115,10 +168,12 @@ namespace minire::gui::components
         , _tongue(*this, theme.dropdown().constants()._tongue)
         , _contents(*this)
         , _lineHeight(*this, 0)
-        , _dropButton(std::make_shared<Button>(kBaseDropButtonId, theme,
-                                               overlayController))
+        , _activeItemContainer(std::make_shared<ActiveItemContainer>(
+            kActiveItemContainerId, theme, overlayController))
+        , _dropButton(std::make_shared<Button>(
+            kBaseDropButtonId, theme, overlayController))
         , _dropdownLayout(std::make_shared<layouts::VerticalTool>(
-            kBaseItemId, kBaseDropButtonId,
+            kActiveItemContainerId, kBaseDropButtonId,
             theme.dropdown().constants()._dropButtonWidth,
             theme.dropdown().constants()._dropButtonAtLeft))
         , _baseItemBuilderCallback(baseItemBuilder)
@@ -135,6 +190,13 @@ namespace minire::gui::components
 
     void Dropdown::initialize()
     {
+        assert(_activeItemContainer);
+        _activeItemContainer->setParent(shared_from_this());
+        _activeItemContainer->setCallback(std::in_place_type<gui::events::OnClick>, "__open__",
+            [this](Component const &, gui::events::OnClick const &)
+            { openTongue(); });
+
+        assert(_dropButton);
         _dropButton->setParent(shared_from_this());
         _dropButton->icon() = theme().makeIcon(theme::Icon::kArrowDown);
         _dropButton->setCallback(std::in_place_type<gui::events::OnClick>, "__open__",
@@ -168,6 +230,7 @@ namespace minire::gui::components
             "__tongue__", _tongueItemBuilderCallback ? _tongueItemBuilderCallback
                                                      : _baseItemBuilderCallback,
             &(theme().dropdown().tongue()));
+
         *(_tongueOverlay->_listview->contents()) = _contents.get();
         _tongueOverlay->_listview->select(_selected);
         _tongueOverlay->_listview->lineHeight() = _lineHeight;
@@ -183,8 +246,11 @@ namespace minire::gui::components
 
     size_t Dropdown::revalidateContent(size_t zOffset,
                                        bool const effectiveVisible,
-                                       Area const & clientArea)
+                                       Area const & contentArea,
+                                       Area const & clippingWindow)
     {
+        assert(_activeItemContainer);
+
         // maybe close the tongue
         if (_tongueOverlay && _tongueOverlay->_destroy)
         {
@@ -197,7 +263,8 @@ namespace minire::gui::components
             auto previous = _selected;
             _selected = std::nullopt;
             handle(dropdown::OnSelectionChanged{previous, _selected});
-            _activeItem.reset();
+
+            _activeItemContainer->setActiveItem({});
         }
 
         // revalidate background (if any)
@@ -208,28 +275,22 @@ namespace minire::gui::components
                 background->setContentInvalidator(shared_from_this());
             }
 
-            background->setContentArea(clientArea);
+            background->setContentArea(contentArea);
+            background->setClippingWindow(clippingWindow);
             background->setVisible(effectiveVisible);
             zOffset = background->onZOrderChanged(zOffset);
         }
 
         // actualize active element
-        if (_selected && (!_activeItem || _contents.isInvalidated()))
+        if (_selected && (!_activeItemContainer->hasActiveItem() || _contents.isInvalidated()))
         {
-            MINIRE_INVARIANT(_baseItemBuilderCallback, "no base item builder for \"{}\"", id());
-            _activeItem.reset();
+            ContentView::Sptr activeItem;
             if (*_selected < _contents.get().size())
             {
-                _activeItem = _baseItemBuilderCallback(_contents.get().at(*_selected), *_selected);
-                _activeItem->setContentInvalidator(shared_from_this());
+                MINIRE_INVARIANT(_baseItemBuilderCallback, "no base item builder for \"{}\"", id());
+                activeItem = _baseItemBuilderCallback(_contents.get().at(*_selected), *_selected);
             }
-        }
-
-        if (_activeItem)
-        {
-            _activeItem->setContentArea(clientArea);
-            _activeItem->setVisible(effectiveVisible);
-            zOffset = _activeItem->onZOrderChanged(zOffset);
+            _activeItemContainer->setActiveItem(activeItem);
         }
 
         // rearrange a tongue (if any)
@@ -245,7 +306,7 @@ namespace minire::gui::components
 
             Tongue const & tongue = _tongue.get();
 
-            float const tongueTop = clientArea._top + clientArea._height;
+            float const tongueTop = contentArea._top + contentArea._height;
             float const heightLimit = overlayController().topClientArea()._height - tongueTop;
             size_t const shownLines = std::min(_contents.get().size(),
                                                tongue._maxLines.value_or(0ULL));
@@ -258,8 +319,8 @@ namespace minire::gui::components
                                       tongue._minHeight.value_or(.0f),
                                       std::min(tongue._maxHeight.value_or(heightLimit), heightLimit));
 
-            listview.horizontal() = Arranger(position::Constant{clientArea._left},
-                                             dimension::Constant{clientArea._width}),
+            listview.horizontal() = Arranger(position::Constant{contentArea._left},
+                                             dimension::Constant{contentArea._width}),
             listview.vertical()   = Arranger(position::Constant{tongueTop},
                                              dimension::Constant{tongueHeight});
 
@@ -319,7 +380,8 @@ namespace minire::gui::components
         _selected = selected;
 
         // actialize an active item
-        _activeItem.reset();
+        assert(_activeItemContainer);
+        _activeItemContainer->setActiveItem({});
         invalidateContent();
 
         // notify subscribers

@@ -109,7 +109,8 @@ namespace minire::gui::components
 
         size_t revalidateContent(size_t zOffset,
                                  bool const effectiveVisible,
-                                 Area const & clientArea) override;
+                                 Area const & contentArea,
+                                 Area const & clippingWindow) override;
     private:
         void openTongue();
         void closeTongue();
@@ -125,6 +126,9 @@ namespace minire::gui::components
             bool                            _destroy;
         };
 
+        class ActiveItemContainer;
+        using ActiveItemContainerSptr = std::shared_ptr<ActiveItemContainer>;
+
     private:
         using Tongue = theme::Dropdown::Constants::Tongue;
 
@@ -133,6 +137,7 @@ namespace minire::gui::components
         Property<Contents>             _contents;
         Property<float>                _lineHeight;
 
+        ActiveItemContainerSptr        _activeItemContainer;
         Button::Sptr                   _dropButton;
         layouts::VerticalTool::Sptr    _dropdownLayout;
         ItemBuilderCallback            _baseItemBuilderCallback;
@@ -140,7 +145,6 @@ namespace minire::gui::components
 
         std::unique_ptr<TongueOverlay> _tongueOverlay;
         Selected                       _selected;
-        ContentView::Sptr              _activeItem;
 
         friend class DefaultHandler;
     };

@@ -679,7 +679,7 @@ namespace minire::rasterizer
 
         // TODO: don't re-create VAO/VBO, but update the existing ones
         std::vector<labels::Vertex> vertices = labels::buildMesh(
-            label._text, *fontRegular, *fontBold, *fontItalic, std::nullopt);
+            label._text, *fontRegular, *fontBold, *fontItalic);
         glm::vec2 const realContentSize = measureVertexArray(vertices);
         flipHorizontal(realContentSize, vertices);
 

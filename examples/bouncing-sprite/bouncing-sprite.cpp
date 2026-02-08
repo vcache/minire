@@ -35,7 +35,8 @@ namespace
             _imageSize = glm::vec2(image->_width, image->_height);
 
             enqueue<minire::events::controller::CreateSprite>(
-                kSpriteId, kSpriteFile, std::monostate(), _position, glm::vec2(0), true, 0);
+                kSpriteId, kSpriteFile, std::monostate(), _position, glm::vec2(0),
+                std::nullopt, true, 0);
         }
 
         void step() override
@@ -46,7 +47,7 @@ namespace
             _position = glm::clamp(_position, glm::vec2{0, 0}, _windowSize - _imageSize);
 
             enqueue<minire::events::controller::MoveSprite>(
-                kSpriteId, _position);
+                kSpriteId, _position, std::nullopt);
 
             if (_position.x + _imageSize.x >= _windowSize.x)
             {

@@ -184,7 +184,8 @@ namespace minire::gui::components
 
             size_t revalidateContent(size_t zOffset,
                                      bool const effectiveVisible,
-                                     Area const & clientArea) override
+                                     Area const & contentArea,
+                                     Area const & clippingWindow) override
             {
                 auto sharedFromThis = shared_from_this();
 
@@ -195,7 +196,8 @@ namespace minire::gui::components
                         _normalBackground.get()->setContentInvalidator(sharedFromThis);
                     }
 
-                    _normalBackground.get()->setContentArea(clientArea);
+                    _normalBackground.get()->setContentArea(contentArea);
+                    _normalBackground.get()->setClippingWindow(clippingWindow);
                     _normalBackground.get()->setVisible(!_isSelected.get() && isHovered() &&
                                                         effectiveVisible);
                     zOffset = _normalBackground.get()->onZOrderChanged(zOffset);
@@ -208,7 +210,8 @@ namespace minire::gui::components
                         _hoverBackground.get()->setContentInvalidator(sharedFromThis);
                     }
 
-                    _hoverBackground.get()->setContentArea(clientArea);
+                    _hoverBackground.get()->setContentArea(contentArea);
+                    _hoverBackground.get()->setClippingWindow(clippingWindow);
                     _hoverBackground.get()->setVisible(!_isSelected.get() && isHovered() &&
                                                        effectiveVisible);
                     zOffset = _hoverBackground.get()->onZOrderChanged(zOffset);
@@ -221,7 +224,8 @@ namespace minire::gui::components
                         _selectedBackground.get()->setContentInvalidator(sharedFromThis);
                     }
 
-                    _selectedBackground.get()->setContentArea(clientArea);
+                    _selectedBackground.get()->setContentArea(contentArea);
+                    _selectedBackground.get()->setClippingWindow(clippingWindow);
                     _selectedBackground.get()->setVisible(_isSelected.get() && effectiveVisible);
                     zOffset = _selectedBackground.get()->onZOrderChanged(zOffset);
                 }
@@ -233,7 +237,8 @@ namespace minire::gui::components
                         _contents.get()->setContentInvalidator(sharedFromThis);
                     }
 
-                    _contents.get()->setContentArea(clientArea);
+                    _contents.get()->setContentArea(contentArea);
+                    _contents.get()->setClippingWindow(clippingWindow);
                     _contents.get()->setVisible(effectiveVisible);
                     zOffset = _contents.get()->onZOrderChanged(zOffset);
                 }
@@ -322,7 +327,8 @@ namespace minire::gui::components
 
     size_t ListView::revalidateContent(size_t zOffset,
                                        bool const effectiveVisible,
-                                       Area const & clientArea)
+                                       Area const & contentArea,
+                                       Area const & clippingWindow)
     {
         if (_selected && *_selected >= _contents.get().size())
         {
@@ -338,7 +344,8 @@ namespace minire::gui::components
                 _background.get()->setContentInvalidator(shared_from_this());
             }
 
-            background->setContentArea(clientArea);
+            background->setContentArea(contentArea);
+            background->setClippingWindow(clippingWindow);
             background->setVisible(effectiveVisible);
             zOffset = background->onZOrderChanged(zOffset);
         }
@@ -346,7 +353,7 @@ namespace minire::gui::components
         float const contentPadding = _contentContainer
             ? _contentContainer->padding().get()._top + _contentContainer->padding().get()._bottom
             : 0;
-        float const heightLimit = clientArea._height - contentPadding;
+        float const heightLimit = contentArea._height - contentPadding;
 
         if (_contents.isInvalidated() || _offset.isInvalidated() ||
             _lineHeight.isInvalidated() || _heightLimit != heightLimit)
@@ -396,7 +403,7 @@ namespace minire::gui::components
                         // NOTE: this dirty hack is required because scrollToSelected()
                         //       will recalc _offset, thus, ListViewElements should be
                         //       re-created.
-                        return revalidateContent(zOffset, effectiveVisible, clientArea);
+                        return revalidateContent(zOffset, effectiveVisible, contentArea, clippingWindow);
                     }
                 }
             }

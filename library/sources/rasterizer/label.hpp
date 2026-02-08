@@ -4,6 +4,7 @@
 #include <minire/text/formatted-string.hpp>
 #include <minire/text/symbol.hpp>
 #include <minire/text/text-format.hpp>
+#include <minire/utils/rect.hpp>
 
 #include <rasterizer/drawable.hpp>
 
@@ -50,7 +51,7 @@ namespace minire::rasterizer
 
         void setFontFace(models::FontFace const & fontData);
 
-        void setMaxSize(std::optional<glm::vec2> const & maxSize);
+        void setClippingWindow(utils::MaybeRect const & clippingWindow);
 
     public:
         // TODO: consider to put projection into UBO
@@ -71,7 +72,7 @@ namespace minire::rasterizer
         FontPtr                  _fontItalic;
         text::FormattedString    _text;
         glm::vec2                _position;
-        std::optional<glm::vec2> _maxSize;     
+        utils::MaybeRect         _clippingWindow;
 
         Program const &          _program;
         mutable VertexBufferUptr _vertexBuffer;

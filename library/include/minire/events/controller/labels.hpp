@@ -3,6 +3,7 @@
 #include <minire/text/formatted-string.hpp>
 #include <minire/text/symbol.hpp>
 #include <minire/text/text-format.hpp>
+#include <minire/utils/rect.hpp>
 
 #include <glm/vec2.hpp>
 
@@ -22,6 +23,10 @@ namespace minire::events::controller
         bool                  _visible;
         size_t                _zOrder;
     };
+
+    // TODO: tidy up this API (lots of logic duplicated: resize,
+    //       move, set area, set clipping window)
+    // TODO: make it more consistent w/ Sprites API
 
     struct MoveLabel
     {
@@ -47,10 +52,10 @@ namespace minire::events::controller
         content::Id _fontFace;
     };
 
-    struct SetLabelClipping
+    struct SetLabelClippingWindow
     {
-        std::string              _id;
-        std::optional<glm::vec2> _maxSize;
+        std::string      _id;
+        utils::MaybeRect _clippingWindow;
     };
 
     struct SetLabelZOrder

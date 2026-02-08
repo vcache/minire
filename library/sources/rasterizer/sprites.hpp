@@ -30,18 +30,25 @@ namespace minire::rasterizer
                     utils::Patch const & patch, // in pixels, on a texture
                     glm::vec2 const & position,
                     glm::vec2 const & dimensions,
+                    utils::MaybeRect const & clippingWindow,
                     bool const visible,
                     size_t const zOrder);
 
         void move(std::string const & id,
-                  glm::vec2 const & position);
+                  glm::vec2 const & position,
+                  utils::MaybeRect const & clippingWindow);
 
         void resize(std::string const & id,
-                    glm::vec2 const & dimensions);
+                    glm::vec2 const & dimensions,
+                    utils::MaybeRect const & clippingWindow);
 
         void setArea(std::string const & id,
                      glm::vec2 const & position,
-                     glm::vec2 const & dimensions);
+                     glm::vec2 const & dimensions,
+                     utils::MaybeRect const & clippingWindow);
+
+        void setClippingWindow(std::string const & id,
+                               utils::MaybeRect const & clippingWindow);
 
         void visible(std::string const & id,
                      bool visible);

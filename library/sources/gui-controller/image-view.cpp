@@ -74,6 +74,24 @@ namespace minire::gui_controller
         setContentSize(area._width, area._height);
     }
 
+    void ImageViewImpl::setClippingWindow(gui::MaybeArea const & area)
+    {
+        utils::MaybeRect rect;
+        if (area)
+        {
+            rect.emplace(area->_left,
+                         area->_top,
+                         area->_left + area->_width,
+                         area->_top + area->_height);
+        }
+
+        if (rect != _clippingWindow)
+        {
+            _newClippingWindow = rect;
+            enqueueUncommited();
+        }
+    }
+
     size_t ImageViewImpl::onZOrderChanged(size_t zOffset)
     {
         if (_zOrder != zOffset || _newZOrder)
@@ -123,13 +141,20 @@ namespace minire::gui_controller
                 _newVisible.reset();
             }
 
+            if (_newClippingWindow)
+            {
+                _clippingWindow = *_newClippingWindow;
+                _newClippingWindow.reset();
+            }
+
             _controller.enqueue<CreateSprite>(
                 _spriteId, _textureId, _patch, _spritePosition,
-                _spriteSize, _visible, _zOrder);
+                _spriteSize, _clippingWindow, _visible, _zOrder);
         }
 
         bool changePosition = false;
         bool changeDimension = false;
+        bool changeClippingWindow = false;
         if (_newSpritePosition)
         {
             if (_spritePosition != *_newSpritePosition)
@@ -150,21 +175,36 @@ namespace minire::gui_controller
             _newSpriteSize.reset();
         }
 
+        if (_newClippingWindow)
+        {
+            if (_clippingWindow != *_newClippingWindow)
+            {
+                _clippingWindow = *_newClippingWindow;
+                changeClippingWindow = true;
+            }
+            _newClippingWindow.reset();
+        }
+
         if (changePosition && changeDimension)
         {
             assert(!_spriteId.empty());
             _controller.enqueue<SetSpriteArea>(_spriteId, _spritePosition,
-                                               _spriteSize);
+                                               _spriteSize, _clippingWindow);
         }
         else if (changePosition)
         {
             assert(!_spriteId.empty());
-            _controller.enqueue<MoveSprite>(_spriteId, _spritePosition);
+            _controller.enqueue<MoveSprite>(_spriteId, _spritePosition, _clippingWindow);
         }
         else if (changeDimension)
         {
             assert(!_spriteId.empty());
-            _controller.enqueue<ResizeSprite>(_spriteId, _spriteSize);
+            _controller.enqueue<ResizeSprite>(_spriteId, _spriteSize, _clippingWindow);
+        }
+        else if (changeClippingWindow)
+        {
+            assert(!_spriteId.empty());
+            _controller.enqueue<SetSpriteClippingWindow>(_spriteId, _clippingWindow);
         }
 
         if (_newZOrder)

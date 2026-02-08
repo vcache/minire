@@ -46,7 +46,6 @@ namespace minire::rasterizer
         uniform mat4 bznkProj;
         uniform vec2 bznkPosition;
 
-        out vec2 bznkFragPos;
         out vec2 bznkFragUv;
         flat out vec4 bznkFragFgColor;
         flat out vec4 bznkFragBgColor;
@@ -66,25 +65,35 @@ namespace minire::rasterizer
     static const char * kFragShader = R"(
         #version 330 core
 
-        in vec2 bznkFragPos;
+        layout(origin_upper_left) in vec4 gl_FragCoord;
+
         in vec2 bznkFragUv;
         flat in vec4 bznkFragFgColor;
         flat in vec4 bznkFragBgColor;
         flat in uint bznkFragFont;
 
         uniform sampler2D bznkFonts[3];
+        uniform vec4 bznkClippingWindow;  // (left, top, right, bottom)
 
         out vec4 bznkOutColor;
 
         void main()
         {
-            ivec2 offset = ivec2(bznkFragUv);
-            float fgFactor = texelFetch(bznkFonts[bznkFragFont], offset, 0).r;
+            if (bznkClippingWindow.x <= gl_FragCoord.x && gl_FragCoord.x <= bznkClippingWindow.z
+             && bznkClippingWindow.y <= gl_FragCoord.y && gl_FragCoord.y <= bznkClippingWindow.w)
+            {
+                ivec2 offset = ivec2(bznkFragUv);
+                float fgFactor = texelFetch(bznkFonts[bznkFragFont], offset, 0).r;
 
-            //float fgFactor = texture(bznkFonts[bznkFragFont], bznkFragUv).r;
-            float bgFactor = 1.0 - fgFactor;
-            bznkOutColor = bznkFragBgColor * bgFactor
-                         + bznkFragFgColor * fgFactor;
+                //float fgFactor = texture(bznkFonts[bznkFragFont], bznkFragUv).r;
+                float bgFactor = 1.0 - fgFactor;
+                bznkOutColor = bznkFragBgColor * bgFactor
+                             + bznkFragFgColor * fgFactor;
+            }
+            else
+            {
+                discard;
+            }
         }
     )";
 
@@ -99,6 +108,7 @@ namespace minire::rasterizer
             , _fontsUniform(_program.getUniformLocation("bznkFonts"))
             , _projUniform(_program.getUniformLocation("bznkProj"))
             , _positionUniform(_program.getUniformLocation("bznkPosition"))
+            , _clippingWindow(_program.getUniformLocation("bznkClippingWindow"))
         {}
 
         void use() const { _program.use(); }
@@ -118,6 +128,20 @@ namespace minire::rasterizer
             MINIRE_GL(glUniform2f, _positionUniform, v.x, v.y);
         }
 
+        void setClippingWindow(utils::MaybeRect const & clippingWindow) const
+        {
+            glm::vec4 value(std::numeric_limits<float>::min(),
+                            std::numeric_limits<float>::min(),
+                            std::numeric_limits<float>::max(),
+                            std::numeric_limits<float>::max());
+            if (clippingWindow)
+            {
+                value = glm::vec4(clippingWindow->_left,  clippingWindow->_top,
+                                  clippingWindow->_right, clippingWindow->_bottom);
+            }
+            _program.setUniform(_clippingWindow, value);
+        }
+
     public:
         static Program const & instance()
         {
@@ -130,6 +154,7 @@ namespace minire::rasterizer
         GLint           _fontsUniform;
         GLint           _projUniform;
         GLint           _positionUniform;
+        GLint           _clippingWindow;
     };
 
     Label::Label(Fonts const & fonts,
@@ -183,10 +208,9 @@ namespace minire::rasterizer
         _invalidated = true;
     }
 
-    void Label::setMaxSize(std::optional<glm::vec2> const & maxSize)
+    void Label::setClippingWindow(utils::MaybeRect const & clippingWindow)
     {
-        _maxSize = maxSize;
-        _invalidated = true;
+        _clippingWindow = clippingWindow;
     }
 
     void Label::setText(text::FormattedString const & text)
@@ -228,6 +252,7 @@ namespace minire::rasterizer
         _program.setFontsUniform(kTextureUnits);
         _program.setProjUniform(projection);
         _program.setPositionUniform(_position);
+        _program.setClippingWindow(_clippingWindow);
 
         _vertexBuffer->draw();
     }
@@ -245,7 +270,7 @@ namespace minire::rasterizer
 
         // TODO: don't re-create VAO/VBO, but update the existing ones
         auto const & vertices = labels::buildMesh(
-            _text, *_fontRegular, *_fontBold, *_fontItalic, _maxSize);
+            _text, *_fontRegular, *_fontBold, *_fontItalic);
         _vertexBuffer = std::make_unique<labels::VertexBuffer>(vertices);
 
         _invalidated = false;

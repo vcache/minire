@@ -102,6 +102,12 @@ namespace minire::opengl
             MINIRE_GL(glUniform3f, location, value.x, value.y, value.z);
         }
 
+        void setUniform(GLint location, glm::vec4 const & value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniform4f, location, value.x, value.y, value.z, value.w);
+        }
+
         void setUniform(GLint location, glm::mat4 const & value) const
         {
             assert(isUsing());

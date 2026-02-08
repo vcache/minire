@@ -205,7 +205,7 @@ namespace minire::rasterizer::sprites
                 return buildMesh(rect, position);
             },
             [&](utils::Rect const & rect) { return buildMesh(rect, position); },
-            [&](utils::NinePatch const & tile) { return buildMesh(tile, position, dimensions); }            
+            [&](utils::NinePatch const & tile) { return buildMesh(tile, position, dimensions); }
         }, patch);
     }
 
