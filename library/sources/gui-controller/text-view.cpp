@@ -116,7 +116,7 @@ namespace minire::gui_controller
         if (text != _text || _newText)
         {
             _newText = text;
-            _textSize = _controller.measure(_text, _fontFace);
+            _textSize = _controller.measure(text, _fontFace);
             invalidate();
             enqueueUncommited();
         }
