@@ -202,7 +202,7 @@ namespace minire::gui::components
     size_t Scrollbar::revalidateContent(size_t zOffset,
                                         bool const effectiveVisible,
                                         Area const & contentArea,
-                                        Area const & /* clippingWindow */)
+                                        Area const & clippingWindow)
     {
         // revalidate background (if any)
         if (auto background = _background.get(); background)
@@ -213,7 +213,7 @@ namespace minire::gui::components
             }
 
             background->setContentArea(contentArea);
-            background->setClippingWindow(contentArea);
+            background->setClippingWindow(clippingWindow);
             background->setVisible(effectiveVisible);
             zOffset = background->onZOrderChanged(zOffset);
         }
