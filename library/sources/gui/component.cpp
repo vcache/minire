@@ -60,6 +60,7 @@ namespace minire::gui
     public:
         Area             _clientArea;
         Area             _contentArea;
+        Area             _contentClippingWindow;
         ZOrderStore      _zOrderStore; // in an ascending zOrder
         ZOrderBoundaries _zOrderBoundaries{0, 0};
         size_t           _zOrder = 0;
@@ -319,6 +320,11 @@ namespace minire::gui
         Area const & clientClippingWindow = intersection(clippingWindow, _impl->_clientArea);
         Area const & contentClippingWindow = intersection(clientClippingWindow, _impl->_contentArea);
         zOffset = revalidateContent(zOffset, effectiveVisible, _impl->_contentArea, contentClippingWindow);
+        if (contentClippingWindow != _impl->_contentClippingWindow)
+        {
+            _impl->_contentClippingWindow = contentClippingWindow;
+            revalidateChildren = true;
+        }
 
         // revalidate Layout
         revalidateChildren |= _layout.isInvalidated();
