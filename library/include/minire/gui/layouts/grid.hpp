@@ -8,7 +8,8 @@
 
 namespace minire::gui::layouts
 {
-    class Grid : public Layout
+    class Grid
+        : public LinearLayout
     {
     public:
         Grid(size_t rows, size_t cols);

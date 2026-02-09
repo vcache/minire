@@ -9,7 +9,7 @@
 namespace minire::gui::components
 {
     class Scrollbar::CustomLayout
-        : public Layout
+        : public LinearLayout
     {
     public:
         explicit CustomLayout(Scrollbar const & scrollbar)

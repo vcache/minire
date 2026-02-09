@@ -15,7 +15,7 @@ namespace minire::gui::components
     static std::string const kScrollbarId = "__scrollbar__";
 
     class ListView::ListViewLayout
-        : public Layout
+        : public LinearLayout
     {
     public:
         using Sptr = std::shared_ptr<ListViewLayout>;

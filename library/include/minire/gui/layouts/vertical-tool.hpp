@@ -7,7 +7,7 @@
 namespace minire::gui::layouts
 {
     class VerticalTool
-        : public Layout
+        : public LinearLayout
     {
     public:
         using Sptr = std::shared_ptr<VerticalTool>;

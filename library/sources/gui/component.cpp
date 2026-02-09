@@ -120,7 +120,7 @@ namespace minire::gui
         , _vertical(*this)
         , _padding(*this)
         , _zOrder(*this)
-        , _layout(*this, std::make_shared<Layout>())
+        , _layout(*this, std::make_shared<LinearLayout>())
         , _impl(std::make_unique<Impl>())
         , _invalidated(false)
         , _contentInvalidated(false)
@@ -335,7 +335,7 @@ namespace minire::gui
 
         utils::Rect const padding = _padding.get(); //  TODO: maybe padding should affect _contentArea instead?
                                                     //        (or just decrease clientArea)
-        Area const & childrenClientArea = Area
+        Area const childrenClientArea = Area
         {
             ._left = _impl->_contentArea._left + padding._left,
             ._top = _impl->_contentArea._top + padding._top,
@@ -346,8 +346,30 @@ namespace minire::gui
         Area const & childrenClientClippingWindow = intersection(contentClippingWindow, childrenClientArea);
 
         {
+            // prepare z-order store
             _impl->sortZOrderStore(); // TODO: don't resort every time (maybe use invalidation flags instead bool)
             RaiiFlag zOrderStoreLock(_impl->_zOrderLocked);
+
+            // fetch the Layout
+            Layout::Sptr const & layout = _layout.get();
+            assert(layout);
+
+            // prepare target for Layout
+            Layout::Targets targets;
+            targets.reserve(_impl->_zOrderStore.size());
+            for(Sptr const & child : _impl->_zOrderStore)
+            {
+                assert(child);
+                targets.emplace_back(Layout::Target
+                {
+                    ._component = *child,
+                });
+            }
+            Layout::Areas const & childrenContentAreas = layout->evaluate(childrenClientArea, targets);
+            assert(childrenContentAreas.size() == _impl->_zOrderStore.size());
+
+            // revalidare the children
+            size_t index = 0;
             for(Sptr const & child : _impl->_zOrderStore)
             {
                 assert(child);
@@ -362,14 +384,15 @@ namespace minire::gui
                                        child->_invalidated ||
                                        effectiveVisibleChanged))
                 {
-                    assert(_layout.get());
-                    Area const & childArea = _layout.get()->evaluate(childrenClientArea, *child);
+                    assert(index < childrenContentAreas.size());
+                    Area const & childArea = childrenContentAreas[index];
                     Area const & childClippingWindow = intersection(childrenClientClippingWindow, childArea);
                     newOffset = child->revalidate(zOffset, effectiveVisible, childArea, childClippingWindow);
                     assert(newOffset == child->_impl->_zOrderBoundaries.second);
                 }
 
                 zOffset = std::max(newOffset, zOffset + kZOrderIndent);
+                index++;
             }
         }
 
