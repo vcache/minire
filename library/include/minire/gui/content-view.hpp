@@ -3,10 +3,12 @@
 #include <minire/content/id.hpp>
 #include <minire/gui/area.hpp>
 #include <minire/text/formatted-string.hpp>
+#include <minire/utils/glyph-grid.hpp>
 #include <minire/utils/rect.hpp>
 
 #include <glm/vec2.hpp>
 
+#include <limits>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -95,6 +97,8 @@ namespace minire::gui
         virtual void setText(text::FormattedString const & text) = 0;
 
         virtual void setFontFace(content::Id const & fontFace) = 0;
+
+        virtual utils::TextLayout const & textLayout() const = 0;
     };
 
     class ContentViewFactory

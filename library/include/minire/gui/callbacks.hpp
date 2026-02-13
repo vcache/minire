@@ -101,6 +101,7 @@ namespace minire::gui
                                   minire::events::application::OnKeyUp,
                                   minire::events::application::OnKeyDown,
                                   minire::events::application::OnTextInput,
+                                  minire::events::application::OnClipboardUpdate,
                                   gui::events::OnDragBegin,
                                   gui::events::OnDragMove,
                                   gui::events::OnDragEnd,

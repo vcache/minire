@@ -17,7 +17,7 @@ namespace minire::rasterizer
         GLsizei maxMipMaps(size_t w, size_t h)
         {
             size_t const side = std::min(w, h);
-            return glm::floor(glm::log2(static_cast<float>(side))) - 1;        
+            return glm::floor(glm::log2(static_cast<float>(side))) - 1;
         }
     }
 

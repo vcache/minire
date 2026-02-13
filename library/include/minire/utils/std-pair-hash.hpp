@@ -2,7 +2,7 @@
 
 #include <functional> // For std::hash
 #include <utility>
-    
+
 #include <boost/container_hash/hash.hpp> // for hash_combine
 
 namespace std

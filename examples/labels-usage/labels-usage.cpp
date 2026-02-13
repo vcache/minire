@@ -86,13 +86,18 @@ namespace
 
             {
                 minire::text::FormattedString loremIpsum;
-                loremIpsum.append(L"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod\n");
-                loremIpsum.append(L"tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim\n").bold(true);
-                loremIpsum.append(L"veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea\n").italic(true);
-                loremIpsum.append(L"commodo consequat. Duis aute irure dolor in reprehenderit in voluptate\n").underline(true);
-                loremIpsum.append(L"velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat\n").strikeout(true);
-                loremIpsum.append(L"cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est\n").invertColors(true);
-                loremIpsum.append(L"laborum.");
+                loremIpsum.append("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod\n");
+                loremIpsum.append("tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim\n",
+                                  minire::text::Format().bold(true));
+                loremIpsum.append("veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea\n",
+                                  minire::text::Format().italic(true));
+                loremIpsum.append("commodo consequat. Duis aute irure dolor in reprehenderit in voluptate\n",
+                                  minire::text::Format().underline(true));
+                loremIpsum.append("velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat\n",
+                                  minire::text::Format().strikeout(true));
+                loremIpsum.append("cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est\n",
+                                  minire::text::Format().invertColors(true));
+                loremIpsum.append("laborum.");
                 _clipping = makeLabel(loremIpsum);
             }
         }

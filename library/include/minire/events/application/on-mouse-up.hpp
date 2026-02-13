@@ -25,5 +25,5 @@ namespace minire::events::application
             , _doubleClick(doubleClick)
         {}
 
-    };   
+    };
 }

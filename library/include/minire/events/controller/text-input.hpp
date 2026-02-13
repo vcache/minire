@@ -6,5 +6,5 @@ namespace minire::events::controller
     {};
 
     struct StopTextInput
-    {};   
+    {};
 }

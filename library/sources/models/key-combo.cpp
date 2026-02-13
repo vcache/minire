@@ -1,7 +1,7 @@
 #include <minire/models/key-combo.hpp>
 
 #include <minire/errors.hpp>
- 
+
 #include <SDL2/SDL_keyboard.h>
 
 #include <algorithm>
@@ -15,7 +15,7 @@ namespace minire::models
     // see https://wiki.libsdl.org/SDL_Keymod
     namespace
     {
-        static constexpr const uint16_t kAllowedModMask = 
+        static constexpr const uint16_t kAllowedModMask =
             KMOD_LSHIFT | KMOD_RSHIFT |
             KMOD_LCTRL  | KMOD_RCTRL  |
             KMOD_LALT   | KMOD_RALT   |
@@ -50,7 +50,7 @@ namespace minire::models
                 std::hash<char> h;
                 size_t result = 0;
                 for (char c : input) c += h(std::toupper(c));
-                return result;                
+                return result;
             }
         };
 
@@ -313,7 +313,7 @@ namespace minire::models
                 {"APP1", SDL_SCANCODE_APP1},
                 {"APP2", SDL_SCANCODE_APP2},
                 {"AUDIOREWIND", SDL_SCANCODE_AUDIOREWIND},
-                {"AUDIOFASTFORWARD", SDL_SCANCODE_AUDIOFASTFORWARD}               
+                {"AUDIOFASTFORWARD", SDL_SCANCODE_AUDIOFASTFORWARD}
             };
             return kKeycodesMap;
         }

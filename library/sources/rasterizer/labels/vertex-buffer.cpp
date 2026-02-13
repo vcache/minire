@@ -11,7 +11,7 @@ namespace minire::rasterizer::labels
 {
     namespace
     {
-        uint32_t fontCodeOf(text::TextFormat const & s)
+        uint32_t fontCodeOf(text::Format const & s)
         {
             if (s.bold()) return 1;
             if (s.italic()) return 2;
@@ -21,21 +21,20 @@ namespace minire::rasterizer::labels
         size_t append(size_t disp,
                       float gx, float gy,
                       float gw, float gh,
-                      text::TextFormat const & format,
-                      wchar_t codePoint,
+                      text::Symbol const & symbol,
                       Font const & font,
                       std::vector<Vertex> & out)
         {
-            uint32_t const fontCode = fontCodeOf(format);
-            utils::Rect uv = font.uvRect(codePoint, L'?');
+            uint32_t const fontCode = fontCodeOf(symbol);
+            utils::Rect uv = font.uvRect(symbol.codePoint(), L'?');
             uv += .5f; // TODO: move that into rasterizer::Font::Font
 
             glm::vec4 bg(0), fg(0);
-            if (!format.blank())
+            if (!symbol.blank())
             {
-                fg = format.foreground();
-                bg = format.background();
-                if (format.invertColors())
+                fg = symbol.foreground();
+                bg = symbol.background();
+                if (symbol.invertColors())
                 {
                     std::swap(fg, bg);
                 }
@@ -47,7 +46,7 @@ namespace minire::rasterizer::labels
             out[disp + 0] = Vertex{ glm::vec2(gx, gy + gh),
                                     glm::vec2(uv._left, uv._bottom),
                                     fg, bg, fontCode};
-            out[disp + 1] = Vertex{ glm::vec2(gx, gy), 
+            out[disp + 1] = Vertex{ glm::vec2(gx, gy),
                                     glm::vec2(uv._left, uv._top),
                                     fg, bg, fontCode};
             out[disp + 2] = Vertex{ glm::vec2(gx + gw, gy),
@@ -66,22 +65,21 @@ namespace minire::rasterizer::labels
             return 6;
         }
 
-        Font const & selectFont(wchar_t codePoint,
-                                text::TextFormat const & format,
+        Font const & selectFont(text::Symbol const & symbol,
                                 Font const & fontRegular,
                                 Font const & fontBold,
                                 Font const & fontItalic)
         {
-            if (format.bold())
+            if (symbol.bold())
             {
-                if (fontBold.loaded(codePoint))
+                if (fontBold.loaded(symbol.codePoint()))
                 {
                     return fontBold;
                 }
             }
-            else if (format.italic())
+            else if (symbol.italic())
             {
-                if (fontItalic.loaded(codePoint))
+                if (fontItalic.loaded(symbol.codePoint()))
                 {
                     return fontItalic;
                 }
@@ -102,12 +100,12 @@ namespace minire::rasterizer::labels
         std::vector<Vertex> result(text.size() * 6);
         size_t offset = 0;
         text::iterate(text, glyphSize,
-            [&](text::TextFormat const & format, wchar_t codePoint,
-                glm::vec2 const & positionMin, glm::vec2 const & glyphSize)
+            [&](text::Symbol const & symbol, glm::vec2 const & positionMin,
+                glm::vec2 const & glyphSize)
             {
-                Font const & font = selectFont(codePoint, format, fontRegular, fontBold, fontItalic);
+                Font const & font = selectFont(symbol, fontRegular, fontBold, fontItalic);
                 offset += append(offset, positionMin.x, positionMin.y, glyphSize.x, glyphSize.y,
-                                 format, codePoint, font, result);
+                                 symbol, font, result);
                 return true;
             });
         result.resize(offset);

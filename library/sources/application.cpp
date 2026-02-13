@@ -134,6 +134,13 @@ namespace minire
         }
     }
 
+    void Application::onClipboardUpdate(std::string clipboardText,
+                                        std::string primarySelection)
+    {
+        postEvent<events::application::OnClipboardUpdate>(std::move(clipboardText),
+                                                          std::move(primarySelection));
+    }
+
     void Application::onMouseWheel(int dx, int dy)
     {
         using namespace events::application;
@@ -180,7 +187,7 @@ namespace minire
         postEvent<events::application::OnMouseDown>(
             x, y, mouseButton, doubleClick);
     }
-    
+
     void Application::onMouseUp(int x, int y, bool doubleClick,
                                 models::MouseButton mouseButton)
     {
@@ -416,10 +423,35 @@ namespace minire
     {
         ::SDL_StartTextInput();
     }
-    
+
     void Application::handle(events::controller::StopTextInput const &)
     {
         ::SDL_StopTextInput();
+    }
+
+    void Application::handle(events::controller::StartClipboardCapture const &)
+    {
+        setCaptureClipboard(true);
+    }
+
+    void Application::handle(events::controller::StopClipboardCapture const &)
+    {
+        setCaptureClipboard(false);
+    }
+
+    void Application::handle(events::controller::SetClipboardText const & e)
+    {
+        setClipboardText(e._text);
+    }
+
+    void Application::handle(events::controller::SetPrimarySelection const & e)
+    {
+        setPrimarySelection(e._text);
+    }
+
+    void Application::handle(events::controller::SetSystemCursor const & e)
+    {
+        setSystemCursor(e._systemCursor);
     }
 
     void Application::handle(events::controller::SceneReset const & e)

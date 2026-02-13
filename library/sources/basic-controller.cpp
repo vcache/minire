@@ -233,6 +233,22 @@ namespace minire
         return text::measure(text, fontFace);
     }
 
+
+    std::unique_ptr<utils::TextLayout> BasicController::layout(text::FormattedString const & text,
+                                                               content::Id const & id)
+    {
+        auto lease = _contentManager.borrow(id);
+        assert(lease);
+        models::FontFace const & fontFace = lease->as<models::FontFace>();
+        return layout(text, fontFace);
+    }
+
+    std::unique_ptr<utils::TextLayout> BasicController::layout(text::FormattedString const & text,
+                                                               models::FontFace const & fontFace)
+    {
+        return text::layout(text, fontFace);
+    }
+
     utils::Aabb BasicController::measure(content::Path const & path) const
     {
         return utils::buildAabb(_contentManager, path);
@@ -312,22 +328,24 @@ namespace minire
     void BasicController::finish() {}
 
     void BasicController::handle(events::application::OnFps const &) {}
-    
+
     void BasicController::handle(events::application::OnResize const &) {}
-    
+
     bool BasicController::handle(events::application::OnMouseWheel const &) { return false; }
-    
+
     bool BasicController::handle(events::application::OnMouseMove const &) { return false; }
-    
+
     bool BasicController::handle(events::application::OnMouseDown const &) { return false; }
-    
+
     bool BasicController::handle(events::application::OnMouseUp const &) { return false; }
-    
+
     bool BasicController::handle(events::application::OnKeyUp const &) { return false; }
-    
+
     bool BasicController::handle(events::application::OnKeyDown const &) { return false; }
 
     bool BasicController::handle(events::application::OnTextInput const &) { return false; }
+
+    bool BasicController::handle(events::application::OnClipboardUpdate const &) { return false; }
 
     void BasicController::handle(events::application::OnRayCaster const &) {}
 }

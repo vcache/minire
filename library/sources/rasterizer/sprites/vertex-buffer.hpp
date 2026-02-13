@@ -12,10 +12,10 @@
 
 namespace minire::rasterizer::sprites
 {
-    // NOTE: Clients must align data elements consistent with the 
+    // NOTE: Clients must align data elements consistent with the
     //       requirements of the client platform, with an additional
     //       base-level requirement that an offset within a buffer to
-    //       a datum comprising N be a multiple of N.        
+    //       a datum comprising N be a multiple of N.
     struct Vertex
     {
         // TODO: why 2?

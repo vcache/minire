@@ -4,10 +4,12 @@
 #include <minire/models/msaa-params.hpp>
 
 #include <SDL2/SDL_keycode.h>
+#include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_scancode.h>
 
 #include <cassert>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 class SDL_Window;
@@ -37,6 +39,8 @@ namespace minire::sdl
         virtual void onMouseDown(int x, int y, bool doubleClick, models::MouseButton);
         virtual void onMouseUp(int x, int y, bool doubleClick, models::MouseButton);
         virtual void onTextInput(std::string);
+        virtual void onClipboardUpdate(std::string clipboardText,
+                                       std::string primarySelection);
 
         // https://wiki.libsdl.org/SDL_Keycode
         // https://wiki.libsdl.org/SDL_Keymod
@@ -49,6 +53,14 @@ namespace minire::sdl
         bool setMouseMode(bool const windowGrab,
                           bool const showCursor,
                           bool const relativeMode);
+
+        void setSystemCursor(::SDL_SystemCursor);
+
+        void setCaptureClipboard(bool);
+        void maybeEmitClipboardUpdate();
+
+        void setClipboardText(std::string const &) const;
+        void setPrimarySelection(std::string const &) const;
 
     protected:
         uint32_t ticks() const { return _frameTicks; } // milliseconds, msec
@@ -63,12 +75,21 @@ namespace minire::sdl
         void handle(SDL_WindowEvent const &);
         void handleResize(int w, int h);
 
+        struct SdlCursorDeleter
+        {
+            void operator()(SDL_Cursor * c) const { ::SDL_FreeCursor(c); }
+        };
+
+        using SdlCursorUptr = std::unique_ptr<SDL_Cursor, SdlCursorDeleter>;
+
     private:
-        SDL_Window * _window;
-        size_t       _width;
-        size_t       _height;
-        std::string  _title;
-        uint32_t     _frameTicks;
-        bool         _working;
+        SDL_Window  * _window;
+        size_t        _width;
+        size_t        _height;
+        std::string   _title;
+        uint32_t      _frameTicks;
+        SdlCursorUptr _cursor;
+        bool          _captureClipboard;
+        bool          _working;
     };
 }

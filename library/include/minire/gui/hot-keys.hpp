@@ -14,7 +14,7 @@ namespace minire::gui
         using Handler = std::function<bool(::SDL_Scancode, uint16_t)>;
 
         void set(::SDL_Scancode key, uint16_t mods, Handler handler);
-     
+
     public:
         bool handle(minire::events::application::OnKeyDown const & e) const;
 

@@ -3,6 +3,7 @@
 #include <glm/vec2.hpp>
 
 #include <minire/text/formatted-string.hpp>
+#include <minire/text/unicode.hpp>
 
 namespace minire::text
 {
@@ -14,11 +15,11 @@ namespace minire::text
                  Function function)
     {
         glm::vec2 position(0);
-        for(auto const & [format, codePoint] : text)
+        for(Symbol const & symbol : text)
         {
-            if (codePoint != L'\n')
+            if (!isLineBreak(symbol.codePoint()))
             {
-                if (!function(format, codePoint, position, glyphSize))
+                if (!function(symbol, position, glyphSize))
                     break;
                 position.x += glyphSize.x;
             }

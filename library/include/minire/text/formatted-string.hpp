@@ -1,180 +1,170 @@
 #pragma once
 
+#include <minire/text/symbol.hpp>
 #include <minire/text/text-format.hpp>
 #include <minire/text/unicode.hpp>
 
-#include <string>
-#include <vector>
-#include <utility>
 #include <cassert>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace minire::text
 {
     // TODO: tests
     class FormattedString
     {
-        friend class Iterator;
-
-        using Fragment = std::pair<TextFormat, std::wstring>;
-        using Fragments = std::vector<Fragment>;
-
     public:
         FormattedString() = default;
 
-        FormattedString(FormattedString const &) = default;
-
-        FormattedString(FormattedString && other)
-            : _fragments(std::move(other._fragments))
-            , _size(other._size)
+        FormattedString(char const * s,
+                        Format const & fmt = {})
         {
-            other._size = 0;
+            assign(std::string(s), fmt);
         }
 
-        FormattedString(wchar_t const * s)
+        FormattedString(wchar_t const * s,
+                        Format const & fmt = {})
         {
-            append(std::wstring(s));
+            assign(std::wstring(s), fmt);
         }
 
-        FormattedString(std::wstring const & s)
+        FormattedString(std::string const & s,
+                        Format const & fmt = {})
         {
-            append(s);
+            assign(s, fmt);
         }
 
-        FormattedString(std::wstring && s)
+        FormattedString(std::wstring const & s,
+                        Format const & fmt = {})
         {
-            append(std::move(s));
+            assign(s, fmt);
         }
 
     public:
-        FormattedString & operator=(FormattedString && other)
+        void assign(std::wstring const & s,
+                    Format const & fmt)
         {
-            FormattedString tmp(std::move(other));
-            std::swap(_fragments, tmp._fragments);
-            std::swap(_size, tmp._size);
+            _store.clear();
+            _store.reserve(s.size());
+            for(wchar_t c : s)
+            {
+                _store.emplace_back(c, fmt);
+            }
+        }
+
+        void assign(std::string const & s,
+                    Format const & fmt)
+        {
+            assign(toUnicode(s), fmt);
+        }
+
+    public:
+        FormattedString & operator+=(FormattedString const & other)
+        {
+            _store.insert(_store.end(), other._store.begin(),
+                                        other._store.end());
             return *this;
         }
 
-        FormattedString & operator=(FormattedString const &) = default;
+        void append(wchar_t const s,
+                    Format fmt = {})
+        {
+            _store.emplace_back(s, std::move(fmt));
+        }
+
+        void append(std::wstring const & s,
+                    Format const & fmt = {})
+        {
+            this->operator+=(FormattedString(s, fmt));
+        }
+
+        void append(std::string const & s,
+                    Format const & fmt = {})
+        {
+            this->operator+=(FormattedString(s, fmt));
+        }
 
     public:
-        TextFormat & append(std::wstring && s)
+        void insert(size_t pos, wchar_t symbol, Format const & fmt)
         {
-            _size += s.size();
-            _fragments.emplace_back(TextFormat(false),
-                                    std::move(s));
-            return _fragments.back().first;
+            assert(pos <= _store.size());
+            _store.emplace(_store.begin() + pos, symbol, fmt);
         }
 
-        TextFormat & append(std::wstring const & s)
+        void erase(size_t pos)
         {
-            _size += s.size();
-            _fragments.emplace_back(TextFormat(false), s);
-            return _fragments.back().first;
+            assert(pos < _store.size());
+            _store.erase(_store.begin() + pos);
         }
 
-        TextFormat & append(std::string const & s)
+        void erase(size_t begin, size_t end /* past-the-end */)
         {
-            return append(toUnicode(s));
+            assert(begin < _store.size());
+            assert(end <= _store.size());
+            assert(begin <= end);
+            _store.erase(_store.begin() + begin,
+                         _store.begin() + end);
         }
 
-        size_t size() const { return _size; }
+        void clear() { _store.clear(); }
 
-        std::wstring wunformat() const
+    public:
+        Symbol const & operator[](size_t index) const
         {
+            assert(index < _store.size());
+            return _store[index];
+        }
+
+        Symbol & operator[](size_t index)
+        {
+            assert(index < _store.size());
+            return _store[index];
+        }
+
+    public:
+        std::wstring wunformat(size_t begin = 0,
+                               size_t end = std::numeric_limits<size_t>::max()) const
+        {
+            end = std::min(end, _store.size());
+            assert(begin <= end);
+
             std::wstring result;
-            for(Fragment const & fragment : _fragments)
+            result.reserve(end - begin);
+            for(size_t i = begin; i < end; ++i)
             {
-                result += fragment.second;
+                Symbol const & symbol = _store[i];
+                result += symbol.codePoint();
             }
             return result;
         }
 
-        std::string unformat() const
+        std::string unformat(size_t begin = 0,
+                             size_t end = std::numeric_limits<size_t>::max()) const
         {
-            return toUtf8(wunformat());
+            return toUtf8(wunformat(begin, end));
         }
 
     public:
         bool operator==(FormattedString const &) const = default;
 
     public:
-        // TODO BUG: it will crash when fragment is an empty string.
-        //           For example:
-        //              FormattedString str;
-        //              str.append(std::wstring());
-        //              for(auto i : str) ... <-- will crash
-        class Iterator
-        {
-            friend class FormattedString;
+        size_t size() const { return _store.size(); }
+        bool empty() const { return _store.empty(); }
 
-            size_t                  _fragment;
-            size_t                  _offset;
-            FormattedString const & _formattedString;
-        
-            inline
-            Iterator(size_t fragment,
-                     size_t offset,
-                     FormattedString const & formattedString)
-                : _fragment(fragment)
-                , _offset(offset)
-                , _formattedString(formattedString)
-            {}
+    public:
+        auto begin() { return _store.begin(); }
+        auto end() { return _store.end(); }
 
-        public:
-            std::pair<TextFormat const &, wchar_t> operator*() const
-            {
-                assert(_fragment < _formattedString._fragments.size());
+        auto begin() const { return _store.begin(); }
+        auto end() const { return _store.end(); }
 
-                Fragment const & fragment =
-                    _formattedString._fragments[_fragment];
-
-                assert(_offset < fragment.second.size());
-                return std::pair<TextFormat const &, wchar_t>(
-                    fragment.first,
-                    fragment.second[_offset]);
-            }
-
-            Iterator& operator++()
-            {
-                assert(_fragment < _formattedString._fragments.size());
-
-                Fragment const & fragment =
-                    _formattedString._fragments[_fragment];
-
-                ++_offset;
-                if (_offset >= fragment.second.size())
-                {
-                    _offset = 0;
-                    ++_fragment;
-                }
-
-                return *this;
-            }
-
-            bool operator==(Iterator const & other) const
-            {
-                return _fragment == other._fragment
-                    && _offset == other._offset;
-            }
-
-            bool operator!=(Iterator const & other) const
-            {
-                return !operator==(other);
-            }
-        };
-
-        Iterator begin() const
-        {
-            return Iterator(0, 0, *this);
-        }
-        
-        Iterator end() const
-        {
-            return Iterator(_fragments.size(), 0, *this);
-        }
+        auto cbegin() const { return _store.cbegin(); }
+        auto cend() const { return _store.cend(); }
 
     private:
-        Fragments _fragments;
-        size_t    _size = 0;
+        // TODO: may be replate to std::list, it will bring better complexity for insert and delete,
+        //       besides, random-order access (operator[]) isn't really required here.
+        std::vector<Symbol> _store;
     };
 }

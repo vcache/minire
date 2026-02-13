@@ -42,12 +42,13 @@ namespace minire::models
         //       exclusively (for example, when moving a camera by a
         //       mouse and need to prevent activation of GUI elements).
 
-        virtual bool handle(events::application::OnMouseWheel const &) { return false; }
-        virtual bool handle(events::application::OnMouseMove const &)  { return false; }
-        virtual bool handle(events::application::OnMouseDown const &)  { return false; }
-        virtual bool handle(events::application::OnMouseUp const &)    { return false; }
-        virtual bool handle(events::application::OnKeyUp const &)      { return false; }
-        virtual bool handle(events::application::OnKeyDown const &)    { return false; }
-        virtual bool handle(events::application::OnTextInput const &)  { return false; }
+        virtual bool handle(events::application::OnMouseWheel const &)      { return false; }
+        virtual bool handle(events::application::OnMouseMove const &)       { return false; }
+        virtual bool handle(events::application::OnMouseDown const &)       { return false; }
+        virtual bool handle(events::application::OnMouseUp const &)         { return false; }
+        virtual bool handle(events::application::OnKeyUp const &)           { return false; }
+        virtual bool handle(events::application::OnKeyDown const &)         { return false; }
+        virtual bool handle(events::application::OnTextInput const &)       { return false; }
+        virtual bool handle(events::application::OnClipboardUpdate const &) { return false; }
     };
 }

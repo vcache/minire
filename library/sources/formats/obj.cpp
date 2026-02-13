@@ -37,13 +37,13 @@ namespace minire::formats
 {
     bool Obj::validate() const
     {
-        if (_faceVertices.size() != _faceNormals.size() && 
+        if (_faceVertices.size() != _faceNormals.size() &&
             _faceNormals.size() != 0)
         {
             return false;
         }
-     
-        if (_faceVertices.size() != _faceUvs.size() && 
+
+        if (_faceVertices.size() != _faceUvs.size() &&
             _faceUvs.size() != 0)
         {
             return false;

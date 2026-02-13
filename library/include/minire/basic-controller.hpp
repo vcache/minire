@@ -7,10 +7,12 @@
 #include <minire/models/input-handler.hpp>
 #include <minire/utils/aabb.hpp>
 #include <minire/utils/barrier.hpp>
+#include <minire/utils/glyph-grid.hpp>
 
 #include <atomic>
 #include <condition_variable>
 #include <deque>
+#include <limits>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -73,6 +75,12 @@ namespace minire
         glm::vec2 measure(text::FormattedString const &,
                           models::FontFace const &) const;
 
+        std::unique_ptr<utils::TextLayout> layout(text::FormattedString const &,
+                                                  content::Id const &);
+
+        std::unique_ptr<utils::TextLayout> layout(text::FormattedString const &,
+                                                  models::FontFace const &);
+
         utils::Aabb measure(content::Path const &) const;
 
         /**
@@ -124,6 +132,7 @@ namespace minire
         bool handle(events::application::OnKeyUp const &) override;
         bool handle(events::application::OnKeyDown const &) override;
         bool handle(events::application::OnTextInput const &) override;
+        bool handle(events::application::OnClipboardUpdate const &) override;
 
     private:
         void worker(events::application::OnResize const & initial);

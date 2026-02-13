@@ -17,12 +17,12 @@ namespace
 
         auto makeText() const
         {
-            minire::text::FormattedString text;
             // TODO: alpha channel
             // TODO: different styles
-            text.append(L"Hello world").background(glm::vec4(0, 0, 0, 0))
-                                       .foreground(glm::vec4(1, 0, 0, 0));
-            return text;
+            return minire::text::FormattedString(
+                "Hello world",
+                minire::text::Format().background(glm::vec4(0, 0, 0, 0))
+                                      .foreground(glm::vec4(1, 0, 0, 0)));
         }
 
         void start() override

@@ -7,7 +7,7 @@ namespace minire::utils::test
     struct SparseRangeCase
     {
         std::vector<std::pair<int, int>> _input;
-        std::vector<std::pair<int, int>> _expected;        
+        std::vector<std::pair<int, int>> _expected;
     };
 
     class SparseRangeTest

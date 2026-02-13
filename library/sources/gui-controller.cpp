@@ -190,9 +190,9 @@ namespace minire
         Overlay & overlay = topOverlay();
 
         if (auto clickTarget = overlay._toClick.lock();
-            clickTarget && clickTarget->_isDraggable.get())
+            clickTarget && clickTarget->_isDraggable.get() &&
+            clickTarget->_isDragging)
         {
-            assert(clickTarget->_isDragging);
             assert(_dragBegin);
             clickTarget->handle(gui::events::OnDragMove{*_dragBegin, e});
         }
@@ -219,17 +219,15 @@ namespace minire
 
         if (auto destination = hovered(); destination)
         {
-            if (e._mouseButton == models::MouseButton::kLeft)
+            overlay._toClick = destination;
+            overlay._clickButton = e._mouseButton;
+            if (e._mouseButton == models::MouseButton::kLeft &&
+                destination->_isDraggable.get())
             {
-                overlay._toClick = destination;
-                overlay._clickButton = e._mouseButton;
-                if (destination->_isDraggable.get())
-                {
-                    assert(!destination->_isDragging);
-                    destination->_isDragging = true;
-                    destination->handle(gui::events::OnDragBegin{e});
-                    _dragBegin = e;
-                }
+                assert(!destination->_isDragging);
+                destination->_isDragging = true;
+                destination->handle(gui::events::OnDragBegin{e});
+                _dragBegin = e;
             }
             destination->handle(e);
             return true;
@@ -250,9 +248,9 @@ namespace minire
         Overlay & overlay = topOverlay();
 
         auto clickTarget = overlay._toClick.lock();
-        if (clickTarget && clickTarget->_isDraggable.get())
+        if (clickTarget && clickTarget->_isDraggable.get() &&
+            clickTarget->_isDragging)
         {
-            assert(clickTarget->_isDragging);
             clickTarget->_isDragging = false;
             clickTarget->handle(gui::events::OnDragEnd{e});
             _dragBegin = std::nullopt;
@@ -266,6 +264,8 @@ namespace minire
             {
                 overlay._toClick.reset();
                 overlay._clickButton = {};
+
+                setFocus(clickTarget->acceptFocus() ? clickTarget : nullptr);
 
                 // NOTE: must not use "overlay" after handler(),
                 //       because handle may close it
@@ -353,6 +353,27 @@ namespace minire
         return false;
     }
 
+    bool GuiController::handle(events::application::OnClipboardUpdate const & e)
+    {
+        _clipboardState = e;
+
+        if(BasicController::handle(e))
+            return true;
+
+        Overlay & overlay = topOverlay();
+        if (auto focused = overlay._focused.lock(); focused)
+        {
+            focused->handle(e);
+            return true;
+        }
+        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        {
+            return sink->handle(e);
+        }
+
+        return false;
+    }
+
     void GuiController::handle(events::application::OnRayCaster const & e)
     {
         BasicController::handle(e);
@@ -369,10 +390,16 @@ namespace minire
         overlay._focused = component;
 
         if (focused)
+        {
+            focused->_hasFocus = false;
             focused->handle(gui::events::OnUnfocus{});
+        }
 
         if (component)
+        {
+            component->_hasFocus = true;
             component->handle(gui::events::OnFocus{});
+        }
     }
 
     void GuiController::setHover(gui::Component::Sptr const & component)
@@ -478,6 +505,53 @@ namespace minire
     void GuiController::pop()
     {
         guiPop();
+    }
+
+    void GuiController::startTextInput()
+    {
+        enqueue<events::controller::StartTextInput>();
+    }
+
+    void GuiController::stopTextInput()
+    {
+        enqueue<events::controller::StopTextInput>();
+    }
+
+    void GuiController::startClipboardCapture()
+    {
+        _clipboardState.reset();
+        enqueue<events::controller::StartClipboardCapture>();
+    }
+
+    void GuiController::stopClipboardCapture()
+    {
+        enqueue<events::controller::StopClipboardCapture>();
+        _clipboardState.reset();
+    }
+
+    void GuiController::setClipboardText(std::string const & text)
+    {
+        enqueue<events::controller::SetClipboardText>(text);
+    }
+
+    void GuiController::setPrimarySelection(std::string const & text)
+    {
+        enqueue<events::controller::SetPrimarySelection>(text);
+    }
+
+    std::string const * GuiController::getClipboardText() const
+    {
+        return _clipboardState ? &_clipboardState->_clipboardText : nullptr;
+    }
+
+    std::string const * GuiController::getPrimarySelection() const
+    {
+        return _clipboardState ? &_clipboardState->_primarySelection : nullptr;
+    }
+
+    void GuiController::setSystemCursor(::SDL_SystemCursor systemCursor)
+    {
+        enqueue<events::controller::SetSystemCursor>(systemCursor);
     }
 
     gui::Area const & GuiController::topClientArea() const

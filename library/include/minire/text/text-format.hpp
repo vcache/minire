@@ -7,7 +7,7 @@
 namespace minire::text
 {
     // TODO: tests
-    class TextFormat
+    class Format
     {
     protected:
         static constexpr uint8_t kBlank        = (1 << 0);
@@ -18,13 +18,7 @@ namespace minire::text
         static constexpr uint8_t kInvertColors = (1 << 5);
 
     public:
-        explicit TextFormat(bool isBlank = true)
-        {
-            blank(isBlank);
-        }
-
-    public:
-        bool operator==(TextFormat const & other) const
+        bool operator==(Format const & other) const
         {
             return _foreground == other._foreground
                 && _background == other._background
@@ -43,27 +37,27 @@ namespace minire::text
         glm::vec4 const & background() const { return _background; }
 
     public:
-        TextFormat & blank(bool v)        { return _s(v, kBlank); }
-        TextFormat & bold(bool v)         { return _s(v, kBold); }
-        TextFormat & italic(bool v)       { return _s(v, kItalic); }
-        TextFormat & underline(bool v)    { return _s(v, kUnderline); }
-        TextFormat & strikeout(bool v)    { return _s(v, kStrikeout); }
-        TextFormat & invertColors(bool v) { return _s(v, kInvertColors); }
-        
-        TextFormat & foreground(glm::vec4 const & v)
+        Format & blank(bool v)        { return _s(v, kBlank); }
+        Format & bold(bool v)         { return _s(v, kBold); }
+        Format & italic(bool v)       { return _s(v, kItalic); }
+        Format & underline(bool v)    { return _s(v, kUnderline); }
+        Format & strikeout(bool v)    { return _s(v, kStrikeout); }
+        Format & invertColors(bool v) { return _s(v, kInvertColors); }
+
+        Format & foreground(glm::vec4 const & v)
         {
             _foreground = v;
             return *this;
         }
-        
-        TextFormat & background(glm::vec4 const & v)
+
+        Format & background(glm::vec4 const & v)
         {
             _background = v;
             return *this;
         }
 
     private:
-        TextFormat & _s(bool val, uint8_t flag)
+        Format & _s(bool val, uint8_t flag)
         {
             if (val)
             {
@@ -79,6 +73,6 @@ namespace minire::text
     private:
         glm::vec4 _foreground = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
         glm::vec4 _background = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-        uint8_t   _flags      = kBlank; // TODO: why not std::bitset?
+        uint8_t   _flags      = 0; // TODO: why not std::bitset?
     };
 }

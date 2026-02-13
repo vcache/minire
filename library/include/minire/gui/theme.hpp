@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minire/gui/content-view.hpp>
+#include <minire/text/text-format.hpp>
 #include <minire/utils/rect.hpp>
 
 #include <glm/vec2.hpp>
@@ -138,6 +139,38 @@ namespace minire::gui
         private:
             Constants _constants;
         };
+
+        class Editbox
+        {
+        public:
+            struct Constants
+            {
+                utils::Rect  _contentPadding;
+                text::Format _activeFormat;
+            };
+
+        public:
+            explicit Editbox(Constants const & constants)
+                : _constants(constants)
+            {}
+
+            virtual ~Editbox() = default;
+
+            Constants const & constants() const { return _constants; }
+
+            virtual ImageView::Sptr makeNormalBg() const = 0;
+
+            virtual ImageView::Sptr makeDisabledBg() const = 0;
+
+            virtual ImageView::Sptr makeCursorImageInsert() const = 0;
+
+            virtual ImageView::Sptr makeCursorImageReplace() const = 0;
+
+            virtual ImageView::Sptr makeSelectionImage() const = 0;
+
+        private:
+            Constants _constants;
+        };
     }
 
     class Theme
@@ -151,5 +184,6 @@ namespace minire::gui
         virtual theme::Scrollbar const & scrollbar() const = 0;
         virtual theme::ListView const & listview() const = 0;
         virtual theme::Dropdown const & dropdown() const = 0;
+        virtual theme::Editbox const & editbox() const = 0;
     };
 }

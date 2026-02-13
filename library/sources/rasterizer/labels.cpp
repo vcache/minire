@@ -19,7 +19,7 @@ namespace minire::rasterizer
         assert(it != _store.cend());
         return *it->second;
     }
-    
+
     void Labels::deallocate(std::string const & key)
     {
         _store.erase(key);

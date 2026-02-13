@@ -16,5 +16,5 @@ namespace minire::events::application
             , _dx(dx)
             , _dy(dy)
         {}
-    };   
+    };
 }

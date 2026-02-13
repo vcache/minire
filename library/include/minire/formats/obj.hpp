@@ -66,7 +66,7 @@ namespace minire::formats
      */
     Obj loadObj(std::string const &);
     Obj loadObj(std::istream &);
-    
+
     void saveObj(Obj const &, std::string const &);
     void saveObj(Obj const &, std::ostream &);
 }

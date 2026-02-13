@@ -61,7 +61,8 @@ namespace minire
         void onMouseUp(int x, int y, bool doubleClick, models::MouseButton) override;
         void onKeyUp(::SDL_Keycode, ::SDL_Scancode,  uint16_t mod) override;
         void onKeyDown(::SDL_Keycode, ::SDL_Scancode, uint16_t mod) override;
-        void onTextInput(std::string);
+        void onTextInput(std::string) override;
+        void onClipboardUpdate(std::string, std::string) override;
 
         void onFps(size_t fps, double mft) override;
 
@@ -97,6 +98,11 @@ namespace minire
         void handle(events::controller::BulkSetLabelZOrders const &);
         void handle(events::controller::StartTextInput const &);
         void handle(events::controller::StopTextInput const &);
+        void handle(events::controller::StartClipboardCapture const &);
+        void handle(events::controller::StopClipboardCapture const &);
+        void handle(events::controller::SetClipboardText const &);
+        void handle(events::controller::SetPrimarySelection const &);
+        void handle(events::controller::SetSystemCursor const &);
         void handle(events::controller::SceneReset const &);
         void handle(events::controller::SceneDispose const &);
         void handle(events::controller::SceneActivateCamera const &);

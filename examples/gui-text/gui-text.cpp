@@ -27,20 +27,19 @@ namespace
             GuiController::start();
 
             minire::text::FormattedString loremIpsum;
-            loremIpsum.append(L"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod\n")
-                .foreground(glm::vec4(0, 0, 1, 1));
-            loremIpsum.append(L"tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim\n")
-                .foreground(glm::vec4(0, 1, 0, 1));
-            loremIpsum.append(L"veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea\n")
-                .foreground(glm::vec4(0, 1, 1, 1));
-            loremIpsum.append(L"commodo consequat. Duis aute irure dolor in reprehenderit in voluptate\n")
-                .foreground(glm::vec4(1, 0, 0, 1));
-            loremIpsum.append(L"velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat\n")
-                .foreground(glm::vec4(1, 0, 1, 1));
-            loremIpsum.append(L"cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est\n")
-                .foreground(glm::vec4(1, 1, 0, 1));
-            loremIpsum.append(L"laborum.")
-                .foreground(glm::vec4(1, 1, 1, 1));
+            loremIpsum.append("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod\n",
+                              minire::text::Format().foreground(glm::vec4(0, 0, 1, 1)));
+            loremIpsum.append("tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim\n",
+                              minire::text::Format().foreground(glm::vec4(0, 1, 0, 1)));
+            loremIpsum.append("veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea\n",
+                              minire::text::Format().foreground(glm::vec4(0, 1, 1, 1)));
+            loremIpsum.append("commodo consequat. Duis aute irure dolor in reprehenderit in voluptate\n",
+                              minire::text::Format().foreground(glm::vec4(1, 0, 0, 1)));
+            loremIpsum.append("velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat\n",
+                              minire::text::Format().foreground(glm::vec4(1, 0, 1, 1)));
+            loremIpsum.append("cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est\n",
+                              minire::text::Format().foreground(glm::vec4(1, 1, 0, 1)));
+            loremIpsum.append("laborum.", minire::text::Format().foreground(glm::vec4(1, 1, 1, 1)));
 
             glm::vec2 size = measure(loremIpsum, kFontFaceId);
 
@@ -72,7 +71,7 @@ namespace
             }
 
             _animatedText = guiRoot().emplace<minire::gui::components::Text>(
-                "animated-text", makeTextView(L"adsfsadf", kFontFaceId));
+                "animated-text", makeTextView("adsfsadf", kFontFaceId));
             _animatedText->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
                                                                 minire::gui::dimension::Content{});
             _animatedText->vertical() = minire::gui::Arranger(minire::gui::position::Begin{},

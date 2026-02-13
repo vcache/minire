@@ -84,9 +84,9 @@ namespace
                     [this](std::any const & value, size_t) -> ContentView::Sptr
                     {
                         std::string const & text = std::any_cast<std::string>(value);
-                        minire::text::FormattedString caption;
-                        caption.append(minire::text::toUnicode(text)).background(glm::vec4(0, 0, 0, 0))
-                                                                     .foreground(glm::vec4(0, 0, 0, 1));
+                        minire::text::FormattedString caption(text,
+                            minire::text::Format().background(glm::vec4(0, 0, 0, 0))
+                                                  .foreground(glm::vec4(0, 0, 0, 1)));
                         return makeTextView(caption, kFontFace);
                     });
 

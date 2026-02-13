@@ -50,14 +50,14 @@ namespace minire::formats
                     case 1: // grey
                         _format = Format::kGrayscale;
                         break;
-                    
+
                     case 2: // grey, alpha
                         MINIRE_THROW("unsupported channels count: {}", channels);
-                    
+
                     case 3: // red, green, blue
                         _format = Format::kRGB;
                         break;
-                    
+
                     case 4: // red, green, blue, alpha
                         _format = Format::kRGBA;
                         break;

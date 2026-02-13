@@ -2,6 +2,7 @@
 
 #include <minire/gui/content-view.hpp>
 
+#include <memory>
 #include <optional>
 
 namespace minire { class GuiController; }
@@ -41,24 +42,26 @@ namespace minire::gui_controller
 
         void setFontFace(content::Id const & fontFace) override;
 
+        utils::TextLayout const & textLayout() const override;
+
         void commit() override;
 
     private:
         void enqueueUncommited();
 
     private:
-        GuiController       & _controller;
+        GuiController                      & _controller;
 
         // current state
-        std::string           _labelId;
-        content::Id           _fontFace;
-        text::FormattedString _text;
-        glm::vec2             _contentPosition{0, 0};
-        glm::vec2             _contentSize{0, 0};
-        glm::vec2             _textSize{0, 0};
-        utils::MaybeRect      _clippingWindow = std::nullopt;
-        size_t                _zOrder = 0;
-        bool                  _visible = true;
+        std::string                          _labelId;
+        content::Id                          _fontFace;
+        text::FormattedString                _text;
+        glm::vec2                            _contentPosition{0, 0};
+        glm::vec2                            _contentSize{0, 0};
+        glm::vec2                            _textSize{0, 0};
+        utils::MaybeRect                     _clippingWindow = std::nullopt;
+        size_t                               _zOrder = 0;
+        bool                                 _visible = true;
 
         // pended updates
         std::optional<content::Id>           _newFontFace;
@@ -68,5 +71,8 @@ namespace minire::gui_controller
         std::optional<utils::MaybeRect>      _newClippingWindow;
         std::optional<size_t>                _newZOrder;
         std::optional<bool>                  _newVisible;
+
+        // cached values
+mutable std::unique_ptr<utils::TextLayout>   _textLayout;
     };
 }

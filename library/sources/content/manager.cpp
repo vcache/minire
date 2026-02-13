@@ -253,7 +253,7 @@ namespace minire::content::readers
                     // TODO: it won't work on non-Posix OS (i.e. *indows)
         MINIRE_INVARIANT(std::filesystem::exists(path),
                          "file doesn't exist: {}", path.string());
-        
+
         std::string ext = path.extension();
         boost::algorithm::to_lower(ext);
 

@@ -127,6 +127,7 @@ namespace minire::gui
         , _hasFocus(false)
         , _isHovered(false)
         , _isDragging(false)
+        , _acceptFocus(false)
     {
         _children.reserve(kExpectedChildren);
         invalidate();
@@ -226,6 +227,12 @@ namespace minire::gui
         _layout.get()->onClear();
         _children.clear();
         invalidate();
+    }
+
+    void Component::setAcceptFocus(bool acceptFocus)
+    {
+        _acceptFocus = acceptFocus;
+        // TODO: drop focus (if any) when it become false
     }
 
     size_t Component::revalidate(size_t zOffset,

@@ -17,7 +17,7 @@ namespace minire::rasterizer
         // glyph parameters
         _glyphWidth = bbox._w;
         _glyphHeight = bbox._h;
-        
+
         // allocate atlas
         using AtlasPixel = uint8_t;
         size_t atlasWidth = minimalSide(bdf.loadedChars());

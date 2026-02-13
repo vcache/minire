@@ -79,7 +79,7 @@ namespace minire::rasterizer::sprites
     {
         std::vector<Vertex> result(6*9);
         size_t offset = 0;
-        
+
         // corners (boundary - out) //
 
         glm::vec2 const corners(dimensions.x - (tile._boundary._right - tile._out._right + 1.0f),

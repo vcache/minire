@@ -108,6 +108,7 @@ namespace minire::gui
         bool hasFocus() const { return _hasFocus; }
         bool isHovered() const { return _isHovered; }
         bool isDragging() const { return _isHovered; }
+        bool acceptFocus() const { return _acceptFocus; }
 
     public:
         bool contains(std::string const & childId) const { return _children.contains(childId); }
@@ -188,6 +189,12 @@ namespace minire::gui
 
         OverlayController & overlayController() { return _overlayController; }
 
+        void setAcceptFocus(bool);
+
+        void startTextInput();
+
+        void stopTextInput();
+
     private:
         size_t revalidate(size_t zOffset,
                           bool effectiveVisible,
@@ -225,6 +232,7 @@ namespace minire::gui
         bool                      _hasFocus;
         bool                      _isHovered;
         bool                      _isDragging;
+        bool                      _acceptFocus;
 
         friend class minire::GuiController;
     };

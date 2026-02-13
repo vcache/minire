@@ -38,10 +38,10 @@ namespace minire
         void setFocus(gui::Component::Sptr const & = {});
 
         gui::ImageView::Sptr makeImageView(content::Id const & textureId,
-                                            utils::Patch const & patch = std::monostate()) override;
+                                           utils::Patch const & patch = std::monostate()) override;
 
         gui::TextView::Sptr makeTextView(text::FormattedString const & text,
-                                          content::Id const & fontFace) override;
+                                         content::Id const & fontFace) override;
 
     protected:
         void step() override;
@@ -60,6 +60,7 @@ namespace minire
         bool handle(events::application::OnKeyUp const &) override;
         bool handle(events::application::OnKeyDown const &) override;
         bool handle(events::application::OnTextInput const &) override;
+        bool handle(events::application::OnClipboardUpdate const &) override;
         void handle(events::application::OnRayCaster const &) override;
 
         gui::Component const & guiRoot() const;
@@ -83,16 +84,28 @@ namespace minire
 
         void pop() override;
 
+        void startTextInput() override;
+         void stopTextInput() override;
+
+        void startClipboardCapture() override;
+        void stopClipboardCapture() override;
+        void setClipboardText(std::string const &) override;
+        void setPrimarySelection(std::string const &) override;
+        std::string const * getClipboardText() const override;
+        std::string const * getPrimarySelection() const override;
+
+        void setSystemCursor(::SDL_SystemCursor) override;
+
         void set(::SDL_Scancode key, uint16_t mods,
                  gui::HotKeys::Handler handler);
 
     private:
         struct Overlay
         {
-            gui::Component::Sptr      _root;
-            gui::Component::Wptr      _focused;
-            gui::Component::Wptr      _hovered;
-            gui::Component::Wptr      _toClick;
+            gui::Component::Sptr       _root;
+            gui::Component::Wptr       _focused;
+            gui::Component::Wptr       _hovered;
+            gui::Component::Wptr       _toClick;
             models::MouseButton        _clickButton;
             std::string                _tag;
             models::InputHandler::Wptr _fallbackHandler;
@@ -117,28 +130,32 @@ namespace minire
     private:
         using UncommittedViews = std::vector<gui::ContentView::Wptr>;
 
-        std::unique_ptr<gui::Theme> _theme;
-        UncommittedViews             _uncommittedViews;
+        using MaybeClipboardState = std::optional<events::application::OnClipboardUpdate>;
+        using MaybeOnMouseDown = std::optional<events::application::OnMouseDown>;
+
+        std::unique_ptr<gui::Theme>   _theme;
+        UncommittedViews              _uncommittedViews;
 
         // TODO: mouse-based events must be cancelled if some of
         //       SDL_WindowEvent have happened (alt+tab, minimization,
         //       unfocus, etc)
-        std::list<Overlay>           _overlays;
+        std::list<Overlay>            _overlays;
 
         // TODO: hot keys must be cleared if some of SDL_WindowEvent
         //       have happened (alt+tab, minimization, unfocus, etc)
         // TODO: hot keys must fire an action not at KeyDown, but on
         //       a KeyUp and only if corresponding keys were pressed
         //       before (on an KeyDown event)
-        gui::HotKeys                _hotKeys;
+        gui::HotKeys                 _hotKeys;
 
-        std::optional<events::application::OnMouseDown>
-                                     _dragBegin;
+        MaybeOnMouseDown             _dragBegin;
 
-        gui::Area                   _windowArea;
+        gui::Area                    _windowArea;
         float                        _mouseX = -1;
         float                        _mouseY = -1;
         bool                         _mouseUpdated = true;
+
+        MaybeClipboardState          _clipboardState;
 
         friend class gui_controller::ImageViewImpl;
         friend class gui_controller::TextViewImpl;

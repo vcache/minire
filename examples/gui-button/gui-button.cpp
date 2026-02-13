@@ -104,9 +104,10 @@ namespace
 
             // create buttons
 
-            minire::text::FormattedString caption;
-            caption.append(L"New").background(glm::vec4(0, 0, 0, 0))
-                                  .foreground(glm::vec4(0, 0, 0, 1));
+            minire::text::FormattedString caption(
+                "New",
+                minire::text::Format().background(glm::vec4(0, 0, 0, 0))
+                                      .foreground(glm::vec4(0, 0, 0, 1)));
 
             Rect const kIconRect(46, 7, 56, 19);
 

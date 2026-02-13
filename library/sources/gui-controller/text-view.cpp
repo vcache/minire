@@ -117,6 +117,7 @@ namespace minire::gui_controller
         {
             _newText = text;
             _textSize = _controller.measure(text, _fontFace);
+            _textLayout.reset();
             invalidate();
             enqueueUncommited();
         }
@@ -128,9 +129,20 @@ namespace minire::gui_controller
         {
             _newFontFace = fontFace;
             _textSize = _controller.measure(_text, _fontFace);
+            _textLayout.reset();
             invalidate();
             enqueueUncommited();
         }
+    }
+
+    utils::TextLayout const & TextViewImpl::textLayout() const
+    {
+        if (!_textLayout)
+        {
+            _textLayout = _controller.layout(_newText ? *_newText : _text,
+                                             _fontFace);
+        }
+        return *_textLayout;
     }
 
     void TextViewImpl::commit()

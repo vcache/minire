@@ -1,10 +1,12 @@
 #pragma once
 
+#include <minire/events/controller/clipboard.hpp>
+#include <minire/events/controller/cursor.hpp>
 #include <minire/events/controller/general.hpp>
-#include <minire/events/controller/sprites.hpp>
 #include <minire/events/controller/labels.hpp>
-#include <minire/events/controller/text-input.hpp>
 #include <minire/events/controller/scene.hpp>
+#include <minire/events/controller/sprites.hpp>
+#include <minire/events/controller/text-input.hpp>
 
 #include <variant>
 
@@ -42,6 +44,13 @@ namespace minire::events
 
                                     controller::StartTextInput,
                                     controller::StopTextInput,
+
+                                    controller::StartClipboardCapture,
+                                    controller::StopClipboardCapture,
+                                    controller::SetClipboardText,
+                                    controller::SetPrimarySelection,
+
+                                    controller::SetSystemCursor,
 
                                     controller::SceneReset,
                                     controller::SceneDispose,

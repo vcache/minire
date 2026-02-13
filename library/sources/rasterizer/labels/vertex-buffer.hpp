@@ -12,11 +12,11 @@
 
 namespace minire::rasterizer { class Font; }
 namespace minire::text { class FormattedString; }
-namespace minire::text { class TextFormat; }
+namespace minire::text { class Format; }
 
 namespace minire::rasterizer::labels
 {
-    // NOTE: Clients must align data elements consistent with the 
+    // NOTE: Clients must align data elements consistent with the
     //       requirements of the client platform, with an additional
     //       base-level requirement that an offset within a buffer to
     //       a datum comprising N be a multiple of N.

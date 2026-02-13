@@ -5,37 +5,42 @@
 namespace minire::text
 {
     // TODO: tests
-    class Symbol : public TextFormat
+    // TODO: maybe do composition instead inheritance,
+    //       thereby format can be stored as shared_ptr<Format>,
+    //       so, symbols can share same Format instead copies.
+    class Symbol : public Format
     {
     public:
-        Symbol(TextFormat const & f, wchar_t c)
-            : TextFormat(f)
+        Symbol(wchar_t c, Format const & fmt)
+            : Format(fmt)
             , _codePoint(c)
         {}
 
         Symbol()
             : _codePoint(L'\0')
-        {}
+        {
+            blank(true);
+        }
 
     public:
         void unset() { blank(true); }
-        
-        void set(wchar_t c) { _codePoint = c; blank(false); }            
-        
-        void set(TextFormat const & f, wchar_t c)
+
+        void set(wchar_t c) { _codePoint = c; blank(false); }
+
+        void set(Format const & f, wchar_t c)
         {
-            static_cast<TextFormat&>(*this) = f;
+            static_cast<Format&>(*this) = f;
             _codePoint = c;
             blank(false); // TODO: wtf?
         }
-        
+
     public:
         wchar_t codePoint() const { return _codePoint; }
 
         bool operator==(Symbol const & other) const
         {
-            auto const & thisFormat = static_cast<TextFormat const &>(*this);
-            auto const & otherFormat = static_cast<TextFormat const &>(other);
+            auto const & thisFormat = static_cast<Format const &>(*this);
+            auto const & otherFormat = static_cast<Format const &>(other);
             return _codePoint == other._codePoint
                 && thisFormat == otherFormat;
         }

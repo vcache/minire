@@ -211,6 +211,79 @@ namespace minire::gui_controller
             std::shared_ptr<DropdownListView> _dropdownListView;
         };
 
+        class BuiltinEditbox
+            : public gui::theme::Editbox
+        {
+        public:
+            explicit BuiltinEditbox(gui::ContentViewFactory & contentFactory)
+                : Editbox(Constants
+                {
+                    ._contentPadding = utils::Rect(5),
+                    ._activeFormat = text::Format().foreground(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
+                                                   .background(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f)),
+                })
+                , _contentFactory(contentFactory)
+            {}
+
+            gui::ImageView::Sptr makeNormalBg() const override
+            {
+                return _contentFactory.makeImageView(kTextureId,
+                    utils::NinePatch
+                    {
+                        ._boundary = utils::Rect(0, 65, 12, 77),
+                        ._out = utils::Rect(2, 67, 10, 75),
+                        ._in = utils::Rect(5, 70, 7, 72),
+                    });
+            }
+
+            gui::ImageView::Sptr makeDisabledBg() const override
+            {
+                return _contentFactory.makeImageView(kTextureId,
+                    utils::NinePatch
+                    {
+                        ._boundary = utils::Rect(0, 161, 12, 173),
+                        ._out = utils::Rect(2, 163, 10, 171),
+                        ._in = utils::Rect(5, 166, 7, 168),
+                    });
+            }
+
+            gui::ImageView::Sptr makeCursorImageInsert() const override
+            {
+                return _contentFactory.makeImageView(kTextureId,
+                    utils::NinePatch
+                    {
+                        ._boundary = utils::Rect(0, 129, 12, 141),
+                        ._out = utils::Rect(2, 131, 10, 139),
+                        ._in = utils::Rect(5, 134, 7, 136),
+                    });
+            }
+
+            gui::ImageView::Sptr makeCursorImageReplace() const override
+            {
+                return _contentFactory.makeImageView(kTextureId,
+                    utils::NinePatch
+                    {
+                        ._boundary = utils::Rect(0, 145, 12, 157),
+                        ._out = utils::Rect(2, 147, 10, 155),
+                        ._in = utils::Rect(5, 150, 7, 152),
+                    });
+            }
+
+            gui::ImageView::Sptr makeSelectionImage() const override
+            {
+                return _contentFactory.makeImageView(kTextureId,
+                    utils::NinePatch
+                    {
+                        ._boundary = utils::Rect(0, 113, 12, 125),
+                        ._out = utils::Rect(2, 115, 10, 123),
+                        ._in = utils::Rect(5, 118, 7, 120),
+                    });
+            }
+
+        private:
+            gui::ContentViewFactory & _contentFactory;
+        };
+
         class BuiltinTheme
             : public gui::Theme
         {
@@ -226,6 +299,7 @@ namespace minire::gui_controller
                 _scrollbar = std::make_shared<BuiltinScrollbar>(_contentFactory);
                 _dropdown = std::make_shared<BuiltinDropdown>(_contentFactory);
                 _listview = std::make_shared<BuiltinListView>(_contentFactory);
+                _editbox = std::make_shared<BuiltinEditbox>(_contentFactory);
             }
 
             gui::ImageView::Sptr makeIcon(gui::theme::Icon icon) const override
@@ -271,6 +345,12 @@ namespace minire::gui_controller
                 return *_dropdown;
             }
 
+            gui::theme::Editbox const & editbox() const override
+            {
+                assert(_editbox);
+                return *_editbox;
+            }
+
         private:
             std::unique_ptr<content::Lease>   _atlas;
             gui::ContentViewFactory &         _contentFactory;
@@ -278,6 +358,7 @@ namespace minire::gui_controller
             std::shared_ptr<BuiltinScrollbar> _scrollbar;
             std::shared_ptr<BuiltinListView>  _listview;
             std::shared_ptr<BuiltinDropdown>  _dropdown;
+            std::shared_ptr<BuiltinEditbox>   _editbox;
         };
     }
 

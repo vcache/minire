@@ -85,10 +85,9 @@ namespace
 
         auto makeItem(std::string const & text)
         {
-            minire::text::FormattedString caption;
-            caption.append(minire::text::toUnicode(text)).background(glm::vec4(0, 0, 0, 0))
-                                                         .foreground(glm::vec4(0, 0, 0, 1));
-
+            using namespace minire::text;
+            FormattedString caption(text, Format().background(glm::vec4(0, 0, 0, 0))
+                                                  .foreground(glm::vec4(0, 0, 0, 1)));
             return makeTextView(caption, kFontFace);
         }
 

@@ -25,7 +25,7 @@ namespace minire::formats
         _bbx._w =
         _bbx._h =
         _bbx._xOff =
-        _bbx._yOff = 
+        _bbx._yOff =
         _bits = 0;
         _loaded = false;
         _bitLines.clear();

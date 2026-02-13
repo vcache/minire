@@ -19,7 +19,7 @@ namespace minire::rasterizer::vertex_buffers
         }
     };
 }
- 
+
 namespace std
 {
     template<>

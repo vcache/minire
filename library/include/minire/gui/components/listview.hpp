@@ -8,6 +8,7 @@
 
 #include <any>
 #include <cassert>
+#include <functional>
 #include <optional>
 #include <vector>
 

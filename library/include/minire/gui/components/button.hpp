@@ -7,6 +7,8 @@
 
 #include <glm/vec2.hpp>
 
+#include <memory>
+
 namespace minire::gui::components
 {
     class Button final

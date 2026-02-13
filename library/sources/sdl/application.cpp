@@ -11,6 +11,18 @@
 
 namespace minire::sdl
 {
+    namespace
+    {
+        template<typename T>
+        struct SdlDeleter
+        {
+            void operator()(T * p) const { ::SDL_free(p); }
+        };
+
+        template<typename T>
+        using SdlUptr = std::unique_ptr<T, SdlDeleter<T>>;
+    }
+
     Application::Application(int width, int height,
                              std::string const & title,
                              models::MsaaParams const & msaaParams)
@@ -18,6 +30,7 @@ namespace minire::sdl
         , _width(width)
         , _height(height)
         , _title(title)
+        , _captureClipboard(false)
         , _working(true)
     {
         MINIRE_INVARIANT(width > 0 && height > 0,
@@ -53,9 +66,16 @@ namespace minire::sdl
             throw;
         }
     }
-    
+
     Application::~Application()
     {
+        if (_cursor)
+        {
+            ::SDL_Cursor * defaultCursor = ::SDL_GetDefaultCursor();
+            ::SDL_SetCursor(defaultCursor);
+            _cursor.reset();
+        }
+
         if (_window) ::SDL_DestroyWindow(_window);
         _window = nullptr;
         ::SDL_Quit();
@@ -73,11 +93,13 @@ namespace minire::sdl
     void Application::onMouseDown(int, int, bool, models::MouseButton) {}
 
     void Application::onMouseUp(int, int, bool, models::MouseButton) {}
-        
+
     void Application::onTextInput(std::string) {}
 
+    void Application::onClipboardUpdate(std::string, std::string) {}
+
     void Application::onKeyUp(::SDL_Keycode, ::SDL_Scancode, uint16_t) {}
-    
+
     void Application::onKeyDown(::SDL_Keycode, ::SDL_Scancode, uint16_t) {}
 
     void Application::onFps(size_t, double) {}
@@ -102,6 +124,82 @@ namespace minire::sdl
         return true;
     }
 
+    void Application::setSystemCursor(::SDL_SystemCursor systemCursor)
+    {
+        if (SDL_Cursor * newCursorPtr = ::SDL_CreateSystemCursor(systemCursor);
+            newCursorPtr)
+        {
+            SdlCursorUptr newCursor(newCursorPtr);
+            ::SDL_SetCursor(newCursor.get());
+            _cursor = std::move(newCursor);
+        }
+        else
+        {
+            MINIRE_WARNING("failed to create system cursor: {}", ::SDL_GetError());
+        }
+    }
+
+    void Application::setCaptureClipboard(bool captureClipboard)
+    {
+        _captureClipboard = captureClipboard;
+        maybeEmitClipboardUpdate();
+    }
+
+    void Application::maybeEmitClipboardUpdate()
+    {
+        if (!_captureClipboard)
+            return;
+
+        std::string clipboardText;
+        if (::SDL_HasClipboardText())
+        {
+            if (SdlUptr<char> text(::SDL_GetClipboardText()); text)
+            {
+                clipboardText = text.get();
+            }
+            else
+            {
+                MINIRE_ERROR("failed to emit clipboard update: {}", ::SDL_GetError());
+            }
+        }
+
+        std::string primarySelection;
+        if (::SDL_HasPrimarySelectionText())
+        {
+            if (SdlUptr<char> text(::SDL_GetPrimarySelectionText()); text)
+            {
+                primarySelection = text.get();
+            }
+            else
+            {
+                MINIRE_ERROR("failed to emit primary selection update: {}", ::SDL_GetError());
+            }
+        }
+
+        onClipboardUpdate(std::move(clipboardText),
+                          std::move(primarySelection));
+    }
+
+    void Application::setClipboardText(std::string const & text) const
+    {
+        if (int const result = ::SDL_SetClipboardText(text.c_str());
+            0 != result)
+        {
+            MINIRE_ERROR("Failed to set clipboard text: {}",
+                         ::SDL_GetError());
+        }
+    }
+
+    void Application::setPrimarySelection(std::string const & text) const
+    {
+        if (int const result = ::SDL_SetPrimarySelectionText(text.c_str());
+            0 != result)
+        {
+            MINIRE_ERROR("Failed to set primary selection text: {}",
+                         ::SDL_GetError());
+        }
+    }
+
     void Application::handleResize(int w, int h)
     {
         MINIRE_INVARIANT(w > 0 && h > 0,
@@ -120,7 +218,7 @@ namespace minire::sdl
                 handleResize(e.data1, e.data2);
                 break;
         }
-    }    
+    }
 
     void Application::handle(SDL_Event const & e)
     {
@@ -175,6 +273,10 @@ namespace minire::sdl
 
             case SDL_TEXTINPUT:
                 onTextInput(std::string(e.text.text));
+                break;
+
+            case SDL_CLIPBOARDUPDATE:
+                maybeEmitClipboardUpdate();
                 break;
 
             default:
