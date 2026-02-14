@@ -53,7 +53,7 @@ namespace minire
         void onResize(size_t width, size_t height) override;
         void onRender() override;
 
-        void onMouseWheel(int dx, int dy) override;
+        void onMouseWheel(int dx, int dy, uint32_t dir, ::SDL_Keymod) override;
         void onMouseMove(int absX, int absY, int relX, int relY,
                          bool left, bool middle, bool right,
                          bool x1, bool x2) override;

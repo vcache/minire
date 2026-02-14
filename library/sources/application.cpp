@@ -141,18 +141,9 @@ namespace minire
                                                           std::move(primarySelection));
     }
 
-    void Application::onMouseWheel(int dx, int dy)
+    void Application::onMouseWheel(int dx, int dy, uint32_t dir, ::SDL_Keymod mod)
     {
-        using namespace events::application;
-        if (auto * last = findEventToSquash<OnMouseWheel>(); last)
-        {
-            last->_dx += dx;
-            last->_dy += dy;
-        }
-        else
-        {
-            postEvent<OnMouseWheel>(dx, dy);
-        }
+        postEvent<events::application::OnMouseWheel>(dx, dy, dir, mod);
     }
 
     void Application::onMouseMove(int absX, int absY, int relX, int relY,

@@ -85,10 +85,10 @@ namespace minire::sdl
 
     void Application::onResize(size_t, size_t) {}
 
-    void Application::onMouseWheel(int, int) {}
+    void Application::onMouseWheel(int, int, uint32_t, ::SDL_Keymod) {}
 
     void Application::onMouseMove(int, int, int, int,
-                             bool, bool, bool, bool, bool) {}
+                                  bool, bool, bool, bool, bool) {}
 
     void Application::onMouseDown(int, int, bool, models::MouseButton) {}
 
@@ -268,7 +268,8 @@ namespace minire::sdl
                 break;
 
             case SDL_MOUSEWHEEL:
-                onMouseWheel(e.wheel.x, e.wheel.y);
+                onMouseWheel(e.wheel.x, e.wheel.y, e.wheel.direction,
+                             ::SDL_GetModState());
                 break;
 
             case SDL_TEXTINPUT:

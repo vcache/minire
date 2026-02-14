@@ -33,7 +33,7 @@ namespace minire::sdl
     protected:
         virtual void onRender();
         virtual void onResize(size_t width, size_t height);
-        virtual void onMouseWheel(int dx, int dy);
+        virtual void onMouseWheel(int dx, int dy, uint32_t dir, ::SDL_Keymod);
         virtual void onMouseMove(int absX, int absY, int relX, int relY,
                                  bool left, bool middle, bool right, bool x1, bool x2);
         virtual void onMouseDown(int x, int y, bool doubleClick, models::MouseButton);
