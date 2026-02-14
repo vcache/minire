@@ -69,4 +69,9 @@ namespace minire::gui::models
 
         handle(exclusive_group::OnChange{previous, _selected});
     }
+
+    void ExclusiveGroup::triggerOnChange()
+    {
+        handle(exclusive_group::OnChange{nullptr, _selected});
+    }
 }

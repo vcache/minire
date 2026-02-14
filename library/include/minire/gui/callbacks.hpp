@@ -113,8 +113,8 @@ namespace minire::gui
     {};
 
     // A RAII-like handler for a Callback.
-    // Must be when a Callback captures objects that might become
-    // dangling.
+    // Must be used when a Callback captures objects that might become
+    // dangling (to make sure that dangling pointers won't appear in _callbacks).
 
     class GenericCallbackHolder
     {

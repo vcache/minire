@@ -35,6 +35,11 @@ namespace minire::gui::models
 
         Checkable * selected() const { return _selected; }
 
+        // Artifically call OnChange handlers,
+        // can be used to initializa states after
+        // attaching an ExclusiveGroup.
+        void triggerOnChange();
+
     public:
         void setAllowUnselect(bool v);
 
