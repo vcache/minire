@@ -1,40 +1,38 @@
 #pragma once
 
+#include <minire/gui/arranger.hpp>
 #include <minire/gui/layout.hpp>
 
 #include <list>
+#include <optional>
 #include <string>
 #include <unordered_map>
-#include <variant>
 
 namespace minire::gui::layouts
 {
-    // TODO: expunge this layout method
-    class /*[[deprecated("An Array layout must be a suitable substitution")]]*/ Flow
-        : public Layout
+    // TODO: add alignment (Begin/Center/End/Justify),
+    //       when total size less than a container
+    // TODO: add paddings (min/max)
+    class Array : public Layout
     {
     public:
-        struct Component
+        struct Element
         {
-            std::string _id;
+            std::optional<std::string> _id;
+            Dimension                  _dimension;
         };
 
-        struct Spacing
-        {
-            float _value;
-        };
-
-        using Element = std::variant<Component, Spacing>;
+        using Elements = std::list<Element>;
 
     public:
         // horizontal=true is a "row"
         // horizontal=false is a "column"
-
-        explicit Flow(bool horizontal,
-                      std::list<Element> const & elements = {});
+        explicit Array(bool horizontal,
+                       Elements const & elements = {});
 
         Areas evaluate(Area const & clientArea,
                        Targets const &) const override;
+
 
         void onErase(gui::Component const &) override;
 
@@ -70,3 +68,4 @@ namespace minire::gui::layouts
         void erase(std::string const &);
     };
 }
+ 
