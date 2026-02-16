@@ -129,9 +129,9 @@ namespace minire::gui::components
 
             void handle(gui::events::OnMouseLeave const & e) override
             {
-                if (_hoverBackground.get())
+                if (auto const & ptr = _hoverBackground.get(); ptr)
                 {
-                    _hoverBackground.get()->setVisible(false);
+                    ptr->setVisible(false);
                 }
                 Component::handle(e);
             }
@@ -158,27 +158,27 @@ namespace minire::gui::components
             {
                 auto sharedFromThis = shared_from_this();
 
-                if (_normalBackground.get())
+                if (auto const & ptr = _normalBackground.get(); ptr)
                 {
-                    _normalBackground.get()->setContentInvalidator(sharedFromThis);
-                    _normalBackground.get()->setVisible(!_isSelected.get() && isHovered());
+                    ptr->setContentInvalidator(sharedFromThis);
+                    ptr->setVisible(!_isSelected.get() && isHovered());
                 }
 
-                if (_hoverBackground.get())
+                if (auto const & ptr = _hoverBackground.get(); ptr)
                 {
-                    _hoverBackground.get()->setContentInvalidator(sharedFromThis);
-                    _hoverBackground.get()->setVisible(!_isSelected.get() && isHovered());
+                    ptr->setContentInvalidator(sharedFromThis);
+                    ptr->setVisible(!_isSelected.get() && isHovered());
                 }
 
-                if (_selectedBackground.get())
+                if (auto const & ptr = _selectedBackground.get(); ptr)
                 {
-                    _selectedBackground.get()->setContentInvalidator(sharedFromThis);
-                    _selectedBackground.get()->setVisible(_isSelected.get());
+                    ptr->setContentInvalidator(sharedFromThis);
+                    ptr->setVisible(_isSelected.get());
                 }
 
-                if (_contents.get())
+                if (auto const & ptr = _contents.get(); ptr)
                 {
-                    _contents.get()->setContentInvalidator(sharedFromThis);
+                    ptr->setContentInvalidator(sharedFromThis);
                 }
             }
 
@@ -189,57 +189,57 @@ namespace minire::gui::components
             {
                 auto sharedFromThis = shared_from_this();
 
-                if (_normalBackground.get())
+                if (auto const & ptr = _normalBackground.get(); ptr)
                 {
                     if (_normalBackground.isInvalidated())
                     {
-                        _normalBackground.get()->setContentInvalidator(sharedFromThis);
+                        ptr->setContentInvalidator(sharedFromThis);
                     }
 
-                    _normalBackground.get()->setContentArea(contentArea);
-                    _normalBackground.get()->setClippingWindow(clippingWindow);
-                    _normalBackground.get()->setVisible(!_isSelected.get() && isHovered() &&
-                                                        effectiveVisible);
-                    zOffset = _normalBackground.get()->onZOrderChanged(zOffset);
+                    ptr->setContentArea(contentArea);
+                    ptr->setClippingWindow(clippingWindow);
+                    ptr->setVisible(!_isSelected.get() && isHovered() &&
+                                    effectiveVisible);
+                    zOffset = ptr->onZOrderChanged(zOffset);
                 }
 
-                if (_hoverBackground.get())
+                if (auto const & ptr = _hoverBackground.get(); ptr)
                 {
                     if (_hoverBackground.isInvalidated())
                     {
-                        _hoverBackground.get()->setContentInvalidator(sharedFromThis);
+                        ptr->setContentInvalidator(sharedFromThis);
                     }
 
-                    _hoverBackground.get()->setContentArea(contentArea);
-                    _hoverBackground.get()->setClippingWindow(clippingWindow);
-                    _hoverBackground.get()->setVisible(!_isSelected.get() && isHovered() &&
-                                                       effectiveVisible);
-                    zOffset = _hoverBackground.get()->onZOrderChanged(zOffset);
+                    ptr->setContentArea(contentArea);
+                    ptr->setClippingWindow(clippingWindow);
+                    ptr->setVisible(!_isSelected.get() && isHovered() &&
+                                    effectiveVisible);
+                    zOffset = ptr->onZOrderChanged(zOffset);
                 }
 
-                if (_selectedBackground.get())
+                if (auto const & ptr = _selectedBackground.get(); ptr)
                 {
                     if (_selectedBackground.isInvalidated())
                     {
-                        _selectedBackground.get()->setContentInvalidator(sharedFromThis);
+                        ptr->setContentInvalidator(sharedFromThis);
                     }
 
-                    _selectedBackground.get()->setContentArea(contentArea);
-                    _selectedBackground.get()->setClippingWindow(clippingWindow);
-                    _selectedBackground.get()->setVisible(_isSelected.get() && effectiveVisible);
-                    zOffset = _selectedBackground.get()->onZOrderChanged(zOffset);
+                    ptr->setContentArea(contentArea);
+                    ptr->setClippingWindow(clippingWindow);
+                    ptr->setVisible(_isSelected.get() && effectiveVisible);
+                    zOffset = ptr->onZOrderChanged(zOffset);
                 }
 
-                if (_contents.get())
+                if (auto const & ptr = _contents.get(); ptr)
                 {
                     if (_contents.isInvalidated())
                     {
                         _contents.get()->setContentInvalidator(sharedFromThis);
                     }
 
-                    _contents.get()->setContentArea(contentArea);
-                    _contents.get()->setClippingWindow(clippingWindow);
-                    _contents.get()->setVisible(effectiveVisible);
+                    ptr->setContentArea(contentArea);
+                    ptr->setClippingWindow(clippingWindow);
+                    ptr->setVisible(effectiveVisible);
                     zOffset = _contents.get()->onZOrderChanged(zOffset);
                 }
 
@@ -337,11 +337,11 @@ namespace minire::gui::components
             handle(listview::OnSelectionChanged{previous, _selected});
         }
 
-        if (auto background = _background.get(); background)
+        if (auto const & background = _background.get(); background)
         {
             if (_background.isInvalidated())
             {
-                _background.get()->setContentInvalidator(shared_from_this());
+                background->setContentInvalidator(shared_from_this());
             }
 
             background->setContentArea(contentArea);

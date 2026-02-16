@@ -4,8 +4,6 @@
 
 namespace minire::gui::components
 {
-    // TODO: clipping for an Icon
-    // TODO: clipping for a Text
     Button::Button(std::string const & id,
                    Theme const & theme,
                    OverlayController & overlayController)
@@ -45,29 +43,22 @@ namespace minire::gui::components
 
         // revalidate visibility
         ImageView::Sptr const & background = activeBackground();
-        if (_bgNormal.get()) (*_bgNormal)->setVisible((_bgNormal.get() == background) && effectiveVisible);
-        if (_bgHovered.get()) (*_bgHovered)->setVisible((_bgHovered.get() == background) && effectiveVisible);
-        if (_bgPressed.get()) (*_bgPressed)->setVisible((_bgPressed.get() == background) && effectiveVisible);
+        if (auto const & p = _bgNormal.get()) p->setVisible((_bgNormal.get() == background) && effectiveVisible);
+        if (auto const & p = _bgHovered.get()) p->setVisible((_bgHovered.get() == background) && effectiveVisible);
+        if (auto const & p = _bgPressed.get()) p->setVisible((_bgPressed.get() == background) && effectiveVisible);
 
-        if (_icon.get())
-        {
-            (*_icon)->setVisible(effectiveVisible);
-        }
-
-        if (_text.get())
-        {
-            (*_text)->setVisible(effectiveVisible);
-        }
+        if (auto const & icon = _icon.get()) icon->setVisible(effectiveVisible);
+        if (auto const & text = _text.get()) text->setVisible(effectiveVisible);
 
         // revalidate positions
         revalidatePositions(contentArea, clippingWindow);
 
         // revalidate zOrder
-        if (_bgNormal.get()) zOffset = (*_bgNormal)->onZOrderChanged(zOffset);
-        if (_bgHovered.get()) zOffset = (*_bgHovered)->onZOrderChanged(zOffset);
-        if (_bgPressed.get()) zOffset = (*_bgPressed)->onZOrderChanged(zOffset);
-        if (_text.get()) zOffset = (*_text)->onZOrderChanged(zOffset);
-        if (_icon.get()) zOffset = (*_icon)->onZOrderChanged(zOffset);
+        if (auto const & p = _bgNormal.get()) zOffset = p->onZOrderChanged(zOffset);
+        if (auto const & p = _bgHovered.get()) zOffset = p->onZOrderChanged(zOffset);
+        if (auto const & p = _bgPressed.get()) zOffset = p->onZOrderChanged(zOffset);
+        if (auto const & p = _text.get()) zOffset = p->onZOrderChanged(zOffset);
+        if (auto const & p = _icon.get()) zOffset = p->onZOrderChanged(zOffset);
 
         // finish
         _bgNormal.revalidate();
@@ -96,24 +87,24 @@ namespace minire::gui::components
         else if (!hasIcon)
         {
             // only a text
-            assert(hasText);
-            auto [size, _] = (*_text)->measure();
+            assert(hasText && _text.get());
+            auto [size, _] = _text.get()->measure();
             return std::make_pair(size.x + extraWidth, size.y + extraHeight);
         }
         else if (!hasText)
         {
             // only an icon
-            assert(hasIcon);
-            auto [size, _] = (*_icon)->measure();
+            assert(hasIcon && _icon.get());
+            auto [size, _] = _icon.get()->measure();
             return std::make_pair(size.x + extraWidth, size.y + extraHeight);
         }
         else
         {
             // an icon and a text
-            assert(hasIcon);
-            assert(hasText);
-            auto [textSize, _] = (*_text)->measure();
-            auto [iconSize, __] = (*_icon)->measure();
+            assert(hasIcon && _icon.get());
+            assert(hasText && _text.get());
+            auto [textSize, _] = _text.get()->measure();
+            auto [iconSize, __] = _icon.get()->measure();
             switch(_iconLocation.get())
             {
                 case theme::Location::kLeft:
@@ -152,8 +143,10 @@ namespace minire::gui::components
             bg->setClippingWindow(clippingWindow);
         }
 
-        bool const hasIcon = _icon.get().operator bool();
-        bool const hasText = _text.get().operator bool();
+        auto const & icon = _icon.get();
+        auto const & text = _text.get();
+        bool const hasIcon = icon.operator bool();
+        bool const hasText = text.operator bool();
 
         glm::vec2 const offset = _state == State::kPressed ? _pressOffset.get()
                                                            : glm::vec2();
@@ -165,30 +158,30 @@ namespace minire::gui::components
         else if (!hasIcon)
         {
             // only a text
-            assert(hasText);
-            auto [size, _] = (*_text)->measure();
+            assert(hasText && text);
+            auto [size, _] = text->measure();
             _textPosition.x = contentArea._left + (contentArea._width - size.x) / 2.0f;
             _textPosition.y = contentArea._top + (contentArea._height - size.y) / 2.0f;
-            (*_text)->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
-            (*_text)->setClippingWindow(clippingWindow);
+            text->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
+            text->setClippingWindow(clippingWindow);
         }
         else if (!hasText)
         {
             // only an icon
-            assert(hasIcon);
-            auto [size, _] = (*_icon)->measure();
+            assert(hasIcon && icon);
+            auto [size, _] = icon->measure();
             _iconPosition.x = contentArea._left + (contentArea._width - size.x) / 2.0f;
             _iconPosition.y = contentArea._top + (contentArea._height - size.y) / 2.0f;
-            (*_icon)->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
-            (*_icon)->setClippingWindow(clippingWindow);
+            icon->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
+            icon->setClippingWindow(clippingWindow);
         }
         else
         {
             // an icon and a text
-            assert(hasIcon);
-            assert(hasText);
-            auto [textSize, _] = (*_text)->measure();
-            auto [iconSize, __] = (*_icon)->measure();
+            assert(hasIcon && icon);
+            assert(hasText && text);
+            auto [textSize, _] = text->measure();
+            auto [iconSize, __] = icon->measure();
 
             float const totalWidth = iconSize.x + textSize.x + _iconSpacing.get();
             float const totalHeight = iconSize.y + textSize.y + _iconSpacing.get();
@@ -224,10 +217,10 @@ namespace minire::gui::components
                     break;
             }
 
-            (*_text)->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
-            (*_text)->setClippingWindow(clippingWindow);
-            (*_icon)->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
-            (*_icon)->setClippingWindow(clippingWindow);
+            text->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
+            text->setClippingWindow(clippingWindow);
+            icon->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
+            icon->setClippingWindow(clippingWindow);
         }
     }
 

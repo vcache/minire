@@ -325,6 +325,7 @@ namespace minire::gui::components
                                              dimension::Constant{tongueHeight});
 
         }
+
         // finish
         _background.revalidate();
         _tongue.revalidate();

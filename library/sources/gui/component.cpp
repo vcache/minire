@@ -193,14 +193,26 @@ namespace minire::gui
 
     void Component::invalidate()
     {
-        if (!_invalidated)
+        // NOTE: *this Component _might_ be not yet re-validated,
+        //       so that the _invalidated can be already set.
+        //       But there is a guarantee, that every parent Component
+        //       has been revalidated.
+
+        _invalidated = true;
+
+        for (auto p = parent(); p && !p->_invalidated; p = p->parent())
         {
-            _invalidated = true;
-            if (auto p = parent(); p)
-            {
-                p->invalidate();
-            }
+            p->_invalidated = true;
         }
+
+#       ifndef NDEBUG
+        // Slightly overkill, but that part was problematic,
+        // so I became paranoid.
+        bool fullChainInvalidated = _invalidated;
+        for(auto p = parent(); fullChainInvalidated && p; p = p->parent())
+            fullChainInvalidated &= p->_invalidated;
+        assert(fullChainInvalidated);
+#       endif
     }
 
     void Component::invalidateContent()
@@ -235,11 +247,18 @@ namespace minire::gui
         // TODO: drop focus (if any) when it become false
     }
 
+    // TODO: add metric the amount of revalidations to detect loops and
+    //       too intensive/pointless revalidations
     size_t Component::revalidate(size_t zOffset,
                                  bool effectiveVisible,
                                  Area const & clientArea,
                                  Area const & clippingWindow)
     {
+        // drop this flag at the beffining, so that descendants and children
+        // may re-set it immediately. This will increase flexibility (however,
+        // it creates the possibility of a hot loop).
+        _invalidated = false;
+
         assert(zOffset != 0); // should start from 1
         assert(_impl);
 
@@ -387,9 +406,9 @@ namespace minire::gui
                                             child->_visible.isInvalidated() ||
                                             child->_visible.get() ||
                                             child->_visible.get() != child->_impl->_visible;
-                if (visibilityTest && (revalidateChildren ||
-                                       child->_invalidated ||
-                                       effectiveVisibleChanged))
+
+                if (child->_invalidated ||
+                    (visibilityTest && (revalidateChildren || effectiveVisibleChanged)))
                 {
                     assert(index < childrenContentAreas.size());
                     Area const & childArea = childrenContentAreas[index];
@@ -406,7 +425,6 @@ namespace minire::gui
         _impl->_zOrderBoundaries.second = zOffset;
 
         // finish
-        _invalidated = false;
         return _impl->_zOrderBoundaries.second;
     }
 

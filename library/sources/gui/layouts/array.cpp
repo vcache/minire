@@ -47,7 +47,7 @@ namespace minire::gui::layouts
             }
             else
             {
-                MINIRE_WARNING("unknown Flow layout target: {}", component.id());
+                MINIRE_WARNING("unknown Array layout target: {}", component.id());
             }
         }
 
