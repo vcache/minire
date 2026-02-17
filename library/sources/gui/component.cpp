@@ -340,6 +340,7 @@ namespace minire::gui
         {
             _impl->_zOrderBoundaries.first = zOffset;
             _impl->_zOrderInvalidated = false;
+            revalidateChildren = true;
         }
 
         // revalidate derivated Component
