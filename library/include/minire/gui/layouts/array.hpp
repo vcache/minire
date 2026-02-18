@@ -67,5 +67,21 @@ namespace minire::gui::layouts
         void storeIndex(Element const &, typename Heap::iterator);
         void erase(std::string const &);
     };
+
+    class Row : public Array
+    {
+    public:
+        explicit Row(Elements const & elements = {})
+            : Array(true, elements)
+        {}
+    };
+
+    class Column : public Array
+    {
+    public:
+        explicit Column(Elements const & elements = {})
+            : Array(false, elements)
+        {}
+    };
 }
  
