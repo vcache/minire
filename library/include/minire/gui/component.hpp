@@ -77,6 +77,14 @@ namespace minire::gui
         Property<Layout::Sptr> const & layout() const { return _layout; }
         Property<Layout::Sptr> & layout() { return _layout; }
 
+        template<typename T, typename ... Args>
+        std::shared_ptr<T> newLayout(Args && ... args)
+        {
+            std::shared_ptr<T> result = std::make_shared<T>(std::forward<Args>(args)...);
+            layout() = result;
+            return result;
+        }
+
         // User's opaque data
         template<typename T>
         void setUserData(T && userData)
@@ -84,13 +92,13 @@ namespace minire::gui
             _userData = std::forward<T>(userData);
         }
 
-        template<typename T, class... Args>
+        template<typename T, typename ... Args>
         void emplaceUserData(Args && ... args)
         {
             _userData.emplace<T>(std::forward<Args>(args)...);
         }
 
-        template<typename T, typename U, class... Args>
+        template<typename T, typename U, typename ... Args>
         void emplaceUserData(std::initializer_list<U> il,
                              Args && ... args)
         {
