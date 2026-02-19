@@ -59,17 +59,19 @@ namespace
                     });
 
                 editbox1->setCallback(std::in_place_type<minire::events::application::OnKeyDown>, "keydown",
-                    [](Component const & component, minire::events::application::OnKeyDown const & event)
+                    [this](Component const & component, minire::events::application::OnKeyDown const & event)
                     {
                         std::string kind = "UNKNOWN";
                         switch(event._key)
                         {
                             case SDLK_RETURN:
                                 kind = "SUBMIT";
+                                unfocus();
                                 break;
 
                             case SDLK_ESCAPE:
                                 kind = "CANCEL";
+                                unfocus();
                                 break;
                         }
                         MINIRE_INFO("A keyboard event for \"{}\": {}", component.id(), kind);

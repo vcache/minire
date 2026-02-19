@@ -317,6 +317,12 @@ namespace minire::gui_controller
 
                     case gui::theme::Icon::kArrowDown:
                         return _contentFactory.makeImageView(kTextureId, utils::Rect(57, 1, 67, 11));
+
+                    case gui::theme::Icon::kDecrease:
+                        return _contentFactory.makeImageView(kTextureId, utils::Rect(69, 1, 78, 11));
+
+                    case gui::theme::Icon::kIncrease:
+                        return _contentFactory.makeImageView(kTextureId, utils::Rect(80, 1, 89, 11));
                 }
                 MINIRE_THROW("unknown Icon: {}", static_cast<int>(icon));
             }

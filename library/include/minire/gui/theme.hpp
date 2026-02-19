@@ -28,6 +28,8 @@ namespace minire::gui
             kArrowUp,
             kArrowRight,
             kArrowDown,
+            kDecrease,
+            kIncrease,
         };
 
         class Button

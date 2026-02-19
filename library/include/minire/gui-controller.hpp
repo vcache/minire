@@ -96,6 +96,8 @@ namespace minire
 
         void setSystemCursor(::SDL_SystemCursor) override;
 
+        void unfocus() override;
+
         void set(::SDL_Scancode key, uint16_t mods,
                  gui::HotKeys::Handler handler);
 

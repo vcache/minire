@@ -554,6 +554,11 @@ namespace minire
         enqueue<events::controller::SetSystemCursor>(systemCursor);
     }
 
+    void GuiController::unfocus()
+    {
+        setFocus({});
+    }
+
     gui::Area const & GuiController::topClientArea() const
     {
         return _windowArea;

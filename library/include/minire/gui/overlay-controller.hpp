@@ -47,5 +47,7 @@ namespace minire::gui
         virtual std::string const * getPrimarySelection() const = 0;
 
         virtual void setSystemCursor(::SDL_SystemCursor) = 0;
+
+        virtual void unfocus() = 0;
     };
 }

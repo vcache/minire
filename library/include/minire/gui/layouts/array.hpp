@@ -4,6 +4,7 @@
 #include <minire/gui/layout.hpp>
 
 #include <list>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -23,6 +24,8 @@ namespace minire::gui::layouts
         };
 
         using Elements = std::list<Element>;
+
+        using Sptr = std::shared_ptr<Array>;
 
     public:
         // horizontal=true is a "row"
