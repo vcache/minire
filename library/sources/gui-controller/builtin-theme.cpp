@@ -284,6 +284,45 @@ namespace minire::gui_controller
             gui::ContentViewFactory & _contentFactory;
         };
 
+        class BuiltinProgressBar
+            : public gui::theme::ProgressBar
+        {
+        public:
+            explicit BuiltinProgressBar(gui::ContentViewFactory & contentFactory)
+                : ProgressBar(Constants
+                {
+                    ._sliderPadding = utils::Rect(3),
+                })
+                , _contentFactory(contentFactory)
+            {}
+
+            gui::ImageView::Sptr makeBackground() const override
+            {
+                return _contentFactory.makeImageView(kTextureId,
+                    utils::NinePatch
+                    {
+                        ._boundary = utils::Rect(0, 161, 12, 173),
+                        ._out = utils::Rect(2, 163, 10, 171),
+                        ._in = utils::Rect(5, 166, 7, 168),
+                    });
+            }
+
+            gui::ImageView::Sptr makeSlider() const override
+            {
+                return _contentFactory.makeImageView(kTextureId,
+                    utils::NinePatch
+                    {
+
+                        ._boundary = utils::Rect(5, 118, 6, 119),
+                        ._out = utils::Rect(5, 118, 6, 119),
+                        ._in = utils::Rect(5, 118, 6, 119),
+                    });
+            }
+
+        private:
+            gui::ContentViewFactory & _contentFactory;
+        };
+
         class BuiltinTheme
             : public gui::Theme
         {
@@ -300,6 +339,7 @@ namespace minire::gui_controller
                 _dropdown = std::make_shared<BuiltinDropdown>(_contentFactory);
                 _listview = std::make_shared<BuiltinListView>(_contentFactory);
                 _editbox = std::make_shared<BuiltinEditbox>(_contentFactory);
+                _progressBar = std::make_shared<BuiltinProgressBar>(_contentFactory);
             }
 
             gui::ImageView::Sptr makeIcon(gui::theme::Icon icon) const override
@@ -357,14 +397,21 @@ namespace minire::gui_controller
                 return *_editbox;
             }
 
+            gui::theme::ProgressBar const & progressBar() const override
+            {
+                assert(_progressBar);
+                return *_progressBar;
+            }
+
         private:
-            std::unique_ptr<content::Lease>   _atlas;
-            gui::ContentViewFactory &         _contentFactory;
-            std::shared_ptr<BuiltinButton>    _button;
-            std::shared_ptr<BuiltinScrollbar> _scrollbar;
-            std::shared_ptr<BuiltinListView>  _listview;
-            std::shared_ptr<BuiltinDropdown>  _dropdown;
-            std::shared_ptr<BuiltinEditbox>   _editbox;
+            std::unique_ptr<content::Lease>     _atlas;
+            gui::ContentViewFactory &           _contentFactory;
+            std::shared_ptr<BuiltinButton>      _button;
+            std::shared_ptr<BuiltinScrollbar>   _scrollbar;
+            std::shared_ptr<BuiltinListView>    _listview;
+            std::shared_ptr<BuiltinDropdown>    _dropdown;
+            std::shared_ptr<BuiltinEditbox>     _editbox;
+            std::shared_ptr<BuiltinProgressBar> _progressBar;
         };
     }
 

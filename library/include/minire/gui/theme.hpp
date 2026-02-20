@@ -173,6 +173,31 @@ namespace minire::gui
         private:
             Constants _constants;
         };
+
+        class ProgressBar
+        {
+        public:
+            struct Constants
+            {
+                utils::Rect _sliderPadding;
+            };
+
+        public:
+            explicit ProgressBar(Constants const & constants)
+                : _constants(constants)
+            {}
+
+            virtual ~ProgressBar() = default;
+
+            Constants const & constants() const { return _constants; }
+
+            virtual ImageView::Sptr makeBackground() const = 0;
+
+            virtual ImageView::Sptr makeSlider() const = 0;
+
+        private:
+            Constants _constants;
+        };
     }
 
     class Theme
@@ -187,5 +212,6 @@ namespace minire::gui
         virtual theme::ListView const & listview() const = 0;
         virtual theme::Dropdown const & dropdown() const = 0;
         virtual theme::Editbox const & editbox() const = 0;
+        virtual theme::ProgressBar const & progressBar() const = 0;
     };
 }
