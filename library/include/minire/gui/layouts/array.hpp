@@ -9,6 +9,11 @@
 #include <string>
 #include <unordered_map>
 
+namespace minire::gui
+{
+    class Component;
+}
+
 namespace minire::gui::layouts
 {
     // TODO: add alignment (Begin/Center/End/Justify),
@@ -42,10 +47,18 @@ namespace minire::gui::layouts
         void onClear() override;
 
         void pushBack(Element const &);
+        void pushBack(Dimension dim) { pushBack(Element{std::nullopt, dim}); }
+        void pushBack(std::string id, Dimension dim) { pushBack(Element{id, dim}); }
+        void pushBack(Component const &, Dimension dim);
+        void pushBack(std::shared_ptr<Component> const &, Dimension dim);
 
         void popBack();
 
         void pushFront(Element const &);
+        void pushFront(Dimension d) { pushFront(Element{std::nullopt, d}); }
+        void pushFront(std::string id, Dimension dim) { pushFront(Element{id, dim}); }
+        void pushFront(Component const &, Dimension dim);
+        void pushFront(std::shared_ptr<Component> const &, Dimension dim);
 
         void popFront();
 

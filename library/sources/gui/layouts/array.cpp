@@ -154,6 +154,18 @@ namespace minire::gui::layouts
         storeIndex(element, std::prev(_heap.end()));
     }
 
+    void Array::pushBack(Component const & component, Dimension dim)
+    {
+        pushBack(component.id(), dim);
+    }
+
+    void Array::pushBack(std::shared_ptr<Component> const & component,
+                         Dimension dim)
+    {
+        MINIRE_INVARIANT(component, "no component provided");
+        pushBack(component->id(), dim);
+    }
+
     void Array::popBack()
     {
         MINIRE_INVARIANT(!_heap.empty(), "cannot pop from empty Array");
@@ -169,6 +181,18 @@ namespace minire::gui::layouts
     {
         _heap.emplace_front(Slot{element});
         storeIndex(element, _heap.begin());
+    }
+
+    void Array::pushFront(Component const & component, Dimension dim)
+    {
+        pushFront(component.id(), dim);
+    }
+
+    void Array::pushFront(std::shared_ptr<Component> const & component,
+                          Dimension dim)
+    {
+        MINIRE_INVARIANT(component, "no component provided");
+        pushFront(component->id(), dim);
     }
 
     void Array::popFront()
