@@ -49,8 +49,9 @@ namespace minire::gui::components
                 slider->setContentInvalidator(shared_from_this());
             }
 
-            slider->setVisible(effectiveVisible);
-            if (effectiveVisible)
+            bool const sliderVisible = effectiveVisible && _value.get() > 0;
+            slider->setVisible(sliderVisible);
+            if (sliderVisible)
             {
                 utils::Rect const & sliderPadding = _sliderPadding.get();
                 Area const realContentArea
