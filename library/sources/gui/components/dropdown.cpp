@@ -393,7 +393,18 @@ namespace minire::gui::components
 
     std::any const * Dropdown::current() const
     {
-        return _selected ? &(_contents.get().at(*_selected)) : nullptr;
+        if (!_selected)
+        {
+            return nullptr;
+        }
 
+        if (_contents.get().empty())
+        {
+            return nullptr;
+        }
+
+        size_t const index = std::min(_contents.get().size() - 1, *_selected);
+        assert(index < _contents.get().size());
+        return &(_contents.get().at(index));
     }
 }
