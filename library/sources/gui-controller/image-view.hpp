@@ -35,6 +35,13 @@ namespace minire::gui_controller
 
         void setVisible(bool visible) override;
 
+        void setContent(content::Id const & textureId,
+                        utils::Patch const & patch) override;
+
+        void setPatch(utils::Patch const & patch) override;
+
+        void setTexture(content::Id const & textureId) override;
+
         void commit() override;
 
     private:
@@ -42,11 +49,11 @@ namespace minire::gui_controller
 
     private:
         GuiController                 & _controller;
-        content::Id const               _textureId;
-        utils::Patch const              _patch;
 
         // current state
         std::string                     _spriteId;
+        content::Id                     _textureId;
+        utils::Patch                    _patch;
         glm::vec2                       _spritePosition{0, 0};
         glm::vec2                       _spriteSize{0, 0};
         glm::vec2                       _imageSize{0, 0};
@@ -56,6 +63,8 @@ namespace minire::gui_controller
         bool                            _visible = true;
 
         // pended updates
+        std::optional<utils::Patch>     _newPatch;
+        std::optional<content::Id>      _newTextureId;
         std::optional<glm::vec2>        _newSpritePosition;
         std::optional<glm::vec2>        _newSpriteSize;
         std::optional<utils::MaybeRect> _newClippingWindow;

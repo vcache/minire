@@ -34,6 +34,12 @@ namespace minire::rasterizer
                     bool const visible,
                     size_t const zOrder);
 
+        void setPatch(std::string const & id,
+                      utils::Patch const & patch);
+
+        void setTexture(std::string const & id,
+                        content::Id const & texture);
+
         void move(std::string const & id,
                   glm::vec2 const & position,
                   utils::MaybeRect const & clippingWindow);

@@ -82,6 +82,13 @@ namespace minire::gui
     public:
         using Sptr = std::shared_ptr<ImageView>;
         using Wptr = std::weak_ptr<ImageView>;
+
+        virtual void setContent(content::Id const & textureId,
+                                utils::Patch const & patch) = 0;
+
+        virtual void setPatch(utils::Patch const & patch) = 0;
+
+        virtual void setTexture(content::Id const & textureId) = 0;
     };
 
     class TextView

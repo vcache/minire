@@ -111,11 +111,53 @@ namespace minire::gui_controller
         }
     }
 
+    void ImageViewImpl::setContent(content::Id const & textureId,
+                                   utils::Patch const & patch)
+    {
+        setTexture(textureId);
+        setPatch(patch);
+    }
+
+    void ImageViewImpl::setPatch(utils::Patch const & patch)
+    {
+        if (patch != _patch || _newPatch)
+        {
+            _newPatch = patch;
+            auto [size, resizable] = _controller.measure(patch, _textureId);
+            _imageSize = size;
+            _resizable = resizable;
+            invalidate();
+            enqueueUncommited();
+        }
+    }
+
+    void ImageViewImpl::setTexture(content::Id const & textureId)
+    {
+        if (textureId != _textureId || _newTextureId)
+        {
+            _newTextureId = textureId;
+            invalidate();
+            enqueueUncommited();
+        }
+    }
+
     void ImageViewImpl::commit()
     {
         if (_spriteId.empty())
         {
             _spriteId = utils::newUuid();
+
+            if (_newPatch)
+            {
+                _patch = *_newPatch;
+                _newPatch.reset();
+            }
+
+            if (_newTextureId)
+            {
+                _textureId = *_newTextureId;
+                _newTextureId.reset();
+            }
 
             if (_newSpritePosition)
             {
@@ -150,6 +192,27 @@ namespace minire::gui_controller
             _controller.enqueue<CreateSprite>(
                 _spriteId, _textureId, _patch, _spritePosition,
                 _spriteSize, _clippingWindow, _visible, _zOrder);
+        }
+
+        if (_newPatch)
+        {
+            if (_patch != *_newPatch)
+            {
+                _patch = *_newPatch;
+                assert(!_spriteId.empty());
+                _controller.enqueue<SetSpritePatch>(_spriteId, _patch);
+            }
+            _newPatch.reset();
+        }
+
+        if (_newTextureId)
+        {
+            if (_textureId != *_newTextureId)
+            {
+                _textureId = *_newTextureId;
+                assert(!_spriteId.empty());
+                _controller.enqueue<SetSpriteTexture>(_spriteId, _textureId);
+            }
         }
 
         bool changePosition = false;

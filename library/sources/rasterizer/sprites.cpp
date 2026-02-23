@@ -154,6 +154,19 @@ namespace minire::rasterizer
     public:
         bool visible() const { return _visible; }
 
+        void setPatch(utils::Patch const & patch)
+        {
+            _patch = patch;
+            _invalidated = true;
+        }
+
+        void setTexture(Textures::Texture::Sptr const & texture)
+        {
+            assert(texture);
+            _texture = texture;
+            _invalidated = true;
+        }
+
         void setPosition(glm::vec2 const & p)
         {
             _position = p;
@@ -249,6 +262,23 @@ namespace minire::rasterizer
 
         auto [_, inserted] = _store.emplace(id, std::move(sprite));
         MINIRE_INVARIANT(inserted, "sprite already exists: \"{}\"", id);
+    }
+
+    void Sprites::setPatch(std::string const & id,
+                           utils::Patch const & patch)
+    {
+        Sprite & sprite = find(id);
+        sprite.setPatch(patch);
+    }
+
+    void Sprites::setTexture(std::string const & id,
+                             content::Id const & texture)
+    {
+        auto textureSptr = _textures.get(texture, {}, false /* no mipmap */);
+        MINIRE_INVARIANT(textureSptr, "no texture found for \"{}\": {}", id, texture);
+
+        Sprite & sprite = find(id);
+        sprite.setTexture(textureSptr);
     }
 
     void Sprites::move(std::string const & id,

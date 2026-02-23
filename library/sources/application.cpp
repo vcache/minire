@@ -312,6 +312,16 @@ namespace minire
                                       e._zOrder);
     }
 
+    void Application::handle(events::controller::SetSpritePatch const & e)
+    {
+        _rasterizer->sprites().setPatch(e._id, e._source);
+    }
+
+    void Application::handle(events::controller::SetSpriteTexture const & e)
+    {
+        _rasterizer->sprites().setTexture(e._id, e._texture);
+    }
+
     void Application::handle(events::controller::ResizeSprite const & e)
     {
         _rasterizer->sprites().resize(e._id, e._dimensions, e._clippingWindow);

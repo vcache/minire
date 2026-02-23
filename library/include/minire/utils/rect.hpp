@@ -76,6 +76,8 @@ namespace minire::utils
         Rect _boundary; // outter boundary of a 9-patch
         Rect _out;
         Rect _in;
+
+        bool operator==(NinePatch const &) const = default;
     };
 
     glm::vec2 defaultSize(NinePatch const &);

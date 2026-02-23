@@ -26,6 +26,18 @@ namespace minire::events::controller
         size_t           _zOrder;
     };
 
+    struct SetSpritePatch
+    {
+        std::string  _id;
+        utils::Patch _source;
+    };
+
+    struct SetSpriteTexture
+    {
+        std::string _id;
+        content::Id _texture;
+    };
+
     // TODO: tidy up this API (lots of logic duplicated: resize,
     //       move, set area, set clipping window)
     // TODO: make it more consistent w/ Labels API
