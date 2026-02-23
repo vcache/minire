@@ -148,25 +148,28 @@ namespace minire::gui::layouts
         _index.clear();
     }
 
-    void Array::pushBack(Element const & element)
+    Array & Array::pushBack(Element const & element)
     {
         _heap.emplace_back(Slot{element});
         storeIndex(element, std::prev(_heap.end()));
+        return *this;
     }
 
-    void Array::pushBack(Component const & component, Dimension dim)
+    Array & Array::pushBack(Component const & component, Dimension dim)
     {
         pushBack(component.id(), dim);
+        return *this;
     }
 
-    void Array::pushBack(std::shared_ptr<Component> const & component,
+    Array & Array::pushBack(std::shared_ptr<Component> const & component,
                          Dimension dim)
     {
         MINIRE_INVARIANT(component, "no component provided");
         pushBack(component->id(), dim);
+        return *this;
     }
 
-    void Array::popBack()
+    Array & Array::popBack()
     {
         MINIRE_INVARIANT(!_heap.empty(), "cannot pop from empty Array");
         Element const & element = _heap.back()._element;
@@ -175,27 +178,31 @@ namespace minire::gui::layouts
             erase(*element._id);
         }
         _heap.pop_back();
+        return *this;
     }
 
-    void Array::pushFront(Element const & element)
+    Array & Array::pushFront(Element const & element)
     {
         _heap.emplace_front(Slot{element});
         storeIndex(element, _heap.begin());
+        return *this;
     }
 
-    void Array::pushFront(Component const & component, Dimension dim)
+    Array & Array::pushFront(Component const & component, Dimension dim)
     {
         pushFront(component.id(), dim);
+        return *this;
     }
 
-    void Array::pushFront(std::shared_ptr<Component> const & component,
+    Array & Array::pushFront(std::shared_ptr<Component> const & component,
                           Dimension dim)
     {
         MINIRE_INVARIANT(component, "no component provided");
         pushFront(component->id(), dim);
+        return *this;
     }
 
-    void Array::popFront()
+    Array & Array::popFront()
     {
         MINIRE_INVARIANT(!_heap.empty(), "cannot pop from empty Array");
         Element const & element = _heap.front()._element;
@@ -204,6 +211,7 @@ namespace minire::gui::layouts
             erase(*element._id);
         }
         _heap.pop_front();
+        return *this;
     }
 
     void Array::storeIndex(Element const & element,
