@@ -110,9 +110,11 @@ namespace minire::gui
 
     Component::Component(std::string const & id,
                          Theme const & theme,
+                         Theme::Style const & style,
                          OverlayController & overlayController)
         : _id(id)
         , _theme(theme)
+        , _style(style)
         , _overlayController(overlayController)
         , _visible(*this, true)
         , _isDraggable(*this, false)

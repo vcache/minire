@@ -47,8 +47,14 @@ add_definitions(
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp
     COMMAND xxd -c 20 -n kBuiltinGuiAtlas -i ${CMAKE_CURRENT_SOURCE_DIR}/data/gui-atlas.png > ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp
+    COMMAND xxd -c 20 -n kBuiltinGuiFontFace6x13 -i ${CMAKE_CURRENT_SOURCE_DIR}/data/6x13.bdf >> ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp
+    COMMAND xxd -c 20 -n kBuiltinGuiFontFace6x13B -i ${CMAKE_CURRENT_SOURCE_DIR}/data/6x13B.bdf >> ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp
+    COMMAND xxd -c 20 -n kBuiltinGuiFontFace6x13O -i ${CMAKE_CURRENT_SOURCE_DIR}/data/6x13O.bdf >> ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/data/gui-atlas.png
-    COMMENT "Embedding gui-atlas into sources dir"
+            ${CMAKE_CURRENT_SOURCE_DIR}/data/6x13.bdf
+            ${CMAKE_CURRENT_SOURCE_DIR}/data/6x13B.bdf
+            ${CMAKE_CURRENT_SOURCE_DIR}/data/6x13O.bdf
+    COMMENT "Embedding data into source dir"
 )
 
 # Build the library

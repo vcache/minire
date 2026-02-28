@@ -36,6 +36,7 @@ namespace minire::gui::components
 
         Dropdown(std::string const & id,
                  Theme const & theme,
+                 Theme::Style const & style,
                  OverlayController &,
                  ItemBuilderCallback baseItemBuilder = {},
                  ItemBuilderCallback tongueItemBuilder = {});
@@ -60,8 +61,15 @@ namespace minire::gui::components
         Property<ImageView::Sptr> const & background() const { return _background; }
         Property<ImageView::Sptr> & background() { return _background; }
 
-        Property<theme::Dropdown::Constants::Tongue> const & tongue() const { return _tongue; }
-        Property<theme::Dropdown::Constants::Tongue> & tongue() { return _tongue; }
+        struct Tongue
+        {
+            std::optional<size_t> _maxLines;
+            std::optional<float>  _minHeight;
+            std::optional<float>  _maxHeight;
+        };
+
+        Property<Tongue> const & tongue() const { return _tongue; }
+        Property<Tongue> & tongue() { return _tongue; }
 
         Property<Contents> const & contents() const { return _contents; }
         Property<Contents> & contents() { return _contents; }
@@ -130,8 +138,6 @@ namespace minire::gui::components
         using ActiveItemContainerSptr = std::shared_ptr<ActiveItemContainer>;
 
     private:
-        using Tongue = theme::Dropdown::Constants::Tongue;
-
         Property<ImageView::Sptr>      _background;
         Property<Tongue>               _tongue;
         Property<Contents>             _contents;

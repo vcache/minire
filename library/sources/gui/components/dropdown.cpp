@@ -160,27 +160,33 @@ namespace minire::gui::components
 
     Dropdown::Dropdown(std::string const & id,
                        Theme const & theme,
+                       Theme::Style const & style,
                        OverlayController & overlayController,
                        ItemBuilderCallback baseItemBuilder,
                        ItemBuilderCallback tongueItemBuilder)
-        : Component(id, theme, overlayController)
-        , _background(*this, theme.dropdown().makeBackground())
-        , _tongue(*this, theme.dropdown().constants()._tongue)
+        : Component(id, theme, style, overlayController)
+        , _background(*this, theme.makeImage("dropdown", "bg", style))
+        , _tongue(*this, Tongue
+            {
+                ._maxLines = theme.parameter<size_t>("dropdown", "t/max-lines", style),
+                ._minHeight = theme.parameter<float>("dropdown", "t/min-height", style),
+                ._maxHeight = theme.parameter<float>("dropdown", "t/max-height", style),
+            })
         , _contents(*this)
         , _lineHeight(*this, 0)
         , _activeItemContainer(std::make_shared<ActiveItemContainer>(
-            kActiveItemContainerId, theme, overlayController))
+            kActiveItemContainerId, theme, style, overlayController))
         , _dropButton(std::make_shared<Button>(
-            kBaseDropButtonId, theme, overlayController))
+            kBaseDropButtonId, theme, style, overlayController))
         , _dropdownLayout(std::make_shared<layouts::VerticalTool>(
             kActiveItemContainerId, kBaseDropButtonId,
-            theme.dropdown().constants()._dropButtonWidth,
-            theme.dropdown().constants()._dropButtonAtLeft))
+            theme.parameter<float>("dropdown", "drop-button-width", style),
+            theme.parameter<bool>("dropdown", "drop-button-at-left", style)))
         , _baseItemBuilderCallback(baseItemBuilder)
         , _tongueItemBuilderCallback(tongueItemBuilder)
     {
         layout() = _dropdownLayout;
-        padding() = theme.dropdown().constants()._padding;
+        padding() = theme.parameter<utils::Rect>("dropdown", "padding", style);
     }
 
     Dropdown::~Dropdown()
@@ -198,7 +204,7 @@ namespace minire::gui::components
 
         assert(_dropButton);
         _dropButton->setParent(shared_from_this());
-        _dropButton->icon() = theme().makeIcon(theme::Icon::kArrowDown);
+        _dropButton->icon() = theme().makeImage("dropdown", "i:arrow-down", style());
         _dropButton->setCallback(std::in_place_type<gui::events::OnClick>, "__open__",
             [this](Component const &, gui::events::OnClick const &)
             { openTongue(); });
@@ -227,9 +233,9 @@ namespace minire::gui::components
         Component & overlay = overlayController().push(_tongueOverlay->_tag,
                                                        _tongueOverlay->_defaultHandler);
         _tongueOverlay->_listview = overlay.emplace<ListView>(
-            "__tongue__", _tongueItemBuilderCallback ? _tongueItemBuilderCallback
-                                                     : _baseItemBuilderCallback,
-            &(theme().dropdown().tongue()));
+            Theme::Style{._name = style()._name, ._modifier = "dropdown"}, "__tongue__",
+            _tongueItemBuilderCallback ? _tongueItemBuilderCallback
+                                       : _baseItemBuilderCallback);
 
         *(_tongueOverlay->_listview->contents()) = _contents.get();
         _tongueOverlay->_listview->select(_selected);

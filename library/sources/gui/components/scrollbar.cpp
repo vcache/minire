@@ -88,17 +88,18 @@ namespace minire::gui::components
 
     Scrollbar::Scrollbar(std::string const & id,
                          Theme const & theme,
+                         Theme::Style const & style,
                          OverlayController & overlayController,
                          bool isVertical)
-        : Component(id, theme, overlayController)
-        , _background(*this, theme.scrollbar().makeBackground())
+        : Component(id, theme, style, overlayController)
+        , _background(*this, theme.makeImage("scrollbar", "bg", style))
         , _step(*this, 0.1f)
-        , _minSliderLength(*this, theme.scrollbar().constants()._minSliderLength)
+        , _minSliderLength(*this, theme.parameter<float>("scrollbar", "min-slider-length", style))
         , _isVertical(*this, isVertical)
         , _value(*this, 0.0f)
-        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, overlayController))
-        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, overlayController))
-        , _slider(std::make_shared<Button>("__slider__", theme, overlayController))
+        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController))
+        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController))
+        , _slider(std::make_shared<Button>("__slider__", theme, style, overlayController))
     {
         layout() = std::make_shared<CustomLayout>(*this);
     }
@@ -107,14 +108,17 @@ namespace minire::gui::components
     {
         auto sharedThis = shared_from_this();
 
+// TODO: why create it here things that will be rewritten in revalidate()
+
         // Increase button
         assert(_increaseButton);
         _increaseButton->setParent(sharedThis);
         _increaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__scrollbar__",
             [this](Component const &, gui::events::OnClick const &)
             { setValue(_value.get() + _step.get()); });
-        _increaseButton->icon() = theme().makeIcon(_isVertical.get() ? theme::Icon::kArrowDown
-                                                                     : theme::Icon::kArrowRight);
+        _increaseButton->icon() = theme().makeImage("scrollbar",
+            _isVertical.get() ? "i:arrow-down" : "i:arrow-right",
+            style());
         _defaultIncreaseIcon = _increaseButton->icon().get();
 
         // Decrease button
@@ -123,8 +127,9 @@ namespace minire::gui::components
         _decreaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__scrollbar__",
             [this](Component const &, gui::events::OnClick const &)
             { setValue(_value.get() - _step.get()); });
-        _decreaseButton->icon() = theme().makeIcon(_isVertical.get() ? theme::Icon::kArrowUp
-                                                                     : theme::Icon::kArrowLeft);
+        _decreaseButton->icon() = theme().makeImage("scrollbar",
+            _isVertical.get() ? "i:arrow-up" : "i:arrow-left",
+            style());
         _defaultDecreaseIcon = _decreaseButton->icon().get();
 
         // Slider button
@@ -225,16 +230,19 @@ namespace minire::gui::components
             assert(_increaseButton);
             if (_increaseButton->icon().get() == _defaultIncreaseIcon.lock())
             {
-                _increaseButton->icon() = theme().makeIcon(_isVertical.get() ? theme::Icon::kArrowDown
-                                                                             : theme::Icon::kArrowRight);
+                _increaseButton->icon() = theme().makeImage("scrollbar",
+                    _isVertical.get() ? "i:arrow-down" : "i:arrow-right",
+                    style());
+
                 _defaultIncreaseIcon = _increaseButton->icon().get();
             }
 
             assert(_decreaseButton);
             if (_decreaseButton->icon().get() == _defaultDecreaseIcon.lock())
             {
-                _decreaseButton->icon() = theme().makeIcon(_isVertical.get() ? theme::Icon::kArrowUp
-                                                                             : theme::Icon::kArrowLeft);
+                _decreaseButton->icon() = theme().makeImage("scrollbar",
+                    _isVertical.get() ? "i:arrow-up" : "i:arrow-left",
+                    style());
                 _defaultDecreaseIcon = _decreaseButton->icon().get();
             }
         }

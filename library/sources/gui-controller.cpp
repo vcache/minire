@@ -80,7 +80,7 @@ namespace minire
 
         // create new overlay
         assert(_theme);
-        auto root = std::make_shared<gui::Component>("__root__", *_theme, *this);
+        auto root = std::make_shared<gui::Component>("__root__", *_theme, gui::Theme::Style{}, *this);
         root->_horizontal = gui::Arranger(gui::position::Constant{0}, gui::dimension::Fill{});
         root->_vertical = gui::Arranger(gui::position::Constant{0}, gui::dimension::Fill{});
 

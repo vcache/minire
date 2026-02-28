@@ -12,6 +12,7 @@ namespace minire::gui::components
 {
     namespace
     {
+        // TODO: won't work w/o std::setlocale
         bool isNonWalnum(wchar_t c)
         {
             return !std::iswalnum(c);
@@ -37,23 +38,24 @@ namespace minire::gui::components
 
     Editbox::Editbox(std::string const & id,
                      Theme const & theme,
+                     Theme::Style const & style,
                      OverlayController & overlayController,
                      TextBuilderCallback textBuilderCallback)
-        : Component(id, theme, overlayController)
-        , _bgNormal(*this, theme.editbox().makeNormalBg())
-        , _bgDisabled(*this, theme.editbox().makeDisabledBg())
-        , _cursorImageInsert(*this, theme.editbox().makeCursorImageInsert())
-        , _cursorImageReplace(*this, theme.editbox().makeCursorImageReplace())
-        , _selectionImage(*this, theme.editbox().makeSelectionImage())
+        : Component(id, theme, style, overlayController)
+        , _bgNormal(*this, theme.makeImage("editbox", "bg-normal", style))
+        , _bgDisabled(*this, theme.makeImage("editbox", "bg-disabled", style))
+        , _cursorImageInsert(*this, theme.makeImage("editbox", "cursor-insert", style))
+        , _cursorImageReplace(*this, theme.makeImage("editbox", "cursor-replace", style))
+        , _selectionImage(*this, theme.makeImage("editbox", "selection-bg", style))
         , _insertMode(*this, true)
         , _enabled(*this, true)
         , _passwordChar(*this, std::nullopt)
-        , _contentPadding(*this, theme.editbox().constants()._contentPadding)
+        , _contentPadding(*this, theme.parameter<utils::Rect>("editbox", "content-padding", style))
         , _textBuilderCallback(std::move(textBuilderCallback))
         , _textBuilderCallbackUpdated(true)
         , _text(*this)
         , _textView()
-        , _activeFormat(theme.editbox().constants()._activeFormat)
+        , _activeFormat(theme.parameter<text::Format>("editbox", "active-format", style))
         , _cursorPos(0)
         , _selectionBegin(kNoIndex)
         , _offset(0)

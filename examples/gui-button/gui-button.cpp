@@ -195,10 +195,10 @@ namespace
                 }
 
                 // icon + text
-                for(theme::Location location : { theme::Location::kLeft,
-                                                 theme::Location::kTop,
-                                                 theme::Location::kRight,
-                                                 theme::Location::kBottom})
+                for(Theme::Location location : { Theme::Location::kLeft,
+                                                 Theme::Location::kTop,
+                                                 Theme::Location::kRight,
+                                                 Theme::Location::kBottom})
                 {
                     for(float const spacing : {0.0f, 10.0f})
                     {

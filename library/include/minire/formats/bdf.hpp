@@ -86,10 +86,12 @@ namespace minire::formats
     public:
         using Sptr = std::shared_ptr<Bdf>;
 
-        explicit Bdf(std::string const &);
+        // reads from FS
+        explicit Bdf(std::string const & filename);
 
+        // reads from std::istream (sourceName is for debug only)
         explicit Bdf(std::istream &,
-                     std::string const &);
+                     std::string const & sourceName);
 
     public:
         BBox const & bbox() const { return _bbx; }

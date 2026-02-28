@@ -38,9 +38,9 @@ namespace minire::gui::components
 
         ListView(std::string const & id,
                  Theme const &,
+                 Theme::Style const &,
                  OverlayController &,
-                 ItemBuilderCallback = {},
-                 theme::ListView const * style = nullptr);
+                 ItemBuilderCallback = {});
 
         using Sptr = std::shared_ptr<ListView>;
         using Wptr = std::weak_ptr<ListView>;

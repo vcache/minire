@@ -18,9 +18,10 @@ namespace minire::gui::components
 
         explicit ContentViewer(std::string const & id,
                                Theme const & theme,
+                               Theme::Style const & style,
                                OverlayController & overlayController,
                                ContentView::Sptr const & content)
-            : Component(id, theme, overlayController)
+            : Component(id, theme, style, overlayController)
             , _content(content)
         {
             MINIRE_INVARIANT(_content, "no Content provided");

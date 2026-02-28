@@ -13,5 +13,5 @@ namespace minire::gui_controller
     //       therefore, the returned point must not outlive content::Manager.
     //       Otherwise, a fatal error will happen on Manger's dtor.
     std::unique_ptr<gui::Theme> makeDefaultTheme(content::Manager &,
-                                                  gui::ContentViewFactory &);
+                                                 gui::ContentViewFactory &);
 }

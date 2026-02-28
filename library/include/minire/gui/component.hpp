@@ -47,6 +47,7 @@ namespace minire::gui
 
         Component(std::string const & id,
                   Theme const & theme,
+                  Theme::Style const & style,
                   OverlayController & overlayController);
         ~Component();
 
@@ -153,6 +154,7 @@ namespace minire::gui
             return const_cast<T &>(const_cast<Component const *>(this)->at<T>(childId));
         }
 
+        // TODO: make all content measurable by default
         virtual std::optional<std::pair<float, float>> measureContent() const
         {
             return std::nullopt;
@@ -163,14 +165,23 @@ namespace minire::gui
         void setParent(Sptr const &);
 
         template<typename T, typename ... Args>
-        std::shared_ptr<T> emplace(std::string const childId,
+        std::shared_ptr<T> emplace(Theme::Style const & style,
+                                   std::string const childId,
                                    Args &&... args)
         {
             std::shared_ptr<T> child = std::make_shared<T>(
-                childId, _theme, _overlayController,
+                childId, _theme, style, _overlayController,
                 std::forward<Args>(args)...);
             child->setParent(shared_from_this());
             return child;
+        }
+
+        template<typename T, typename ... Args>
+        std::shared_ptr<T> emplace(std::string const childId,
+                                   Args &&... args)
+        {
+            return emplace<T>(_style, childId,
+                              std::forward<Args>(args)...);
         }
 
         void invalidate();
@@ -195,6 +206,8 @@ namespace minire::gui
 
         Theme const & theme() const { return _theme; }
 
+        Theme::Style const & style() const { return _style; }
+
         OverlayController & overlayController() { return _overlayController; }
 
         void setAcceptFocus(bool);
@@ -218,6 +231,7 @@ namespace minire::gui
 
         std::string const         _id;
         Theme const             & _theme;
+        Theme::Style const        _style;
         OverlayController       & _overlayController;
 
         Property<bool>            _visible;

@@ -85,7 +85,7 @@ namespace minire
         void pop() override;
 
         void startTextInput() override;
-         void stopTextInput() override;
+        void stopTextInput() override;
 
         void startClipboardCapture() override;
         void stopClipboardCapture() override;

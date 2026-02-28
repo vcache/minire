@@ -23,6 +23,7 @@ namespace minire::gui::components
 
         ProgressBar(std::string const & id,
                     Theme const & theme,
+                    Theme::Style const & style,
                     OverlayController &,
                     Direction const);
 

@@ -107,14 +107,15 @@ namespace minire::gui::components
         public:
             ListViewItem(std::string const & id,
                          Theme const & theme,
+                         Theme::Style const & style,
                          OverlayController & overlayController,
                          ContentView::Sptr const & contents,
                          ListView & listview,
                          size_t index)
-                : Component(id, theme, overlayController)
-                , _normalBackground(*this, theme.listview().makeNormalItemBackground())
-                , _hoverBackground(*this, theme.listview().makeHoverItemBackground())
-                , _selectedBackground(*this, theme.listview().makeSelectedItemBackground())
+                : Component(id, theme, style, overlayController)
+                , _normalBackground(*this, theme.makeImage("listview", "bg-item-normal", style))
+                , _hoverBackground(*this, theme.makeImage("listview", "bg-item-hovered", style))
+                , _selectedBackground(*this, theme.makeImage("listview", "bg-item-selected", style))
                 , _contents(*this, contents)
                 , _isSelected(*this, false)
                 , _listview(listview)
@@ -271,35 +272,26 @@ namespace minire::gui::components
         };
     }
 
-    namespace
-    {
-        theme::ListView const & listviewStyle(Theme const & theme,
-                                              theme::ListView const * style)
-        {
-            return style ? *style : theme.listview();
-        }
-    }
-
     ListView::ListView(std::string const & id,
                        Theme const & theme,
+                       Theme::Style const & style,
                        OverlayController & overlayController,
-                       ItemBuilderCallback itemBuilderCallback,
-                       theme::ListView const * style)
-        : Component(id, theme, overlayController)
-        , _background(*this, listviewStyle(theme, style).makeBackground())
+                       ItemBuilderCallback itemBuilderCallback)
+        : Component(id, theme, style, overlayController)
+        , _background(*this, theme.makeImage("listview", "bg", style))
         , _contents(*this)
         , _offset(*this, 0)
         , _lineHeight(*this, 0)
-        , _scrollbar(std::make_shared<Scrollbar>("__scrollbar__", theme, overlayController, true))
+        , _scrollbar(std::make_shared<Scrollbar>("__scrollbar__", theme, style, overlayController, true))
         , _contentLayout(std::make_shared<ListViewLayout>())
         , _verticalToolLayout(std::make_shared<layouts::VerticalTool>(
             kContentId, kScrollbarId,
-            listviewStyle(theme, style).constants()._scrollbarWidth,
-            listviewStyle(theme, style).constants()._scrollbarAtLeft))
+            theme.parameter<float>("listview", "scrollbar-width", style),
+            theme.parameter<bool>("listview", "scrollbar-at-left", style)))
         , _itemBuilderCallback(itemBuilderCallback)
     {
         layout() = _verticalToolLayout;
-        padding() = listviewStyle(theme, style).constants()._padding;
+        padding() = theme.parameter<utils::Rect>("listview", "padding", style);
     }
 
     void ListView::initialize()

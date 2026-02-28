@@ -29,18 +29,19 @@ namespace minire::gui::components
 
     SpinBox::SpinBox(std::string const & id,
                      Theme const & theme,
+                     Theme::Style const & style,
                      OverlayController & overlayController,
                      Editbox::TextBuilderCallback textBuilderCallback)
-        : Component(id, theme, overlayController)
+        : Component(id, theme, style, overlayController)
         , _spacing(*this, 0.0f)
         , _value(*this, 0.0f)
         , _step(*this, 0.5f)
         , _minimum(*this, -100.0f)
         , _maximum(*this, 100.0f)
         , _format(*this, "{}")
-        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, overlayController))
-        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, overlayController))
-        , _editbox(std::make_shared<Editbox>("__edit__", theme, overlayController, textBuilderCallback))
+        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController))
+        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController))
+        , _editbox(std::make_shared<Editbox>("__edit__", theme, style, overlayController, textBuilderCallback))
     {
         refreshView();
     }
@@ -55,14 +56,14 @@ namespace minire::gui::components
         _decreaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__spinbox__",
             [this](Component const &, gui::events::OnClick const &)
             { stepDown(); });
-        _decreaseButton->icon() = theme().makeIcon(theme::Icon::kDecrease);
+        _decreaseButton->icon() = theme().makeImage("spinbox", "i:decrease", style());
 
         assert(_increaseButton);
         _increaseButton->setParent(sharedThis);
         _increaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__spinbox__",
             [this](Component const &, gui::events::OnClick const &)
             { stepUp(); });
-        _increaseButton->icon() = theme().makeIcon(theme::Icon::kIncrease);
+        _increaseButton->icon() = theme().makeImage("spinbox", "i:increase", style());
 
         // build editbox
         assert(_editbox);

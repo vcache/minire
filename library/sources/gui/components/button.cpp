@@ -6,18 +6,19 @@ namespace minire::gui::components
 {
     Button::Button(std::string const & id,
                    Theme const & theme,
+                   Theme::Style const & style,
                    OverlayController & overlayController)
-        : Component(id, theme, overlayController)
-        , _bgNormal(*this, theme.button().makeNormalBg())
-        , _bgHovered(*this, theme.button().makeHoveredBg())
-        , _bgPressed(*this, theme.button().makePressedBg())
+        : Component(id, theme, style, overlayController)
+        , _bgNormal(*this, theme.makeImage("button", "bg-normal", style))
+        , _bgHovered(*this, theme.makeImage("button", "bg-hovered", style))
+        , _bgPressed(*this, theme.makeImage("button", "bg-pressed", style))
         , _text(*this)
         , _icon(*this)
-        , _iconLocation(*this, theme.button().constants()._iconLocation)
-        , _iconSpacing(*this, theme.button().constants()._iconSpacing)
-        , _pressOffset(*this, theme.button().constants()._pressOffset)
+        , _iconLocation(*this, theme.parameter<Theme::Location>("button", "icon-location", style))
+        , _iconSpacing(*this, theme.parameter<float>("button", "icon-spacing", style))
+        , _pressOffset(*this, theme.parameter<glm::vec2>("button", "press-offset", style))
     {
-        padding() = theme.button().constants()._padding;
+        padding() = theme.parameter<utils::Rect>("button", "padding", style);
     }
 
     template<typename T>
@@ -107,13 +108,13 @@ namespace minire::gui::components
             auto [iconSize, __] = _icon.get()->measure();
             switch(_iconLocation.get())
             {
-                case theme::Location::kLeft:
-                case theme::Location::kRight:
+                case Theme::Location::kLeft:
+                case Theme::Location::kRight:
                     return std::make_pair(iconSize.x + textSize.x + _iconSpacing.get() + extraWidth,
                                           std::max(iconSize.y, textSize.y) + extraHeight);
 
-                case theme::Location::kTop:
-                case theme::Location::kBottom:
+                case Theme::Location::kTop:
+                case Theme::Location::kBottom:
                     return std::make_pair(std::max(iconSize.x, textSize.x) + extraWidth,
                                           iconSize.y + textSize.y + _iconSpacing.get() + extraHeight);
             }
@@ -188,28 +189,28 @@ namespace minire::gui::components
 
             switch(_iconLocation.get())
             {
-                case theme::Location::kLeft:
+                case Theme::Location::kLeft:
                     _iconPosition.x = contentArea._left + (contentArea._width - totalWidth) / 2.0f;
                     _textPosition.x = _iconPosition.x + iconSize.x + _iconSpacing.get();
                     _iconPosition.y = contentArea._top + (contentArea._height - iconSize.y) / 2.0f;
                     _textPosition.y = contentArea._top + (contentArea._height - textSize.y) / 2.0f;
                     break;
 
-                case theme::Location::kTop:
+                case Theme::Location::kTop:
                     _iconPosition.x = contentArea._left + (contentArea._width - iconSize.x) / 2.0f;
                     _textPosition.x = contentArea._left + (contentArea._width - textSize.x) / 2.0f;
                     _iconPosition.y = contentArea._top + (contentArea._height - totalHeight) / 2.0f;
                     _textPosition.y = _iconPosition.y + iconSize.y + _iconSpacing.get();
                     break;
 
-                case theme::Location::kRight:
+                case Theme::Location::kRight:
                     _textPosition.x = contentArea._left + (contentArea._width - totalWidth) / 2.0f;
                     _iconPosition.x = _textPosition.x + textSize.x + _iconSpacing.get();
                     _iconPosition.y = contentArea._top + (contentArea._height - iconSize.y) / 2.0f;
                     _textPosition.y = contentArea._top + (contentArea._height - textSize.y) / 2.0f;
                     break;
 
-                case theme::Location::kBottom:
+                case Theme::Location::kBottom:
                     _iconPosition.x = contentArea._left + (contentArea._width - iconSize.x) / 2.0f;
                     _textPosition.x = contentArea._left + (contentArea._width - textSize.x) / 2.0f;
                     _textPosition.y = contentArea._top + (contentArea._height - totalHeight) / 2.0f;

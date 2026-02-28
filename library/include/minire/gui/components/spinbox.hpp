@@ -23,6 +23,7 @@ namespace minire::gui::components
     public:
         SpinBox(std::string const & id,
                 Theme const & theme,
+                Theme::Style const & style,
                 OverlayController &,
                 Editbox::TextBuilderCallback = {});
 

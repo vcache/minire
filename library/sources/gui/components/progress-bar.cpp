@@ -8,14 +8,15 @@ namespace minire::gui::components
 {
     ProgressBar::ProgressBar(std::string const & id,
                              Theme const & theme,
+                             Theme::Style const & style,
                              OverlayController & overlayController,
                              Direction const direction)
-        : Component(id, theme, overlayController)
-        , _background(*this, theme.progressBar().makeBackground())
-        , _slider(*this, theme.progressBar().makeSlider())
+        : Component(id, theme, style, overlayController)
+        , _background(*this, theme.makeImage("progress-bar", "bg", style))
+        , _slider(*this, theme.makeImage("progress-bar", "slider", style))
         , _value(*this, 0.0f)
         , _direction(*this, direction)
-        , _sliderPadding(*this, theme.progressBar().constants()._sliderPadding)
+        , _sliderPadding(*this, theme.parameter<utils::Rect>("progress-bar", "slider-padding", style))
     {}
 
     size_t ProgressBar::revalidateContent(size_t zOffset,

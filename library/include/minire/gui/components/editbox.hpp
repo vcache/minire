@@ -50,6 +50,7 @@ namespace minire::gui::components
 
         Editbox(std::string const & id,
                 Theme const & theme,
+                Theme::Style const & style,
                 OverlayController &,
                 TextBuilderCallback = {});
 

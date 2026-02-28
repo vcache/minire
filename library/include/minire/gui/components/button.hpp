@@ -18,6 +18,7 @@ namespace minire::gui::components
     public:
         Button(std::string const & id,
                Theme const & theme,
+               Theme::Style const & style,
                OverlayController &);
 
         using Sptr = std::shared_ptr<Button>;
@@ -45,8 +46,8 @@ namespace minire::gui::components
         Property<ImageView::Sptr> const & icon() const { return _icon; }
         Property<ImageView::Sptr> & icon() { return _icon; }
 
-        Property<theme::Location> const & iconLocation() const { return _iconLocation; }
-        Property<theme::Location> & iconLocation() { return _iconLocation; }
+        Property<Theme::Location> const & iconLocation() const { return _iconLocation; }
+        Property<Theme::Location> & iconLocation() { return _iconLocation; }
 
         Property<float> const & iconSpacing() const { return _iconSpacing; }
         Property<float> & iconSpacing() { return _iconSpacing; }
@@ -91,7 +92,7 @@ namespace minire::gui::components
 
         Property<TextView::Sptr>  _text;
         Property<ImageView::Sptr> _icon;
-        Property<theme::Location> _iconLocation;
+        Property<Theme::Location> _iconLocation;
         Property<float>           _iconSpacing;
 
         Property<glm::vec2>       _pressOffset;
