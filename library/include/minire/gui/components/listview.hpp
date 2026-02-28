@@ -3,7 +3,7 @@
 #include <minire/gui/callbacks.hpp>
 #include <minire/gui/component.hpp>
 #include <minire/gui/components/scrollbar.hpp>
-#include <minire/gui/content-view.hpp>
+#include <minire/gui/components/text.hpp>
 #include <minire/gui/layouts/vertical-tool.hpp>
 
 #include <any>
@@ -21,6 +21,31 @@ namespace minire::gui::components
             std::optional<size_t> _previous;
             std::optional<size_t> _current;
         };
+
+        template<typename Stringify>
+        class SimpleItemBuilder
+        {
+        public:
+            explicit SimpleItemBuilder(Stringify && stringify)
+                : _stringify(std::forward<Stringify>(stringify))
+            {}
+
+            Component::Sptr operator()(std::any const & value, size_t const index,
+                                       Theme const & theme, Theme::Style const & style,
+                                       OverlayController & overlayController) const
+            {
+                text::FormattedString caption = _stringify(value, index);
+                TextView::Sptr textView = theme.makeText("listview", "item-text", style, caption);
+                auto result = std::make_shared<Text>("__simple_item__", theme, style,
+                                                     overlayController, textView);
+                result->horizontal() = Arranger(position::Begin{}, dimension::Fill{});
+                result->vertical() = Arranger(position::Center{}, dimension::Content{});
+                return result;
+            }
+
+        private:
+            Stringify _stringify;
+        };
     }
 
     // TODO: optional scrollbar
@@ -34,7 +59,9 @@ namespace minire::gui::components
     {
     public:
         using ItemBuilderCallback =
-            std::function<ContentView::Sptr(std::any const & value, size_t index)>;
+            std::function<Component::Sptr(std::any const & value, size_t index,
+                                          Theme const & theme, Theme::Style const & style,
+                                          OverlayController & overlayController)>;
 
         ListView(std::string const & id,
                  Theme const &,

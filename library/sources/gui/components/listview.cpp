@@ -109,15 +109,15 @@ namespace minire::gui::components
                          Theme const & theme,
                          Theme::Style const & style,
                          OverlayController & overlayController,
-                         ContentView::Sptr const & contents,
+                         Component::Sptr const & contents,
                          ListView & listview,
                          size_t index)
                 : Component(id, theme, style, overlayController)
                 , _normalBackground(*this, theme.makeImage("listview", "bg-item-normal", style))
                 , _hoverBackground(*this, theme.makeImage("listview", "bg-item-hovered", style))
                 , _selectedBackground(*this, theme.makeImage("listview", "bg-item-selected", style))
-                , _contents(*this, contents)
                 , _isSelected(*this, false)
+                , _contents(contents)
                 , _listview(listview)
                 , _index(index)
             {}
@@ -177,9 +177,29 @@ namespace minire::gui::components
                     ptr->setVisible(_isSelected.get());
                 }
 
-                if (auto const & ptr = _contents.get(); ptr)
+                if (_contents)
                 {
-                    ptr->setContentInvalidator(sharedFromThis);
+                    _contents->setParent(sharedFromThis);
+                    _contents->setCallback(std::in_place_type<gui::events::OnMouseEnter>, "__enter__",
+                        [this](Component const &, gui::events::OnMouseEnter const & e)
+                        {
+                            handle(e);
+                        });
+                    _contents->setCallback(std::in_place_type<gui::events::OnMouseLeave>, "__leave__",
+                        [this](Component const &, gui::events::OnMouseLeave const & e)
+                        {
+                            handle(e);
+                        });
+                    _contents->setCallback(std::in_place_type<gui::events::OnClick>, "__cleack__",
+                        [this](Component const &, gui::events::OnClick const & e)
+                        {
+                            handle(e);
+                        });
+                    _contents->setCallback(std::in_place_type<minire::events::application::OnMouseWheel>, "__wheel__",
+                        [this](Component const &, minire::events::application::OnMouseWheel const & e)
+                        {
+                            handle(e);
+                        });
                 }
             }
 
@@ -190,6 +210,9 @@ namespace minire::gui::components
             {
                 auto sharedFromThis = shared_from_this();
 
+                bool const isReallyHovered = isHovered() ||
+                    (_contents && _contents->isHovered());
+
                 if (auto const & ptr = _normalBackground.get(); ptr)
                 {
                     if (_normalBackground.isInvalidated())
@@ -199,7 +222,7 @@ namespace minire::gui::components
 
                     ptr->setContentArea(contentArea);
                     ptr->setClippingWindow(clippingWindow);
-                    ptr->setVisible(!_isSelected.get() && isHovered() &&
+                    ptr->setVisible(!_isSelected.get() && !isReallyHovered &&
                                     effectiveVisible);
                     zOffset = ptr->onZOrderChanged(zOffset);
                 }
@@ -213,7 +236,7 @@ namespace minire::gui::components
 
                     ptr->setContentArea(contentArea);
                     ptr->setClippingWindow(clippingWindow);
-                    ptr->setVisible(!_isSelected.get() && isHovered() &&
+                    ptr->setVisible(!_isSelected.get() && isReallyHovered &&
                                     effectiveVisible);
                     zOffset = ptr->onZOrderChanged(zOffset);
                 }
@@ -231,23 +254,9 @@ namespace minire::gui::components
                     zOffset = ptr->onZOrderChanged(zOffset);
                 }
 
-                if (auto const & ptr = _contents.get(); ptr)
-                {
-                    if (_contents.isInvalidated())
-                    {
-                        _contents.get()->setContentInvalidator(sharedFromThis);
-                    }
-
-                    ptr->setContentArea(contentArea);
-                    ptr->setClippingWindow(clippingWindow);
-                    ptr->setVisible(effectiveVisible);
-                    zOffset = _contents.get()->onZOrderChanged(zOffset);
-                }
-
                 _normalBackground.revalidate();
                 _hoverBackground.revalidate();
                 _selectedBackground.revalidate();
-                _contents.revalidate();
                 _isSelected.revalidate();
 
                 return zOffset;
@@ -255,20 +264,20 @@ namespace minire::gui::components
 
             std::optional<std::pair<float, float>> measureContent() const override
             {
-                if (!_contents.get()) return std::nullopt;
-                auto [size, _] = _contents.get()->measure();
-                return std::make_pair(size.x, size.y);
+                if (!_contents) return std::nullopt;
+                return _contents->measureContent();
             }
 
         private:
-            Property<ImageView::Sptr>   _normalBackground;
-            Property<ImageView::Sptr>   _hoverBackground;
-            Property<ImageView::Sptr>   _selectedBackground;
-            Property<ContentView::Sptr> _contents;
-            Property<bool>              _isSelected;
+            Property<ImageView::Sptr> _normalBackground;
+            Property<ImageView::Sptr> _hoverBackground;
+            Property<ImageView::Sptr> _selectedBackground;
+            Property<bool>            _isSelected;
 
-            ListView &                  _listview;
-            size_t const                _index;
+            Component::Sptr           _contents;
+
+            ListView &                _listview;
+            size_t const              _index;
         };
     }
 
@@ -360,17 +369,19 @@ namespace minire::gui::components
                 index < totalLines && totalHeight < heightLimit;
                 ++index)
             {
-                if (auto const & itemContent =
-                        _itemBuilderCallback(_contents.get().at(index), index);
-                    itemContent)
+                if (auto const & item = _itemBuilderCallback(_contents.get().at(index), index,
+                                                             theme(), style(), overlayController());
+                    item)
                 {
                     if (_lineHeight.get() <= 0)
                     {
-                        auto [size, _] = itemContent->measure();
-                        _lineHeight = size.y;
+                        auto const maybeSize = item->measureContent();
+                        MINIRE_INVARIANT(maybeSize, "ListView's item must be measurable, or "
+                                                    "ListView::lineHeight() must be set");
+                        _lineHeight = maybeSize->second;
                     }
                     auto listViewItem = _contentContainer->emplace<ListViewItem>(
-                        fmt::format("__item/{}__", index), itemContent, *this, index);
+                        fmt::format("__item/{}__", index), item, *this, index);
                     listViewItem->isSelected() = (_selected && *_selected == index);
                     _contentLayout->pushBack(listViewItem->id(), _lineHeight.get());
                     totalHeight += _lineHeight.get();

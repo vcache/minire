@@ -4,7 +4,6 @@
 #include <minire/gui/component.hpp>
 #include <minire/gui/components/button.hpp>
 #include <minire/gui/components/listview.hpp>
-#include <minire/gui/content-view.hpp>
 #include <minire/gui/layouts/vertical-tool.hpp>
 
 #include <any>
@@ -31,8 +30,7 @@ namespace minire::gui::components
         , public Callback<Dropdown, dropdown::OnSelectionChanged>
     {
     public:
-        using ItemBuilderCallback =
-            std::function<ContentView::Sptr(std::any const & value, size_t index)>;
+        using ItemBuilderCallback = ListView::ItemBuilderCallback;
 
         Dropdown(std::string const & id,
                  Theme const & theme,

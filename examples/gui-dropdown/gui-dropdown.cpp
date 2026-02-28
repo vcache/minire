@@ -72,7 +72,7 @@ namespace
     private:
         void fillContents()
         {
-            MINIRE_INFO("Seelcted case is: {}", _case);
+            MINIRE_INFO("Selected case is: {}", _case);
 
             for(Dropdown::Sptr const & dropdown : _dropdowns)
             {
@@ -81,14 +81,6 @@ namespace
             }
 
             _case = (_case + 1) % _cases.size();
-        }
-
-        auto makeItem(std::string const & text)
-        {
-            using namespace minire::text;
-            FormattedString caption(text, Format().background(glm::vec4(0, 0, 0, 0))
-                                                  .foreground(glm::vec4(0, 0, 0, 1)));
-            return makeTextView(caption, kFontFace);
         }
 
     protected:
@@ -110,10 +102,15 @@ namespace
                 dropdown->horizontal() = Arranger(position::Center{}, dimension::Constant{200});
                 dropdown->vertical()   = Arranger(position::Center{}, dimension::Constant{25});
                 dropdown->setBaseItemBuilder(
-                    [this](std::any const & value, size_t) -> ContentView::Sptr
-                    {
-                        return makeItem(std::any_cast<std::string>(value));
-                    });
+                    listview::SimpleItemBuilder(
+                        [](std::any const & value, size_t const)
+                        {
+                            return minire::text::FormattedString(
+                                std::any_cast<std::string>(value),
+                                minire::text::Format().background(glm::vec4(0, 0, 0, 0))
+                                                      .foreground(glm::vec4(0, 0, 0, 1)));
+                        }));
+
                 dropdown->setCallback(std::in_place_type<dropdown::OnSelectionChanged>, "foo",
                     [](Component const &, dropdown::OnSelectionChanged const & e)
                     {
@@ -131,10 +128,14 @@ namespace
                 dropdown->vertical()   = Arranger(position::Center{}, dimension::Constant{25});
                 dropdown->lineHeight() = 50;
                 dropdown->setBaseItemBuilder(
-                    [this](std::any const & value, size_t) -> ContentView::Sptr
-                    {
-                        return makeItem(std::any_cast<std::string>(value));
-                    });
+                    listview::SimpleItemBuilder(
+                        [](std::any const & value, size_t const)
+                        {
+                            return minire::text::FormattedString(
+                                std::any_cast<std::string>(value),
+                                minire::text::Format().background(glm::vec4(0, 0, 0, 0))
+                                                      .foreground(glm::vec4(0, 0, 0, 1)));
+                        }));
                 dropdown->setCallback(std::in_place_type<dropdown::OnSelectionChanged>, "foo",
                     [](Component const &, dropdown::OnSelectionChanged const & e)
                     {

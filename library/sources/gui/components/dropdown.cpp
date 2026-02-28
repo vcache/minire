@@ -111,51 +111,20 @@ namespace minire::gui::components
     public:
         using Component::Component;
 
-        size_t revalidateContent(size_t zOffset,
-                                 bool const effectiveVisible,
-                                 Area const & contentArea,
-                                 Area const & clippingWindow) override
+        void setActiveItem(Component::Sptr const & activeItem)
         {
-            if (_activeItem)
-            {
-                auto [size, isResizable] = _activeItem->measure();
-                if (!isResizable && size.y < contentArea._height)
-                {
-                    Area itemContentArea
-                    {
-                        ._left = contentArea._left,
-                        ._top = contentArea._top + (contentArea._height - size.y) * 0.5f,
-                        ._width = contentArea._width,
-                        ._height = contentArea._height,
-                    };
-                    _activeItem->setContentArea(itemContentArea);
-                }
-                else
-                {
-                    _activeItem->setContentArea(contentArea);
-                }
-
-                _activeItem->setClippingWindow(clippingWindow);
-                _activeItem->setVisible(effectiveVisible);
-                zOffset = _activeItem->onZOrderChanged(zOffset);
-            }
-            return zOffset;
-        }
-
-        void setActiveItem(ContentView::Sptr const & activeItem)
-        {
+            clear();
             _activeItem = activeItem;
             if (_activeItem)
             {
-                _activeItem->setContentInvalidator(shared_from_this());
+                _activeItem->setParent(shared_from_this());
             }
-            invalidateContent();
         }
 
         bool hasActiveItem() const { return _activeItem.operator bool(); }
 
     private:
-        ContentView::Sptr _activeItem;
+        Component::Sptr _activeItem;
     };
 
     Dropdown::Dropdown(std::string const & id,
@@ -290,11 +259,18 @@ namespace minire::gui::components
         // actualize active element
         if (_selected && (!_activeItemContainer->hasActiveItem() || _contents.isInvalidated()))
         {
-            ContentView::Sptr activeItem;
+            Component::Sptr activeItem;
             if (*_selected < _contents.get().size())
             {
                 MINIRE_INVARIANT(_baseItemBuilderCallback, "no base item builder for \"{}\"", id());
-                activeItem = _baseItemBuilderCallback(_contents.get().at(*_selected), *_selected);
+                activeItem = _baseItemBuilderCallback(_contents.get().at(*_selected), *_selected,
+                                                      theme(), style(), overlayController());
+                if (activeItem)
+                {
+                    activeItem->setCallback(std::in_place_type<gui::events::OnClick>, "__open__",
+                        [this](Component const &, gui::events::OnClick const &)
+                        { openTongue(); });
+                }
             }
             _activeItemContainer->setActiveItem(activeItem);
         }

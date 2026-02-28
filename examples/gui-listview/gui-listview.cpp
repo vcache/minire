@@ -81,14 +81,14 @@ namespace
             {
                 auto listview = container->emplace<ListView>(
                     fmt::format("listview-{}", column),
-                    [this](std::any const & value, size_t) -> ContentView::Sptr
-                    {
-                        std::string const & text = std::any_cast<std::string>(value);
-                        minire::text::FormattedString caption(text,
-                            minire::text::Format().background(glm::vec4(0, 0, 0, 0))
-                                                  .foreground(glm::vec4(0, 0, 0, 1)));
-                        return makeTextView(caption, kFontFace);
-                    });
+                    listview::SimpleItemBuilder(
+                        [](std::any const & value, size_t const)
+                        {
+                            return minire::text::FormattedString(
+                                std::any_cast<std::string>(value),
+                                minire::text::Format().background(glm::vec4(0, 0, 0, 0))
+                                                      .foreground(glm::vec4(0, 0, 0, 1)));
+                        }));
 
                 listview->horizontal()  = Arranger(position::Center{}, dimension::Constant{250});
                 listview->vertical()    = Arranger(position::Center{}, dimension::Constant{100});
