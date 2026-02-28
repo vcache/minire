@@ -2,6 +2,7 @@
 
 #include <minire/content/manager.hpp>
 #include <minire/gui-controller.hpp>
+#include <minire/gui/components/label.hpp>
 #include <minire/gui/components/text.hpp>
 #include <minire/logging.hpp>
 #include <minire/text/formatted-string.hpp>
@@ -42,6 +43,14 @@ namespace
             loremIpsum.append("laborum.", minire::text::Format().foreground(glm::vec4(1, 1, 1, 1)));
 
             glm::vec2 size = measure(loremIpsum, kFontFaceId);
+
+            {
+                auto comp = guiRoot().emplace<minire::gui::components::Label>("label-example", loremIpsum);
+                comp->horizontal() = minire::gui::Arranger(minire::gui::position::Begin{},
+                                                           minire::gui::dimension::Content{});
+                comp->vertical() = minire::gui::Arranger(minire::gui::position::Center{},
+                                                         minire::gui::dimension::Content{});
+            }
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Text>(
