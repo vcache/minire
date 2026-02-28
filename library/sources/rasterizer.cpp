@@ -39,7 +39,7 @@ namespace minire
 
         _materials.add(models::PbrMaterial::kMaterialKind,
                        std::make_unique<rasterizer::materials::PbrFactory>(_textures));
-   }
+    }
 
     void Rasterizer::setScreenSize(size_t const width,
                                    size_t const height)
@@ -194,6 +194,7 @@ namespace minire
         auto primitives = cullPrimitives(scene);
         shadowPass(scene, primitives, directionalLights, pointLights);
         colorPass(scene, directionalLights, pointLights);
+        draw2d();
     }
 
     void Rasterizer::shadowPass(Scene const & scene,
@@ -290,9 +291,6 @@ namespace minire
             draw3d(scene, _directionalLightsShadowMaps,
                    _pointLightsShadowMaps);
         }
-
-        // perform drawing of 2D layer
-        draw2d();
     }
 
     void Rasterizer::draw3d(Scene const & scene,
