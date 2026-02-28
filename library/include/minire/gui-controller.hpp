@@ -8,6 +8,7 @@
 #include <minire/gui/theme.hpp>
 #include <minire/models/input-handler.hpp>
 #include <minire/models/mouse-button.hpp>
+#include <minire/models/system-cursor.hpp>
 
 #include <list>
 #include <optional>
@@ -94,7 +95,7 @@ namespace minire
         std::string const * getClipboardText() const override;
         std::string const * getPrimarySelection() const override;
 
-        void setSystemCursor(::SDL_SystemCursor) override;
+        void setSystemCursor(models::SystemCursor const) override;
 
         void unfocus() override;
 
@@ -156,6 +157,7 @@ namespace minire
         float                        _mouseX = -1;
         float                        _mouseY = -1;
         bool                         _mouseUpdated = true;
+        models::SystemCursor         _systemCursor = models::SystemCursor::kArrow;
 
         MaybeClipboardState          _clipboardState;
 

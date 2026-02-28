@@ -1,12 +1,11 @@
 #include <minire/sdl/application.hpp>
 
+#include <utils/fps-counter.hpp>
+
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 
-#include <utils/fps-counter.hpp>
-
 #include <SDL2/SDL.h>
-
 #include <fmt/format.h>
 
 namespace minire::sdl
@@ -21,6 +20,28 @@ namespace minire::sdl
 
         template<typename T>
         using SdlUptr = std::unique_ptr<T, SdlDeleter<T>>;
+
+        ::SDL_SystemCursor toSdlCursor(models::SystemCursor const systemCursor)
+        {
+            switch(systemCursor)
+            {
+                case models::SystemCursor::kArrow:      return SDL_SYSTEM_CURSOR_ARROW;
+                case models::SystemCursor::kIbeam:      return SDL_SYSTEM_CURSOR_IBEAM;
+                case models::SystemCursor::kWait:       return SDL_SYSTEM_CURSOR_WAIT;
+                case models::SystemCursor::kCrosshair:  return SDL_SYSTEM_CURSOR_CROSSHAIR;
+                case models::SystemCursor::kWaitArrow:  return SDL_SYSTEM_CURSOR_WAITARROW;
+                case models::SystemCursor::kSizeNWSE:   return SDL_SYSTEM_CURSOR_SIZENWSE;
+                case models::SystemCursor::kSizeNESW:   return SDL_SYSTEM_CURSOR_SIZENESW;
+                case models::SystemCursor::kSizeWE:     return SDL_SYSTEM_CURSOR_SIZEWE;
+                case models::SystemCursor::kSizeNS:     return SDL_SYSTEM_CURSOR_SIZENS;
+                case models::SystemCursor::kSizeAll:    return SDL_SYSTEM_CURSOR_SIZEALL;
+                case models::SystemCursor::kNo:         return SDL_SYSTEM_CURSOR_NO;
+                case models::SystemCursor::kHand:       return SDL_SYSTEM_CURSOR_HAND;
+            }
+
+            MINIRE_THROW("unexpected SystemCursor value: {}",
+                         static_cast<int>(systemCursor));
+        }
     }
 
     Application::Application(int width, int height,
@@ -124,9 +145,9 @@ namespace minire::sdl
         return true;
     }
 
-    void Application::setSystemCursor(::SDL_SystemCursor systemCursor)
+    void Application::setSystemCursor(models::SystemCursor const systemCursor)
     {
-        if (SDL_Cursor * newCursorPtr = ::SDL_CreateSystemCursor(systemCursor);
+        if (SDL_Cursor * newCursorPtr = ::SDL_CreateSystemCursor(toSdlCursor(systemCursor));
             newCursorPtr)
         {
             SdlCursorUptr newCursor(newCursorPtr);

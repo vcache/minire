@@ -112,8 +112,6 @@ namespace minire::gui::components
         void handle(gui::events::OnUnfocus const &) override;
         void handle(gui::events::OnDragMove const &) override;
         void handle(gui::events::OnDragEnd const &) override;
-        void handle(gui::events::OnMouseEnter const &) override;
-        void handle(gui::events::OnMouseLeave const &) override;
         void handle(minire::events::application::OnMouseDown const &) override;
         void handle(minire::events::application::OnKeyDown const &) override;
         void handle(minire::events::application::OnTextInput const &) override;

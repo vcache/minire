@@ -138,6 +138,10 @@ namespace minire
         // force recalc of hovered item
         _mouseUpdated = true;
         hovered();
+
+        auto hoveredComp = hovered();
+        setSystemCursor(hoveredComp ? hoveredComp->systemCursor()
+                                    : models::SystemCursor::kArrow);
     }
 
     void GuiController::handle(events::application::OnResize const & e)
@@ -549,9 +553,13 @@ namespace minire
         return _clipboardState ? &_clipboardState->_primarySelection : nullptr;
     }
 
-    void GuiController::setSystemCursor(::SDL_SystemCursor systemCursor)
+    void GuiController::setSystemCursor(models::SystemCursor const systemCursor)
     {
-        enqueue<events::controller::SetSystemCursor>(systemCursor);
+        if (_systemCursor != systemCursor)
+        {
+            _systemCursor = systemCursor;
+            enqueue<events::controller::SetSystemCursor>(_systemCursor);
+        }
     }
 
     void GuiController::unfocus()

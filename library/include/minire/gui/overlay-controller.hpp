@@ -2,8 +2,7 @@
 
 #include <minire/gui/area.hpp>
 #include <minire/models/input-handler.hpp>
-
-#include <SDL2/SDL_mouse.h>
+#include <minire/models/system-cursor.hpp>
 
 #include <memory>
 #include <string>
@@ -46,7 +45,7 @@ namespace minire::gui
 
         virtual std::string const * getPrimarySelection() const = 0;
 
-        virtual void setSystemCursor(::SDL_SystemCursor) = 0;
+        virtual void setSystemCursor(minire::models::SystemCursor) = 0;
 
         virtual void unfocus() = 0;
     };

@@ -8,6 +8,7 @@
 #include <minire/gui/layout.hpp>
 #include <minire/gui/property.hpp>
 #include <minire/gui/theme.hpp>
+#include <minire/models/system-cursor.hpp>
 #include <minire/utils/rect.hpp>
 
 #include <any>
@@ -118,6 +119,9 @@ namespace minire::gui
         bool isHovered() const { return _isHovered; }
         bool isDragging() const { return _isHovered; }
         bool acceptFocus() const { return _acceptFocus; }
+
+        models::SystemCursor systemCursor() const { return _systemCursor; }
+        void setSystemCursor(models::SystemCursor const);
 
     public:
         bool contains(std::string const & childId) const { return _children.contains(childId); }
@@ -241,6 +245,7 @@ namespace minire::gui
         Property<utils::Rect>     _padding;
         Property<size_t>          _zOrder;
         Property<Layout::Sptr>    _layout;
+        models::SystemCursor      _systemCursor;
 
         std::any                  _userData;
 

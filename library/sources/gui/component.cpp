@@ -1,6 +1,7 @@
 #include <minire/gui/component.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/gui/overlay-controller.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -123,6 +124,7 @@ namespace minire::gui
         , _padding(*this)
         , _zOrder(*this)
         , _layout(*this, std::make_shared<LinearLayout>())
+        , _systemCursor(models::SystemCursor::kArrow)
         , _impl(std::make_unique<Impl>())
         , _invalidated(false)
         , _contentInvalidated(false)
@@ -247,6 +249,18 @@ namespace minire::gui
     {
         _acceptFocus = acceptFocus;
         // TODO: drop focus (if any) when it become false
+    }
+
+    void Component::setSystemCursor(models::SystemCursor const systemCursor)
+    {
+        if (systemCursor != _systemCursor)
+        {
+            _systemCursor = systemCursor;
+            if (hasFocus())
+            {
+                overlayController().setSystemCursor(systemCursor);
+            }
+        }
     }
 
     // TODO: add metric the amount of revalidations to detect loops and

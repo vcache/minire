@@ -2,6 +2,7 @@
 
 #include <minire/models/mouse-button.hpp>
 #include <minire/models/msaa-params.hpp>
+#include <minire/models/system-cursor.hpp>
 
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_mouse.h>
@@ -54,7 +55,7 @@ namespace minire::sdl
                           bool const showCursor,
                           bool const relativeMode);
 
-        void setSystemCursor(::SDL_SystemCursor);
+        void setSystemCursor(models::SystemCursor const);
 
         void setCaptureClipboard(bool);
         void maybeEmitClipboardUpdate();

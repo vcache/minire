@@ -59,6 +59,7 @@ namespace minire::gui::components
         , _primarySelection(std::nullopt)
         , _contentAreaOffset(0)
     {
+        setSystemCursor(models::SystemCursor::kIbeam);
         setAcceptFocus(true);
         isDraggable() = true;
     }
@@ -605,18 +606,6 @@ namespace minire::gui::components
     void Editbox::handle(gui::events::OnDragEnd const & e)
     {
         actualizePrimarySelection();
-        CommonCallbacks::handle(e);
-    }
-
-    void Editbox::handle(gui::events::OnMouseEnter const & e)
-    {
-        overlayController().setSystemCursor(::SDL_SYSTEM_CURSOR_IBEAM);
-        CommonCallbacks::handle(e);
-    }
-
-    void Editbox::handle(gui::events::OnMouseLeave const & e)
-    {
-        overlayController().setSystemCursor(::SDL_SYSTEM_CURSOR_ARROW);
         CommonCallbacks::handle(e);
     }
 
