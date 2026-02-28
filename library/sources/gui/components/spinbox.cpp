@@ -30,8 +30,7 @@ namespace minire::gui::components
     SpinBox::SpinBox(std::string const & id,
                      Theme const & theme,
                      Theme::Style const & style,
-                     OverlayController & overlayController,
-                     Editbox::TextBuilderCallback textBuilderCallback)
+                     OverlayController & overlayController)
         : Component(id, theme, style, overlayController)
         , _spacing(*this, 0.0f)
         , _value(*this, 0.0f)
@@ -41,7 +40,7 @@ namespace minire::gui::components
         , _format(*this, "{}")
         , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController))
         , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController))
-        , _editbox(std::make_shared<Editbox>("__edit__", theme, style, overlayController, textBuilderCallback))
+        , _editbox(std::make_shared<Editbox>("__edit__", theme, style, overlayController))
     {
         refreshView();
     }

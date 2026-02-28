@@ -108,7 +108,7 @@ namespace minire::gui::components
     {
         auto sharedThis = shared_from_this();
 
-// TODO: why create it here things that will be rewritten in revalidate()
+        // TODO: why create it here things that will be rewritten in revalidate()
 
         // Increase button
         assert(_increaseButton);

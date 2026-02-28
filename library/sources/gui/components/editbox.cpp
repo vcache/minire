@@ -39,8 +39,7 @@ namespace minire::gui::components
     Editbox::Editbox(std::string const & id,
                      Theme const & theme,
                      Theme::Style const & style,
-                     OverlayController & overlayController,
-                     TextBuilderCallback textBuilderCallback)
+                     OverlayController & overlayController)
         : Component(id, theme, style, overlayController)
         , _bgNormal(*this, theme.makeImage("editbox", "bg-normal", style))
         , _bgDisabled(*this, theme.makeImage("editbox", "bg-disabled", style))
@@ -51,8 +50,6 @@ namespace minire::gui::components
         , _enabled(*this, true)
         , _passwordChar(*this, std::nullopt)
         , _contentPadding(*this, theme.parameter<utils::Rect>("editbox", "content-padding", style))
-        , _textBuilderCallback(std::move(textBuilderCallback))
-        , _textBuilderCallbackUpdated(true)
         , _text(*this)
         , _textView()
         , _activeFormat(theme.parameter<text::Format>("editbox", "active-format", style))
@@ -133,8 +130,7 @@ namespace minire::gui::components
 
         // maybe rebuild text view from
         if (_text.isInvalidated() ||
-            _passwordChar.isInvalidated() ||
-            _textBuilderCallbackUpdated)
+            _passwordChar.isInvalidated())
         {
             text::FormattedString const * effectiveText = &(_text.get());
 
@@ -147,8 +143,7 @@ namespace minire::gui::components
             }
 
             assert(effectiveText);
-            _textView = _textBuilderCallback ? _textBuilderCallback(*effectiveText)
-                                             : TextView::Sptr();
+            _textView = theme().makeText("editbox", "text", style(), *effectiveText);
             if (_textView)
             {
                 _textView->setContentInvalidator(shared_from_this());
@@ -283,8 +278,6 @@ namespace minire::gui::components
         _passwordChar.revalidate();
         _contentPadding.revalidate();
         _text.revalidate();
-
-        _textBuilderCallbackUpdated = false;
 
         return zOffset;
     }

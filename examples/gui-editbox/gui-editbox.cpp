@@ -18,8 +18,6 @@ using namespace minire::utils;
 
 namespace
 {
-    static std::string const kFontFace = "ucs-6x13-example";
-
     class GuiEditbox
         : public minire::GuiController
     {
@@ -45,9 +43,7 @@ namespace
             {
                 // destination
 
-                auto editbox1 = container->emplace<Editbox>("regular-1",
-                    [this](minire::text::FormattedString const & v) { return makeTextView(v, kFontFace); });
-
+                auto editbox1 = container->emplace<Editbox>("regular-1");
                 editbox1->horizontal()  = Arranger(position::Center{}, dimension::Constant{200});
                 editbox1->vertical()    = Arranger(position::Center{}, dimension::Constant{25});
 
@@ -85,9 +81,6 @@ namespace
 
                 editbox2->horizontal()  = Arranger(position::Center{}, dimension::Constant{200});
                 editbox2->vertical()    = Arranger(position::Center{}, dimension::Constant{25});
-                editbox2->setTextBuilderCallback(
-                    [this](minire::text::FormattedString const & v) { return makeTextView(v, kFontFace); });
-
                 editbox2->setCallback(std::in_place_type<editbox::OnTextChanged>, "foobar",
                     [editbox1, container]
                     (Component const & component, editbox::OnTextChanged const & event)
@@ -111,8 +104,7 @@ namespace
 
             {
 
-                auto editbox = container->emplace<Editbox>("password",
-                    [this](minire::text::FormattedString const & v) { return makeTextView(v, kFontFace); });
+                auto editbox = container->emplace<Editbox>("password");
 
                 editbox->horizontal()  = Arranger(position::Center{}, dimension::Constant{200});
                 editbox->vertical()    = Arranger(position::Center{}, dimension::Constant{25});
@@ -132,9 +124,7 @@ namespace
             // disabled editbox
 
             {
-                auto editbox = container->emplace<Editbox>("disabled",
-                    [this](minire::text::FormattedString const & v) { return makeTextView(v, kFontFace); });
-
+                auto editbox = container->emplace<Editbox>("disabled");
                 editbox->horizontal()  = Arranger(position::Center{}, dimension::Constant{200});
                 editbox->vertical()    = Arranger(position::Center{}, dimension::Constant{25});
 
@@ -166,16 +156,6 @@ int main()
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-
-        auto lease = manager.upload(kFontFace, minire::models::FontFace
-            {
-                ._regular = "../common/6x13.bdf",
-                ._bold = "../common/6x13B.bdf",
-                ._italic = "../common/6x13O.bdf",
-                ._glyphWidth = 6,
-                ._glyphHeight = 13,
-            });
-
         minire::Application application(1280, 720, "GUI Editbox", manager);
         application.setController<GuiEditbox>(kMaxCtrlFps);
         application.setVsync(true);

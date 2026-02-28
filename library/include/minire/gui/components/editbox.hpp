@@ -43,16 +43,12 @@ namespace minire::gui::components
         using Callback<Editbox, editbox::OnTextChanged>::setCallback;
         using Callback<Editbox, editbox::OnTextChanged>::eraseCallback;
 
-        using TextBuilderCallback =
-            std::function<TextView::Sptr(text::FormattedString const &)>;
-
         using PasswordChar = std::optional<wchar_t>;
 
         Editbox(std::string const & id,
                 Theme const & theme,
                 Theme::Style const & style,
-                OverlayController &,
-                TextBuilderCallback = {});
+                OverlayController &);
 
         Property<ImageView::Sptr> const & bgNormal() const { return _bgNormal; }
         Property<ImageView::Sptr> & bgNormal() { return _bgNormal; }
@@ -84,14 +80,6 @@ namespace minire::gui::components
 
         text::Format const & activeFormat() const { return _activeFormat; }
         text::Format & activeFormat() { return _activeFormat; }
-
-        template<typename Callback>
-        void setTextBuilderCallback(Callback callback)
-        {
-            _textBuilderCallback = callback;
-            _textBuilderCallbackUpdated = true;
-            invalidate();
-        }
 
     public:
         Property<text::FormattedString> const & text() const { return _text; }
@@ -169,10 +157,6 @@ namespace minire::gui::components
         Property<bool>                  _enabled;
         Property<PasswordChar>          _passwordChar;
         Property<utils::Rect>           _contentPadding;
-
-        // TOOD: it should be a Property, but std::function cannot be compared by ==
-        TextBuilderCallback             _textBuilderCallback;
-        bool                            _textBuilderCallbackUpdated;
 
         Property<text::FormattedString> _text;
         TextView::Sptr                  _textView;

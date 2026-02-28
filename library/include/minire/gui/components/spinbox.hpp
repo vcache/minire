@@ -24,8 +24,7 @@ namespace minire::gui::components
         SpinBox(std::string const & id,
                 Theme const & theme,
                 Theme::Style const & style,
-                OverlayController &,
-                Editbox::TextBuilderCallback = {});
+                OverlayController &);
 
         using Sptr = std::shared_ptr<SpinBox>;
         using Wptr = std::weak_ptr<SpinBox>;
@@ -65,15 +64,6 @@ namespace minire::gui::components
 
         void stepDown();
         void stepUp();
-
-        template<typename Callback>
-        void setTextBuilderCallback(Callback callback)
-        {
-            if (_editbox)
-            {
-                _editbox->setTextBuilderCallback(std::forward<Callback>(callback));
-            }
-        }
 
     protected:
         void initialize() override;

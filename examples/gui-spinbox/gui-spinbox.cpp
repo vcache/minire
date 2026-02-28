@@ -17,8 +17,6 @@ using namespace minire::utils;
 
 namespace
 {
-    static std::string const kFontFace = "ucs-6x13-example";
-
     class GuiSpinbox
         : public minire::GuiController
     {
@@ -36,9 +34,7 @@ namespace
             container->vertical() = Arranger::fill();
 
             {
-                auto spinbox = container->emplace<SpinBox>("spinedit-0",
-                    [this](minire::text::FormattedString const & v) { return makeTextView(v, kFontFace); });
-
+                auto spinbox = container->emplace<SpinBox>("spinedit-0");
                 layout->set(0, 0, spinbox->id());
                 spinbox->horizontal() = Arranger(position::Center{}, dimension::Constant{100});
                 spinbox->vertical() = Arranger(position::Center{}, dimension::Constant{24});
@@ -48,9 +44,7 @@ namespace
             }
 
             {
-                auto spinbox = container->emplace<SpinBox>("spinedit-1",
-                    [this](minire::text::FormattedString const & v) { return makeTextView(v, kFontFace); });
-
+                auto spinbox = container->emplace<SpinBox>("spinedit-1");
                 layout->set(1, 0, spinbox->id());
                 spinbox->horizontal() = Arranger(position::Center{}, dimension::Constant{150});
                 spinbox->vertical() = Arranger(position::Center{}, dimension::Constant{24});
@@ -76,16 +70,6 @@ int main()
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-
-        auto lease = manager.upload(kFontFace, minire::models::FontFace
-            {
-                ._regular = "../common/6x13.bdf",
-                ._bold = "../common/6x13B.bdf",
-                ._italic = "../common/6x13O.bdf",
-                ._glyphWidth = 6,
-                ._glyphHeight = 13,
-            });
-
         minire::Application application(1280, 720, "GUI Spinbox", manager);
         application.setController<GuiSpinbox>(kMaxCtrlFps);
         application.setGlDebug(false);
