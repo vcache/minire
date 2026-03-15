@@ -371,7 +371,7 @@ namespace minire
     void SceneImpl::Node::detach()
     {
         std::vector<Node::Sptr> queue{shared_from_this()};
-        queue.reserve(_scene._nodesEstimate);  // TODO: it should be "max-depth-estimate" rather than nodes count
+        queue.reserve(_scene._nodesEstimate);
         while(!queue.empty())
         {
             Node::Sptr node = queue.back();
@@ -396,6 +396,7 @@ namespace minire
                     },
                 }, child);
             }
+            _scene._nodesEstimate = std::max(_scene._nodesEstimate, queue.size());
         }
     }
 
@@ -421,21 +422,9 @@ namespace minire
         , _parent(parent)
         , _visible(visible())       // TODO: duplicate w/ model()?
     {
-        ++_scene._nodesEstimate;
-
-        Node::propagate();
-
         // calling at the end, to avoid unwanted calls to virtual methods
+        Node::propagate(); // must be called before "setAllowPropagation" !
         setAllowPropagation(true);
-    }
-
-    SceneImpl::Node::~Node()
-    {
-        assert(_scene._nodesEstimate != 0);
-        if (_scene._nodesEstimate != 0)
-        {
-            --_scene._nodesEstimate;
-        }
     }
 
     bool SceneImpl::Node::lerp(float weight, size_t epochNumber)
@@ -702,7 +691,7 @@ namespace minire
     void SceneImpl::revalidateModels()
     {
         std::vector<Node::Sptr> queue;
-        queue.reserve(_nodesEstimate);  // TODO: it should be "max-depth-estimate" rather than nodes count
+        queue.reserve(_nodesEstimate);
 
         assert(_root);
         if (_root->_modelInvalidated)
@@ -736,6 +725,8 @@ namespace minire
                     },
                 }, child);
             }
+
+            _nodesEstimate = std::max(_nodesEstimate, queue.size());
         }
     }
 
@@ -851,6 +842,8 @@ namespace minire
                     }
                 }
             }
+
+            _nodesEstimate = std::max(_nodesEstimate, queue.size());
         }
 
         return updated;
@@ -922,6 +915,8 @@ namespace minire
             {
                 activateParents(node->_parent.lock());
             }
+
+            _nodesEstimate = std::max(_nodesEstimate, queue.size());
         }
     }
 
@@ -983,6 +978,8 @@ namespace minire
 
             // mark node as clean (TODO: move into Node::)
             node->_globalTransformState = Node::GlobalTransformState::kClean;
+
+            _nodesEstimate = std::max(_nodesEstimate, queue.size());
         }
     }
 

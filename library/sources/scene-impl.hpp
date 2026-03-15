@@ -411,8 +411,6 @@ namespace minire
                  Wptr parent,
                  SceneImpl & scene);
 
-            ~Node() override;
-
         public:
             scene::Node::Sptr make(std::string const & name, models::Node) override;
             scene::Mesh::Sptr make(std::string const & name, models::Mesh) override;
