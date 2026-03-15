@@ -228,8 +228,8 @@ namespace
             auto material = makeMaterial();
 
             // Attach them to a scene
-            auto quadNode = scene().root().newNode(Node{Transform(glm::vec3(0, -1, 0)), true});
-            quadNode->newMesh("quad",
+            auto quadNode = scene().root().make(Node{Transform(glm::vec3(0, -1, 0)), true});
+            quadNode->make("quad",
                 Mesh
                 {
                     ._source = mkPath(path::Special::kVertexBuffers, "quads-example"),
@@ -238,8 +238,8 @@ namespace
                     ._visible = true,
                 });
 
-            auto sphereNode = scene().root().newNode(Node{Transform(), true});
-            sphereNode->newMesh("sphere",
+            auto sphereNode = scene().root().make(Node{Transform(), true});
+            sphereNode->make("sphere",
                 Mesh
                 {
                     ._source = mkPath(path::Special::kVertexBuffers, "sphere-example"),

@@ -118,7 +118,7 @@ namespace minire
 
     // SceneImpl::Node //
 
-    scene::Node::Sptr SceneImpl::Node::newNode(std::string const & name, models::Node model)
+    scene::Node::Sptr SceneImpl::Node::make(std::string const & name, models::Node model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
         Node::Sptr node = std::make_shared<Node>(name, std::move(model), weak_from_this(), _scene);
@@ -128,7 +128,7 @@ namespace minire
         return node;
     }
     
-    scene::Mesh::Sptr SceneImpl::Node::newMesh(std::string const & name, models::Mesh model)
+    scene::Mesh::Sptr SceneImpl::Node::make(std::string const & name, models::Mesh model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
         auto mesh = _scene._rasterizer.meshes().getMesh(model._source,
@@ -166,8 +166,8 @@ namespace minire
         return meshLeaf;
     }
     
-    scene::DirectionalLight::Sptr SceneImpl::Node::newDirectionalLight(std::string const & name,
-                                                                       models::DirectionalLight model)
+    scene::DirectionalLight::Sptr SceneImpl::Node::make(std::string const & name,
+                                                        models::DirectionalLight model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
         auto directionalLightLeaf = std::make_shared<DirectionalLightLeaf>(name, model, weak_from_this(), _scene);
@@ -177,8 +177,8 @@ namespace minire
         return directionalLightLeaf;
     }
 
-    scene::PointLight::Sptr SceneImpl::Node::newPointLight(std::string const & name,
-                                                           models::PointLight model)
+    scene::PointLight::Sptr SceneImpl::Node::make(std::string const & name,
+                                                  models::PointLight model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
         auto pointLightLeaf = std::make_shared<PointLightLeaf>(name, model, weak_from_this(), _scene);
@@ -188,8 +188,8 @@ namespace minire
         return pointLightLeaf;
     }
     
-    scene::PerspectiveCamera::Sptr SceneImpl::Node::newPerspectiveCamera(std::string const & name,
-                                                                         models::PerspectiveCamera model)
+    scene::PerspectiveCamera::Sptr SceneImpl::Node::make(std::string const & name,
+                                                         models::PerspectiveCamera model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
         auto perspectiveCameraLeaf = std::make_shared<PerspectiveCameraLeaf>(name, model, weak_from_this(), _scene);
@@ -198,8 +198,8 @@ namespace minire
         return perspectiveCameraLeaf;
     }
     
-    scene::OrthographicCamera::Sptr SceneImpl::Node::newOrthographicCamera(std::string const & name,
-                                                                           models::OrthographicCamera model)
+    scene::OrthographicCamera::Sptr SceneImpl::Node::make(std::string const & name,
+                                                          models::OrthographicCamera model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
         auto orthographicCameraLeaf = std::make_shared<OrthographicCameraLeaf>(name, model, weak_from_this(), _scene);
@@ -208,8 +208,8 @@ namespace minire
         return orthographicCameraLeaf;
     }
     
-    scene::Billboard::Sptr SceneImpl::Node::newBillboard(std::string const & name,
-                                                         models::Billboard model)
+    scene::Billboard::Sptr SceneImpl::Node::make(std::string const & name,
+                                                 models::Billboard model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
         auto billboard = _scene._rasterizer.billboards().create(model);
@@ -227,14 +227,14 @@ namespace minire
         return billboardLeaf;
     }
 
-    void SceneImpl::Node::newFromSource(content::Path const & source,
-                                        content::Manager & contentManager,
-                                        bool visible)
+    void SceneImpl::Node::makeFromSource(content::Path const & source,
+                                         content::Manager & contentManager,
+                                         bool visible)
     {
         instantiateGltf(*this, source, contentManager, visible);
     }
 
-    void SceneImpl::Node::newAnimationSet(models::AnimationSet animationSet) // const ref?
+    void SceneImpl::Node::makeAnimationSet(models::AnimationSet animationSet) // const ref?
     {
         // drop any current active animation
         if (_activeAnimation)

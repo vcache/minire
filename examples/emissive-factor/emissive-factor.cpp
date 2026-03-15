@@ -49,8 +49,8 @@ namespace
 
             TestbedApplication::onStart();
 
-            _cubeNode = scene().root().newNode(Node{_cubeTransform, true});
-            _cubeMesh = _cubeNode->newMesh(
+            _cubeNode = scene().root().make(Node{_cubeTransform, true});
+            _cubeMesh = _cubeNode->make(
                 Mesh
                 {
                     ._source = mkPath("cube.gltf", path::Special::kMeshes, path::Index(0)),

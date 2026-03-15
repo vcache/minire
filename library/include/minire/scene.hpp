@@ -248,39 +248,31 @@ namespace minire
             void setVisible(bool visible) { model(kVisible)._visible = visible; }
 
         public:
-            // TODO: maybe just make(name, ...) instead new...(...)
             // TODO: make consistent w/ Sprites and Labels
-            virtual Node::Sptr newNode(std::string const & name, models::Node) = 0;
-            virtual Mesh::Sptr newMesh(std::string const & name, models::Mesh) = 0;
-            virtual DirectionalLight::Sptr newDirectionalLight(std::string const & name,
-                                                               models::DirectionalLight) = 0;
-            virtual PointLight::Sptr newPointLight(std::string const & name,
-                                                   models::PointLight) = 0;
-            virtual PerspectiveCamera::Sptr newPerspectiveCamera(std::string const & name,
-                                                                 models::PerspectiveCamera) = 0;
-            virtual OrthographicCamera::Sptr newOrthographicCamera(std::string const & name,
-                                                                   models::OrthographicCamera) = 0;
-            virtual Billboard::Sptr newBillboard(std::string const & name,
-                                                 models::Billboard) = 0;
+            virtual Node::Sptr make(std::string const & name, models::Node) = 0;
+            virtual Mesh::Sptr make(std::string const & name, models::Mesh) = 0;
+            virtual DirectionalLight::Sptr make(std::string const &, models::DirectionalLight) = 0;
+            virtual PointLight::Sptr make(std::string const &, models::PointLight) = 0;
+            virtual PerspectiveCamera::Sptr make(std::string const &, models::PerspectiveCamera) = 0;
+            virtual OrthographicCamera::Sptr make(std::string const &, models::OrthographicCamera) = 0;
+            virtual Billboard::Sptr make(std::string const & name, models::Billboard) = 0;
 
-            Node::Sptr newNode(models::Node model) { return newNode(utils::newUuid(), std::move(model)); }
-            Mesh::Sptr newMesh(models::Mesh model) { return newMesh(utils::newUuid(), std::move(model)); }
-            DirectionalLight::Sptr newDirectionalLight(models::DirectionalLight model) { return newDirectionalLight(utils::newUuid(), std::move(model)); }
-            PointLight::Sptr newPointLight(models::PointLight model) { return newPointLight(utils::newUuid(), std::move(model)); }
-            PerspectiveCamera::Sptr newPerspectiveCamera(models::PerspectiveCamera model) { return newPerspectiveCamera(utils::newUuid(), std::move(model)); }
-            OrthographicCamera::Sptr newOrthographicCamera(models::OrthographicCamera model) { return newOrthographicCamera(utils::newUuid(), std::move(model)); }
-            Billboard::Sptr newBillboard(models::Billboard model) { return newBillboard(utils::newUuid(), std::move(model)); }
+            Node::Sptr make(models::Node model) { return make(utils::newUuid(), std::move(model)); }
+            Mesh::Sptr make(models::Mesh model) { return make(utils::newUuid(), std::move(model)); }
+            DirectionalLight::Sptr make(models::DirectionalLight model) { return make(utils::newUuid(), std::move(model)); }
+            PointLight::Sptr make(models::PointLight model) { return make(utils::newUuid(), std::move(model)); }
+            PerspectiveCamera::Sptr make(models::PerspectiveCamera model) { return make(utils::newUuid(), std::move(model)); }
+            OrthographicCamera::Sptr make(models::OrthographicCamera model) { return make(utils::newUuid(), std::move(model)); }
+            Billboard::Sptr make(models::Billboard model) { return make(utils::newUuid(), std::move(model)); }
 
-            virtual void newFromSource(content::Path const &,
-                                       content::Manager &,
-                                       bool visible) = 0;
+            virtual void makeFromSource(content::Path const &, content::Manager &, bool visible) = 0;
 
         public:
             static constexpr size_t kInfinitely = std::numeric_limits<size_t>::max();
 
             // NOTE: will replace any existing animations, i.e.
             //       this command has "assign" semantics.
-            virtual void newAnimationSet(models::AnimationSet animationSet) = 0;
+            virtual void makeAnimationSet(models::AnimationSet animationSet) = 0;
 
             /**
              * \param repeats kInfinitely or a specific value,
@@ -295,7 +287,7 @@ namespace minire
 
             virtual void stopAnimation() = 0;
 
-            // Params semantics as in newAnimationSet and playAnimation
+            // Params semantics as in makeAnimationSet and playAnimation
             virtual void inlineAnimation(models::AnimationTracks animationTracks,
                                          size_t repeats = 1, // or kInfinitely
                                          float speedScale = 1.0f) = 0;

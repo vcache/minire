@@ -12,7 +12,7 @@ namespace
         {
             TestbedApplication::onStart();
 
-            scene().root().newMesh("cube",
+            scene().root().make("cube",
                 minire::models::Mesh
                 {
                     ._source = minire::content::mkPath("Box.glb",

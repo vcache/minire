@@ -121,15 +121,15 @@ namespace
                                                 ._aspectRatio = std::nullopt,
                                                 ._visible = true};
 
-            auto camNode = scene().root().newNode("cam-node", Node{cameraTransform(5.0f), true});
-            auto camera = camNode->newPerspectiveCamera(cameraModel);
+            auto camNode = scene().root().make("cam-node", Node{cameraTransform(5.0f), true});
+            auto camera = camNode->make(cameraModel);
             camera->activate();
 
-            auto lightNode = scene().root().newNode(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
-            lightNode->newPointLight("bulb", PointLight(glm::vec4(1, 1, 1, 500), 2, std::nullopt, true));
+            auto lightNode = scene().root().make(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
+            lightNode->make("bulb", PointLight(glm::vec4(1, 1, 1, 500), 2, std::nullopt, true));
 
-            _cubeNode = scene().root().newNode("cube-node", Node{Transform(), true});
-            _cubeNode->newMesh("cube", Mesh
+            _cubeNode = scene().root().make("cube-node", Node{Transform(), true});
+            _cubeNode->make("cube", Mesh
                 {
                     ._source = _arguments._useGltf ? mkPath("cube.gltf", path::Special::kMeshes, path::Index(0))
                                                    : mkPath("cube.obj"),

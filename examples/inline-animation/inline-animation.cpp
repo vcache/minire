@@ -18,8 +18,8 @@ namespace
 
             TestbedApplication::onStart();
 
-            auto cubeNode = scene().root().newNode(models::Node{models::Transform(), true});
-            cubeNode->newMesh(
+            auto cubeNode = scene().root().make(models::Node{models::Transform(), true});
+            cubeNode->make(
                 models::Mesh
                 {
                     ._source = content::mkPath(

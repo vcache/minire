@@ -150,8 +150,8 @@ namespace
             Transform initialCameraTransform;
             _orbiting.evaluate(initialCameraTransform);
 
-            _cameraNode = scene().root().newNode(Node{initialCameraTransform, true});
-            _camera = _cameraNode->newPerspectiveCamera(
+            _cameraNode = scene().root().make(Node{initialCameraTransform, true});
+            _camera = _cameraNode->make(
                 minire::models::PerspectiveCamera
                 {
                     ._yFov = glm::radians(45.0f),
@@ -162,34 +162,34 @@ namespace
                 });
             _camera->activate();
 
-            auto lightNode = scene().root().newNode(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
-            lightNode->newPointLight(PointLight(glm::vec4(1, 1, 1, 500), 2, std::nullopt, true));
+            auto lightNode = scene().root().make(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
+            lightNode->make(PointLight(glm::vec4(1, 1, 1, 500), 2, std::nullopt, true));
 
-            auto targetNode = scene().root().newNode("target", Node{minire::models::Transform(), true});
+            auto targetNode = scene().root().make("target", Node{minire::models::Transform(), true});
             if (_arguments._scene != kNoIndex)
             {
-                targetNode->newFromSource(mkPath(_arguments._filename,
-                                                 path::Special::kScenes,
-                                                 path::Index(_arguments._scene)),
-                                          contentManager(), true);
+                targetNode->makeFromSource(mkPath(_arguments._filename,
+                                                  path::Special::kScenes,
+                                                  path::Index(_arguments._scene)),
+                                           contentManager(), true);
             }
             else if (_arguments._node != kNoIndex)
             {
-                targetNode->newFromSource(mkPath(_arguments._filename,
-                                                 path::Special::kNodes,
-                                                 path::Index(_arguments._node)),
-                                          contentManager(), true);
+                targetNode->makeFromSource(mkPath(_arguments._filename,
+                                                  path::Special::kNodes,
+                                                  path::Index(_arguments._node)),
+                                           contentManager(), true);
             }
             else if (_arguments._mesh != kNoIndex)
             {
                 // NOTE: in a case of meshes, there are two ways to achieve same result
 #if 1
-                targetNode->newFromSource(mkPath(_arguments._filename,
-                                                 path::Special::kMeshes,
-                                                 path::Index(_arguments._mesh)),
-                                          contentManager(), true);
+                targetNode->makeFromSource(mkPath(_arguments._filename,
+                                                  path::Special::kMeshes,
+                                                  path::Index(_arguments._mesh)),
+                                           contentManager(), true);
 #else
-                targetNode->newFromSource(
+                targetNode->makeFromSource(
                     Mesh
                     {
                         ._source = mkPath(_arguments._filename,
@@ -206,7 +206,7 @@ namespace
             }
             else
             {
-                targetNode->newFromSource(mkPath(_arguments._filename), contentManager(), true);
+                targetNode->makeFromSource(mkPath(_arguments._filename), contentManager(), true);
             }
 
             if (!_arguments._animationName.empty())

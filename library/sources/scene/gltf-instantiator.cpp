@@ -104,7 +104,7 @@ namespace minire::scene
                 ::tinygltf::PerspectiveCamera const & pcamera = camera.perspective;
                 MINIRE_INVARIANT(pcamera.yfov > 0.0, "bad camera.yfov ({})", pcamera.yfov);
                 MINIRE_INVARIANT(pcamera.znear > 0.0, "bad camera.znear ({})", pcamera.znear);
-                parent.newPerspectiveCamera(
+                parent.make(
                     camera.name.empty() ? utils::newUuid() : camera.name,
                     models::PerspectiveCamera
                     {
@@ -124,7 +124,7 @@ namespace minire::scene
                 MINIRE_INVARIANT(ocamera.ymag != 0.0, "bad camera.ymag ({})", ocamera.ymag);
                 MINIRE_INVARIANT(ocamera.zfar > ocamera.znear, "zfar <= znear ({} <= {})",
                                  ocamera.zfar, ocamera.znear);
-                parent.newOrthographicCamera(
+                parent.make(
                     camera.name.empty() ? utils::newUuid() : camera.name,
                     models::OrthographicCamera
                     {
@@ -193,7 +193,7 @@ namespace minire::scene
                     pointLight._color[2] = light.color[2];
                 }
 
-                parent.newPointLight(light.name.empty() ? utils::newUuid() : light.name, pointLight);
+                parent.make(light.name.empty() ? utils::newUuid() : light.name, pointLight);
             }
             else // TODO: support directional light
             {
@@ -223,7 +223,7 @@ namespace minire::scene
 
             models::Transform transform = utils::getNodeTransform(node);
 
-            scene::Node::Sptr const & newNode = parent.newNode(
+            scene::Node::Sptr const & newNode = parent.make(
                 node.name.empty() ? utils::newUuid() : node.name,
                 models::Node
                 {
@@ -368,7 +368,7 @@ namespace minire::scene
                 }
 
                 // upload animations
-                newNode->newAnimationSet(std::move(animationSet));
+                newNode->makeAnimationSet(std::move(animationSet));
             }
         }
 
@@ -462,7 +462,7 @@ namespace minire::scene
                 }
 
                 // instantiate a mesh
-                pendedMesh._parent.newMesh(pendedMesh._name, std::move(pendedMesh._model));
+                pendedMesh._parent.make(pendedMesh._name, std::move(pendedMesh._model));
             }
         }
 

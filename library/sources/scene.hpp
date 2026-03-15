@@ -447,25 +447,18 @@ namespace minire
             ~Node() override;
 
         public:
-            scene::Node::Sptr newNode(std::string const & name, models::Node) override;
-            scene::Mesh::Sptr newMesh(std::string const & name, models::Mesh) override;
-            scene::DirectionalLight::Sptr newDirectionalLight(std::string const & name,
-                                                              models::DirectionalLight) override;
-            scene::PointLight::Sptr newPointLight(std::string const & name,
-                                                  models::PointLight) override;
-            scene::PerspectiveCamera::Sptr newPerspectiveCamera(std::string const & name,
-                                                                models::PerspectiveCamera) override;
-            scene::OrthographicCamera::Sptr newOrthographicCamera(std::string const & name,
-                                                                  models::OrthographicCamera) override;
-            scene::Billboard::Sptr newBillboard(std::string const & name,
-                                                models::Billboard) override;
+            scene::Node::Sptr make(std::string const & name, models::Node) override;
+            scene::Mesh::Sptr make(std::string const & name, models::Mesh) override;
+            scene::DirectionalLight::Sptr make(std::string const &, models::DirectionalLight) override;
+            scene::PointLight::Sptr make(std::string const &, models::PointLight) override;
+            scene::PerspectiveCamera::Sptr make(std::string const &, models::PerspectiveCamera) override;
+            scene::OrthographicCamera::Sptr make(std::string const &, models::OrthographicCamera) override;
+            scene::Billboard::Sptr make(std::string const &, models::Billboard) override;
 
-            void newFromSource(content::Path const &,
-                               content::Manager &,
-                               bool visible) override;
+            void makeFromSource(content::Path const &, content::Manager &, bool visible) override;
 
         public:
-            void newAnimationSet(models::AnimationSet animationSet) override;
+            void makeAnimationSet(models::AnimationSet animationSet) override;
             void playAnimation(models::AnimationId const &, size_t repeats, float speedScale) override;
             void stopAnimation() override;
             void inlineAnimation(models::AnimationTracks animationTracks,

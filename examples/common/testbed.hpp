@@ -54,9 +54,9 @@ namespace minire::examples
 
             _orbiting.evaluate(_cameraTransform);
 
-            _cameraNode = root.newNode("cam-node", Node{_cameraTransform, true});
+            _cameraNode = root.make("cam-node", Node{_cameraTransform, true});
             {
-                _perspectiveCamera = _cameraNode->newPerspectiveCamera("persp-cam",
+                _perspectiveCamera = _cameraNode->make("persp-cam",
                     PerspectiveCamera
                     {
                         ._yFov = glm::radians(45.0f),
@@ -66,7 +66,7 @@ namespace minire::examples
                         ._visible = true,
                     });
 
-                _orthographicCamera = _cameraNode->newOrthographicCamera("ortho-cam",
+                _orthographicCamera = _cameraNode->make("ortho-cam",
                     OrthographicCamera
                     {   ._xMag = _orbiting.distance() / 2,
                         ._yMag = _orbiting.distance() / 2,
@@ -78,8 +78,8 @@ namespace minire::examples
                 _perspectiveCamera->activate();
             }
 
-            auto floorNode = root.newNode("floor-node", Node{Transform(glm::vec3(0, -.5, 0)), true});
-            floorNode->newMesh("floor-plane",
+            auto floorNode = root.make("floor-node", Node{Transform(glm::vec3(0, -.5, 0)), true});
+            floorNode->make("floor-plane",
                 Mesh
                 {
                     ._source = mkPath("../common/floor-plane.glb", path::Special::kMeshes, path::Index(0)),
@@ -95,14 +95,14 @@ namespace minire::examples
                     ._visible = _isFloorPlaneEnabled,
                 });
 
-            auto directlightNode = root.newNode("directlight-node",
+            auto directlightNode = root.make("directlight-node",
                 Node{Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))), true});
-            directlightNode->newDirectionalLight("sun",
+            directlightNode->make("sun",
                 DirectionalLight(glm::vec3(0, 10, 0), ShadowParams{4096, false}, _isDirectLightEnabled));
 
-            auto pointlightNode = root.newNode("pointlight-node",
+            auto pointlightNode = root.make("pointlight-node",
                 Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
-            pointlightNode->newPointLight("bulb",
+            pointlightNode->make("bulb",
                 PointLight(glm::vec4(1, 1, 1, 500), 2, ShadowParams{}, _isPointLightEnabled));
         }
 
