@@ -4,7 +4,7 @@
 
 #include <rasterizer.hpp>
 #include <rasterizer/constants.hpp>
-#include <scene/gltf-instantiator.hpp>
+#include <scene-impl/gltf-instantiator.hpp>
 #include <utils/overloaded.hpp>
 
 #include <minire/errors.hpp>

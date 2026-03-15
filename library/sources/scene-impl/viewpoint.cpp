@@ -1,4 +1,4 @@
-#include <scene/viewpoint.hpp>
+#include <scene-impl/viewpoint.hpp>
 
 #include <minire/errors.hpp>
 

@@ -11,8 +11,8 @@
 #include <opengl.hpp>
 #include <rasterizer.hpp>
 #include <scene-impl.hpp>
-#include <scene/gltf-instantiator.hpp>
-#include <scene/viewpoint.hpp>
+#include <scene-impl/gltf-instantiator.hpp>
+#include <scene-impl/viewpoint.hpp>
 #include <text/measurer.hpp>
 #include <utils/overloaded.hpp>
 

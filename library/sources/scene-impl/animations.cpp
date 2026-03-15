@@ -1,4 +1,4 @@
-#include <scene/animations.hpp>
+#include <scene-impl/animations.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/models/animations.hpp>

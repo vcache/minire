@@ -1,4 +1,4 @@
-#include <scene/gltf-instantiator.hpp>
+#include <scene-impl/gltf-instantiator.hpp>
 
 #include <minire/content/asset.hpp>
 #include <minire/content/manager.hpp>
