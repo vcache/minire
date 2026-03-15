@@ -274,99 +274,69 @@ namespace minire
             friend class SceneImpl;
         };
 
-        // TODO: DirectionalLightLeaf, PointLightLeaf, PerspectiveCameraLeaf, and OrthographicCameraLeaf
-        //       can be templatized
-
-        class DirectionalLightLeaf final
-            : public Leaf<DirectionalLightLeaf, scene::DirectionalLight>
-            , public utils::Lerpable<models::DirectionalLight>
+        template<typename Derived, typename SceneType, typename ModelType>
+        class LerpableLeaf
+            : public Leaf<Derived, SceneType>
+            , public utils::Lerpable<ModelType>
         {
         public:
-            explicit DirectionalLightLeaf(std::string name,
-                                          models::DirectionalLight const & model,
-                                          std::weak_ptr<Node> parent,
-                                          SceneImpl & scene)
-                : Leaf(std::move(name), model, parent)
-                , Lerpable(model)
+            explicit LerpableLeaf(std::string name,
+                                 ModelType const & model,
+                                 std::weak_ptr<Node> parent,
+                                 SceneImpl & scene)
+                : Leaf<Derived, SceneType>(std::move(name), model, parent)
+                , utils::Lerpable<ModelType>(model)
                 , _scene(scene)
             {}
 
-            // TODO: class Lerpable::Update during invalidation()
+        protected:
+            SceneImpl & _scene;
+        };
+
+        class DirectionalLightLeaf final
+            : public LerpableLeaf<DirectionalLightLeaf,
+                                  scene::DirectionalLight,
+                                  models::DirectionalLight>
+        {
+        public:
+            using LerpableLeaf::LerpableLeaf;
 
             void revalidate() override;
-
-        private:
-            SceneImpl & _scene;
         };
 
         class PointLightLeaf final
-            : public Leaf<PointLightLeaf, scene::PointLight>
-            , public utils::Lerpable<models::PointLight>
+            : public LerpableLeaf<PointLightLeaf,
+                                  scene::PointLight,
+                                  models::PointLight>
         {
         public:
-            explicit PointLightLeaf(std::string name,
-                                    models::PointLight const & model,
-                                    std::weak_ptr<Node> parent,
-                                    SceneImpl & scene)
-                : Leaf(std::move(name), model, parent)
-                , Lerpable(model)
-                , _scene(scene)
-            {}
-
-            // TODO: class Lerpable::Update during invalidation()
+            using LerpableLeaf::LerpableLeaf;
 
             void revalidate() override;
-
-        private:
-            SceneImpl & _scene;
         };
 
         class PerspectiveCameraLeaf final
-            : public Leaf<PerspectiveCameraLeaf, scene::PerspectiveCamera>
-            , public utils::Lerpable<models::PerspectiveCamera>
+            : public LerpableLeaf<PerspectiveCameraLeaf,
+                                  scene::PerspectiveCamera,
+                                  models::PerspectiveCamera>
         {
         public:
-            explicit PerspectiveCameraLeaf(std::string name,
-                                           models::PerspectiveCamera const & model,
-                                           std::weak_ptr<Node> parent,
-                                           SceneImpl & scene)
-                : Leaf(std::move(name), model, parent)
-                , Lerpable(model)
-                , _scene(scene)
-            {}
+            using LerpableLeaf::LerpableLeaf;
 
             void activate() override;
-
-            // TODO: class Lerpable::Update during invalidation()
-
             void revalidate() override;
-
-        private:
-            SceneImpl & _scene;
         };
 
         class OrthographicCameraLeaf final
-            : public Leaf<OrthographicCameraLeaf, scene::OrthographicCamera>
-            , public utils::Lerpable<models::OrthographicCamera>
+            : public LerpableLeaf<OrthographicCameraLeaf,
+                                  scene::OrthographicCamera,
+                                  models::OrthographicCamera>
         {
         public:
-            explicit OrthographicCameraLeaf(std::string name,
-                                            models::OrthographicCamera const & model,
-                                            std::weak_ptr<Node> parent,
-                                            SceneImpl & scene)
-                : Leaf(std::move(name), model, parent)
-                , Lerpable(model)
-                , _scene(scene)
-            {}
+            using LerpableLeaf::LerpableLeaf;
 
             void activate() override;
-
-            // TODO: class Lerpable::Update during invalidation()
-
             void revalidate() override;
-
-        private:
-            SceneImpl & _scene;
         };
 
         class BillboardLeaf final
@@ -384,8 +354,6 @@ namespace minire
             bool lerp(float, size_t) { return false; } // just for compatibility
 
             auto const & billboard() const { return _billboard; }
-
-            // TODO: invalidate()
 
         private:
             std::shared_ptr<rasterizer::Billboard> _billboard;
