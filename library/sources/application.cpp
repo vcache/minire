@@ -4,6 +4,7 @@
 #include <minire/instrumentation/formatters.hpp>
 #include <minire/instrumentation/stopwatch.hpp>
 #include <minire/logging.hpp>
+#include <minire/utils/aabb-tools.hpp>
 #include <minire/utils/geometry.hpp>
 #include <minire/utils/ray-caster.hpp>
 #include <minire/utils/unow.hpp>
@@ -206,6 +207,48 @@ namespace minire
         assert(lease);
         models::FontFace const & fontData = lease->as<models::FontFace>();
         return text::measure(text, fontData);
+    }
+
+    std::pair<glm::vec2, bool>
+    Application::measure(models::sprite::Image const & image) const
+    {
+        return std::visit(utils::Overloaded
+        {
+            [this, &image](std::monostate const &)
+            {
+                auto lease = contentManager().borrow(image._texture);
+                assert(lease);
+                minire::models::Image::Sptr const & picture = lease->as<minire::models::Image::Sptr>();
+                MINIRE_INVARIANT(picture, "not a valid image: {}", image._texture);
+                return std::make_pair(glm::vec2(picture->_width, picture->_height), false);
+            },
+
+            [this](utils::Rect const & tile)
+            {
+                return std::make_pair(glm::vec2(tile._right - tile._left + 1,
+                                                tile._bottom - tile._top + 1),
+                                      false);
+            },
+
+            [this](utils::NinePatch const & ninePatch)
+            {
+                return std::make_pair(utils::defaultSize(ninePatch), true);
+            },
+        }, image._patch);
+    }
+
+    std::unique_ptr<utils::TextLayout> Application::layout(text::FormattedString const & text,
+                                                           content::Id const & fontFace) const
+    {
+        auto lease = contentManager().borrow(fontFace);
+        assert(lease);
+        models::FontFace const & fontData = lease->as<models::FontFace>();
+        return text::layout(text, fontData);
+    }
+
+    utils::Aabb Application::measure(content::Path const & path) const
+    {
+        return utils::buildAabb(_contentManager, path);
     }
 
     Scene & Application::scene() const

@@ -10,6 +10,8 @@
 #include <minire/sdl/gl-application.hpp>
 #include <minire/sprite.hpp>
 
+#include <glm/vec2.hpp>
+
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -17,6 +19,7 @@
 
 namespace minire::content { class Manager; }
 namespace minire::utils { class RayCaster; }
+namespace minire::utils { class TextLayout; }
 
 namespace minire
 {
@@ -81,9 +84,16 @@ namespace minire
         Label::Sptr const & findLabel(std::string const & name);
         Label::Sptr const & detachLabel(std::string const & name);
 
-        // TODO: really should be here? what about other measurers?
         glm::vec2 measure(text::FormattedString const & text,
                           content::Id const & fontFace) const;
+
+        std::pair<glm::vec2 /* min size */, bool /* resizable */>
+        measure(models::sprite::Image const & image) const;
+
+        std::unique_ptr<utils::TextLayout> layout(text::FormattedString const & text,
+                                                  content::Id const & fontFace) const;
+
+        utils::Aabb measure(content::Path const & path) const;
 
         // TODO: a Scene should be detachable. So that user might have several prepared scenes
         //       which can be switched to an active.

@@ -513,32 +513,10 @@ namespace minire
         return Application::make(std::move(model));
     }
 
-    std::pair<glm::vec2 /* min size */, bool /* resizable */>
+    std::pair<glm::vec2, bool>
     GuiApplication::measure(minire::models::sprite::Image const & image) const
     {
-        return std::visit(utils::Overloaded
-        {
-            [this, &image](std::monostate const &)
-            {
-                auto lease = contentManager().borrow(image._texture);
-                assert(lease);
-                minire::models::Image::Sptr const & picture = lease->as<minire::models::Image::Sptr>();
-                MINIRE_INVARIANT(picture, "not a valid image: {}", image._texture);
-                return std::make_pair(glm::vec2(picture->_width, picture->_height), false);
-            },
-
-            [this](utils::Rect const & tile)
-            {
-                return std::make_pair(glm::vec2(tile._right - tile._left + 1,
-                                                tile._bottom - tile._top + 1),
-                                      false);
-            },
-
-            [this](utils::NinePatch const & ninePatch)
-            {
-                return std::make_pair(utils::defaultSize(ninePatch), true);
-            },
-        }, image._patch);
+        return Application::measure(image);
     }
 
     glm::vec2 GuiApplication::measure(text::FormattedString const & text,
@@ -550,10 +528,7 @@ namespace minire
     std::unique_ptr<utils::TextLayout> GuiApplication::layout(text::FormattedString const & text,
                                                               content::Id const & fontFace) const
     {
-        auto lease = contentManager().borrow(fontFace);
-        assert(lease);
-        models::FontFace const & fontData = lease->as<models::FontFace>();
-        return text::layout(text, fontData);
+        return Application::layout(text, fontFace);
     }
 
     std::unique_ptr<gui::Theme> GuiApplication::makeBuiltinTheme()
