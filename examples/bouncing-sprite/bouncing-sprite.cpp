@@ -36,7 +36,7 @@ namespace
             MINIRE_INVARIANT(image, "not a valid image: {}", kSpriteFile);
             _imageSize = glm::vec2(image->_width, image->_height);
 
-            _sprite = makeSprite(minire::models::Sprite
+            _sprite = make(minire::models::Sprite
             {
                 ._image = minire::models::sprite::Image{kSpriteFile, std::monostate()},
                 ._position = _position,

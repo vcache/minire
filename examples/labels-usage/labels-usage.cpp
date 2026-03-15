@@ -25,7 +25,7 @@ namespace
 
         LabelData buildLabel(minire::text::FormattedString const & text)
         {
-            minire::Label::Sptr label = makeLabel(minire::models::Label
+            minire::Label::Sptr label = make(minire::models::Label
             {
                 ._text = text,
                 ._fontFace = "ucs-6x13-example",

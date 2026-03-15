@@ -151,8 +151,8 @@ namespace minire
         _rasterizer->vertexBuffers().dispose(id);
     }
 
-    Sprite::Sptr Application::makeSprite(std::string const & name,
-                                         models::Sprite model)
+    Sprite::Sptr Application::make(std::string const & name,
+                                   models::Sprite model)
     {
         assert(_rasterizer);
         return _rasterizer->sprites().make(name, std::move(model));
@@ -175,8 +175,8 @@ namespace minire
         return result;
     }
 
-    Label::Sptr Application::makeLabel(std::string const & name,
-                                       models::Label model)
+    Label::Sptr Application::make(std::string const & name,
+                                  models::Label model)
     {
         assert(_rasterizer);
         return _rasterizer->labels().make(name, std::move(model));

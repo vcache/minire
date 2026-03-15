@@ -87,8 +87,8 @@ namespace minire
         void set(::SDL_Scancode key, uint16_t mods,
                  gui::HotKeys::Handler handler);
 
-        Sprite::Sptr create(minire::models::Sprite) override;
-        Label::Sptr create(minire::models::Label) override;
+        Sprite::Sptr make(minire::models::Sprite) override;
+        Label::Sptr make(minire::models::Label) override;
 
         std::pair<glm::vec2 /* min size */, bool /* resizable */>
         measure(minire::models::sprite::Image const &) const override;

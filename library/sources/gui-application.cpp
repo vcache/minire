@@ -503,14 +503,14 @@ namespace minire
         _hotKeys.set(key, mods, std::move(handler));
     }
 
-    Sprite::Sptr GuiApplication::create(minire::models::Sprite model)
+    Sprite::Sptr GuiApplication::make(minire::models::Sprite model)
     {
-        return Application::makeSprite(std::move(model));
+        return Application::make(std::move(model));
     }
 
-    Label::Sptr GuiApplication::create(minire::models::Label model)
+    Label::Sptr GuiApplication::make(minire::models::Label model)
     {
-        return Application::makeLabel(std::move(model));
+        return Application::make(std::move(model));
     }
 
     std::pair<glm::vec2 /* min size */, bool /* resizable */>

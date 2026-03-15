@@ -70,14 +70,14 @@ namespace minire
         //       (for a tree of transforms/visibility/etc). Gui should be built upon this "2D Scene".
 
         // A 'name' can be optional. If a 'name' is empty(), a sprite will anonymouse.
-        Sprite::Sptr makeSprite(models::Sprite model) { return makeSprite({}, std::move(model)); }
-        Sprite::Sptr makeSprite(std::string const & name, models::Sprite);
+        Sprite::Sptr make(models::Sprite model) { return make({}, std::move(model)); }
+        Sprite::Sptr make(std::string const & name, models::Sprite);
         Sprite::Sptr const & findSprite(std::string const & name);
         Sprite::Sptr const & detachSprite(std::string const & name); // detached Sprite cannot be re-attached
 
         // A 'name' can be optional. If a 'name' is empty(), a sprite will anonymouse.
-        Label::Sptr makeLabel(models::Label model) { return makeLabel({}, std::move(model)); }
-        Label::Sptr makeLabel(std::string const & name, models::Label);
+        Label::Sptr make(models::Label model) { return make({}, std::move(model)); }
+        Label::Sptr make(std::string const & name, models::Label);
         Label::Sptr const & findLabel(std::string const & name);
         Label::Sptr const & detachLabel(std::string const & name);
 

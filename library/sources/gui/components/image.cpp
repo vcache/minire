@@ -83,7 +83,7 @@ namespace minire::gui::components
 
         if (!_sprite)
         {
-            _sprite = overlayController().create(models::Sprite
+            _sprite = overlayController().make(models::Sprite
             {
                 ._image = *_image.get(),
                 ._position = newPosition,

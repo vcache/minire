@@ -53,8 +53,8 @@ namespace minire::gui
         virtual void unfocus() = 0;
 
     public:
-        virtual Sprite::Sptr create(minire::models::Sprite) = 0;
-        virtual Label::Sptr create(minire::models::Label) = 0;
+        virtual Sprite::Sptr make(minire::models::Sprite) = 0;
+        virtual Label::Sptr make(minire::models::Label) = 0;
 
         // returns (min size, is resizeable)
         virtual std::pair<glm::vec2, bool> measure(minire::models::sprite::Image const &) const = 0;

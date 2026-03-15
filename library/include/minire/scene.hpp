@@ -248,7 +248,6 @@ namespace minire
             void setVisible(bool visible) { model(kVisible)._visible = visible; }
 
         public:
-            // TODO: make consistent w/ Sprites and Labels
             virtual Node::Sptr make(std::string const & name, models::Node) = 0;
             virtual Mesh::Sptr make(std::string const & name, models::Mesh) = 0;
             virtual DirectionalLight::Sptr make(std::string const &, models::DirectionalLight) = 0;

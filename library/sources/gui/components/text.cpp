@@ -64,7 +64,7 @@ namespace minire::gui::components
 
         if (!_label)
         {
-            _label = overlayController().create(models::Label
+            _label = overlayController().make(models::Label
             {
                 ._text = _text.get(),
                 ._fontFace = _fontFace.get(),
