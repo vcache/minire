@@ -441,6 +441,8 @@ namespace minire
             void dispose(models::ScenePath const &) override;
             void disposeAll() override;
 
+            void detach() override;
+
         private:
             SceneItem find(models::ScenePath const &) const override;
 

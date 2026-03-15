@@ -350,7 +350,6 @@ namespace minire
     {
         if (auto it = findIterator(path); !it.empty())
         {
-            // TODO: Node::detach must detach all children recursively
             std::visit([](auto & item) { assert(item); item->detach(); },
                        it.item());            
             it.erase();
@@ -361,8 +360,43 @@ namespace minire
 
     void SceneImpl::Node::disposeAll()
     {
+        for(auto & [_, child] : _children)
+        {
+            std::visit([](auto & item) { assert(item); item->detach(); }, child);
+        }
         _children.clear();
         // TODO: erase animations and other assiciated objects
+    }
+
+    void SceneImpl::Node::detach()
+    {
+        std::vector<Node::Sptr> queue{shared_from_this()};
+        queue.reserve(_scene._nodesEstimate);  // TODO: it should be "max-depth-estimate" rather than nodes count
+        while(!queue.empty())
+        {
+            Node::Sptr node = queue.back();
+            queue.pop_back();
+
+            Object::detached();
+
+            assert(node);
+            for(auto & [_, child] : node->_children)
+            {
+                std::visit(utils::Overloaded
+                {
+                    [&queue](Node::Sptr const & childNode)
+                    {
+                        assert(childNode);
+                        queue.emplace_back(childNode);
+                    },
+                    [this](auto const & leafNode)
+                    {
+                        assert(leafNode);
+                        leafNode->detached();
+                    },
+                }, child);
+            }
+        }
     }
 
     SceneImpl::Node::SceneItem

@@ -31,7 +31,7 @@ namespace minire::utils
         virtual ~Object() = default;
 
     public:
-        void detach()
+        virtual void detach()
         {
             _detached = true;
         }
