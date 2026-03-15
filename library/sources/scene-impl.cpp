@@ -147,17 +147,20 @@ namespace minire
 
             for(models::Mesh::Skin::Bone const & boneModel : bones)
             {
+                auto node = nodeFromPointer(boneModel._jointNode);
+                MINIRE_INVARIANT(node && !node->detached(),
+                                 "a skin bone is null pointer or detached: {}", boneModel._jointNode);
+
                 meshLeaf->_skinBones.emplace_back(MeshLeaf::SkinBone
                 {
                     ._inverseBindMatrix = boneModel._inverseBindMatrix,
-                    ._node = nodeFromPointer(boneModel._jointNode),
+                    ._node = node,
                 });
-                MINIRE_INVARIANT(meshLeaf->_skinBones.back()._node,
-                                 "skin bone is a null pointer: {}", boneModel._jointNode);
             }
 
             meshLeaf->_skinOrigin = model._skin->_origin ? nodeFromPointer(*model._skin->_origin)
                                                          : Node::Sptr();
+            assert(!meshLeaf->_skinOrigin || !meshLeaf->_skinOrigin->detached());
         }
         return meshLeaf;
     }
@@ -353,8 +356,6 @@ namespace minire
             std::visit([](auto & item) { assert(item); item->detach(); },
                        it.item());            
             it.erase();
-
-            // TODO: erase animations and other assiciated objects
         }
     }
 
@@ -365,7 +366,6 @@ namespace minire
             std::visit([](auto & item) { assert(item); item->detach(); }, child);
         }
         _children.clear();
-        // TODO: erase animations and other assiciated objects
     }
 
     void SceneImpl::Node::detach()
@@ -418,9 +418,8 @@ namespace minire
                           SceneImpl & scene)
         : scene::Node(std::move(name), std::move(model))
         , _scene(scene)
-        , _localTransform(origin()) // TODO: duplicate w/ model()?
+        , _localTransform(origin()) // TODO: maybe use model's origin() instead of _localTransform
         , _parent(parent)
-        , _visible(visible())       // TODO: duplicate w/ model()?
     {
         // calling at the end, to avoid unwanted calls to virtual methods
         Node::propagate(); // must be called before "setAllowPropagation" !
@@ -620,6 +619,7 @@ namespace minire
     scene::Node & SceneImpl::root() const
     {
         assert(_root);
+        assert(!_root->detached());
         return *_root;
     }
 
@@ -765,11 +765,16 @@ namespace minire
                 assert(activeAnimation._animationSequencers.size() == activeAnimation._animationTracks->size());
                 for(size_t i = 0; i < activeAnimation._animationTracks->size(); ++i)
                 {
-                    AnimationTrack const & animationTrack = (*activeAnimation._animationTracks)[i];
+                    AnimationTrack & animationTrack = (*activeAnimation._animationTracks)[i];
                     ActiveAnimation::SequencerSet const & sequencerSet = activeAnimation._animationSequencers[i];
 
                     Node::Sptr const & targetNode = animationTrack._target;
-                    if (!targetNode || targetNode->detached()) continue;
+                    if (!targetNode) continue;
+                    if (targetNode->detached())
+                    {
+                        animationTrack._target.reset();
+                        continue;
+                    }
 
                     assert(animationTrack._animation);
                     scene::KeyframeAnimation const & anim = *animationTrack._animation;
@@ -1038,6 +1043,12 @@ namespace minire
             }
             else
             {
+                if (skinBone._node && skinBone._node->detached())
+                {
+                    // erase detached node to prevent ref leaking
+                    const_cast<Node::Sptr &>(skinBone._node).reset();
+                }
+
                 // TODO: add more debug info
                 result.emplace_back(kIdentityMatrix);
                 MINIRE_WARNING("skinBone refers to a non-existing Node or "

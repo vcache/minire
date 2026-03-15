@@ -81,9 +81,17 @@ namespace minire
                     {
                         // estimate a pivot (origin) point of a model
                         auto parent = mesh->_skinOrigin;
-                        if (!parent || parent->detached()) parent = mesh->_parent.lock();
+                        if (parent && parent->detached())
+                        {
+                            // erase detached node to prevent ref leaking
+                            mesh->_skinOrigin.reset();
+                            parent.reset();
+                        }
+
+                        // no valid skinOrigin, thus fallback to a parent
+                        parent = mesh->_parent.lock();
                         MINIRE_INVARIANT(parent && !parent->detached(),
-                                         "a mesh doesn't have a parent");
+                                         "a mesh doesn't have a non-detached parent");
                         assert(parent->hasGlobalTransform());
 
                         // perform rendering
@@ -236,7 +244,7 @@ namespace minire
             void propagate() override { if (auto p = _parent.lock(); p) p->propagate(); }
 
         private:
-            std::weak_ptr<Node> _parent;
+            std::weak_ptr<Node> _parent; // TODO: why weak_ptr? where detached() is checked?
             bool                _activated = false;
 
             friend class SceneImpl;
@@ -263,13 +271,13 @@ namespace minire
             struct SkinBone
             {
                 glm::mat4 const       _inverseBindMatrix;
-                std::shared_ptr<Node> _node; // TODO: too many detached() checks
+                std::shared_ptr<Node> _node;
             };
             using SkinBones = std::vector<SkinBone>;
 
             std::shared_ptr<rasterizer::Mesh> _mesh;
             SkinBones                         _skinBones;
-            std::shared_ptr<Node>             _skinOrigin; // TODO: too many detached() checks
+            std::shared_ptr<Node>             _skinOrigin;
 
             friend class SceneImpl;
         };
@@ -367,7 +375,7 @@ namespace minire
     private:
         struct AnimationTrack
         {
-            std::shared_ptr<Node>          _target; // TODO: too many detached() checks
+            std::shared_ptr<Node>          _target;
             scene::KeyframeAnimation::Sptr _animation;
         };
 
@@ -398,6 +406,7 @@ namespace minire
                             float const speedScale);
         };
 
+        // TODO: it won't hide children when visible=false
         class Node final
             : public scene::Node
             , public std::enable_shared_from_this<Node>
@@ -487,7 +496,6 @@ namespace minire
             AnimationSet          _animationSet;
             ActiveAnimation::Uptr _activeAnimation;
             GlobalTransformState  _globalTransformState = GlobalTransformState::kDirty;
-            bool                  _visible = true;
             bool                  _activated = false; // for _localTransform
             bool                  _childActivated = false;
             bool                  _hasActiveChildrenAnimation = false;
