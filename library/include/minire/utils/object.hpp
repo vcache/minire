@@ -24,7 +24,7 @@ namespace minire::utils
                         Model model)
             : _name(name)
             , _model(std::move(model))
-            , _flags(kAllFlags)
+            , _flags(0)
             , _detached(false)
         {}
 
@@ -73,8 +73,27 @@ namespace minire::utils
         bool invalidated() const { return _flags != 0; }
         bool invalidated(Mask mask) const { return _flags & mask; }
 
-        void invalidate() { _flags = kAllFlags; }
-        void invalidate(Mask mask) { _flags |= mask; }
+        // NOTE: since "invalidate" calls a virtual methods,
+        //       it shouldn't be called from a constructor.
+
+        void invalidate()
+        {
+            bool wasInvalidated = invalidated();
+            _flags = kAllFlags;
+            if (_allowPropagation && !wasInvalidated) propagate();
+        }
+
+        void invalidate(Mask mask)
+        {
+            bool wasInvalidated = invalidated();
+            _flags |= mask;
+            if (_allowPropagation && !wasInvalidated) propagate();
+        }
+
+        void setAllowPropagation(bool v) { _allowPropagation = v; }
+
+        // called once any flag set, but just once
+        virtual void propagate() {}
 
     protected:
         Model & model(Mask mask)
@@ -88,6 +107,7 @@ namespace minire::utils
         Model             _model;
         Mask              _flags = 0;
         bool              _detached = false;
+        bool              _allowPropagation = false; // TODO: get rid of this hack
     };
 
     // A helper for RAII-style lifecycle of an Object

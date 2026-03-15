@@ -341,11 +341,13 @@ namespace minire
             }
         }
 
+        _scene->setEpochNumber(_epochNumber);
+
         // transfer accumulated models state into scene instances
         if (_epochStarted)
         {
             instrumentation::Stopwatch<> stopwatch("models-revalidation", _timekeeper);
-            _scene->revalidateModels(_epochNumber);
+            _scene->revalidateModels();
         }
 
         // fetch and handle events from controller if any
@@ -353,7 +355,7 @@ namespace minire
         if (_epochStarted)
         {
             instrumentation::Stopwatch<> stopwatch("animation-advance", _timekeeper);
-            performLerp |= _scene->advanceAnimations(_animationGap, _epochNumber);
+            performLerp |= _scene->advanceAnimations(_animationGap);
             _animationGap = 0;
             _epochStarted = false;
         }
@@ -363,7 +365,7 @@ namespace minire
             instrumentation::Stopwatch<> stopwatch("scene-lerping", _timekeeper);
             double const weight = _epochDuration != 0 ? _epochPlayed / _epochDuration : 1.0;
             assert(weight >= 0);
-            _scene->lerp(weight, _epochNumber);
+            _scene->lerp(weight);
         }
 
         {

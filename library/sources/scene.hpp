@@ -55,13 +55,15 @@ namespace minire
 
         scene::Viewpoint const & viewpoint() const { return _viewpoint; }
 
-        void lerp(float weight, size_t epochNumber);
+        void setEpochNumber(size_t epochNumber) { _epochNumber = epochNumber; }
 
-        void revalidateModels(size_t epochNumber);
+        void lerp(float weight);
+
+        void revalidateModels();
 
         void revalidateNodes();
 
-        bool advanceAnimations(float delta /* seconds */, size_t epochNumber);
+        bool advanceAnimations(float delta /* seconds */);
 
     public:
         // TODO: implement detached() mechanism
@@ -230,7 +232,8 @@ namespace minire
             scene::Node::Wptr parent() const override { return _parent; }
             void setParent(scene::Node::Sptr const & newParent) override;
 
-            virtual void revalidateModel(size_t epochNumber) = 0; // TODO: move it into Object?
+        private:
+            void propagate() override { if (auto p = _parent.lock(); p) p->propagate(); }
 
         private:
             std::weak_ptr<Node> _parent;
@@ -255,8 +258,6 @@ namespace minire
             bool lerp(float, size_t) { return false; } // just for compatibility
 
             // TODO: lerpable _emissiveFactor
-
-            void revalidateModel(size_t epochNumber) override;
 
         private:
             struct SkinBone
@@ -292,7 +293,7 @@ namespace minire
 
             // TODO: class Lerpable::Update during invalidation()
 
-            void revalidateModel(size_t epochNumber) override;
+            void revalidate() override;
 
         private:
             SceneImpl & _scene;
@@ -314,7 +315,7 @@ namespace minire
 
             // TODO: class Lerpable::Update during invalidation()
 
-            void revalidateModel(size_t epochNumber) override;
+            void revalidate() override;
 
         private:
             SceneImpl & _scene;
@@ -338,7 +339,7 @@ namespace minire
 
             // TODO: class Lerpable::Update during invalidation()
 
-            void revalidateModel(size_t epochNumber) override;
+            void revalidate() override;
 
         private:
             SceneImpl & _scene;
@@ -362,7 +363,7 @@ namespace minire
 
             // TODO: class Lerpable::Update during invalidation()
 
-            void revalidateModel(size_t epochNumber) override;
+            void revalidate() override;
 
         private:
             SceneImpl & _scene;
@@ -385,8 +386,6 @@ namespace minire
             auto const & billboard() const { return _billboard; }
 
             // TODO: invalidate()
-
-            void revalidateModel(size_t epochNumber) override;
 
         private:
             std::shared_ptr<rasterizer::Billboard> _billboard;
@@ -485,13 +484,12 @@ namespace minire
                 return GlobalTransformState::kClean == _globalTransformState;
             }
 
-            // TODO: impl model() invalidation
-
             void invalidateGlobalTransform();
             void deactiveChildrenAnimation();
             void activeChildrenAnimation();
 
-            void revalidateModel(size_t epochNumber);
+            void revalidate() override;
+            void propagate() override;
 
         private:
             using Child = std::variant<Node::Sptr,
@@ -525,7 +523,8 @@ namespace minire
             bool                  _activated = false; // for _localTransform
             bool                  _childActivated = false;
             bool                  _hasActiveChildrenAnimation = false;
-            // TODO: use  Object's flags instead all these bools
+            bool                  _modelInvalidated = false; // Object::invalidated
+            // TODO: too many flags, consider migration to std::bitset
 
         private:
             struct ItemIterator
@@ -580,6 +579,7 @@ namespace minire
         Node::Sptr                     _root;
         ActiveCamera                   _activeCamera;
         scene::Viewpoint               _viewpoint;
+        size_t                         _epochNumber = 0;
         size_t                         _nodesEstimate = 1;
 
         mutable MeshLeaves             _meshLeaves;

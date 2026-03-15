@@ -52,40 +52,41 @@ namespace minire
 
         // erase the element from an old parent
         oldParent->_children.erase(oldIterator);
+
+        if (newParent)
+        {
+            if (ObjectType::invalidated()) propagate();
+            // TODO: also should re-activate other stuff of a parent 
+        }
     }
 
     // SceneImpl::*Leaf //
 
-    void SceneImpl::MeshLeaf::revalidateModel(size_t)
-    {
-        Object::revalidate();
-    }
-
-    void SceneImpl::DirectionalLightLeaf::revalidateModel(size_t epochNumber)
+    void SceneImpl::DirectionalLightLeaf::revalidate()
     {
         if (invalidated(kColor))
         {
-            Lerpable::update(epochNumber, model());
+            Lerpable::update(_scene._epochNumber, model());
             _scene.activate(*this); // TODO: why?
         }
         Object::revalidate();
     }
 
-    void SceneImpl::PointLightLeaf::revalidateModel(size_t epochNumber)
+    void SceneImpl::PointLightLeaf::revalidate()
     {
         if (invalidated(kColor | kAttenuation))
         {
-            Lerpable::update(epochNumber, model());
+            Lerpable::update(_scene._epochNumber, model());
             _scene.activate(*this); // TODO: why?
         }
         Object::revalidate();
     }
 
-    void SceneImpl::PerspectiveCameraLeaf::revalidateModel(size_t epochNumber)
+    void SceneImpl::PerspectiveCameraLeaf::revalidate()
     {
         if (invalidated(kYFov /*| kZNear | kZFar | kAspectRatio*/))
         {
-            Lerpable::update(epochNumber, model());
+            Lerpable::update(_scene._epochNumber, model());
             _scene.activate(*this);
         }
         Object::revalidate();
@@ -96,11 +97,11 @@ namespace minire
         _scene.setActiveCamera(*this);
     }
 
-    void SceneImpl::OrthographicCameraLeaf::revalidateModel(size_t epochNumber)
+    void SceneImpl::OrthographicCameraLeaf::revalidate()
     {
         if (invalidated(kXMag | kYMag /* | kZNear | kZFar*/))
         {
-            Lerpable::update(epochNumber, model());
+            Lerpable::update(_scene._epochNumber, model());
             _scene.activate(*this);
         }
         Object::revalidate();
@@ -109,11 +110,6 @@ namespace minire
     void SceneImpl::OrthographicCameraLeaf::activate()
     {
         _scene.setActiveCamera(*this);
-    }
-
-    void SceneImpl::BillboardLeaf::revalidateModel(size_t)
-    {
-        Object::revalidate();
     }
 
     // SceneImpl::Node //
@@ -342,6 +338,12 @@ namespace minire
 
         // Erase the element from an old parent
         oldParent->_children.erase(oldIterator);
+
+        if (newParent)
+        {
+            if (invalidated()) propagate();
+            // TODO: also should re-activate other stuff of a parent
+        }
     }
 
     void SceneImpl::Node::dispose(models::ScenePath const & path)
@@ -386,6 +388,11 @@ namespace minire
         , _visible(visible())       // TODO: duplicate w/ model()?
     {
         ++_scene._nodesEstimate;
+
+        Node::propagate();
+
+        // calling at the end, to avoid unwanted calls to virtual methods
+        setAllowPropagation(true);
     }
 
     SceneImpl::Node::~Node()
@@ -505,14 +512,25 @@ namespace minire
         }
     }
 
-    void SceneImpl::Node::revalidateModel(size_t epochNumber)
+    void SceneImpl::Node::revalidate()
     {
         if (invalidated(kOrigin))
         {
-            _localTransform.update(epochNumber, origin());
+            _localTransform.update(_scene._epochNumber, origin());
             _scene.activate(*this); // NOTE: will also invalidate global transform
         }
         Object::revalidate();
+    }
+
+    void SceneImpl::Node::propagate()
+    {
+        _modelInvalidated = true;
+        for(auto parent = _parent.lock();
+            parent && !parent->_modelInvalidated;
+            parent = parent->_parent.lock())
+        {
+            parent->_modelInvalidated = true;
+        }
     }
 
     // ActiveAnimation //
@@ -647,19 +665,23 @@ namespace minire
 
     // TODO: don't revalidate invisible nodes
     // TODO: don't revalidate culled-out nodes
-    void SceneImpl::revalidateModels(size_t epochNumber)
+    void SceneImpl::revalidateModels()
     {
-        assert(_root);
-        std::vector<Node::Sptr> queue{_root};
+        std::vector<Node::Sptr> queue;
         queue.reserve(_nodesEstimate);  // TODO: it should be "max-depth-estimate" rather than nodes count
-        // TODO: !!! avoid full tree traverse !!!
+
+        assert(_root);
+        if (_root->_modelInvalidated)
+            queue.emplace_back(_root);
+
         while(!queue.empty())
         {
             Node::Sptr node = queue.back();
             queue.pop_back();
 
             assert(node);
-            node->revalidateModel(epochNumber);
+            node->revalidate();
+            node->_modelInvalidated = false;
 
             for(auto & [_, child] : node->_children)
             {
@@ -668,12 +690,15 @@ namespace minire
                     [&queue](Node::Sptr const & childNode)
                     {
                         assert(childNode);
-                        queue.emplace_back(childNode);
+                        if (childNode->_modelInvalidated)
+                        {
+                            queue.emplace_back(childNode);
+                        }
                     },
-                    [epochNumber](auto const & leafNode)
+                    [this](auto const & leafNode)
                     {
                         assert(leafNode);
-                        leafNode->revalidateModel(epochNumber);
+                        leafNode->revalidate();
                     },
                 }, child);
             }
@@ -682,7 +707,7 @@ namespace minire
 
     // TODO: don't animate invisible nodes
     // TODO: don't animate culled-out nodes
-    bool SceneImpl::advanceAnimations(float delta /* seconds */, size_t epochNumber)
+    bool SceneImpl::advanceAnimations(float delta /* seconds */)
     {
         assert(_root);
         std::vector<Node::Sptr> queue{_root};
@@ -749,7 +774,7 @@ namespace minire
 
                     if (hasTrack)
                     {
-                        targetNode->_localTransform.update(epochNumber, current);
+                        targetNode->_localTransform.update(_epochNumber, current);
                         activate(*targetNode);
                         updated |= true;
                     }
@@ -815,7 +840,7 @@ namespace minire
 
     // TODO: don't lerp invisible nodes
     // TODO: don't lerp culled-out nodes
-    void SceneImpl::lerp(float weight, size_t epochNumber)
+    void SceneImpl::lerp(float weight)
     {
         assert(_root);
 
@@ -833,7 +858,7 @@ namespace minire
 
             if (node->_activated)
             {
-                node->_activated = node->lerp(weight, epochNumber);
+                node->_activated = node->lerp(weight, _epochNumber);
                 node->invalidateGlobalTransform();
             }
 
@@ -850,10 +875,10 @@ namespace minire
                             queue.emplace_back(child);
                             return false; // lerping status is not known yet
                         },
-                        [weight, epochNumber](auto & child) -> bool
+                        [weight, this](auto & child) -> bool
                         {
                             assert(child);
-                            return child->lerp(weight, epochNumber);
+                            return child->lerp(weight, _epochNumber);
                         }
                     }, child);
                 }
