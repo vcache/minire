@@ -13,6 +13,8 @@ namespace minire::gui::components
         using Sptr = std::shared_ptr<ProgressBar>;
         using Wptr = std::weak_ptr<ProgressBar>;
 
+        static constexpr std::string kName = "ProgressBar";
+
         enum class Direction
         {
             kLeftToRight,
@@ -27,11 +29,11 @@ namespace minire::gui::components
                     OverlayController &,
                     Direction const);
 
-        Property<models::sprite::MaybeImage> const & background() const { return Image::image(); }
-        Property<models::sprite::MaybeImage> & background() { return Image::image(); }
+        Property<minire::models::sprite::MaybeImage> const & background() const { return Image::image(); }
+        Property<minire::models::sprite::MaybeImage> & background() { return Image::image(); }
 
-        Property<models::sprite::MaybeImage> const & slider() const { assert(_slider); return _slider->image(); }
-        Property<models::sprite::MaybeImage> & slider() { assert(_slider); return _slider->image(); }
+        Property<minire::models::sprite::MaybeImage> const & slider() const { assert(_slider); return _slider->image(); }
+        Property<minire::models::sprite::MaybeImage> & slider() { assert(_slider); return _slider->image(); }
 
         Property<float> const & value() const { return _value; }
         Property<float> & value() { return _value; }

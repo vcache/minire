@@ -47,6 +47,8 @@ namespace minire::gui::components
         using Contents = std::vector<std::any>;
         using Selected = std::optional<size_t>;
 
+        static constexpr std::string kName = "Dropdown";
+
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
         using CommonCallbacks::eraseCallback;

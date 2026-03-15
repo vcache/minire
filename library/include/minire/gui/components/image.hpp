@@ -14,6 +14,8 @@ namespace minire::gui::components
         using Sptr = std::shared_ptr<Image>;
         using Wptr = std::weak_ptr<Image>;
 
+        static constexpr std::string kName = "Image";
+
         explicit Image(std::string const & id,
                        Theme const & theme,
                        Theme::Style const & style,

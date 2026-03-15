@@ -17,7 +17,7 @@ namespace minire::gui::components
         : Component(id, theme, style, overlayController)
         , _text(*this, std::move(text))
         , _fontFace(*this, fontFace ? *fontFace
-                                    : theme.get<content::Id>("text", "font-face", style))
+                                    : theme.get<content::Id>(kName, "font-face", style))
     {
         horizontal()->_dimension = dimension::Content{};
         vertical()->_dimension = dimension::Content{};

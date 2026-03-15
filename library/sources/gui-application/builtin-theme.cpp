@@ -1,10 +1,19 @@
 #include <gui-application/builtin-theme.hpp>
 
-#include <minire/gui/theme.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
 #include <minire/formats/bdf.hpp>
 #include <minire/formats/image.hpp>
+#include <minire/gui/components/button.hpp>
+#include <minire/gui/components/dropdown.hpp>
+#include <minire/gui/components/editbox.hpp>
+#include <minire/gui/components/image.hpp>
+#include <minire/gui/components/listview.hpp>
+#include <minire/gui/components/progress-bar.hpp>
+#include <minire/gui/components/scrollbar.hpp>
+#include <minire/gui/components/spinbox.hpp>
+#include <minire/gui/components/text.hpp>
+#include <minire/gui/theme.hpp>
 #include <minire/models/font-face.hpp>
 
 #include <cassert>
@@ -90,9 +99,11 @@ namespace minire::gui_application
 
         private:
             gui::Theme::Value const & getImpl(std::string const & component,
-                                              std::string const & name,
+                                              std::string const & property,
                                               gui::Theme::Style const & style) const override
             {
+                using namespace gui::components;
+
                 static gui::Theme::Value const kIconArrowLeft(mkImage(utils::Rect(29, 1, 35, 11)));
                 static gui::Theme::Value const kIconArrowUp(mkImage(utils::Rect(37, 1, 47, 11)));
                 static gui::Theme::Value const kIconArrowRight(mkImage(utils::Rect(49, 1, 55, 11)));
@@ -100,26 +111,27 @@ namespace minire::gui_application
                 static gui::Theme::Value const kIconDecrease(mkImage(utils::Rect(69, 1, 78, 11)));
                 static gui::Theme::Value const kIconIncrease(mkImage(utils::Rect(80, 1, 89, 11)));
 
-                if ("i:arrow-left" == name)      return kIconArrowLeft;
-                if ("i:arrow-up" == name)        return kIconArrowUp;
-                if ("i:arrow-right" == name)     return kIconArrowRight;
-                if ("i:arrow-down" == name)      return kIconArrowDown;
-                if ("i:decrease" == name)        return kIconDecrease;
-                if ("i:increase" == name)        return kIconIncrease;
+                if ("i:arrow-left" == property)      return kIconArrowLeft;
+                if ("i:arrow-up" == property)        return kIconArrowUp;
+                if ("i:arrow-right" == property)     return kIconArrowRight;
+                if ("i:arrow-down" == property)      return kIconArrowDown;
+                if ("i:decrease" == property)        return kIconDecrease;
+                if ("i:increase" == property)        return kIconIncrease;
 
-                if ("button" == component)       return getButton(name, style);
-                if ("scrollbar" == component)    return getScrollbar(name, style);
-                if ("listview" == component)     return getListview(name, style);
-                if ("dropdown" == component)     return getDropdown(name, style);
-                if ("editbox" == component)      return getEdit(name, style);
-                if ("progress-bar" == component) return getProgressBar(name, style);
-                if ("text" == component)         return getText(name, style);
-                if ("spinbox" == component)      { /* nothing */ }
+                if (Button::kName == component)      return getButton(property, style);
+                if (Dropdown::kName == component)    return getDropdown(property, style);
+                if (Editbox::kName == component)     return getEdit(property, style);
+                if (Image::kName == component)       { /* nothing */ }
+                if (ListView::kName == component)    return getListview(property, style);
+                if (ProgressBar::kName == component) return getProgressBar(property, style);
+                if (Scrollbar::kName == component)   return getScrollbar(property, style);
+                if (SpinBox::kName == component)     { /* nothing */ }
+                if (Text::kName == component)        return getText(property, style);
 
                 MINIRE_THROW("no such component");
             }
 
-            gui::Theme::Value const & getButton(std::string const & name,
+            gui::Theme::Value const & getButton(std::string const & property,
                                                 gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kIconLocation(gui::Theme::Location::kLeft);
@@ -136,18 +148,18 @@ namespace minire::gui_application
                                                                   utils::Rect(2, 34, 10, 42),
                                                                   utils::Rect(5, 37, 7, 39)));
 
-                if ("icon-location" == name)   return kIconLocation;
-                if ("icon-spacing" == name)    return kIconSpacing;
-                if ("content-padding" == name) return kContentPadding;
-                if ("press-offset" == name)    return kPressOffset;
-                if ("bg-normal" == name)       return kBgNormal;
-                if ("bg-hovered" == name)      return kBgHovered;
-                if ("bg-pressed" == name)      return kBgPressed;
+                if ("icon-location" == property)   return kIconLocation;
+                if ("icon-spacing" == property)    return kIconSpacing;
+                if ("content-padding" == property) return kContentPadding;
+                if ("press-offset" == property)    return kPressOffset;
+                if ("bg-normal" == property)       return kBgNormal;
+                if ("bg-hovered" == property)      return kBgHovered;
+                if ("bg-pressed" == property)      return kBgPressed;
 
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & getScrollbar(std::string const & name,
+            gui::Theme::Value const & getScrollbar(std::string const & property,
                                                    gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kMinSliderLength(10.0f);
@@ -155,13 +167,13 @@ namespace minire::gui_application
                                                                   utils::Rect(2, 50, 11, 59),
                                                                   utils::Rect(5, 53, 8, 56)));
 
-                if ("min-slider-length" == name) return kMinSliderLength;
-                if ("bg" == name)                return kBgPressed;
+                if ("min-slider-length" == property) return kMinSliderLength;
+                if ("bg" == property)                return kBgPressed;
 
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & getListview(std::string const & name,
+            gui::Theme::Value const & getListview(std::string const & property,
                                                   gui::Theme::Style const & style) const
             {
                 static gui::Theme::Value const kPadding(utils::Rect(3));
@@ -184,25 +196,26 @@ namespace minire::gui_application
 
                 // as a dropdown's tongue
 
-                if ("dropdown" == style._modifier)
+                if (!style.empty() &&
+                    gui::components::Dropdown::kName == style.back())
                 {
-                    if ("bg" == name) return kBg_Dropdown;
+                    if ("bg" == property) return kBg_Dropdown;
                 }
 
                 // default
 
-                if ("padding" == name)           return kPadding;
-                if ("scrollbar-width" == name)   return kScrollbarWidth;
-                if ("scrollbar-at-left" == name) return kScrollbarAtLeft;
-                if ("bg" == name)                return kBg;
-                if ("bg-item-normal" == name)    return kBgItemNormal;
-                if ("bg-item-hovered" == name)   return kBgItemHovered;
-                if ("bg-item-selected" == name)  return kBgItemSelected;
+                if ("padding" == property)           return kPadding;
+                if ("scrollbar-width" == property)   return kScrollbarWidth;
+                if ("scrollbar-at-left" == property) return kScrollbarAtLeft;
+                if ("bg" == property)                return kBg;
+                if ("bg-item-normal" == property)    return kBgItemNormal;
+                if ("bg-item-hovered" == property)   return kBgItemHovered;
+                if ("bg-item-selected" == property)  return kBgItemSelected;
 
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & getDropdown(std::string const & name,
+            gui::Theme::Value const & getDropdown(std::string const & property,
                                                   gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kPadding(utils::Rect(3));
@@ -215,18 +228,18 @@ namespace minire::gui_application
                                                            utils::Rect(2, 67, 10, 75),
                                                            utils::Rect(5, 70, 7, 72)));
 
-                if ("padding" == name)             return kPadding;
-                if ("t/max-lines" == name)         return kTongueMaxLines;
-                if ("t/min-height" == name)        return kTongueMinHeight;
-                if ("t/max-height" == name)        return kTongueMaxHeight;
-                if ("drop-button-width" == name)   return kDropButtonWidth;
-                if ("drop-button-at-left" == name) return kDropButtonAtLeft;
-                if ("bg" == name)                  return kBg;
+                if ("padding" == property)             return kPadding;
+                if ("t/max-lines" == property)         return kTongueMaxLines;
+                if ("t/min-height" == property)        return kTongueMinHeight;
+                if ("t/max-height" == property)        return kTongueMaxHeight;
+                if ("drop-button-width" == property)   return kDropButtonWidth;
+                if ("drop-button-at-left" == property) return kDropButtonAtLeft;
+                if ("bg" == property)                  return kBg;
 
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & getEdit(std::string const & name,
+            gui::Theme::Value const & getEdit(std::string const & property,
                                               gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kContentPadding(utils::Rect(5));
@@ -249,18 +262,18 @@ namespace minire::gui_application
                                                                     utils::Rect(2, 115, 10, 123),
                                                                     utils::Rect(5, 118, 7, 120)));
 
-                if ("content-padding" == name) return kContentPadding;
-                if ("active-format" == name)   return kActiveFormat;
-                if ("bg-normal" == name)       return kBgNormal;
-                if ("bg-disabled" == name)     return kBgDisabled;
-                if ("cursor-insert" == name)   return kCursorInsert;
-                if ("cursor-replace" == name)  return kCursorReplace;
-                if ("selection-bg" == name)    return kSelectionBg;
+                if ("content-padding" == property) return kContentPadding;
+                if ("active-format" == property)   return kActiveFormat;
+                if ("bg-normal" == property)       return kBgNormal;
+                if ("bg-disabled" == property)     return kBgDisabled;
+                if ("cursor-insert" == property)   return kCursorInsert;
+                if ("cursor-replace" == property)  return kCursorReplace;
+                if ("selection-bg" == property)    return kSelectionBg;
 
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & getProgressBar(std::string const & name,
+            gui::Theme::Value const & getProgressBar(std::string const & property,
                                                      gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kSliderPadding(utils::Rect(3));
@@ -271,19 +284,19 @@ namespace minire::gui_application
                                                                utils::Rect(5, 118, 6, 119),
                                                                utils::Rect(5, 118, 6, 119)));
 
-                if ("slider-padding" == name) return kSliderPadding;
-                if ("bg" == name)             return kBg;
-                if ("slider" == name)         return kSlider;
+                if ("slider-padding" == property) return kSliderPadding;
+                if ("bg" == property)             return kBg;
+                if ("slider" == property)         return kSlider;
 
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & getText(std::string const & name,
+            gui::Theme::Value const & getText(std::string const & property,
                                               gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kFontFace(kFontFaceId);
 
-                if ("font-face" == name) return kFontFace;
+                if ("font-face" == property) return kFontFace;
 
                 MINIRE_THROW("no such parameter");
             }

@@ -38,9 +38,9 @@ namespace minire::gui::components
         , _minimum(*this, -100.0f)
         , _maximum(*this, 100.0f)
         , _format(*this, "{}")
-        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController, false, true))
-        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController, false, true))
-        , _editbox(std::make_shared<Editbox>("__edit__", theme, style, overlayController))
+        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, concat(style, kName), overlayController, false, true))
+        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, concat(style, kName), overlayController, false, true))
+        , _editbox(std::make_shared<Editbox>("__edit__", theme, concat(style, kName), overlayController))
     {
         refreshView();
     }
@@ -56,7 +56,7 @@ namespace minire::gui::components
             [this](Component const &, gui::OnClick const &)
             { stepDown(); });
         _decreaseButton->icon() =
-            theme().get<minire::models::sprite::MaybeImage>("spinbox", "i:decrease", style());
+            theme().get<minire::models::sprite::MaybeImage>(kName, "i:decrease", style());
 
         assert(_increaseButton);
         _increaseButton->setParent(sharedThis);
@@ -64,7 +64,7 @@ namespace minire::gui::components
             [this](Component const &, gui::OnClick const &)
             { stepUp(); });
         _increaseButton->icon() =
-            theme().get<minire::models::sprite::MaybeImage>("spinbox", "i:increase", style());
+            theme().get<minire::models::sprite::MaybeImage>(kName, "i:increase", style());
 
         // build editbox
         assert(_editbox);

@@ -38,6 +38,8 @@ namespace minire::gui::components
         using Sptr = std::shared_ptr<Editbox>;
         using Wptr = std::weak_ptr<Editbox>;
 
+        static constexpr std::string kName = "Editbox";
+
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
         using CommonCallbacks::eraseCallback;

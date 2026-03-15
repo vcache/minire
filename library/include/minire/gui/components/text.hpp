@@ -16,6 +16,8 @@ namespace minire::gui::components
         using Sptr = std::shared_ptr<Text>;
         using Wptr = std::weak_ptr<Text>;
 
+        static constexpr std::string kName = "Text";
+
         // NOTE: If \a fontFace isn't provided, it will be taken from
         //       from Theme with a given Style.
         explicit Text(std::string const & id,

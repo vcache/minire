@@ -134,28 +134,28 @@ namespace minire::gui::components
                        ItemBuilderCallback baseItemBuilder,
                        ItemBuilderCallback tongueItemBuilder)
         : Image(id, theme, style, overlayController,
-                theme.get<minire::models::sprite::MaybeImage>("dropdown", "bg", style))
+                theme.get<minire::models::sprite::MaybeImage>(kName, "bg", style))
         , _tongue(*this, Tongue
             {
-                ._maxLines = theme.get<size_t>("dropdown", "t/max-lines", style),
-                ._minHeight = theme.get<float>("dropdown", "t/min-height", style),
-                ._maxHeight = theme.get<float>("dropdown", "t/max-height", style),
+                ._maxLines = theme.get<size_t>(kName, "t/max-lines", style),
+                ._minHeight = theme.get<float>(kName, "t/min-height", style),
+                ._maxHeight = theme.get<float>(kName, "t/max-height", style),
             })
         , _contents(*this)
         , _lineHeight(*this, 0)
         , _activeItemContainer(std::make_shared<ActiveItemContainer>(
-            kActiveItemContainerId, theme, style, overlayController))
+            kActiveItemContainerId, theme, concat(style, kName), overlayController))
         , _dropButton(std::make_shared<components::Button>(
-            kBaseDropButtonId, theme, style, overlayController, false, true)) //  TODO: cascaded style
+            kBaseDropButtonId, theme, concat(style, kName), overlayController, false, true))
         , _dropdownLayout(std::make_shared<layouts::VerticalTool>(
             kActiveItemContainerId, kBaseDropButtonId,
-            theme.get<float>("dropdown", "drop-button-width", style),
-            theme.get<bool>("dropdown", "drop-button-at-left", style)))
+            theme.get<float>(kName, "drop-button-width", style),
+            theme.get<bool>(kName, "drop-button-at-left", style)))
         , _baseItemBuilderCallback(baseItemBuilder)
         , _tongueItemBuilderCallback(tongueItemBuilder)
     {
         layout() = _dropdownLayout;
-        padding() = theme.get<utils::Rect>("dropdown", "padding", style);
+        padding() = theme.get<utils::Rect>(kName, "padding", style); // TODO don't use padding()
     }
 
     Dropdown::~Dropdown()
@@ -176,7 +176,7 @@ namespace minire::gui::components
         assert(_dropButton);
         _dropButton->setParent(shared_from_this());
         _dropButton->icon() = theme().get<minire::models::sprite::MaybeImage>(
-            "dropdown", "i:arrow-down", style());
+            kName, "i:arrow-down", style());
         _dropButton->setCallback(std::in_place_type<gui::OnClick>, "__open__",
             [this](Component const &, gui::OnClick const &)
             { openTongue(); });
@@ -205,7 +205,7 @@ namespace minire::gui::components
         Component & overlay = overlayController().push(_tongueOverlay->_tag,
                                                        _tongueOverlay->_defaultHandler);
         _tongueOverlay->_listview = overlay.emplace<ListView>(
-            Theme::Style{._name = style()._name, ._modifier = "dropdown"}, "__tongue__",
+            concat(style(), kName), "__tongue__",
             _tongueItemBuilderCallback ? _tongueItemBuilderCallback
                                        : _baseItemBuilderCallback);
 
@@ -256,7 +256,7 @@ namespace minire::gui::components
             {
                 MINIRE_INVARIANT(_baseItemBuilderCallback, "no base item builder for \"{}\"", id());
                 activeItem = _baseItemBuilderCallback(_contents.get().at(*_selected), *_selected,
-                                                      theme(), style() /* TODO: cascade +dropdown */, overlayController());
+                                                      theme(), concat(style(), kName), overlayController());
                 if (activeItem)
                 {
                     activeItem->setEventTransparent(true);

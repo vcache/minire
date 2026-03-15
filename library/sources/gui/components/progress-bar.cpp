@@ -12,12 +12,12 @@ namespace minire::gui::components
                              OverlayController & overlayController,
                              Direction const direction)
         : Image(id, theme, style, overlayController,
-                theme.get<models::sprite::MaybeImage>("progress-bar", "bg", style))
+                theme.get<models::sprite::MaybeImage>(kName, "bg", style))
         , _slider(std::make_shared<Image>("__slider__", theme, style, overlayController,
-                  theme.get<models::sprite::MaybeImage>("progress-bar", "slider", style)))
+                  theme.get<models::sprite::MaybeImage>(kName, "slider", style)))
         , _value(*this, 0.0f)
         , _direction(*this, direction)
-        , _sliderPadding(*this, theme.get<utils::Rect>("progress-bar", "slider-padding", style))
+        , _sliderPadding(*this, theme.get<utils::Rect>(kName, "slider-padding", style))
     {}
 
     void ProgressBar::initialize()

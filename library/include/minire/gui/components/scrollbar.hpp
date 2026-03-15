@@ -29,6 +29,8 @@ namespace minire::gui::components
         using Sptr = std::shared_ptr<Scrollbar>;
         using Wptr = std::weak_ptr<Scrollbar>;
 
+        static constexpr std::string kName = "Scrollbar"; // TODO: why not ScrollBar?
+
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
         using CommonCallbacks::eraseCallback;

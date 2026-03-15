@@ -167,22 +167,16 @@ namespace minire::gui::components
             {
                 auto sharedFromThis = shared_from_this();
 
-                // TODO: cascaded style
-                // TODO: MaybeImage ?
                 _normalBackground = emplace<Image>("__normal-bg__",
-                    theme().get<minire::models::sprite::MaybeImage>("listview", "bg-item-normal", style()));
+                    theme().get<minire::models::sprite::MaybeImage>(ListView::kName, "bg-item-normal", style()));
                 _normalBackground->setEventTransparent(true);
 
-                // TODO: cascaded style
-                // TODO: MaybeImage ?
                 _hoverBackground = emplace<Image>("__hover-bg__",
-                    theme().get<minire::models::sprite::MaybeImage>("listview", "bg-item-hovered", style()));
+                    theme().get<minire::models::sprite::MaybeImage>(ListView::kName, "bg-item-hovered", style()));
                 _hoverBackground->setEventTransparent(true);
 
-                // TODO: cascaded style
-                // TODO: MaybeImage ?
                 _selectedBackground = emplace<Image>("__select-bg__",
-                    theme().get<minire::models::sprite::MaybeImage>("listview", "bg-item-selected", style()));
+                    theme().get<minire::models::sprite::MaybeImage>(ListView::kName, "bg-item-selected", style()));
                 _selectedBackground->setEventTransparent(true);
 
                 if (_contents)
@@ -232,20 +226,21 @@ namespace minire::gui::components
                        OverlayController & overlayController,
                        ItemBuilderCallback itemBuilderCallback)
         : Image(id, theme, style, overlayController,
-                theme.get<minire::models::sprite::MaybeImage>("listview", "bg", style))
+                theme.get<minire::models::sprite::MaybeImage>(kName, "bg", style))
         , _contents(*this)
         , _offset(*this, 0)
         , _lineHeight(*this, 0)
-        , _scrollbar(std::make_shared<VerticalScrollbar>("__scrollbar__", theme, style, overlayController)) // TODO: cascaded style "listview", "scrollbar"
+        , _scrollbar(std::make_shared<VerticalScrollbar>("__scrollbar__", theme, concat(style, kName),
+                                                         overlayController))
         , _contentLayout(std::make_shared<ListViewLayout>())
         , _verticalToolLayout(std::make_shared<layouts::VerticalTool>(
             kContentId, kScrollbarId,
-            theme.get<float>("listview", "scrollbar-width", style),
-            theme.get<bool>("listview", "scrollbar-at-left", style)))
+            theme.get<float>(kName, "scrollbar-width", style),
+            theme.get<bool>(kName, "scrollbar-at-left", style)))
         , _itemBuilderCallback(itemBuilderCallback)
     {
         layout() = _verticalToolLayout;
-        padding() = theme.get<utils::Rect>("listview", "padding", style);
+        padding() = theme.get<utils::Rect>(kName, "padding", style);// TODO: don't use this padding
     }
 
     void ListView::initialize()
@@ -305,7 +300,8 @@ namespace minire::gui::components
                 ++index)
             {
                 if (auto const & item = _itemBuilderCallback(_contents.get().at(index), index,
-                                                             theme(), style(), overlayController());
+                                                             theme(), concat(style(), kName),
+                                                             overlayController());
                     item)
                 {
                     if (_lineHeight.get() <= 0)

@@ -35,7 +35,6 @@ namespace minire::gui::components
                                        Theme const & theme, Theme::Style const & style,
                                        OverlayController & overlayController) const
             {
-                // TODO: cascaded style [listview, text]
                 auto result = std::make_shared<Text>("__simple_item__", theme, style,
                                                      overlayController, _stringify(value, index));
                 result->horizontal() = Arranger(position::Begin{}, dimension::Fill{});
@@ -73,6 +72,8 @@ namespace minire::gui::components
         using Wptr = std::weak_ptr<ListView>;
         using Contents = std::vector<std::any>;
         using Selected = std::optional<size_t>;
+
+        static constexpr std::string kName = "ListView";
 
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;

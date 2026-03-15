@@ -33,6 +33,8 @@ namespace minire::gui::components
         using Sptr = std::shared_ptr<Button>;
         using Wptr = std::weak_ptr<Button>;
 
+        static constexpr std::string kName = "Button";
+
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
         using CommonCallbacks::eraseCallback;
