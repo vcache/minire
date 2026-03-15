@@ -134,12 +134,12 @@ namespace minire::gui::components
                        ItemBuilderCallback baseItemBuilder,
                        ItemBuilderCallback tongueItemBuilder)
         : Image(id, theme, style, overlayController,
-                theme.parameter<minire::models::sprite::MaybeImage>("dropdown", "bg", style))
+                theme.get<minire::models::sprite::MaybeImage>("dropdown", "bg", style))
         , _tongue(*this, Tongue
             {
-                ._maxLines = theme.parameter<size_t>("dropdown", "t/max-lines", style),
-                ._minHeight = theme.parameter<float>("dropdown", "t/min-height", style),
-                ._maxHeight = theme.parameter<float>("dropdown", "t/max-height", style),
+                ._maxLines = theme.get<size_t>("dropdown", "t/max-lines", style),
+                ._minHeight = theme.get<float>("dropdown", "t/min-height", style),
+                ._maxHeight = theme.get<float>("dropdown", "t/max-height", style),
             })
         , _contents(*this)
         , _lineHeight(*this, 0)
@@ -149,13 +149,13 @@ namespace minire::gui::components
             kBaseDropButtonId, theme, style, overlayController, false, true)) //  TODO: cascaded style
         , _dropdownLayout(std::make_shared<layouts::VerticalTool>(
             kActiveItemContainerId, kBaseDropButtonId,
-            theme.parameter<float>("dropdown", "drop-button-width", style),
-            theme.parameter<bool>("dropdown", "drop-button-at-left", style)))
+            theme.get<float>("dropdown", "drop-button-width", style),
+            theme.get<bool>("dropdown", "drop-button-at-left", style)))
         , _baseItemBuilderCallback(baseItemBuilder)
         , _tongueItemBuilderCallback(tongueItemBuilder)
     {
         layout() = _dropdownLayout;
-        padding() = theme.parameter<utils::Rect>("dropdown", "padding", style);
+        padding() = theme.get<utils::Rect>("dropdown", "padding", style);
     }
 
     Dropdown::~Dropdown()
@@ -175,7 +175,7 @@ namespace minire::gui::components
 
         assert(_dropButton);
         _dropButton->setParent(shared_from_this());
-        _dropButton->icon() = theme().parameter<minire::models::sprite::MaybeImage>(
+        _dropButton->icon() = theme().get<minire::models::sprite::MaybeImage>(
             "dropdown", "i:arrow-down", style());
         _dropButton->setCallback(std::in_place_type<gui::OnClick>, "__open__",
             [this](Component const &, gui::OnClick const &)

@@ -63,14 +63,13 @@ namespace minire::gui
          * \a name - how component is used, component-specific (e.g. "normal", "hovered", "pressed", etc)
          * \a style - stylistic variant of a (component, name) pair (e.g., "builtin", "menu", "hud" etc)
          * */
-        // TODO: rename "parameter" -> "get"
         template<typename T>
-        auto parameter(std::string const & component,
-                       std::string const & name,
-                       Style const & style) const
+        auto get(std::string const & component,
+                 std::string const & name,
+                 Style const & style) const
         try
         {
-            Value const & value = parameterImpl(component, name, style);
+            Value const & value = getImpl(component, name, style);
             if constexpr(std::is_same_v<T, size_t>)
             {
                 int64_t result = std::get<int64_t>(value);
@@ -94,8 +93,8 @@ namespace minire::gui
         }
 
     protected:
-        virtual Value const & parameterImpl(std::string const & component,
-                                            std::string const & name,
-                                            Style const & style) const = 0;
+        virtual Value const & getImpl(std::string const & component,
+                                      std::string const & name,
+                                      Style const & style) const = 0;
     };
 }

@@ -1,7 +1,5 @@
 #include <minire/gui/components/button.hpp>
 
-#include <minire/logging.hpp> // TODO: [X]
-
 #include <minire/errors.hpp>
 #include <minire/gui/layout.hpp>
 #include <minire/gui/layouts/array.hpp>
@@ -17,23 +15,23 @@ namespace minire::gui::components
         : Component(id, theme, style, overlayController)
         , _bgNormal(std::make_shared<components::Image>(
                 "__bg-normal__", theme, style, overlayController,
-                theme.parameter<minire::models::sprite::MaybeImage>("button", "bg-normal", style)))
+                theme.get<minire::models::sprite::MaybeImage>("button", "bg-normal", style)))
         , _bgHovered(std::make_shared<components::Image>(
                 "__bg-hovered__", theme, style, overlayController,
-                theme.parameter<minire::models::sprite::MaybeImage>("button", "bg-hovered", style)))
+                theme.get<minire::models::sprite::MaybeImage>("button", "bg-hovered", style)))
         , _bgPressed(std::make_shared<components::Image>(
                 "__bg-pressed__", theme, style, overlayController,
-                theme.parameter<minire::models::sprite::MaybeImage>("button", "bg-pressed", style)))
+                theme.get<minire::models::sprite::MaybeImage>("button", "bg-pressed", style)))
         , _content(hasIcon || hasText ? std::make_shared<Component>("__content__", theme, style, overlayController)
                                       : Component::Sptr{})
         , _text(hasText ? std::make_shared<components::Text>("__caption__", theme, style, overlayController)
                         : components::Text::Sptr{}) // TODO: cascaded style: text <- button
         , _icon(hasIcon ? std::make_shared<components::Image>("__icon__", theme, style, overlayController, std::nullopt)
                         : components::Image::Sptr{}) // TODO: cascaded style: text <- button
-        , _iconLocation(*this, theme.parameter<Theme::Location>("button", "icon-location", style))
-        , _iconSpacing(*this, theme.parameter<float>("button", "icon-spacing", style))
-        , _pressOffset(*this, theme.parameter<glm::vec2>("button", "press-offset", style))
-        , _contentPadding(*this, theme.parameter<utils::Rect>("button", "content-padding", style))
+        , _iconLocation(*this, theme.get<Theme::Location>("button", "icon-location", style))
+        , _iconSpacing(*this, theme.get<float>("button", "icon-spacing", style))
+        , _pressOffset(*this, theme.get<glm::vec2>("button", "press-offset", style))
+        , _contentPadding(*this, theme.get<utils::Rect>("button", "content-padding", style))
         , _hasText(hasText)
         , _hasIcon(hasIcon)
     {

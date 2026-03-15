@@ -89,9 +89,9 @@ namespace minire::gui_application
         {}
 
         private:
-            gui::Theme::Value const & parameterImpl(std::string const & component,
-                                                    std::string const & name,
-                                                    gui::Theme::Style const & style) const override
+            gui::Theme::Value const & getImpl(std::string const & component,
+                                              std::string const & name,
+                                              gui::Theme::Style const & style) const override
             {
                 static gui::Theme::Value const kIconArrowLeft(mkImage(utils::Rect(29, 1, 35, 11)));
                 static gui::Theme::Value const kIconArrowUp(mkImage(utils::Rect(37, 1, 47, 11)));
@@ -107,20 +107,20 @@ namespace minire::gui_application
                 if ("i:decrease" == name)        return kIconDecrease;
                 if ("i:increase" == name)        return kIconIncrease;
 
-                if ("button" == component)       return parameterButton(name, style);
-                if ("scrollbar" == component)    return parameterScrollbar(name, style);
-                if ("listview" == component)     return parameterListview(name, style);
-                if ("dropdown" == component)     return parameterDropdown(name, style);
-                if ("editbox" == component)      return parameterEdit(name, style);
-                if ("progress-bar" == component) return parameterProgressBar(name, style);
-                if ("text" == component)         return parameterText(name, style);
+                if ("button" == component)       return getButton(name, style);
+                if ("scrollbar" == component)    return getScrollbar(name, style);
+                if ("listview" == component)     return getListview(name, style);
+                if ("dropdown" == component)     return getDropdown(name, style);
+                if ("editbox" == component)      return getEdit(name, style);
+                if ("progress-bar" == component) return getProgressBar(name, style);
+                if ("text" == component)         return getText(name, style);
                 if ("spinbox" == component)      { /* nothing */ }
 
                 MINIRE_THROW("no such component");
             }
 
-            gui::Theme::Value const & parameterButton(std::string const & name,
-                                                      gui::Theme::Style const &) const
+            gui::Theme::Value const & getButton(std::string const & name,
+                                                gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kIconLocation(gui::Theme::Location::kLeft);
                 static gui::Theme::Value const kIconSpacing(4.0f);
@@ -147,8 +147,8 @@ namespace minire::gui_application
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & parameterScrollbar(std::string const & name,
-                                                         gui::Theme::Style const &) const
+            gui::Theme::Value const & getScrollbar(std::string const & name,
+                                                   gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kMinSliderLength(10.0f);
                 static gui::Theme::Value const kBgPressed(mkImage(utils::Rect(0, 48, 13, 61),
@@ -161,8 +161,8 @@ namespace minire::gui_application
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & parameterListview(std::string const & name,
-                                                        gui::Theme::Style const & style) const
+            gui::Theme::Value const & getListview(std::string const & name,
+                                                  gui::Theme::Style const & style) const
             {
                 static gui::Theme::Value const kPadding(utils::Rect(3));
                 static gui::Theme::Value const kScrollbarWidth(21.0f);
@@ -202,8 +202,8 @@ namespace minire::gui_application
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & parameterDropdown(std::string const & name,
-                                                        gui::Theme::Style const &) const
+            gui::Theme::Value const & getDropdown(std::string const & name,
+                                                  gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kPadding(utils::Rect(3));
                 static gui::Theme::Value const kTongueMaxLines(5);
@@ -226,8 +226,8 @@ namespace minire::gui_application
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & parameterEdit(std::string const & name,
-                                                    gui::Theme::Style const &) const
+            gui::Theme::Value const & getEdit(std::string const & name,
+                                              gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kContentPadding(utils::Rect(5));
                 static gui::Theme::Value const kActiveFormat(
@@ -260,8 +260,8 @@ namespace minire::gui_application
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & parameterProgressBar(std::string const & name,
-                                                           gui::Theme::Style const &) const
+            gui::Theme::Value const & getProgressBar(std::string const & name,
+                                                     gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kSliderPadding(utils::Rect(3));
                 static gui::Theme::Value const kBg(mkImage(utils::Rect(0, 161, 12, 173),
@@ -278,8 +278,8 @@ namespace minire::gui_application
                 MINIRE_THROW("no such parameter");
             }
 
-            gui::Theme::Value const & parameterText(std::string const & name,
-                                                    gui::Theme::Style const &) const
+            gui::Theme::Value const & getText(std::string const & name,
+                                              gui::Theme::Style const &) const
             {
                 static gui::Theme::Value const kFontFace(kFontFaceId);
 

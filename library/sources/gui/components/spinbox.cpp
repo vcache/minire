@@ -56,7 +56,7 @@ namespace minire::gui::components
             [this](Component const &, gui::OnClick const &)
             { stepDown(); });
         _decreaseButton->icon() =
-            theme().parameter<minire::models::sprite::MaybeImage>("spinbox", "i:decrease", style());
+            theme().get<minire::models::sprite::MaybeImage>("spinbox", "i:decrease", style());
 
         assert(_increaseButton);
         _increaseButton->setParent(sharedThis);
@@ -64,7 +64,7 @@ namespace minire::gui::components
             [this](Component const &, gui::OnClick const &)
             { stepUp(); });
         _increaseButton->icon() =
-            theme().parameter<minire::models::sprite::MaybeImage>("spinbox", "i:increase", style());
+            theme().get<minire::models::sprite::MaybeImage>("spinbox", "i:increase", style());
 
         // build editbox
         assert(_editbox);

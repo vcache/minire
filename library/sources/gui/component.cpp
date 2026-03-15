@@ -1,7 +1,5 @@
 #include <minire/gui/component.hpp>
 
-#include <minire/logging.hpp> // TODO: [X]
-
 #include <minire/errors.hpp>
 #include <minire/gui/overlay-controller.hpp>
 

@@ -3,8 +3,6 @@
 #include <minire/gui/overlay-controller.hpp>
 #include <minire/models/sprite.hpp>
 
-#include <minire/logging.hpp> // TODO: [X]
-
 #include <cassert>
 
 namespace minire::gui::components

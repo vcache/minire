@@ -92,9 +92,9 @@ namespace minire::gui::components
                          OverlayController & overlayController,
                          bool isVertical)
         : Image(id, theme, style, overlayController,
-                theme.parameter<minire::models::sprite::MaybeImage>("scrollbar", "bg", style))
+                theme.get<minire::models::sprite::MaybeImage>("scrollbar", "bg", style))
         , _step(*this, 0.1f)
-        , _minSliderLength(*this, theme.parameter<float>("scrollbar", "min-slider-length", style))
+        , _minSliderLength(*this, theme.get<float>("scrollbar", "min-slider-length", style))
         , _value(*this, 0.0f)
         , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController, false, true)) // TODO: cascade style "scrollbar" <- "button"
         , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController, false, true)) // TODO: cascade style "scrollbar" <- "button"
@@ -118,7 +118,7 @@ namespace minire::gui::components
         _increaseButton->setCallback(std::in_place_type<gui::OnClick>, "__scrollbar__",
             [this](Component const &, gui::OnClick const &)
             { setValue(_value.get() + _step.get()); });
-        _increaseButton->icon() = theme().parameter<minire::models::sprite::MaybeImage>("scrollbar",
+        _increaseButton->icon() = theme().get<minire::models::sprite::MaybeImage>("scrollbar",
             _isVertical ? "i:arrow-down" : "i:arrow-right",
             style());
 
@@ -128,7 +128,7 @@ namespace minire::gui::components
         _decreaseButton->setCallback(std::in_place_type<gui::OnClick>, "__scrollbar__",
             [this](Component const &, gui::OnClick const &)
             { setValue(_value.get() - _step.get()); });
-        _decreaseButton->icon() = theme().parameter<minire::models::sprite::MaybeImage>("scrollbar",
+        _decreaseButton->icon() = theme().get<minire::models::sprite::MaybeImage>("scrollbar",
             _isVertical ? "i:arrow-up" : "i:arrow-left",
             style());
 

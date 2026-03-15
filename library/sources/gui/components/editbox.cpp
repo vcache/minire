@@ -43,22 +43,22 @@ namespace minire::gui::components
                      OverlayController & overlayController)
         : Component(id, theme, style, overlayController)
         , _bgNormal(std::make_shared<Image>("__bg-normal__", theme, style, overlayController,
-                    theme.parameter<models::sprite::MaybeImage>("editbox", "bg-normal", style)))
+                    theme.get<models::sprite::MaybeImage>("editbox", "bg-normal", style)))
         , _bgDisabled(std::make_shared<Image>("__bg-disabled__", theme, style, overlayController,
-                      theme.parameter<models::sprite::MaybeImage>("editbox", "bg-disabled", style)))
+                      theme.get<models::sprite::MaybeImage>("editbox", "bg-disabled", style)))
         , _cursorImageInsert(std::make_shared<Image>("__cursor-insert__", theme, style, overlayController,
-                             theme.parameter<models::sprite::MaybeImage>("editbox", "cursor-insert", style)))
+                             theme.get<models::sprite::MaybeImage>("editbox", "cursor-insert", style)))
         , _cursorImageReplace(std::make_shared<Image>("__cursor-replace__", theme, style, overlayController,
-                              theme.parameter<models::sprite::MaybeImage>("editbox", "cursor-replace", style)))
+                              theme.get<models::sprite::MaybeImage>("editbox", "cursor-replace", style)))
         , _selectionImage(std::make_shared<Image>("__selection__", theme, style, overlayController,
-                          theme.parameter<models::sprite::MaybeImage>("editbox", "selection-bg", style)))
+                          theme.get<models::sprite::MaybeImage>("editbox", "selection-bg", style)))
         , _insertMode(*this, true)
         , _enabled(*this, true)
         , _passwordChar(*this, std::nullopt)
-        , _contentPadding(*this, theme.parameter<utils::Rect>("editbox", "content-padding", style))
+        , _contentPadding(*this, theme.get<utils::Rect>("editbox", "content-padding", style))
         , _text(*this)
         , _textView(std::make_shared<Text>("__text__", theme, style, overlayController))
-        , _activeFormat(theme.parameter<text::Format>("editbox", "active-format", style))
+        , _activeFormat(theme.get<text::Format>("editbox", "active-format", style))
         , _cursorPos(0)
         , _selectionBegin(kNoIndex)
         , _offset(0)
