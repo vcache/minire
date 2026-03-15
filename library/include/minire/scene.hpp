@@ -248,6 +248,9 @@ namespace minire
             void setVisible(bool visible) { model(kVisible)._visible = visible; }
 
         public:
+            // Generally, user code should store pointers to these objects as Wptr,
+            // but it won't hurt storing as Sptr if the user understands possible pitfalls.
+
             virtual Node::Sptr make(std::string const & name, models::Node) = 0;
             virtual Mesh::Sptr make(std::string const & name, models::Mesh) = 0;
             virtual DirectionalLight::Sptr make(std::string const &, models::DirectionalLight) = 0;

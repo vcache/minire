@@ -66,32 +66,23 @@ namespace minire
         bool advanceAnimations(float delta /* seconds */);
 
     public:
-        // TODO: implement detached() mechanism
-
         template<typename Callable>
         void cullModels(Callable callable) const
         {
             auto it = _meshLeaves.begin();
             while(it != _meshLeaves.end())
             {
-                if (auto const & mesh = *it;
-                    mesh && !mesh->detached())
+                if (auto mesh = it->lock(); mesh)
                 {
                     if (mesh->visible())
                     {
                         // estimate a pivot (origin) point of a model
-                        auto parent = mesh->_skinOrigin;
-                        if (parent && parent->detached())
-                        {
-                            // erase detached node to prevent ref leaking
-                            mesh->_skinOrigin.reset();
-                            parent.reset();
-                        }
+                        auto parent = mesh->_skinOrigin.lock();
 
                         // no valid skinOrigin, thus fallback to a parent
-                        parent = mesh->_parent.lock();
-                        MINIRE_INVARIANT(parent && !parent->detached(),
-                                         "a mesh doesn't have a non-detached parent");
+                        if (!parent) parent = mesh->_parent.lock();
+
+                        MINIRE_INVARIANT(parent, "a mesh doesn't have a parent");
                         assert(parent->hasGlobalTransform());
 
                         // perform rendering
@@ -116,8 +107,7 @@ namespace minire
             auto it = _billboardsLeaves.begin();
             while(it != _billboardsLeaves.end())
             {
-                if (auto const & billboard = it->second;
-                    billboard && !billboard->detached())
+                if (auto const & billboard = it->second.lock(); billboard)
                 {
                     if (billboard->visible())
                     {
@@ -147,8 +137,7 @@ namespace minire
             auto it = _directionalLightLeaves.begin();
             while(it != _directionalLightLeaves.end() && index < limit)
             {
-                if (auto const & directionalLight = *it;
-                    directionalLight && !directionalLight->detached())
+                if (auto const & directionalLight = it->lock(); directionalLight)
                 {
                     if (directionalLight->visible())
                     {
@@ -185,8 +174,7 @@ namespace minire
             auto it = _pointLightLeaves.begin();
             while(it != _pointLightLeaves.end() && index < limit)
             {
-                if (auto const & pointLight = *it;
-                    pointLight && !pointLight->detached())
+                if (auto const & pointLight = it->lock(); pointLight)
                 {
                     if (pointLight->visible())
                     {
@@ -226,6 +214,7 @@ namespace minire
         {
         public:
             using Sptr = std::shared_ptr<Derived>;
+            using Wptr = std::weak_ptr<Derived>;
 
             using ObjectType::detach;
             using ObjectType::name;
@@ -240,11 +229,13 @@ namespace minire
             scene::Node::Wptr parent() const override { return _parent; }
             void setParent(scene::Node::Sptr const & newParent) override;
 
+            void detach() override { MINIRE_THROW("detach() shouldn't be called for Scene objects"); }
+
         private:
             void propagate() override { if (auto p = _parent.lock(); p) p->propagate(); }
 
         private:
-            std::weak_ptr<Node> _parent; // TODO: why weak_ptr? where detached() is checked?
+            std::weak_ptr<Node> _parent;
             bool                _activated = false;
 
             friend class SceneImpl;
@@ -270,14 +261,14 @@ namespace minire
         private:
             struct SkinBone
             {
-                glm::mat4 const       _inverseBindMatrix;
-                std::shared_ptr<Node> _node;
+                glm::mat4 const     _inverseBindMatrix;
+                std::weak_ptr<Node> _node;
             };
             using SkinBones = std::vector<SkinBone>;
 
             std::shared_ptr<rasterizer::Mesh> _mesh;
             SkinBones                         _skinBones;
-            std::shared_ptr<Node>             _skinOrigin;
+            std::weak_ptr<Node>               _skinOrigin;
 
             friend class SceneImpl;
         };
@@ -375,7 +366,7 @@ namespace minire
     private:
         struct AnimationTrack
         {
-            std::shared_ptr<Node>          _target;
+            std::weak_ptr<Node>            _target;
             scene::KeyframeAnimation::Sptr _animation;
         };
 
@@ -406,7 +397,6 @@ namespace minire
                             float const speedScale);
         };
 
-        // TODO: it won't hide children when visible=false
         class Node final
             : public scene::Node
             , public std::enable_shared_from_this<Node>
@@ -448,7 +438,7 @@ namespace minire
             void dispose(models::ScenePath const &) override;
             void disposeAll() override;
 
-            void detach() override;
+            void detach() override { MINIRE_THROW("detach() shouldn't be called for Scene objects"); }
 
         private:
             SceneItem find(models::ScenePath const &) const override;
@@ -530,16 +520,16 @@ namespace minire
         };
 
         using ActiveCamera = std::variant<std::monostate,
-                                          PerspectiveCameraLeaf::Sptr,
-                                          OrthographicCameraLeaf::Sptr>;
+                                          PerspectiveCameraLeaf::Wptr,
+                                          OrthographicCameraLeaf::Wptr>;
 
     private:
-        using BillboardsLeafRecord = std::pair<size_t, BillboardLeaf::Sptr>;
+        using BillboardsLeafRecord = std::pair<size_t, BillboardLeaf::Wptr>;
 
-        using MeshLeaves = std::list<MeshLeaf::Sptr>;
+        using MeshLeaves = std::list<MeshLeaf::Wptr>;
         using BillboardsLeaves = std::list<BillboardsLeafRecord>;
-        using DirectionalLightLeaves = std::list<DirectionalLightLeaf::Sptr>;
-        using PointLightLeaves = std::list<PointLightLeaf::Sptr>;
+        using DirectionalLightLeaves = std::list<DirectionalLightLeaf::Wptr>;
+        using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
 
         template<typename T>
         void activate(T &);

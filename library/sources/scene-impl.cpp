@@ -22,6 +22,11 @@ namespace minire
 {
     // TODO: store/calculate absolute path for nodes/leaves (and use them for logging)
 
+    // TODO: Node::visible is broken, it won't hide its children when visible=false
+    //       (should evaluate effective visibility as in GUI)
+
+    // TODO: too many passes, should re-design into a single traverse that re-validates all components
+
     // SceneImpl::Leaf //
 
     template<typename Derived, typename ObjectType>
@@ -40,11 +45,6 @@ namespace minire
                                                               oldIterator->second);
             MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into a new parent node (\"{}\")",
                              name(), newParent->name());
-        }
-        else
-        {
-            // if a new parent isn't specified, a leaf should be detached from a scene
-            detach();
         }
 
         // reset _parent for the element
@@ -148,8 +148,7 @@ namespace minire
             for(models::Mesh::Skin::Bone const & boneModel : bones)
             {
                 auto node = nodeFromPointer(boneModel._jointNode);
-                MINIRE_INVARIANT(node && !node->detached(),
-                                 "a skin bone is null pointer or detached: {}", boneModel._jointNode);
+                MINIRE_INVARIANT(node, "a skin bone is null pointer: {}", boneModel._jointNode);
 
                 meshLeaf->_skinBones.emplace_back(MeshLeaf::SkinBone
                 {
@@ -159,8 +158,7 @@ namespace minire
             }
 
             meshLeaf->_skinOrigin = model._skin->_origin ? nodeFromPointer(*model._skin->_origin)
-                                                         : Node::Sptr();
-            assert(!meshLeaf->_skinOrigin || !meshLeaf->_skinOrigin->detached());
+                                                         : Node::Wptr();
         }
         return meshLeaf;
     }
@@ -252,14 +250,13 @@ namespace minire
             animationTracksSptr->reserve(animationTracks.size());
             for(auto const & [target, keyframeAnimation] : animationTracks)
             {
+                auto const & targetSptr = nodeFromPointer(target);
+                MINIRE_INVARIANT(targetSptr, "no valid animation target: {}", target);
                 animationTracksSptr->emplace_back(AnimationTrack
                 {
-                    ._target = nodeFromPointer(target),
+                    ._target = targetSptr,
                     ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
                 });
-                MINIRE_INVARIANT(animationTracksSptr->back()._target &&
-                                 !animationTracksSptr->back()._target->detached(),
-                                 "animation target is a null pointer: {}", target);
             }
             newAnimationSet.emplace(animationId, animationTracksSptr);
         }
@@ -297,14 +294,13 @@ namespace minire
         animationTracksSptr->reserve(animationTracks.size());
         for(auto const & [target, keyframeAnimation] : animationTracks)
         {
+            auto const & targetSptr = nodeFromPointer(target);
+            MINIRE_INVARIANT(targetSptr, "no valid animation target: {}", target);
             animationTracksSptr->emplace_back(AnimationTrack
             {
-                ._target = nodeFromPointer(target),
+                ._target = targetSptr,
                 ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
             });
-            MINIRE_INVARIANT(animationTracksSptr->back()._target &&
-                             !animationTracksSptr->back()._target->detached(),
-                             "animation target is a null pointer: {}", target);
         }
 
         // activate this animation
@@ -314,6 +310,8 @@ namespace minire
     }
 
     // TODO: code duplicated w/ Left::setParent
+    // TODO: when parent is changed, some animation may steel refer to moved nodes,
+    //       it will work, but ill-logic.
     void SceneImpl::Node::setParent(scene::Node::Sptr const & newParentIface)
     {
         // Find a leaf's iterator
@@ -329,11 +327,6 @@ namespace minire
                                                               oldIterator->second);
             MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into a new parent node (\"{}\")",
                              name(), newParent->name());
-        }
-        else
-        {
-            // if a new parent isn't specified, a leaf should be detached from a scene
-            detach();
         }
 
         // Reset _parent for the element
@@ -353,51 +346,13 @@ namespace minire
     {
         if (auto it = findIterator(path); !it.empty())
         {
-            std::visit([](auto & item) { assert(item); item->detach(); },
-                       it.item());            
             it.erase();
         }
     }
 
     void SceneImpl::Node::disposeAll()
     {
-        for(auto & [_, child] : _children)
-        {
-            std::visit([](auto & item) { assert(item); item->detach(); }, child);
-        }
         _children.clear();
-    }
-
-    void SceneImpl::Node::detach()
-    {
-        std::vector<Node::Sptr> queue{shared_from_this()};
-        queue.reserve(_scene._nodesEstimate);
-        while(!queue.empty())
-        {
-            Node::Sptr node = queue.back();
-            queue.pop_back();
-
-            Object::detached();
-
-            assert(node);
-            for(auto & [_, child] : node->_children)
-            {
-                std::visit(utils::Overloaded
-                {
-                    [&queue](Node::Sptr const & childNode)
-                    {
-                        assert(childNode);
-                        queue.emplace_back(childNode);
-                    },
-                    [this](auto const & leafNode)
-                    {
-                        assert(leafNode);
-                        leafNode->detached();
-                    },
-                }, child);
-            }
-            _scene._nodesEstimate = std::max(_scene._nodesEstimate, queue.size());
-        }
     }
 
     SceneImpl::Node::SceneItem
@@ -541,6 +496,8 @@ namespace minire
             _localTransform.update(_scene._epochNumber, origin());
             _scene.activate(*this); // NOTE: will also invalidate global transform
         }
+        MINIRE_INVARIANT(visible(), "TODO: node visibility is broken "
+                                    "(effective visibility doesn't evaluate)");
         Object::revalidate();
     }
 
@@ -619,22 +576,19 @@ namespace minire
     scene::Node & SceneImpl::root() const
     {
         assert(_root);
-        assert(!_root->detached());
         return *_root;
     }
 
     void SceneImpl::setActiveCamera(PerspectiveCameraLeaf & camera)
     {
-        MINIRE_INVARIANT(!camera.detached(), "the camera is detached: {}", camera.name());
-        _activeCamera = ActiveCamera(camera.shared_from_this());
+        _activeCamera = ActiveCamera(camera.weak_from_this());
         _viewpoint.setCamera(camera.current());
     }
 
     // TODO: code duplication
     void SceneImpl::setActiveCamera(OrthographicCameraLeaf & camera)
     {
-        MINIRE_INVARIANT(!camera.detached(), "the camera is detached: {}", camera.name());
-        _activeCamera = camera.shared_from_this();
+        _activeCamera = ActiveCamera(camera.weak_from_this());
         _viewpoint.setCamera(camera.current());
     }
 
@@ -768,45 +722,41 @@ namespace minire
                     AnimationTrack & animationTrack = (*activeAnimation._animationTracks)[i];
                     ActiveAnimation::SequencerSet const & sequencerSet = activeAnimation._animationSequencers[i];
 
-                    Node::Sptr const & targetNode = animationTrack._target;
-                    if (!targetNode) continue;
-                    if (targetNode->detached())
+                    if (Node::Sptr const & targetNode = animationTrack._target.lock();
+                        targetNode)
                     {
-                        animationTrack._target.reset();
-                        continue;
-                    }
+                        assert(animationTrack._animation);
+                        scene::KeyframeAnimation const & anim = *animationTrack._animation;
+                        models::Transform current = targetNode->_localTransform.current();
 
-                    assert(animationTrack._animation);
-                    scene::KeyframeAnimation const & anim = *animationTrack._animation;
-                    models::Transform current = targetNode->_localTransform.current();
+                        bool hasTrack = false;
+                        if (anim._translation && sequencerSet._translation &&
+                            !sequencerSet._translation->isDone())
+                        {
+                            current._translation = sequencerSet._translation->current(*anim._translation);
+                            hasTrack |= true;
+                        }
 
-                    bool hasTrack = false;
-                    if (anim._translation && sequencerSet._translation &&
-                        !sequencerSet._translation->isDone())
-                    {
-                        current._translation = sequencerSet._translation->current(*anim._translation);
-                        hasTrack |= true;
-                    }
+                        if (anim._rotation && sequencerSet._rotation &&
+                            !sequencerSet._rotation->isDone())
+                        {
+                            current._rotation = sequencerSet._rotation->current(*anim._rotation);
+                            hasTrack |= true;
+                        }
 
-                    if (anim._rotation && sequencerSet._rotation &&
-                        !sequencerSet._rotation->isDone())
-                    {
-                        current._rotation = sequencerSet._rotation->current(*anim._rotation);
-                        hasTrack |= true;
-                    }
+                        if (anim._scale && sequencerSet._scale &&
+                            !sequencerSet._scale->isDone())
+                        {
+                            current._scale = sequencerSet._scale->current(*anim._scale);
+                            hasTrack |= true;
+                        }
 
-                    if (anim._scale && sequencerSet._scale &&
-                        !sequencerSet._scale->isDone())
-                    {
-                        current._scale = sequencerSet._scale->current(*anim._scale);
-                        hasTrack |= true;
-                    }
-
-                    if (hasTrack)
-                    {
-                        targetNode->_localTransform.update(_epochNumber, current);
-                        activate(*targetNode);
-                        updated |= true;
+                        if (hasTrack)
+                        {
+                            targetNode->_localTransform.update(_epochNumber, current);
+                            activate(*targetNode);
+                            updated |= true;
+                        }
                     }
                 }
 
@@ -999,9 +949,9 @@ namespace minire
         std::visit(utils::Overloaded
         {
             [](std::monostate) {},
-            [this](auto const & camera)
+            [this](auto const & wcamera)
             {
-                if (camera && !camera->detached())
+                if (auto const & camera = wcamera.lock())
                 {
                     Node::Sptr parent = camera->_parent.lock();
                     MINIRE_INVARIANT(parent, "an active camera has no parent");
@@ -1036,19 +986,13 @@ namespace minire
 
         for(MeshLeaf::SkinBone const & skinBone : mesh._skinBones)
         {
-            if (skinBone._node && !skinBone._node->detached() &&
-                skinBone._node->hasGlobalTransform())
+            if (auto const & node = skinBone._node.lock();
+                node && node->hasGlobalTransform())
             {
-                result.emplace_back(skinBone._node->_globalTransform * skinBone._inverseBindMatrix);
+                result.emplace_back(node->_globalTransform * skinBone._inverseBindMatrix);
             }
             else
             {
-                if (skinBone._node && skinBone._node->detached())
-                {
-                    // erase detached node to prevent ref leaking
-                    const_cast<Node::Sptr &>(skinBone._node).reset();
-                }
-
                 // TODO: add more debug info
                 result.emplace_back(kIdentityMatrix);
                 MINIRE_WARNING("skinBone refers to a non-existing Node or "
