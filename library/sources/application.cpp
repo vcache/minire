@@ -344,7 +344,7 @@ namespace minire
         // transfer accumulated models state into scene instances
         if (_epochStarted)
         {
-            instrumentation::Stopwatch<> stopwatch("scene-models-revalidation", _timekeeper);
+            instrumentation::Stopwatch<> stopwatch("models-revalidation", _timekeeper);
             _scene->revalidateModels(_epochNumber);
         }
 

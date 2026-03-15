@@ -145,7 +145,7 @@ namespace minire::rasterizer
     public:
         void draw(glm::mat4 const & projection) override
         {
-            tryRevalidate();
+            revalidate();
 
             _program.use();
             _program.setProjUniform(projection);
@@ -160,7 +160,7 @@ namespace minire::rasterizer
         }
 
     private:
-        void tryRevalidate()
+        void revalidate() override
         {
             if (invalidated())
             {
@@ -183,7 +183,7 @@ namespace minire::rasterizer
                     _vertexBuffer.reload(buildMesh());
                 }
 
-                revalidate();
+                Object::revalidate();
             }
         }
 

@@ -59,6 +59,9 @@ namespace minire::utils
             invalidate();
         }
 
+        // NOTE: Descendants should also call Object::revalidate()
+        virtual void revalidate() { _flags = 0; }
+
     protected:
         static constexpr Mask mkMask(size_t index)
         {
@@ -72,12 +75,6 @@ namespace minire::utils
 
         void invalidate() { _flags = kAllFlags; }
         void invalidate(Mask mask) { _flags |= mask; }
-
-        void revalidate() { _flags = 0; }
-
-        // TODO: maybe add pure abstract tryRevalidate(),
-        //       (to enforce revalidation routines). Shouldn't be
-        //       expensive, for final classes.
 
     protected:
         Model & model(Mask mask)

@@ -175,7 +175,7 @@ namespace minire::rasterizer
         {
             static const std::array<GLint, 3> kTextureUnits{0, 1, 2};
 
-            tryRevalidate();
+            revalidate();
 
             _program.use();
 
@@ -211,7 +211,7 @@ namespace minire::rasterizer
             );
         }
 
-        void tryRevalidate()
+        void revalidate() override
         {
             if (invalidated())
             {
@@ -259,7 +259,7 @@ namespace minire::rasterizer
                     _vertexBuffer = std::make_unique<labels::VertexBuffer>(vertices);
                 }
 
-                revalidate();
+                Object::revalidate();
             }
         }
 
