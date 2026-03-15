@@ -6,7 +6,7 @@
 
 #include <opengl.hpp>
 #include <rasterizer/materials/pbr.hpp>
-#include <scene.hpp>
+#include <scene-impl.hpp>
 #include <utils/frustum.hpp>
 
 #include <glm/gtx/transform.hpp>

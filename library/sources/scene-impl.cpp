@@ -1,6 +1,6 @@
 // TODO: this class is a mess, should refactor it
 
-#include <scene.hpp>
+#include <scene-impl.hpp>
 
 #include <rasterizer.hpp>
 #include <rasterizer/constants.hpp>

@@ -4,7 +4,7 @@
 #include <codegen/plugins/skinning.hpp>
 #include <codegen/plugins/vertex-position.hpp>
 #include <rasterizer/mesh.hpp>
-#include <scene.hpp>
+#include <scene-impl.hpp>
 
 #include <minire/errors.hpp>
 

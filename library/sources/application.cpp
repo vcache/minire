@@ -10,7 +10,7 @@
 
 #include <opengl.hpp>
 #include <rasterizer.hpp>
-#include <scene.hpp>
+#include <scene-impl.hpp>
 #include <scene/gltf-instantiator.hpp>
 #include <scene/viewpoint.hpp>
 #include <text/measurer.hpp>

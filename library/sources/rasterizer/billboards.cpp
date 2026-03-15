@@ -13,7 +13,7 @@
 #include <rasterizer/labels/vertex-buffer.hpp>
 #include <rasterizer/sprites/vertex-buffer.hpp>
 #include <rasterizer/textures.hpp>
-#include <scene.hpp>
+#include <scene-impl.hpp>
 #include <utils/overloaded.hpp>
 
 #include <glm/mat4x4.hpp>

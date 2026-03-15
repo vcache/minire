@@ -5,7 +5,7 @@
 #include <minire/logging.hpp>
 
 #include <rasterizer/resources.hpp>
-#include <scene.hpp>
+#include <scene-impl.hpp>
 
 #include <cassert>
 #include <algorithm>
