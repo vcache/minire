@@ -9,6 +9,7 @@ namespace minire
 {
     class Label
         : public utils::Object<Label, models::Label>
+        , public utils::Detachable
     {
     protected:
         static constexpr size_t kText           = mkMask(0);

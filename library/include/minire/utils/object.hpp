@@ -25,24 +25,11 @@ namespace minire::utils
             : _name(name)
             , _model(std::move(model))
             , _flags(0)
-            , _detached(false)
         {}
 
         virtual ~Object() = default;
 
     public:
-        virtual void detach()
-        {
-            _detached = true;
-        }
-
-        // If true, the detaching is pended and will be performed
-        // during the next rendering iteration.
-        bool detached() const
-        {
-            return _detached;
-        }
-
         std::string const & name() const { return _name; }
 
     public:
@@ -106,8 +93,27 @@ namespace minire::utils
         std::string const _name;
         Model             _model;
         Mask              _flags = 0;
-        bool              _detached = false;
         bool              _allowPropagation = false; // TODO: get rid of this hack
+    };
+
+    // A helper for detachable-objects
+    class Detachable
+    {
+    public:
+        void detach()
+        {
+            _detached = true;
+        }
+
+        // If true, the detaching is pended and will be performed
+        // during the next rendering iteration.
+        bool detached() const
+        {
+            return _detached;
+        }
+
+    private:
+        bool _detached = false;
     };
 
     // A helper for RAII-style lifecycle of an Object

@@ -9,6 +9,7 @@ namespace minire
 {
     class Sprite
         : public utils::Object<Sprite, models::Sprite>
+        , public utils::Detachable
     {
     protected:
         static constexpr size_t kTexture        = mkMask(0);

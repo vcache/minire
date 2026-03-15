@@ -216,7 +216,6 @@ namespace minire
             using Sptr = std::shared_ptr<Derived>;
             using Wptr = std::weak_ptr<Derived>;
 
-            using ObjectType::detach;
             using ObjectType::name;
 
             explicit Leaf(std::string name,
@@ -228,8 +227,6 @@ namespace minire
 
             scene::Node::Wptr parent() const override { return _parent; }
             void setParent(scene::Node::Sptr const & newParent) override;
-
-            void detach() override { MINIRE_THROW("detach() shouldn't be called for Scene objects"); }
 
         private:
             void propagate() override { if (auto p = _parent.lock(); p) p->propagate(); }
@@ -437,8 +434,6 @@ namespace minire
 
             void dispose(models::ScenePath const &) override;
             void disposeAll() override;
-
-            void detach() override { MINIRE_THROW("detach() shouldn't be called for Scene objects"); }
 
         private:
             SceneItem find(models::ScenePath const &) const override;
