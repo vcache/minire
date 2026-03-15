@@ -708,7 +708,7 @@ namespace minire::rasterizer
         }, billboard._placement);
     }
 
-    void Billboards::draw(Scene const & scene) const
+    void Billboards::draw(SceneImpl const & scene) const
     {
         scene::Viewpoint const & viewpoint = scene.viewpoint();
         assert(viewpoint.hasCamera());

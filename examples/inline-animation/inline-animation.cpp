@@ -1,55 +1,53 @@
 #include "../common/testbed.hpp"
 
 #include <minire/models/animations.hpp>
-#include <minire/models/mesh.hpp>
 
 #include <cstdlib> // for EXIT_SUCCESS
 
 namespace
 {
     class InlineAnimation
-        : public minire::examples::TestbedController
+        : public minire::examples::TestbedApplication
     {
     public:
-        using TestbedController::TestbedController;
+        using TestbedApplication::TestbedApplication;
 
-        void start() override
+        void onStart() override
         {
-            using namespace minire::content;
-            using namespace minire::events::controller;
-            using namespace minire::models;
+            using namespace minire;
 
-            TestbedController::start();
+            TestbedApplication::onStart();
 
-            enqueue<SceneNewNode>("cube-node", ScenePath(), Transform(), true);
-            enqueue<SceneNewMesh>("cube-mesh", ScenePath{"cube-node"},
-                Mesh
+            auto cubeNode = scene().root().newNode(models::Node{models::Transform(), true});
+            cubeNode->newMesh(
+                models::Mesh
                 {
-                    ._source = mkPath("Box.glb", path::Special::kMeshes, path::Index(0)),
+                    ._source = content::mkPath(
+                        "Box.glb", content::path::Special::kMeshes, content::path::Index(0)),
                     ._defaultMaterial = nullptr,
-                },
-                true);
+                    ._skin = std::nullopt,
+                    ._visible = true,
+                });
 
-            enqueue<SceneInlineAnimation>(
-                ScenePath{"cube-node"},
-                AnimationTracks
+            cubeNode->inlineAnimation(
+                models::AnimationTracks
                 {
                     {
-                        ScenePath{},
-                        KeyframeAnimation
+                        models::NodePointer(cubeNode),
+                        models::KeyframeAnimation
                         {
                             ._timeline = std::make_shared<std::vector<float>>(std::vector<float>{0, 5}),
-                            ._translation = KeyframeAnimation::Track<glm::vec3>(
+                            ._translation = models::KeyframeAnimation::Track<glm::vec3>(
                                 {
                                     glm::vec3(0, 0, 0), glm::vec3(5, 5, 5),
                                 },
-                                Interpolation::kLinear),
+                                models::Interpolation::kLinear),
                             ._rotation = std::nullopt,
                             ._scale = std::nullopt,
                         },
                     }
                 },
-                ScenePlayAnimation::kInfinitely,
+                scene::Node::kInfinitely,
                 1.0f);
         }
     };

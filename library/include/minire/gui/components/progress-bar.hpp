@@ -1,13 +1,13 @@
 #pragma once
 
 #include <minire/gui/component.hpp>
-#include <minire/gui/content-view.hpp>
+#include <minire/gui/components/image.hpp>
 #include <minire/utils/rect.hpp>
 
 namespace minire::gui::components
 {
     class ProgressBar final
-        : public Component
+        : public Image
     {
     public:
         using Sptr = std::shared_ptr<ProgressBar>;
@@ -27,11 +27,11 @@ namespace minire::gui::components
                     OverlayController &,
                     Direction const);
 
-        Property<ImageView::Sptr> const & background() const { return _background; }
-        Property<ImageView::Sptr> & background() { return _background; }
+        Property<models::sprite::MaybeImage> const & background() const { return Image::image(); }
+        Property<models::sprite::MaybeImage> & background() { return Image::image(); }
 
-        Property<ImageView::Sptr> const & slider() const { return _slider; }
-        Property<ImageView::Sptr> & slider() { return _slider; }
+        Property<models::sprite::MaybeImage> const & slider() const { assert(_slider); return _slider->image(); }
+        Property<models::sprite::MaybeImage> & slider() { assert(_slider); return _slider->image(); }
 
         Property<float> const & value() const { return _value; }
         Property<float> & value() { return _value; }
@@ -43,6 +43,7 @@ namespace minire::gui::components
         Property<utils::Rect> & sliderPadding() { return _sliderPadding; }
 
     protected:
+        void initialize() override;
         size_t revalidateContent(size_t zOffset,
                                  bool const effectiveVisible,
                                  Area const & contentArea,
@@ -51,10 +52,9 @@ namespace minire::gui::components
         Area evalSliderArea(Area const & contentArea) const;
 
     private:
-        Property<ImageView::Sptr> _background;
-        Property<ImageView::Sptr> _slider;
-        Property<float>           _value;
-        Property<Direction>       _direction;
-        Property<utils::Rect>     _sliderPadding;
+        components::Image::Sptr _slider;
+        Property<float>         _value;
+        Property<Direction>     _direction;
+        Property<utils::Rect>   _sliderPadding;
     };
 }

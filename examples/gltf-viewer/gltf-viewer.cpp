@@ -1,6 +1,5 @@
 #include <minire/application.hpp>
 
-#include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/grips/orbiting.hpp>
 #include <minire/grips/panning.hpp>
@@ -129,63 +128,68 @@ namespace
 namespace
 {
     class GltfViewer
-        : public minire::BasicController
+        : public minire::Application
     {
     public:
-        explicit GltfViewer(minire::content::Manager & contentManager,
-                            Arguments const & arguments)
-            : BasicController(contentManager, 60)
+        template<typename... AppArgs>
+        explicit GltfViewer(Arguments const & arguments,
+                            AppArgs && ... appArgs)
+            : Application(std::forward<AppArgs>(appArgs)...)
             , _arguments(arguments)
-            , _camera{._yFov = glm::radians(45.0f),
-                      ._zNear = 0.001f,
-                      ._zFar = 1000.0f,
-                      ._aspectRatio = std::nullopt}
             , _target(0.0f, 0.0f, 0.0f)
             , _orbiting(_target, 10)
         {}
 
-        void start() override
+        void onStart() override
         {
             using namespace minire::content;
-            using namespace minire::events::controller;
             using namespace minire::models;
 
-            _orbiting.evaluate(_cameraTransform);
-            enqueue<SceneNewNode>("cam-node", ScenePath(), _cameraTransform, true);
-            enqueue<SceneNewPerspectiveCamera>("cam", ScenePath{"cam-node"}, _camera, true);
-            enqueue<SceneActivateCamera>(ScenePath{"cam-node", "cam"});
+            Application::onStart();
 
-            enqueue<SceneNewNode>("light-node", ScenePath(), Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
-            enqueue<SceneNewPointLight>("bulb", ScenePath{"light-node"}, PointLight(glm::vec4(1, 1, 1, 500), 2), true);
+            Transform initialCameraTransform;
+            _orbiting.evaluate(initialCameraTransform);
 
-            enqueue<SceneNewNode>("target-node", ScenePath(), minire::models::Transform(), true);
+            _cameraNode = scene().root().newNode(Node{initialCameraTransform, true});
+            _camera = _cameraNode->newPerspectiveCamera(
+                minire::models::PerspectiveCamera
+                {
+                    ._yFov = glm::radians(45.0f),
+                    ._zNear = 0.001f,
+                    ._zFar = 1000.0f,
+                    ._aspectRatio = std::nullopt,
+                    ._visible = true,
+                });
+            _camera->activate();
+
+            auto lightNode = scene().root().newNode(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
+            lightNode->newPointLight(PointLight(glm::vec4(1, 1, 1, 500), 2, std::nullopt, true));
+
+            auto targetNode = scene().root().newNode("target", Node{minire::models::Transform(), true});
             if (_arguments._scene != kNoIndex)
             {
-                enqueue<SceneNewFromSource>(ScenePath{"target-node"},
-                                            mkPath(_arguments._filename,
-                                                   path::Special::kScenes,
-                                                   path::Index(_arguments._scene)),
-                                            true);
+                targetNode->newFromSource(mkPath(_arguments._filename,
+                                                 path::Special::kScenes,
+                                                 path::Index(_arguments._scene)),
+                                          contentManager(), true);
             }
             else if (_arguments._node != kNoIndex)
             {
-                enqueue<SceneNewFromSource>(ScenePath{"target-node"},
-                                            mkPath(_arguments._filename,
-                                                   path::Special::kNodes,
-                                                   path::Index(_arguments._node)),
-                                            true);
+                targetNode->newFromSource(mkPath(_arguments._filename,
+                                                 path::Special::kNodes,
+                                                 path::Index(_arguments._node)),
+                                          contentManager(), true);
             }
             else if (_arguments._mesh != kNoIndex)
             {
                 // NOTE: in a case of meshes, there are two ways to achieve same result
 #if 1
-                enqueue<SceneNewFromSource>(ScenePath{"target-node"},
-                                            mkPath(_arguments._filename,
-                                                   path::Special::kMeshes,
-                                                   path::Index(_arguments._mesh)),
-                                            true);
+                targetNode->newFromSource(mkPath(_arguments._filename,
+                                                 path::Special::kMeshes,
+                                                 path::Index(_arguments._mesh)),
+                                          contentManager(), true);
 #else
-                enqueue<SceneNewMesh>("cube", ScenePath{"target-node"},
+                targetNode->newFromSource(
                     Mesh
                     {
                         ._source = mkPath(_arguments._filename,
@@ -194,102 +198,117 @@ namespace
                         ._defaultMaterial = _arguments._setDefaultMaterial
                             ? std::make_shared<minire::models::PbrMaterial>()
                             : minire::material::Model::Sptr()
+                        ._skin = std::nullopt,
+                        ._visible = true,
                     },
                     true);
 #endif
             }
             else
             {
-                enqueue<SceneNewFromSource>(ScenePath{"target-node"},
-                                            mkPath(_arguments._filename),
-                                            true);
+                targetNode->newFromSource(mkPath(_arguments._filename), contentManager(), true);
             }
 
             if (!_arguments._animationName.empty())
             {
                 minire::models::ScenePath containerNode;
                 boost::split(containerNode, _arguments._animationSceneNode, boost::is_any_of("/"));
-                enqueue<ScenePlayAnimation>(_arguments._animationName,
-                                            containerNode,
-                                            _arguments._animationRepeats,
-                                            _arguments._animationScale);
+                scene().root().at<minire::scene::Node>(containerNode)
+                              .playAnimation(_arguments._animationName,
+                                             _arguments._animationRepeats,
+                                             _arguments._animationScale);
             }
         }
 
-        bool handle(minire::events::application::OnMouseMove const & event) override
+        bool handle(minire::application::OnMouseMove const & e) override
         {
-            using namespace minire::events::controller;
             using namespace minire::models;
 
+            if (Application::handle(e))
+                return true;
+
             bool updated = false;
-            if (event._left)
+            if (e._left)
             {
-                _orbiting.updateAngles(0.01f * static_cast<float>(event._relX),
-                                       0.01f * static_cast<float>(event._relY));
+                _orbiting.updateAngles(0.01f * static_cast<float>(e._relX),
+                                       0.01f * static_cast<float>(e._relY));
                 updated = true;
             }
-            else if (event._right && _panning)
+            else if (e._right && _panning)
             {
-                _orbiting.target() = _panning.update(event._absX, event._absY,
-                                                     _cameraTransform.matrix(),
-                                                     _target, _camera, _windowSize,
-                                                     _cameraTransform._translation);
+                _orbiting.target() = _panning.update(e._absX, e._absY,
+                                                     _cameraNode->origin().matrix(),
+                                                     _target, _camera->model(), _windowSize,
+                                                     _cameraNode->origin()._translation);
                 updated = true;
             }
 
             if (updated)
             {
-                _orbiting.evaluate(_cameraTransform);
-                enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
+                _orbiting.evaluate(_cameraNode->origin());
             }
 
             return true;
         }
 
-        bool handle(minire::events::application::OnMouseDown const & e) override
+        bool handle(minire::application::OnMouseDown const & e) override
         {
+            if (Application::handle(e))
+                return true;
+
             if (e._mouseButton == minire::models::MouseButton::kRight)
             {
                 _panning.start(e._x, e._y);
             }
+
             return true;
         }
 
-        bool handle(minire::events::application::OnMouseUp const &) override
+        bool handle(minire::application::OnMouseUp const & e) override
         {
+            if (Application::handle(e))
+                return true;
+
             if (_panning)
             {
                 _panning.finish(_target);
             }
+
             return true;
         }
 
-        bool handle(minire::events::application::OnMouseWheel const & event) override
+        bool handle(minire::application::OnMouseWheel const & e) override
         {
-            using namespace minire::events::controller;
             using namespace minire::models;
 
-            _orbiting.updateDistance(-0.5f * event._dy);
-            _orbiting.evaluate(_cameraTransform);
-            enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
+            if (Application::handle(e))
+                return true;
+
+            _orbiting.updateDistance(-0.5f * e._dy);
+            _orbiting.evaluate(_cameraNode->origin());
 
             return true;
         }
 
-        void handle(minire::events::application::OnResize const & e) override
+        bool handle(minire::application::OnResize const & e) override
         {
+            if (Application::handle(e))
+                return true;
+
             _windowSize.x = static_cast<float>(e._width);
             _windowSize.y = static_cast<float>(e._height);
+
+            return true;
         }
 
     private:
-        Arguments const &                       _arguments;
-        minire::models::PerspectiveCamera const _camera;
-        minire::models::Transform               _cameraTransform;
-        glm::vec3                               _target;
-        minire::grips::Orbiting                 _orbiting;
-        minire::grips::Panning<false>           _panning;
-        glm::vec2                               _windowSize;
+        Arguments const &                      _arguments;
+        minire::scene::Node::Sptr              _cameraNode;
+        minire::scene::PerspectiveCamera::Sptr _camera;
+        glm::vec3                              _target;
+        minire::grips::Orbiting                _orbiting;
+        minire::grips::Panning<false>          _panning;
+        glm::vec2                              _windowSize;
     };
 }
 
@@ -324,8 +343,7 @@ int main(int argc, char ** argv)
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
 
         // Create and run the Application and its Controller
-        minire::Application application(1280, 720, "gLTF Viewer", manager);
-        application.setController<GltfViewer>(arguments);
+        GltfViewer application(arguments, 1280, 720, "gLTF Viewer", manager);
         application.setVsync(true);
         application.setGlDebug(false);
 

@@ -3,10 +3,10 @@
 #include <minire/content/id.hpp>
 #include <minire/content/path.hpp>
 #include <minire/errors.hpp>
-#include <minire/events/controller/scene.hpp>
 #include <minire/material.hpp>
 #include <minire/models/scene-path.hpp>
 #include <minire/models/transform.hpp>
+#include <minire/scene.hpp>
 
 #include <scene/animations.hpp>
 #include <scene/viewpoint.hpp>
@@ -27,44 +27,28 @@ namespace minire
     class Rasterizer;
 
     /**
+     * TODO: why are they split? Maybe make a single public call
      * Main loop's expected call sequence:
      *
+     *  revalidateModels()  // mandatory
      *  advanceAnimations() // optional
      *  lerp()              // optional (mandatory if animations advanced)
      *  revalidateNode()    // mandatory
      *  cullModels(...)
      *
      * */
-    class Scene
+    class SceneImpl
+        : public Scene
     {
     public:
-        explicit Scene(Rasterizer &);
+        explicit SceneImpl(Rasterizer &);
 
     public:
-        void handle(events::controller::SceneReset const &);
-        void handle(events::controller::SceneDispose const &);
-        void handle(events::controller::SceneActivateCamera const &);
-        void handle(events::controller::SceneSetAmbientLight const &);
-        void handle(events::controller::SceneNewNode const &);
-        void handle(events::controller::SceneNewMesh const &);
-        void handle(events::controller::SceneNewDirectionalLight const &);
-        void handle(events::controller::SceneNewPointLight const &);
-        void handle(events::controller::SceneNewPerspectiveCamera const &);
-        void handle(events::controller::SceneNewOrthographicCamera const &);
-        void handle(events::controller::SceneNewBillboard const &);
-        void handle(events::controller::SceneSetParent const &);
-        void handle(events::controller::SceneSetVisibility const &);
-        void handle(events::controller::SceneSetTransform const &, size_t epochNumber);
-        void handle(events::controller::SceneSetDirectionalLight const &, size_t epochNumber);
-        void handle(events::controller::SceneSetPointLight const &, size_t epochNumber);
-        void handle(events::controller::SceneSetPerspectiveCamera const &, size_t epochNumber);
-        void handle(events::controller::SceneSetOrthographicCamera const &, size_t epochNumber);
-        void handle(events::controller::SceneSetMeshEmissiveFactor const &);
-        void handle(events::controller::SceneSetMeshSkin const &);
-        void handle(events::controller::SceneNewAnimationSet const &);
-        void handle(events::controller::ScenePlayAnimation const &);
-        void handle(events::controller::SceneStopAnimation const &);
-        void handle(events::controller::SceneInlineAnimation const &);
+        scene::Node & root() const override;
+
+        void setActiveCamera(models::ScenePath const &) override;
+
+        void reset() override;
 
     public:
         void setViewport(size_t width, size_t height);
@@ -73,31 +57,36 @@ namespace minire
 
         void lerp(float weight, size_t epochNumber);
 
+        void revalidateModels(size_t epochNumber);
+
         void revalidateNodes();
 
         bool advanceAnimations(float delta /* seconds */, size_t epochNumber);
 
     public:
+        // TODO: implement detached() mechanism
+
         template<typename Callable>
         void cullModels(Callable callable) const
         {
             auto it = _meshLeaves.begin();
             while(it != _meshLeaves.end())
             {
-                if (auto mesh = it->lock();
-                    mesh)
+                if (auto const & mesh = *it;
+                    mesh && !mesh->detached())
                 {
-                    if (mesh->_visible)
+                    if (mesh->visible())
                     {
                         // estimate a pivot (origin) point of a model
-                        auto parent = mesh->_skinOrigin.lock();
-                        if (!parent) parent = mesh->_parent.lock();
-                        MINIRE_INVARIANT(parent, "a mesh doesn't have a parent");
+                        auto parent = mesh->_skinOrigin;
+                        if (!parent || parent->detached()) parent = mesh->_parent.lock();
+                        MINIRE_INVARIANT(parent && !parent->detached(),
+                                         "a mesh doesn't have a parent");
                         assert(parent->hasGlobalTransform());
 
                         // perform rendering
                         assert(mesh->_mesh);
-                        callable(*mesh->_mesh, mesh->_emissiveFactor,
+                        callable(*mesh->_mesh, mesh->emissiveFactor(),
                                  parent->_globalTransform,
                                  makeSkinningVector(*mesh));
                     }
@@ -117,10 +106,10 @@ namespace minire
             auto it = _billboardsLeaves.begin();
             while(it != _billboardsLeaves.end())
             {
-                if (auto billboard = it->second.lock();
-                    billboard)
+                if (auto const & billboard = it->second;
+                    billboard && !billboard->detached())
                 {
-                    if (billboard->_visible)
+                    if (billboard->visible())
                     {
                         auto parent = billboard->_parent.lock();
                         MINIRE_INVARIANT(parent, "a billboard doesn't have a parent");
@@ -148,10 +137,10 @@ namespace minire
             auto it = _directionalLightLeaves.begin();
             while(it != _directionalLightLeaves.end() && index < limit)
             {
-                if (auto directionalLight = it->lock();
-                    directionalLight)
+                if (auto const & directionalLight = *it;
+                    directionalLight && !directionalLight->detached())
                 {
-                    if (directionalLight->_visible)
+                    if (directionalLight->visible())
                     {
                         auto parent = directionalLight->_parent.lock();
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
@@ -186,10 +175,10 @@ namespace minire
             auto it = _pointLightLeaves.begin();
             while(it != _pointLightLeaves.end() && index < limit)
             {
-                if (auto pointLight = it->lock();
-                    pointLight)
+                if (auto const & pointLight = *it;
+                    pointLight && !pointLight->detached())
                 {
-                    if (pointLight->_visible)
+                    if (pointLight->visible())
                     {
                         auto parent = pointLight->_parent.lock();
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
@@ -212,80 +201,206 @@ namespace minire
             return index;
         }
 
-        glm::vec3 const & ambientLight() const { return _ambientLight; }
-
     private:
         void updateGlobalTransforms();
         void actualizeViewpoint();
 
     private:
-        struct Node;
+        class Node;
 
-        template<typename T>
-        struct Leaf : public T
+        template<typename Derived,
+                 typename ObjectType>
+        class Leaf
+            : public ObjectType
+            , public std::enable_shared_from_this<Derived>
         {
+        public:
+            using Sptr = std::shared_ptr<Derived>;
+
+            using ObjectType::detach;
+            using ObjectType::name;
+
+            explicit Leaf(std::string name,
+                          typename ObjectType::ModelType const & model,
+                          std::weak_ptr<Node> parent)
+                : ObjectType(std::move(name), model)
+                , _parent(parent)
+            {}
+
+            scene::Node::Wptr parent() const override { return _parent; }
+            void setParent(scene::Node::Sptr const & newParent) override;
+
+            virtual void revalidateModel(size_t epochNumber) = 0; // TODO: move it into Object?
+
+        private:
             std::weak_ptr<Node> _parent;
-            bool                _visible = true;
             bool                _activated = false;
 
-            using Sptr = std::shared_ptr<Leaf>;
-            using Wptr = std::weak_ptr<Leaf>;
-
-            explicit Leaf(typename T::ElementType const & init,
-                          std::weak_ptr<Node> parent,
-                          bool visible)
-                : T(init)
-                , _parent(parent)
-                , _visible(visible)
-            {}
+            friend class SceneImpl;
         };
 
-        struct Mesh
+        // TODO: maybe model() shouldn't be stored at all (if it is only used at ctor)?
+        class MeshLeaf final
+            : public Leaf<MeshLeaf, scene::Mesh>
         {
-            using ElementType = std::shared_ptr<rasterizer::Mesh>;
+        public:
+            explicit MeshLeaf(std::string name,
+                              models::Mesh const & model,
+                              std::weak_ptr<Node> parent,
+                              std::shared_ptr<rasterizer::Mesh> const & mesh)
+                : Leaf(std::move(name), model, parent)
+                , _mesh(mesh)
+            {}
 
+            bool lerp(float, size_t) { return false; } // just for compatibility
+
+            // TODO: lerpable _emissiveFactor
+
+            void revalidateModel(size_t epochNumber) override;
+
+        private:
             struct SkinBone
             {
-                glm::mat4 const     _inverseBindMatrix;
-                std::weak_ptr<Node> _node;
+                glm::mat4 const       _inverseBindMatrix;
+                std::shared_ptr<Node> _node; // TODO: too many detached() checks
             };
             using SkinBones = std::vector<SkinBone>;
 
-            ElementType         _mesh;
-            SkinBones           _skinBones;
-            std::weak_ptr<Node> _skinOrigin;
-            glm::vec3           _emissiveFactor = glm::vec3(0); // TODO: is not lerpable?
+            std::shared_ptr<rasterizer::Mesh> _mesh;
+            SkinBones                         _skinBones;
+            std::shared_ptr<Node>             _skinOrigin; // TODO: too many detached() checks
 
-            explicit Mesh(ElementType const & mesh)
-                : _mesh(mesh)
-            {}
-
-            bool lerp(float, size_t) { return false; } // just for compatibility
+            friend class SceneImpl;
         };
 
-        struct Billboard
+        // TODO: DirectionalLightLeaf, PointLightLeaf, PerspectiveCameraLeaf, and OrthographicCameraLeaf
+        //       can be templatized
+
+        class DirectionalLightLeaf final
+            : public Leaf<DirectionalLightLeaf, scene::DirectionalLight>
+            , public utils::Lerpable<models::DirectionalLight>
         {
-            using ElementType = std::shared_ptr<rasterizer::Billboard>;
+        public:
+            explicit DirectionalLightLeaf(std::string name,
+                                          models::DirectionalLight const & model,
+                                          std::weak_ptr<Node> parent,
+                                          SceneImpl & scene)
+                : Leaf(std::move(name), model, parent)
+                , Lerpable(model)
+                , _scene(scene)
+            {}
 
-            ElementType _billboard;
+            // TODO: class Lerpable::Update during invalidation()
 
-            explicit Billboard(ElementType const & billboard)
-                : _billboard(billboard)
+            void revalidateModel(size_t epochNumber) override;
+
+        private:
+            SceneImpl & _scene;
+        };
+
+        class PointLightLeaf final
+            : public Leaf<PointLightLeaf, scene::PointLight>
+            , public utils::Lerpable<models::PointLight>
+        {
+        public:
+            explicit PointLightLeaf(std::string name,
+                                    models::PointLight const & model,
+                                    std::weak_ptr<Node> parent,
+                                    SceneImpl & scene)
+                : Leaf(std::move(name), model, parent)
+                , Lerpable(model)
+                , _scene(scene)
+            {}
+
+            // TODO: class Lerpable::Update during invalidation()
+
+            void revalidateModel(size_t epochNumber) override;
+
+        private:
+            SceneImpl & _scene;
+        };
+
+        class PerspectiveCameraLeaf final
+            : public Leaf<PerspectiveCameraLeaf, scene::PerspectiveCamera>
+            , public utils::Lerpable<models::PerspectiveCamera>
+        {
+        public:
+            explicit PerspectiveCameraLeaf(std::string name,
+                                           models::PerspectiveCamera const & model,
+                                           std::weak_ptr<Node> parent,
+                                           SceneImpl & scene)
+                : Leaf(std::move(name), model, parent)
+                , Lerpable(model)
+                , _scene(scene)
+            {}
+
+            void activate() override;
+
+            // TODO: class Lerpable::Update during invalidation()
+
+            void revalidateModel(size_t epochNumber) override;
+
+        private:
+            SceneImpl & _scene;
+        };
+
+        class OrthographicCameraLeaf final
+            : public Leaf<OrthographicCameraLeaf, scene::OrthographicCamera>
+            , public utils::Lerpable<models::OrthographicCamera>
+        {
+        public:
+            explicit OrthographicCameraLeaf(std::string name,
+                                            models::OrthographicCamera const & model,
+                                            std::weak_ptr<Node> parent,
+                                            SceneImpl & scene)
+                : Leaf(std::move(name), model, parent)
+                , Lerpable(model)
+                , _scene(scene)
+            {}
+
+            void activate() override;
+
+            // TODO: class Lerpable::Update during invalidation()
+
+            void revalidateModel(size_t epochNumber) override;
+
+        private:
+            SceneImpl & _scene;
+        };
+
+        class BillboardLeaf final
+            : public Leaf<BillboardLeaf, scene::Billboard>
+        {
+        public:
+            explicit BillboardLeaf(std::string name,
+                                   models::Billboard model,
+                                   std::weak_ptr<Node> parent,
+                                   std::shared_ptr<rasterizer::Billboard> const & billboard)
+                : Leaf(std::move(name), std::move(model), parent)
+                , _billboard(billboard)
             {}
 
             bool lerp(float, size_t) { return false; } // just for compatibility
+
+            auto const & billboard() const { return _billboard; }
+
+            // TODO: invalidate()
+
+            void revalidateModel(size_t epochNumber) override;
+
+        private:
+            std::shared_ptr<rasterizer::Billboard> _billboard;
+
+            friend class SceneImpl;
         };
 
-        using MeshLeaf = Leaf<Mesh>;
-        using DirectionalLightLeaf = Leaf<utils::Lerpable<models::DirectionalLight>>;
-        using PointLightLeaf = Leaf<utils::Lerpable<models::PointLight>>;
-        using PerspectiveCameraLeaf = Leaf<utils::Lerpable<models::PerspectiveCamera>>;
-        using OrthographicCameraLeaf = Leaf<utils::Lerpable<models::OrthographicCamera>>;
-        using BillboardLeaf = Leaf<Billboard>;
+        void setActiveCamera(PerspectiveCameraLeaf & camera);
+        void setActiveCamera(OrthographicCameraLeaf & camera);
 
+    private:
         struct AnimationTrack
         {
-            std::weak_ptr<Node>            _target;
+            std::shared_ptr<Node>          _target; // TODO: too many detached() checks
             scene::KeyframeAnimation::Sptr _animation;
         };
 
@@ -316,11 +431,76 @@ namespace minire
                             float const speedScale);
         };
 
-        struct Node
+        class Node final
+            : public scene::Node
+            , public std::enable_shared_from_this<Node>
         {
+        public:
             using Sptr = std::shared_ptr<Node>;
             using Wptr = std::weak_ptr<Node>;
 
+            Node(std::string name,
+                 Object::ModelType && model,
+                 Wptr parent,
+                 SceneImpl & scene);
+
+            ~Node() override;
+
+        public:
+            scene::Node::Sptr newNode(std::string const & name, models::Node) override;
+            scene::Mesh::Sptr newMesh(std::string const & name, models::Mesh) override;
+            scene::DirectionalLight::Sptr newDirectionalLight(std::string const & name,
+                                                              models::DirectionalLight) override;
+            scene::PointLight::Sptr newPointLight(std::string const & name,
+                                                  models::PointLight) override;
+            scene::PerspectiveCamera::Sptr newPerspectiveCamera(std::string const & name,
+                                                                models::PerspectiveCamera) override;
+            scene::OrthographicCamera::Sptr newOrthographicCamera(std::string const & name,
+                                                                  models::OrthographicCamera) override;
+            scene::Billboard::Sptr newBillboard(std::string const & name,
+                                                models::Billboard) override;
+
+            void newFromSource(content::Path const &,
+                               content::Manager &,
+                               bool visible) override;
+
+        public:
+            void newAnimationSet(models::AnimationSet animationSet) override;
+            void playAnimation(models::AnimationId const &, size_t repeats, float speedScale) override;
+            void stopAnimation() override;
+            void inlineAnimation(models::AnimationTracks animationTracks,
+                                 size_t repeats, float speedScale) override;
+
+        public:
+            size_t size() const override { return _children.size(); }
+            bool empty() const override { return _children.empty(); }
+
+            scene::Node::Wptr parent() const override { return _parent; }
+            void setParent(scene::Node::Sptr const & newParent) override;
+
+            void dispose(models::ScenePath const &) override;
+            void disposeAll() override;
+
+        private:
+            SceneItem find(models::ScenePath const &) const override;
+
+        private:
+            bool lerp(float weight, size_t epochNumber);
+
+            bool hasGlobalTransform() const
+            {
+                return GlobalTransformState::kClean == _globalTransformState;
+            }
+
+            // TODO: impl model() invalidation
+
+            void invalidateGlobalTransform();
+            void deactiveChildrenAnimation();
+            void activeChildrenAnimation();
+
+            void revalidateModel(size_t epochNumber);
+
+        private:
             using Child = std::variant<Node::Sptr,
                                        MeshLeaf::Sptr,
                                        DirectionalLightLeaf::Sptr,
@@ -339,65 +519,68 @@ namespace minire
                 kGrey,  // own is clean, but some children are outdated
             };
 
-            Scene                 & _scene;
-            LerpableTransform       _localTransform;
-            glm::vec3               _globalPosition;
-            glm::mat4               _globalTransform;
-            Wptr                    _parent;
-            ChildrenMap             _children;
-            AnimationSet            _animationSet;
-            ActiveAnimation::Uptr   _activeAnimation;
-            GlobalTransformState    _globalTransformState = GlobalTransformState::kDirty;
-            bool                    _visible = true;
-            bool                    _activated = false; // for _localTransform
-            bool                    _childActivated = false;
-            bool                    _hasActiveChildrenAnimation = false;
+            SceneImpl           & _scene;
+            LerpableTransform     _localTransform;
+            glm::vec3             _globalPosition;
+            glm::mat4             _globalTransform;
+            Wptr                  _parent;
+            ChildrenMap           _children;
+            AnimationSet          _animationSet;
+            ActiveAnimation::Uptr _activeAnimation;
+            GlobalTransformState  _globalTransformState = GlobalTransformState::kDirty;
+            bool                  _visible = true;
+            bool                  _activated = false; // for _localTransform
+            bool                  _childActivated = false;
+            bool                  _hasActiveChildrenAnimation = false;
+            // TODO: use  Object's flags instead all these bools
 
-            Node(Scene & scene, models::Transform,
-                 Wptr parent, bool visible);
-
-            ~Node();
-
-            bool lerp(float weight, size_t epochNumber);
-
-            bool hasGlobalTransform() const
+        private:
+            struct ItemIterator
             {
-                return GlobalTransformState::kClean == _globalTransformState;
-            }
+                Node const *                _parent;
+                ChildrenMap::const_iterator _iterator;
+
+                bool empty() const { return !_parent || _iterator == _parent->_children.cend(); }
+                auto const & item() const { assert(!empty()); return _iterator->second; }
+                void erase()
+                {
+                    assert(!empty());
+                    const_cast<Node *>(_parent)->_children.erase(_iterator);
+                }
+            };
+
+            ItemIterator findIterator(models::ScenePath const &) const;
+
+            // NOTE: empty path points to the _root,
+            // Will throw if path incorrect, otherwise result guranteed to correct.
+            template<typename T>
+            typename T::Sptr const & findInternal(models::ScenePath const &) const;
+
+            Node::Sptr nodeFromPointer(models::NodePointer const &) const;
+
+            friend class SceneImpl;
         };
 
         using ActiveCamera = std::variant<std::monostate,
-                                          PerspectiveCameraLeaf::Wptr,
-                                          OrthographicCameraLeaf::Wptr>;
+                                          PerspectiveCameraLeaf::Sptr,
+                                          OrthographicCameraLeaf::Sptr>;
 
     private:
-        using BillboardsLeafRecord = std::pair<size_t, BillboardLeaf::Wptr>;
+        using BillboardsLeafRecord = std::pair<size_t, BillboardLeaf::Sptr>;
 
-        using MeshLeaves = std::list<MeshLeaf::Wptr>;
+        using MeshLeaves = std::list<MeshLeaf::Sptr>;
         using BillboardsLeaves = std::list<BillboardsLeafRecord>;
-        using DirectionalLightLeaves = std::list<DirectionalLightLeaf::Wptr>;
-        using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
-
-        using ChildIterator = std::pair<Node::Sptr, Node::ChildrenMap::iterator>;
-
-        // NOTE: empty path points to the _root,
-        // Will throw if path incorrect, otherwise result guranteed to correct.
-        template<typename T>
-        T find(models::ScenePath const &);
+        using DirectionalLightLeaves = std::list<DirectionalLightLeaf::Sptr>;
+        using PointLightLeaves = std::list<PointLightLeaf::Sptr>;
 
         template<typename T>
         void activate(T &);
 
         void activateParents(Node::Sptr);
 
-        void activeChildrenAnimation(Node::Sptr);
-        void deactiveChildrenAnimation(Node::Sptr);
+        material::SkinningVector makeSkinningVector(MeshLeaf const &) const;
 
-        void invalidateGlobalTransform(Node::Sptr);
-
-        material::SkinningVector makeSkinningVector(Mesh const &) const;
-
-        void dump(Node const &, std::string const &, size_t = 0) const;
+        // TODO: lerpable _ambientLight
 
     private:
         Rasterizer                   & _rasterizer;
@@ -405,7 +588,6 @@ namespace minire
         ActiveCamera                   _activeCamera;
         scene::Viewpoint               _viewpoint;
         size_t                         _nodesEstimate = 1;
-        glm::vec3                      _ambientLight = glm::vec3(0.03f);
 
         mutable MeshLeaves             _meshLeaves;
         mutable BillboardsLeaves       _billboardsLeaves;

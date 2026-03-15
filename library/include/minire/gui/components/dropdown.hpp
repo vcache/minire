@@ -3,6 +3,7 @@
 #include <minire/gui/callbacks.hpp>
 #include <minire/gui/component.hpp>
 #include <minire/gui/components/button.hpp>
+#include <minire/gui/components/image.hpp>
 #include <minire/gui/components/listview.hpp>
 #include <minire/gui/layouts/vertical-tool.hpp>
 
@@ -26,7 +27,7 @@ namespace minire::gui::components
 
     // TODO: dont' open tongue on empty list
     class Dropdown final
-        : public Component
+        : public Image
         , public Callback<Dropdown, dropdown::OnSelectionChanged>
     {
     public:
@@ -56,8 +57,8 @@ namespace minire::gui::components
         Button const & dropButton() const { assert(_dropButton); return *_dropButton; }
         Button & dropButton() { assert(_dropButton); return *_dropButton; }
 
-        Property<ImageView::Sptr> const & background() const { return _background; }
-        Property<ImageView::Sptr> & background() { return _background; }
+        Property<minire::models::sprite::MaybeImage> const & background() const { return Image::image(); }
+        Property<minire::models::sprite::MaybeImage> & background() { return Image::image(); }
 
         struct Tongue
         {
@@ -108,7 +109,7 @@ namespace minire::gui::components
             invalidate();
         }
 
-        void handle(gui::events::OnClick const &) override;
+        void handle(gui::OnClick const &) override;
 
     protected:
         void initialize() override;
@@ -136,7 +137,6 @@ namespace minire::gui::components
         using ActiveItemContainerSptr = std::shared_ptr<ActiveItemContainer>;
 
     private:
-        Property<ImageView::Sptr>      _background;
         Property<Tongue>               _tongue;
         Property<Contents>             _contents;
         Property<float>                _lineHeight;

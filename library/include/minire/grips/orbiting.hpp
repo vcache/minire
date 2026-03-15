@@ -15,7 +15,7 @@
 namespace minire::grips
 {
     // TODO: screen resoution to sensitivity
-    // TODO: helpers for events::application::* processing and active camera
+    // TODO: helpers for events::* processing and active camera
     class Orbiting
     {
         constexpr float static kEpsilon = std::numeric_limits<float>::epsilon();

@@ -1,7 +1,5 @@
-#include <minire/application.hpp>
-
 #include <minire/content/manager.hpp>
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 #include <minire/gui/components/button.hpp>
 #include <minire/gui/components/image.hpp>
 #include <minire/gui/layouts/grid.hpp>
@@ -19,17 +17,17 @@ namespace
     static std::string const kFontFace = "ucs-6x13-example";
 
     class GuiButton
-        : public minire::GuiController
+        : public minire::GuiApplication
     {
-        using GuiController::GuiController;
+        using GuiApplication::GuiApplication;
 
     protected:
-        void start() override
+        void onStart() override
         {
-            GuiController::start();
+            GuiApplication::onStart();
 
-            using namespace minire::gui;
             using namespace minire::gui::components;
+            using namespace minire::gui;
             using namespace minire::utils;
 
             // create test cases
@@ -88,7 +86,7 @@ namespace
 
                     auto bg = subContainer->emplace<Image>(
                         fmt::format("bg-{}x{}", row, col),
-                        makeImageView(kAtlas,
+                        minire::models::sprite::Image(kAtlas,
                             NinePatch
                             {
                                 ._boundary = Rect(30, 36, 51, 57),
@@ -138,13 +136,14 @@ namespace
                 // empty content
                 {
                     std::string cellId = fmt::format("{}x{}", row++, i);
-                    auto button = container->at<Component>(cellId).emplace<Button>("btn");
+                    auto button = container->at<Component>(cellId).emplace<Button>("btn", false, false);
                     button->horizontal() = kArrangers[i].first;
                     button->vertical() = kArrangers[i].second;
                     button->setCheckable(isCheckable);
 
-                    button->setCallback(std::in_place_type<events::OnClick>, "foo",
-                                        [cellId](Component &, events::OnClick const &) { MINIRE_INFO("Clicked at {}", cellId); } );
+                    button->setCallback(std::in_place_type<OnClick>, "foo",
+                                        [cellId](Component &, OnClick const &)
+                                        { MINIRE_INFO("Clicked at {}", cellId); } );
 
                     button->setCallback(std::in_place_type<models::checkable::OnCheckedChanged>, "foo",
                         [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
@@ -157,14 +156,15 @@ namespace
                 // icon only
                 {
                     std::string cellId = fmt::format("{}x{}", row++, i);
-                    auto button = container->at<Component>(cellId).emplace<Button>("btn");
+                    auto button = container->at<Component>(cellId).emplace<Button>("btn", false, true);
                     button->horizontal() = kArrangers[i].first;
                     button->vertical() = kArrangers[i].second;
-                    button->icon() = makeImageView(kAtlas, kIconRect);
+                    button->icon() = minire::models::sprite::Image(kAtlas, kIconRect);
                     button->setCheckable(isCheckable);
 
-                    button->setCallback(std::in_place_type<events::OnClick>, "foo",
-                                        [cellId](Component &, events::OnClick const &) { MINIRE_INFO("Clicked at {}", cellId); } );
+                    button->setCallback(std::in_place_type<OnClick>, "foo",
+                                        [cellId](Component &, OnClick const &)
+                                        { MINIRE_INFO("Clicked at {}", cellId); } );
 
                     button->setCallback(std::in_place_type<models::checkable::OnCheckedChanged>, "foo",
                         [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
@@ -177,14 +177,16 @@ namespace
                 // text only
                 {
                     std::string cellId = fmt::format("{}x{}", row++, i);
-                    auto button = container->at<Component>(cellId).emplace<Button>("btn");
+                    auto button = container->at<Component>(cellId).emplace<Button>("btn", true, false);
                     button->horizontal() = kArrangers[i].first;
                     button->vertical() = kArrangers[i].second;
-                    button->text() = makeTextView(caption, kFontFace);
+                    button->text() = caption;
+                    button->fontFace() = kFontFace;
                     button->setCheckable(isCheckable);
 
-                    button->setCallback(std::in_place_type<events::OnClick>, "foo",
-                                        [cellId](Component &, events::OnClick const &) { MINIRE_INFO("Clicked at {}", cellId); } );
+                    button->setCallback(std::in_place_type<OnClick>, "foo",
+                                        [cellId](Component &, OnClick const &)
+                                        { MINIRE_INFO("Clicked at {}", cellId); } );
 
                     button->setCallback(std::in_place_type<models::checkable::OnCheckedChanged>, "foo",
                         [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
@@ -203,17 +205,19 @@ namespace
                     for(float const spacing : {0.0f, 10.0f})
                     {
                         std::string cellId = fmt::format("{}x{}", row++, i);
-                        auto button = container->at<Component>(cellId).emplace<Button>("btn");
+                        auto button = container->at<Component>(cellId).emplace<Button>("btn", true, true);
                         button->horizontal() = kArrangers[i].first;
                         button->vertical() = kArrangers[i].second;
-                        button->text() = makeTextView(caption, kFontFace);
-                        button->icon() = makeImageView(kAtlas, kIconRect);
+                        button->text() = caption;
+                        button->fontFace() = kFontFace;
+                        button->icon() = minire::models::sprite::Image(kAtlas, kIconRect);
                         button->iconLocation() = location;
                         button->iconSpacing() = spacing;
                         button->setCheckable(isCheckable);
 
-                        button->setCallback(std::in_place_type<events::OnClick>, "foo",
-                                            [cellId](Component &, events::OnClick const &) { MINIRE_INFO("Clicked at {}", cellId); } );
+                        button->setCallback(std::in_place_type<OnClick>, "foo",
+                                            [cellId](Component &, OnClick const &)
+                                            { MINIRE_INFO("Clicked at {}", cellId); } );
 
                         button->setCallback(std::in_place_type<models::checkable::OnCheckedChanged>, "foo",
                             [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
@@ -251,8 +255,6 @@ namespace
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
@@ -269,8 +271,7 @@ int main()
                 ._glyphHeight = 13,
             });
 
-        minire::Application application(1280, 720, "GUI Button", manager);
-        application.setController<GuiButton>(kMaxCtrlFps);
+        GuiButton application(1280, 720, "GUI Button", manager);
         application.setGlDebug(false);
         application.setVsync(true);
 

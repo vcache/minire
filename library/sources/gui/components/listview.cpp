@@ -113,40 +113,11 @@ namespace minire::gui::components
                          ListView & listview,
                          size_t index)
                 : Component(id, theme, style, overlayController)
-                , _normalBackground(*this, theme.makeImage("listview", "bg-item-normal", style))
-                , _hoverBackground(*this, theme.makeImage("listview", "bg-item-hovered", style))
-                , _selectedBackground(*this, theme.makeImage("listview", "bg-item-selected", style))
                 , _isSelected(*this, false)
                 , _contents(contents)
                 , _listview(listview)
                 , _index(index)
             {}
-
-            void handle(gui::events::OnMouseEnter const & e) override
-            {
-                invalidateContent();
-                Component::handle(e);
-            }
-
-            void handle(gui::events::OnMouseLeave const & e) override
-            {
-                if (auto const & ptr = _hoverBackground.get(); ptr)
-                {
-                    ptr->setVisible(false);
-                }
-                Component::handle(e);
-            }
-
-            void handle(minire::events::application::OnMouseWheel const & e) override
-            {
-                _listview.scroll(e._dy);
-                Component::handle(e);
-            }
-
-            void handle(gui::events::OnClick const &) override
-            {
-                _listview.select(_index);
-            }
 
             size_t index() const { return _index; }
 
@@ -155,129 +126,103 @@ namespace minire::gui::components
             Property<bool> & isSelected() { return _isSelected; }
 
         protected:
+            void handle(gui::OnMouseEnter const & e) override
+            {
+                updateBackground();
+                Component::handle(e);
+            }
+
+            void handle(gui::OnMouseLeave const & e) override
+            {
+                updateBackground();
+                Component::handle(e);
+            }
+
+            void handle(application::OnMouseWheel const & e) override
+            {
+                _listview.scroll(e._dy);
+                Component::handle(e);
+            }
+
+            void handle(gui::OnClick const &) override
+            {
+                _listview.select(_index);
+            }
+
+            void updateBackground()
+            {
+                bool const isReallyHovered = isHovered();
+
+                assert(_normalBackground);
+                _normalBackground->visible() = !_isSelected.get() && !isReallyHovered;
+
+                assert(_hoverBackground);
+                _hoverBackground->visible() = !_isSelected.get() && isReallyHovered;
+
+                assert(_selectedBackground);
+                _selectedBackground->visible() = _isSelected.get();
+            }
+
             void initialize() override
             {
                 auto sharedFromThis = shared_from_this();
 
-                if (auto const & ptr = _normalBackground.get(); ptr)
-                {
-                    ptr->setContentInvalidator(sharedFromThis);
-                    ptr->setVisible(!_isSelected.get() && isHovered());
-                }
+                // TODO: cascaded style
+                // TODO: MaybeImage ?
+                _normalBackground = emplace<Image>("__normal-bg__",
+                    theme().parameter<minire::models::sprite::MaybeImage>("listview", "bg-item-normal", style()));
+                _normalBackground->setEventTransparent(true);
 
-                if (auto const & ptr = _hoverBackground.get(); ptr)
-                {
-                    ptr->setContentInvalidator(sharedFromThis);
-                    ptr->setVisible(!_isSelected.get() && isHovered());
-                }
+                // TODO: cascaded style
+                // TODO: MaybeImage ?
+                _hoverBackground = emplace<Image>("__hover-bg__",
+                    theme().parameter<minire::models::sprite::MaybeImage>("listview", "bg-item-hovered", style()));
+                _hoverBackground->setEventTransparent(true);
 
-                if (auto const & ptr = _selectedBackground.get(); ptr)
-                {
-                    ptr->setContentInvalidator(sharedFromThis);
-                    ptr->setVisible(_isSelected.get());
-                }
+                // TODO: cascaded style
+                // TODO: MaybeImage ?
+                _selectedBackground = emplace<Image>("__select-bg__",
+                    theme().parameter<minire::models::sprite::MaybeImage>("listview", "bg-item-selected", style()));
+                _selectedBackground->setEventTransparent(true);
 
                 if (_contents)
                 {
                     _contents->setParent(sharedFromThis);
-                    _contents->setCallback(std::in_place_type<gui::events::OnMouseEnter>, "__enter__",
-                        [this](Component const &, gui::events::OnMouseEnter const & e)
-                        {
-                            handle(e);
-                        });
-                    _contents->setCallback(std::in_place_type<gui::events::OnMouseLeave>, "__leave__",
-                        [this](Component const &, gui::events::OnMouseLeave const & e)
-                        {
-                            handle(e);
-                        });
-                    _contents->setCallback(std::in_place_type<gui::events::OnClick>, "__cleack__",
-                        [this](Component const &, gui::events::OnClick const & e)
-                        {
-                            handle(e);
-                        });
-                    _contents->setCallback(std::in_place_type<minire::events::application::OnMouseWheel>, "__wheel__",
-                        [this](Component const &, minire::events::application::OnMouseWheel const & e)
-                        {
-                            handle(e);
-                        });
+                    _contents->setEventTransparent(true);
                 }
+
+                updateBackground();
             }
 
             size_t revalidateContent(size_t zOffset,
-                                     bool const effectiveVisible,
-                                     Area const & contentArea,
-                                     Area const & clippingWindow) override
+                                     bool const /*effectiveVisible*/,
+                                     Area const & /*contentArea*/,
+                                     Area const & /*clippingWindow*/) override
             {
-                auto sharedFromThis = shared_from_this();
-
-                bool const isReallyHovered = isHovered() ||
-                    (_contents && _contents->isHovered());
-
-                if (auto const & ptr = _normalBackground.get(); ptr)
+                if (_isSelected.isInvalidated())
                 {
-                    if (_normalBackground.isInvalidated())
-                    {
-                        ptr->setContentInvalidator(sharedFromThis);
-                    }
-
-                    ptr->setContentArea(contentArea);
-                    ptr->setClippingWindow(clippingWindow);
-                    ptr->setVisible(!_isSelected.get() && !isReallyHovered &&
-                                    effectiveVisible);
-                    zOffset = ptr->onZOrderChanged(zOffset);
+                    updateBackground();
                 }
-
-                if (auto const & ptr = _hoverBackground.get(); ptr)
-                {
-                    if (_hoverBackground.isInvalidated())
-                    {
-                        ptr->setContentInvalidator(sharedFromThis);
-                    }
-
-                    ptr->setContentArea(contentArea);
-                    ptr->setClippingWindow(clippingWindow);
-                    ptr->setVisible(!_isSelected.get() && isReallyHovered &&
-                                    effectiveVisible);
-                    zOffset = ptr->onZOrderChanged(zOffset);
-                }
-
-                if (auto const & ptr = _selectedBackground.get(); ptr)
-                {
-                    if (_selectedBackground.isInvalidated())
-                    {
-                        ptr->setContentInvalidator(sharedFromThis);
-                    }
-
-                    ptr->setContentArea(contentArea);
-                    ptr->setClippingWindow(clippingWindow);
-                    ptr->setVisible(_isSelected.get() && effectiveVisible);
-                    zOffset = ptr->onZOrderChanged(zOffset);
-                }
-
-                _normalBackground.revalidate();
-                _hoverBackground.revalidate();
-                _selectedBackground.revalidate();
                 _isSelected.revalidate();
-
                 return zOffset;
             }
 
-            std::optional<std::pair<float, float>> measureContent() const override
+            std::optional<glm::vec2> measureContent() const override
             {
                 if (!_contents) return std::nullopt;
                 return _contents->measureContent();
             }
 
         private:
-            Property<ImageView::Sptr> _normalBackground;
-            Property<ImageView::Sptr> _hoverBackground;
-            Property<ImageView::Sptr> _selectedBackground;
-            Property<bool>            _isSelected;
+            Image::Sptr     _normalBackground;
+            Image::Sptr     _hoverBackground;
+            Image::Sptr     _selectedBackground;
+            Property<bool>  _isSelected;
 
-            Component::Sptr           _contents;
+            Component::Sptr _contents;
 
-            ListView &                _listview;
-            size_t const              _index;
+            ListView &      _listview;
+            size_t const    _index;
         };
     }
 
@@ -286,12 +231,12 @@ namespace minire::gui::components
                        Theme::Style const & style,
                        OverlayController & overlayController,
                        ItemBuilderCallback itemBuilderCallback)
-        : Component(id, theme, style, overlayController)
-        , _background(*this, theme.makeImage("listview", "bg", style))
+        : Image(id, theme, style, overlayController,
+                theme.parameter<minire::models::sprite::MaybeImage>("listview", "bg", style))
         , _contents(*this)
         , _offset(*this, 0)
         , _lineHeight(*this, 0)
-        , _scrollbar(std::make_shared<Scrollbar>("__scrollbar__", theme, style, overlayController, true))
+        , _scrollbar(std::make_shared<VerticalScrollbar>("__scrollbar__", theme, style, overlayController)) // TODO: cascaded style "listview", "scrollbar"
         , _contentLayout(std::make_shared<ListViewLayout>())
         , _verticalToolLayout(std::make_shared<layouts::VerticalTool>(
             kContentId, kScrollbarId,
@@ -305,11 +250,11 @@ namespace minire::gui::components
 
     void ListView::initialize()
     {
-        auto sharedFromThis = shared_from_this();
+        Image::initialize();
 
         if (_scrollbar)
         {
-            _scrollbar->setParent(sharedFromThis);
+            _scrollbar->setParent(shared_from_this());
             _scrollbar->step() = 1.0;
             _scrollbar->setValue(0);
             _scrollbar->setCallback(std::in_place_type<scrollbar::OnValueChanged>, "__scroll__",
@@ -331,24 +276,14 @@ namespace minire::gui::components
                                        Area const & contentArea,
                                        Area const & clippingWindow)
     {
+        zOffset = Image::revalidateContent(zOffset, effectiveVisible,
+                                           contentArea, clippingWindow);
+
         if (_selected && *_selected >= _contents.get().size())
         {
             auto previous = _selected;
             _selected = std::nullopt;
             handle(listview::OnSelectionChanged{previous, _selected});
-        }
-
-        if (auto const & background = _background.get(); background)
-        {
-            if (_background.isInvalidated())
-            {
-                background->setContentInvalidator(shared_from_this());
-            }
-
-            background->setContentArea(contentArea);
-            background->setClippingWindow(clippingWindow);
-            background->setVisible(effectiveVisible);
-            zOffset = background->onZOrderChanged(zOffset);
         }
 
         float const contentPadding = _contentContainer
@@ -375,10 +310,10 @@ namespace minire::gui::components
                 {
                     if (_lineHeight.get() <= 0)
                     {
-                        auto const maybeSize = item->measureContent();
+                        auto const & maybeSize = item->measureContent();
                         MINIRE_INVARIANT(maybeSize, "ListView's item must be measurable, or "
                                                     "ListView::lineHeight() must be set");
-                        _lineHeight = maybeSize->second;
+                        _lineHeight = maybeSize->y;
                     }
                     auto listViewItem = _contentContainer->emplace<ListViewItem>(
                         fmt::format("__item/{}__", index), item, *this, index);
@@ -414,7 +349,6 @@ namespace minire::gui::components
             _heightLimit = heightLimit;
         }
 
-        _background.revalidate();
         _contents.revalidate();
         _offset.revalidate();
         _lineHeight.revalidate();

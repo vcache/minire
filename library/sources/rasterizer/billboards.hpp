@@ -2,7 +2,7 @@
 
 #include <minire/models/billboard.hpp>
 
-namespace minire { class Scene; }
+namespace minire { class SceneImpl; }
 namespace minire::content { class Manager; }
 namespace minire::scene { class Viewpoint; }
 
@@ -25,7 +25,7 @@ namespace minire::rasterizer
 
         std::shared_ptr<Billboard> create(models::Billboard const &) const;
 
-        void draw(Scene const &) const;
+        void draw(SceneImpl const &) const;
 
     public:
         class Program;

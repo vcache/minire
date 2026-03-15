@@ -1,7 +1,10 @@
+// TODO: this class is a mess, should refactor it
+
 #include <scene.hpp>
 
 #include <rasterizer.hpp>
 #include <rasterizer/constants.hpp>
+#include <scene/gltf-instantiator.hpp>
 #include <utils/overloaded.hpp>
 
 #include <minire/errors.hpp>
@@ -17,19 +20,375 @@
 
 namespace minire
 {
-    // Node //
+    // TODO: store/calculate absolute path for nodes/leaves (and use them for logging)
 
-    Scene::Node::Node(Scene & scene, models::Transform transform,
-                      Wptr parent, bool visible)
-        : _scene(scene)
-        , _localTransform(transform)
+    // SceneImpl::Leaf //
+
+    template<typename Derived, typename ObjectType>
+    void SceneImpl::Leaf<Derived, ObjectType>::setParent(scene::Node::Sptr const & newParentIface)
+    {
+        // find a leaf's iterator
+        auto oldParent = _parent.lock();
+        MINIRE_INVARIANT(oldParent, "an un-parented scene leaf cannot be re-parented: \"{}\"", name());
+        auto oldIterator = oldParent->_children.find(name());
+
+        // find a new parent and insert element to a new parent's children
+        SceneImpl::Node::Sptr newParent = std::static_pointer_cast<SceneImpl::Node>(newParentIface);
+        if (newParent)
+        {
+            auto [_, inserted] = newParent->_children.emplace(oldIterator->first,
+                                                              oldIterator->second);
+            MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into a new parent node (\"{}\")",
+                             name(), newParent->name());
+        }
+        else
+        {
+            // if a new parent isn't specified, a leaf should be detached from a scene
+            detach();
+        }
+
+        // reset _parent for the element
+        _parent = newParent;
+
+        // erase the element from an old parent
+        oldParent->_children.erase(oldIterator);
+    }
+
+    // SceneImpl::*Leaf //
+
+    void SceneImpl::MeshLeaf::revalidateModel(size_t)
+    {
+        Object::revalidate();
+    }
+
+    void SceneImpl::DirectionalLightLeaf::revalidateModel(size_t epochNumber)
+    {
+        if (invalidated(kColor))
+        {
+            Lerpable::update(epochNumber, model());
+            _scene.activate(*this); // TODO: why?
+        }
+        Object::revalidate();
+    }
+
+    void SceneImpl::PointLightLeaf::revalidateModel(size_t epochNumber)
+    {
+        if (invalidated(kColor | kAttenuation))
+        {
+            Lerpable::update(epochNumber, model());
+            _scene.activate(*this); // TODO: why?
+        }
+        Object::revalidate();
+    }
+
+    void SceneImpl::PerspectiveCameraLeaf::revalidateModel(size_t epochNumber)
+    {
+        if (invalidated(kYFov /*| kZNear | kZFar | kAspectRatio*/))
+        {
+            Lerpable::update(epochNumber, model());
+            _scene.activate(*this);
+        }
+        Object::revalidate();
+    }
+
+    void SceneImpl::PerspectiveCameraLeaf::activate()
+    {
+        _scene.setActiveCamera(*this);
+    }
+
+    void SceneImpl::OrthographicCameraLeaf::revalidateModel(size_t epochNumber)
+    {
+        if (invalidated(kXMag | kYMag /* | kZNear | kZFar*/))
+        {
+            Lerpable::update(epochNumber, model());
+            _scene.activate(*this);
+        }
+        Object::revalidate();
+    }
+
+    void SceneImpl::OrthographicCameraLeaf::activate()
+    {
+        _scene.setActiveCamera(*this);
+    }
+
+    void SceneImpl::BillboardLeaf::revalidateModel(size_t)
+    {
+        Object::revalidate();
+    }
+
+    // SceneImpl::Node //
+
+    scene::Node::Sptr SceneImpl::Node::newNode(std::string const & name, models::Node model)
+    {
+        MINIRE_INVARIANT(!name.empty(), "a name is empty");
+        Node::Sptr node = std::make_shared<Node>(name, std::move(model), weak_from_this(), _scene);
+        auto [_, inserted] = _children.emplace(name, node);
+        MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
+        invalidateGlobalTransform();
+        return node;
+    }
+    
+    scene::Mesh::Sptr SceneImpl::Node::newMesh(std::string const & name, models::Mesh model)
+    {
+        MINIRE_INVARIANT(!name.empty(), "a name is empty");
+        auto mesh = _scene._rasterizer.meshes().getMesh(model._source,
+                                                        model._defaultMaterial);
+        assert(mesh);
+
+        auto meshLeaf = std::make_shared<MeshLeaf>(name, model, weak_from_this(), mesh);
+        auto [_, inserted] = _children.emplace(name, meshLeaf);
+        MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
+        _scene._meshLeaves.push_back(meshLeaf);
+
+        if (model._skin)
+        {
+            models::Mesh::Skin::Bones const & bones = model._skin->_bones;
+            meshLeaf->_skinBones.reserve(bones.size());
+
+            MINIRE_INVARIANT(bones.size() <= rasterizer::Constants::kMaxBones,
+                             "a mesh {} contains too many bones: {}, limit is {}",
+                             name, bones.size(), rasterizer::Constants::kMaxBones);
+
+            for(models::Mesh::Skin::Bone const & boneModel : bones)
+            {
+                meshLeaf->_skinBones.emplace_back(MeshLeaf::SkinBone
+                {
+                    ._inverseBindMatrix = boneModel._inverseBindMatrix,
+                    ._node = nodeFromPointer(boneModel._jointNode),
+                });
+                MINIRE_INVARIANT(meshLeaf->_skinBones.back()._node,
+                                 "skin bone is a null pointer: {}", boneModel._jointNode);
+            }
+
+            meshLeaf->_skinOrigin = model._skin->_origin ? nodeFromPointer(*model._skin->_origin)
+                                                         : Node::Sptr();
+        }
+        return meshLeaf;
+    }
+    
+    scene::DirectionalLight::Sptr SceneImpl::Node::newDirectionalLight(std::string const & name,
+                                                                       models::DirectionalLight model)
+    {
+        MINIRE_INVARIANT(!name.empty(), "a name is empty");
+        auto directionalLightLeaf = std::make_shared<DirectionalLightLeaf>(name, model, weak_from_this(), _scene);
+        auto [_, inserted] = _children.emplace(name, directionalLightLeaf);
+        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
+        _scene._directionalLightLeaves.push_back(directionalLightLeaf);
+        return directionalLightLeaf;
+    }
+
+    scene::PointLight::Sptr SceneImpl::Node::newPointLight(std::string const & name,
+                                                           models::PointLight model)
+    {
+        MINIRE_INVARIANT(!name.empty(), "a name is empty");
+        auto pointLightLeaf = std::make_shared<PointLightLeaf>(name, model, weak_from_this(), _scene);
+        auto [_, inserted] = _children.emplace(name, pointLightLeaf);
+        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
+        _scene._pointLightLeaves.push_back(pointLightLeaf);
+        return pointLightLeaf;
+    }
+    
+    scene::PerspectiveCamera::Sptr SceneImpl::Node::newPerspectiveCamera(std::string const & name,
+                                                                         models::PerspectiveCamera model)
+    {
+        MINIRE_INVARIANT(!name.empty(), "a name is empty");
+        auto perspectiveCameraLeaf = std::make_shared<PerspectiveCameraLeaf>(name, model, weak_from_this(), _scene);
+        auto [_, inserted] = _children.emplace(name, perspectiveCameraLeaf);
+        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
+        return perspectiveCameraLeaf;
+    }
+    
+    scene::OrthographicCamera::Sptr SceneImpl::Node::newOrthographicCamera(std::string const & name,
+                                                                           models::OrthographicCamera model)
+    {
+        MINIRE_INVARIANT(!name.empty(), "a name is empty");
+        auto orthographicCameraLeaf = std::make_shared<OrthographicCameraLeaf>(name, model, weak_from_this(), _scene);
+        auto [_, inserted] = _children.emplace(name, orthographicCameraLeaf);
+        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
+        return orthographicCameraLeaf;
+    }
+    
+    scene::Billboard::Sptr SceneImpl::Node::newBillboard(std::string const & name,
+                                                         models::Billboard model)
+    {
+        MINIRE_INVARIANT(!name.empty(), "a name is empty");
+        auto billboard = _scene._rasterizer.billboards().create(model);
+        assert(billboard);
+
+        auto billboardLeaf = std::make_shared<BillboardLeaf>(name, model, weak_from_this(), billboard);
+        auto [_, inserted] = _children.emplace(name, billboardLeaf);
+        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
+
+        _scene._billboardsLeaves.emplace_back(model._zOrder, billboardLeaf);
+        _scene._billboardsLeaves.sort([](auto const & a, auto const & b)
+            {
+                return a.first < b.first;
+            });
+        return billboardLeaf;
+    }
+
+    void SceneImpl::Node::newFromSource(content::Path const & source,
+                                        content::Manager & contentManager,
+                                        bool visible)
+    {
+        instantiateGltf(*this, source, contentManager, visible);
+    }
+
+    void SceneImpl::Node::newAnimationSet(models::AnimationSet animationSet) // const ref?
+    {
+        // drop any current active animation
+        if (_activeAnimation)
+        {
+            _activeAnimation.reset();
+            deactiveChildrenAnimation();
+        }
+
+        // transform animation set from abstract (model) into a concrete one
+        AnimationSet newAnimationSet;
+        newAnimationSet.reserve(animationSet.size());
+        for(auto const & [animationId, animationTracks] : animationSet)
+        {
+            // TODO: code dup
+            AnimationTracksSptr animationTracksSptr = std::make_shared<AnimationTracks>();
+            animationTracksSptr->reserve(animationTracks.size());
+            for(auto const & [target, keyframeAnimation] : animationTracks)
+            {
+                animationTracksSptr->emplace_back(AnimationTrack
+                {
+                    ._target = nodeFromPointer(target),
+                    ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
+                });
+                MINIRE_INVARIANT(animationTracksSptr->back()._target &&
+                                 !animationTracksSptr->back()._target->detached(),
+                                 "animation target is a null pointer: {}", target);
+            }
+            newAnimationSet.emplace(animationId, animationTracksSptr);
+        }
+        _animationSet = std::move(newAnimationSet);
+    }
+    
+    void SceneImpl::Node::playAnimation(models::AnimationId const & animationId,
+                                        size_t repeats, float speedScale)
+    {
+        auto it = _animationSet.find(animationId);
+        MINIRE_INVARIANT(it != _animationSet.cend(),
+                         "no such animation: {}", animationId);
+
+        assert(it->second);
+        _activeAnimation = std::make_unique<ActiveAnimation>(
+            it->second, repeats, speedScale);
+        activeChildrenAnimation();
+    }
+    
+    void SceneImpl::Node::stopAnimation()
+    {
+        if (_activeAnimation)
+        {
+            _activeAnimation.reset();
+            deactiveChildrenAnimation();
+        }
+    }
+    
+    void SceneImpl::Node::inlineAnimation(models::AnimationTracks animationTracks,
+                                          size_t repeats, float speedScale)
+    {
+        // transform animation set from abstract (model) into a concrete one
+        // TODO: code dup
+        AnimationTracksSptr animationTracksSptr = std::make_shared<AnimationTracks>();
+        animationTracksSptr->reserve(animationTracks.size());
+        for(auto const & [target, keyframeAnimation] : animationTracks)
+        {
+            animationTracksSptr->emplace_back(AnimationTrack
+            {
+                ._target = nodeFromPointer(target),
+                ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
+            });
+            MINIRE_INVARIANT(animationTracksSptr->back()._target &&
+                             !animationTracksSptr->back()._target->detached(),
+                             "animation target is a null pointer: {}", target);
+        }
+
+        // activate this animation
+        _activeAnimation = std::make_unique<ActiveAnimation>(
+            animationTracksSptr, repeats, speedScale);
+        activeChildrenAnimation();
+    }
+
+    // TODO: code duplicated w/ Left::setParent
+    void SceneImpl::Node::setParent(scene::Node::Sptr const & newParentIface)
+    {
+        // Find a leaf's iterator
+        auto oldParent = _parent.lock();
+        MINIRE_INVARIANT(oldParent, "an un-parented scene leaf cannot be re-parented: \"{}\"", name());
+        auto oldIterator = oldParent->_children.find(name());
+
+        // Find a new parent and insert element to a new parent's children
+        SceneImpl::Node::Sptr newParent = std::static_pointer_cast<SceneImpl::Node>(newParentIface);
+        if (newParent)
+        {
+            auto [_, inserted] = newParent->_children.emplace(oldIterator->first,
+                                                              oldIterator->second);
+            MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into a new parent node (\"{}\")",
+                             name(), newParent->name());
+        }
+        else
+        {
+            // if a new parent isn't specified, a leaf should be detached from a scene
+            detach();
+        }
+
+        // Reset _parent for the element
+        _parent = newParent;
+
+        // Erase the element from an old parent
+        oldParent->_children.erase(oldIterator);
+    }
+
+    void SceneImpl::Node::dispose(models::ScenePath const & path)
+    {
+        if (auto it = findIterator(path); !it.empty())
+        {
+            // TODO: Node::detach must detach all children recursively
+            std::visit([](auto & item) { assert(item); item->detach(); },
+                       it.item());            
+            it.erase();
+
+            // TODO: erase animations and other assiciated objects
+        }
+    }
+
+    void SceneImpl::Node::disposeAll()
+    {
+        _children.clear();
+        // TODO: erase animations and other assiciated objects
+    }
+
+    SceneImpl::Node::SceneItem
+    SceneImpl::Node::find(models::ScenePath const & path) const
+    {
+        if (auto it = findIterator(path); !it.empty())
+        {
+            return std::visit(
+                [](auto const & child) -> SceneItem { return child; },
+                it.item());
+        }
+        return std::monostate();
+    }
+
+    SceneImpl::Node::Node(std::string name,
+                          Object::ModelType && model,
+                          Wptr parent,
+                          SceneImpl & scene)
+        : scene::Node(std::move(name), std::move(model))
+        , _scene(scene)
+        , _localTransform(origin()) // TODO: duplicate w/ model()?
         , _parent(parent)
-        , _visible(visible)
+        , _visible(visible())       // TODO: duplicate w/ model()?
     {
         ++_scene._nodesEstimate;
     }
 
-    Scene::Node::~Node()
+    SceneImpl::Node::~Node()
     {
         assert(_scene._nodesEstimate != 0);
         if (_scene._nodesEstimate != 0)
@@ -38,16 +397,129 @@ namespace minire
         }
     }
 
-    bool Scene::Node::lerp(float weight, size_t epochNumber)
+    bool SceneImpl::Node::lerp(float weight, size_t epochNumber)
     {
         return _localTransform.lerp(weight, epochNumber);
     }
 
+    // TODO: cover by tests
+    SceneImpl::Node::ItemIterator
+    SceneImpl::Node::findIterator(models::ScenePath const & path) const
+    {
+        Node const * node = this;
+        ChildrenMap::const_iterator it = node->_children.cend();
+        size_t index = 0;
+        for(; index < path.size(); ++index)
+        {
+            assert(node);
+            it = node->_children.find(path[index]);
+            if (it == node->_children.cend())
+                break;
+            bool const isLast = (index == path.size() - 1);
+            if (Node::Sptr const * asNode = std::get_if<Node::Sptr>(&it->second);
+                asNode && !isLast)
+            {
+                assert(*asNode);
+                node = asNode->get();
+                it = node->_children.cend();
+            }
+        }
+
+        if (index != path.size())
+        {
+            assert(node);
+            it = node->_children.cend();
+        }
+
+        assert(node);
+        return ItemIterator{._parent = node, ._iterator = it};
+    }
+
+    template<typename T>
+    typename T::Sptr const & SceneImpl::Node::findInternal(models::ScenePath const & path) const
+    {
+        // find an interator
+        auto it = findIterator(path);
+        MINIRE_INVARIANT(!it.empty(), "no such item \"{}\" inside \"{}\"",
+                         path, name());
+
+        // get a value
+        typename T::Sptr const * fetched = std::get_if<typename T::Sptr>(&it.item());
+        MINIRE_INVARIANT(fetched, "element at path \"{}\" is not {}",
+                         path, utils::demangle<T>());
+        return *fetched;
+    }
+
+    SceneImpl::Node::Sptr
+    SceneImpl::Node::nodeFromPointer(models::NodePointer const & nodePointer) const
+    {
+        return std::visit(utils::Overloaded
+            {
+                [this](models::ScenePath const & p) { return findInternal<Node>(p); },
+                [](scene::Node::Sptr const & p) { return std::static_pointer_cast<Node>(p); },
+            }, nodePointer);
+    }
+
+    void SceneImpl::Node::invalidateGlobalTransform()
+    {
+        _globalTransformState = GlobalTransformState::kDirty;
+        for(auto node = _parent.lock();
+            node && GlobalTransformState::kClean == node->_globalTransformState;
+            node = node->_parent.lock())
+        {
+            node->_globalTransformState = GlobalTransformState::kGrey;
+        }
+    }
+
+    void SceneImpl::Node::deactiveChildrenAnimation()
+    {
+        for(auto parent = _parent.lock();
+            parent && parent->_hasActiveChildrenAnimation;
+            parent = parent->_parent.lock())
+        {
+            parent->_hasActiveChildrenAnimation = std::any_of(
+                parent->_children.cbegin(), parent->_children.cend(),
+                [](auto const & pair)
+                {
+                    return std::visit(utils::Overloaded
+                    {
+                        [](Node::Sptr const & i)
+                        {
+                            assert(i);
+                            return i->_hasActiveChildrenAnimation ||
+                                   i->_activeAnimation.operator bool();
+                        },
+                        [](auto const &) { return false; },
+                    }, pair.second);
+                });
+        }
+    }
+
+    void SceneImpl::Node::activeChildrenAnimation()
+    {
+        for(auto parent = _parent.lock();
+            parent && !parent->_hasActiveChildrenAnimation;
+            parent = parent->_parent.lock())
+        {
+            parent->_hasActiveChildrenAnimation = true;
+        }
+    }
+
+    void SceneImpl::Node::revalidateModel(size_t epochNumber)
+    {
+        if (invalidated(kOrigin))
+        {
+            _localTransform.update(epochNumber, origin());
+            _scene.activate(*this); // NOTE: will also invalidate global transform
+        }
+        Object::revalidate();
+    }
+
     // ActiveAnimation //
 
-    Scene::ActiveAnimation::ActiveAnimation(AnimationTracksSptr const & animationTracks,
-                                            size_t const repeats,
-                                            float const speedScale)
+    SceneImpl::ActiveAnimation::ActiveAnimation(AnimationTracksSptr const & animationTracks,
+                                                size_t const repeats,
+                                                float const speedScale)
         : _animationTracks(animationTracks)
     {
         auto getOrMakeSequencer = [this, repeats, speedScale]
@@ -98,502 +570,119 @@ namespace minire
 
     // Scene //
 
-    Scene::Scene(Rasterizer & rasterizer)
+    SceneImpl::SceneImpl(Rasterizer & rasterizer)
         : _rasterizer(rasterizer)
     {
-        handle(events::controller::SceneReset{});
+        reset();
     }
 
-    void Scene::handle(events::controller::SceneReset const &)
+    scene::Node & SceneImpl::root() const
     {
-        _root = std::make_shared<Node>(*this, models::Transform{},
-                                       Node::Wptr(), true);
+        assert(_root);
+        return *_root;
     }
 
-    void Scene::handle(events::controller::SceneDispose const & e)
+    void SceneImpl::setActiveCamera(PerspectiveCameraLeaf & camera)
     {
-        if (e._item.empty())
-        {
-            handle(events::controller::SceneReset{});
-        }
-
-        auto [parent, iterator] = find<ChildIterator>(e._item);
-        assert(parent && iterator != parent->_children.cend());
-        parent->_children.erase(iterator);
+        MINIRE_INVARIANT(!camera.detached(), "the camera is detached: {}", camera.name());
+        _activeCamera = ActiveCamera(camera.shared_from_this());
+        _viewpoint.setCamera(camera.current());
     }
 
-    void Scene::handle(events::controller::SceneActivateCamera const & e)
+    // TODO: code duplication
+    void SceneImpl::setActiveCamera(OrthographicCameraLeaf & camera)
     {
-        if (e._item.empty())
+        MINIRE_INVARIANT(!camera.detached(), "the camera is detached: {}", camera.name());
+        _activeCamera = camera.shared_from_this();
+        _viewpoint.setCamera(camera.current());
+    }
+
+    void SceneImpl::setActiveCamera(models::ScenePath const & path)
+    {
+        if (path.empty())
         {
             _activeCamera = std::monostate();
             _viewpoint.unsetCamera();
         }
         else
         {
-            Node::Child camera = find<Node::Child>(e._item);
-            _activeCamera = std::visit(utils::Overloaded
+            assert(_root);
+            Node::ItemIterator it = _root->findIterator(path);
+            MINIRE_INVARIANT(!it.empty(), "no such camera: {}", path);
+            std::visit(utils::Overloaded
             {
-                [this](PerspectiveCameraLeaf::Sptr & camera) -> ActiveCamera
+                [this](PerspectiveCameraLeaf::Sptr const & camera)
                 {
                     assert(camera);
-                    _viewpoint.setCamera(camera->current());
-                    return PerspectiveCameraLeaf::Wptr(camera);
+                    camera->activate();
                 },
 
-                [this](OrthographicCameraLeaf::Sptr & camera) -> ActiveCamera
+                [this](OrthographicCameraLeaf::Sptr const & camera)
                 {
                     assert(camera);
-                    _viewpoint.setCamera(camera->current());
-                    return OrthographicCameraLeaf::Wptr(camera);
+                    camera->activate();
                 },
 
-                [&e](auto && item) -> ActiveCamera
+                [&path](auto && item)
                 {
                     using T = std::decay_t<decltype(item)>;
                     MINIRE_THROW("got {} instead of a camera: {}",
-                                 utils::demangle<T>(), e._item);
+                                 utils::demangle<T>(), path);
                 }
-            }, camera);
+            }, it.item());
         }
     }
-
-    void Scene::handle(events::controller::SceneSetAmbientLight const & e)
+    
+    void SceneImpl::reset()
     {
-        _ambientLight = e._ambientLight;
+        _root = std::make_shared<Node>("(the root)",
+            models::Node{models::Transform{}, true},
+            Node::Wptr(), *this);
     }
 
-    void Scene::handle(events::controller::SceneNewNode const & e)
-    {
-        Node::Sptr parent = find<Node::Sptr>(e._parent);
-        assert(parent);
-        Node::Sptr node = std::make_shared<Node>(*this, std::move(e._origin), parent, e._visible);
-        auto [_, inserted] = parent->_children.emplace(e._id, node);
-        invalidateGlobalTransform(node);
-        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
-    }
-
-    void Scene::handle(events::controller::SceneNewMesh const & e)
-    {
-        auto mesh = _rasterizer.meshes().getMesh(e._data._source,
-                                                 e._data._defaultMaterial);
-        assert(mesh);
-
-        Node::Sptr parent = find<Node::Sptr>(e._parent);
-        assert(parent);
-        auto meshLeaf = std::make_shared<MeshLeaf>(mesh, parent, e._visible);
-        auto [_, inserted] = parent->_children.emplace(e._id, meshLeaf);
-        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
-        _meshLeaves.push_back(meshLeaf);
-    }
-
-    void Scene::handle(events::controller::SceneNewDirectionalLight const & e)
-    {
-        Node::Sptr parent = find<Node::Sptr>(e._parent);
-        assert(parent);
-        auto directionalLightLeaf = std::make_shared<DirectionalLightLeaf>(e._data, parent, e._visible);
-        auto [_, inserted] = parent->_children.emplace(e._id, directionalLightLeaf);
-        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
-        _directionalLightLeaves.push_back(directionalLightLeaf);
-    }
-
-    void Scene::handle(events::controller::SceneNewPointLight const & e)
-    {
-        Node::Sptr parent = find<Node::Sptr>(e._parent);
-        assert(parent);
-        auto pointLightLeaf = std::make_shared<PointLightLeaf>(e._data, parent, e._visible);
-        auto [_, inserted] = parent->_children.emplace(e._id, pointLightLeaf);
-        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
-        _pointLightLeaves.push_back(pointLightLeaf);
-    }
-
-    void Scene::handle(events::controller::SceneNewPerspectiveCamera const & e)
-    {
-        Node::Sptr parent = find<Node::Sptr>(e._parent);
-        assert(parent);
-        auto [_, inserted] = parent->_children.emplace(
-            e._id, std::make_shared<PerspectiveCameraLeaf>(e._data, parent, e._visible));
-        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
-    }
-
-    void Scene::handle(events::controller::SceneNewOrthographicCamera const & e)
-    {
-        Node::Sptr parent = find<Node::Sptr>(e._parent);
-        assert(parent);
-        auto [_, inserted] = parent->_children.emplace(
-            e._id, std::make_shared<OrthographicCameraLeaf>(e._data, parent, e._visible));
-        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
-    }
-
-    void Scene::handle(events::controller::SceneNewBillboard const & e)
-    {
-        auto billboard = _rasterizer.billboards().create(e._data);
-        assert(billboard);
-
-        Node::Sptr parent = find<Node::Sptr>(e._parent);
-        assert(parent);
-        auto billboardLeaf = std::make_shared<BillboardLeaf>(billboard, parent, e._visible);
-        auto [_, inserted] = parent->_children.emplace(e._id, billboardLeaf);
-        MINIRE_INVARIANT(inserted, "failed to insert {} into {}", e._id, e._parent);
-
-        _billboardsLeaves.emplace_back(e._data._zOrder, billboardLeaf);
-        _billboardsLeaves.sort([](auto const & a, auto const & b)
-            {
-                return a.first < b.first;
-            });
-    }
-
-    void Scene::handle(events::controller::SceneSetParent const & e)
-    {
-        // Find an item's iterator and its parent
-        // (it must exists unless event._item points to the _root)
-        auto [oldParent, oldIterator] = find<ChildIterator>(e._item);
-        assert(oldParent && oldIterator != oldParent->_children.cend());
-
-        // Find a new parent and insert element to a new parent's children
-        Node::Sptr newParent = find<Node::Sptr>(e._attribute);
-        assert(newParent);
-        auto [newIt, inserted] = newParent->_children.emplace(oldIterator->first,
-                                                              oldIterator->second);
-        MINIRE_INVARIANT(inserted, "failed to insert {} into new parent: {}",
-                         e._item, e._attribute);
-
-        // Reset _parent for the element
-        std::visit(utils::Overloaded
-        {
-            [&oldParent, &newParent, this](Node::Sptr & child)
-            {
-                assert(child);
-                assert(child->_parent.lock() == oldParent);
-                child->_parent = newParent;
-                invalidateGlobalTransform(child);
-            },
-            [&oldParent, &newParent](auto & child)
-            {
-                assert(child);
-                assert(child->_parent.lock() == oldParent);
-                child->_parent = newParent;
-            }
-        }, newIt->second);
-
-        // Erase the element from an old parent
-        oldParent->_children.erase(oldIterator);
-    }
-
-    void Scene::handle(events::controller::SceneSetVisibility const & e)
-    {
-        Node::Child item = find<Node::Child>(e._item);
-        std::visit(
-            [v = e._attribute](auto & item) { assert(item); item->_visible = v; },
-            item);
-
-        // TODO: drop lerp target when switching false -> true
-    }
-
-    void Scene::handle(events::controller::SceneSetTransform const & e,
-                       size_t epochNumber)
-    {
-        auto node = find<Node::Sptr>(e._item);
-        assert(node);
-        node->_localTransform.update(epochNumber, e._attribute);
-        activate(*node); // NOTE: will also invalidate global transform
-    }
-
-    void Scene::handle(events::controller::SceneSetDirectionalLight const & e,
-                       size_t epochNumber)
-    {
-        auto directionalLight = find<DirectionalLightLeaf::Sptr>(e._item);
-        assert(directionalLight);
-        directionalLight->update(epochNumber, e._attribute);
-        activate(*directionalLight);
-    }
-
-    void Scene::handle(events::controller::SceneSetPointLight const & e,
-                       size_t epochNumber)
-    {
-        auto pointLight = find<PointLightLeaf::Sptr>(e._item);
-        assert(pointLight);
-        pointLight->update(epochNumber, e._attribute);
-        activate(*pointLight);
-    }
-
-    void Scene::handle(events::controller::SceneSetPerspectiveCamera const & e,
-                       size_t epochNumber)
-    {
-        auto perspectiveCamera = find<PerspectiveCameraLeaf::Sptr>(e._item);
-        assert(perspectiveCamera);
-        perspectiveCamera->update(epochNumber, e._attribute);
-        activate(*perspectiveCamera);
-    }
-
-    void Scene::handle(events::controller::SceneSetOrthographicCamera const & e,
-                       size_t epochNumber)
-    {
-        auto orthographicCamera = find<OrthographicCameraLeaf::Sptr>(e._item);
-        assert(orthographicCamera);
-        orthographicCamera->update(epochNumber, e._attribute);
-        activate(*orthographicCamera);
-    }
-
-    void Scene::handle(events::controller::SceneSetMeshEmissiveFactor const & e)
-    {
-        auto mesh = find<MeshLeaf::Sptr>(e._item);
-        assert(mesh);
-        mesh->_emissiveFactor = e._attribute;
-    }
-
-    void Scene::handle(events::controller::SceneSetMeshSkin const & e)
-    {
-        auto mesh = find<MeshLeaf::Sptr>(e._item);
-        assert(mesh);
-
-        models::MeshSkin::Bones const & bones = e._attribute._bones;
-        mesh->_skinBones.clear();
-        mesh->_skinBones.reserve(bones.size());
-
-        MINIRE_INVARIANT(bones.size() <= rasterizer::Constants::kMaxBones,
-                         "a mesh {} contains to many bones: {}, limit is {}",
-                         e._item, bones.size(), rasterizer::Constants::kMaxBones);
-
-        for(models::MeshSkin::Bone const & boneModel : bones)
-        {
-            mesh->_skinBones.emplace_back(Mesh::SkinBone
-            {
-                ._inverseBindMatrix = boneModel._inverseBindMatrix,
-                ._node = find<Node::Sptr>(boneModel._jointNode),
-            });
-            assert(!mesh->_skinBones.back()._node.expired());
-        }
-
-        mesh->_skinOrigin = e._attribute._origin ? find<Node::Sptr>(*e._attribute._origin)
-                                                 : Node::Wptr();
-    }
-
-    void Scene::handle(events::controller::SceneNewAnimationSet const & e)
-    {
-        Node::Sptr containerNode = find<Node::Sptr>(e._containerNode);
-        assert(containerNode);
-
-        // drop any current active animation
-        if (containerNode->_activeAnimation)
-        {
-            containerNode->_activeAnimation.reset();
-            deactiveChildrenAnimation(containerNode->_parent.lock());
-        }
-
-        // transform animation set from abstract (model) into a concrete one
-        AnimationSet newAnimationSet;
-        newAnimationSet.reserve(e._animationSet.size());
-        for(auto const & [animationId, animationTracks] : e._animationSet)
-        {
-            AnimationTracksSptr animationTracksSptr = std::make_shared<AnimationTracks>();
-            animationTracksSptr->reserve(animationTracks.size());
-            for(auto const & [targetScenePath, keyframeAnimation] : animationTracks)
-            {
-                models::ScenePath targetNodePath = models::concat(e._containerNode, targetScenePath);
-                Node::Sptr targetNode = find<Node::Sptr>(targetNodePath);
-                assert(targetNode);
-                animationTracksSptr->emplace_back(AnimationTrack
-                {
-                    ._target = targetNode,
-                    ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
-                });
-            }
-            newAnimationSet.emplace(animationId, animationTracksSptr);
-        }
-
-        containerNode->_animationSet = std::move(newAnimationSet);
-    }
-
-    void Scene::handle(events::controller::ScenePlayAnimation const & e)
-    {
-        Node::Sptr node = find<Node::Sptr>(e._containerNode);
-        assert(node);
-        auto it = node->_animationSet.find(e._animationId);
-        MINIRE_INVARIANT(it != node->_animationSet.cend(),
-                         "no such animation: {}", e._animationId);
-
-        assert(it->second);
-        node->_activeAnimation = std::make_unique<ActiveAnimation>(
-            it->second, e._repeats, e._speedScale);
-        activeChildrenAnimation(node->_parent.lock());
-    }
-
-    void Scene::handle(events::controller::SceneStopAnimation const & e)
-    {
-        Node::Sptr node = find<Node::Sptr>(e._containerNode);
-        assert(node);
-        if (node->_activeAnimation)
-        {
-            node->_activeAnimation.reset();
-            deactiveChildrenAnimation(node->_parent.lock());
-        }
-    }
-
-    void Scene::handle(events::controller::SceneInlineAnimation const & e)
-    {
-        // find a node to contain an animation
-        Node::Sptr containerNode = find<Node::Sptr>(e._containerNode);
-        assert(containerNode);
-
-        // transform animation set from abstract (model) into a concrete one
-        AnimationTracksSptr animationTracksSptr = std::make_shared<AnimationTracks>();
-        animationTracksSptr->reserve(e._animationTracks.size());
-        for(auto const & [targetScenePath, keyframeAnimation] : e._animationTracks)
-        {
-            models::ScenePath targetNodePath = models::concat(e._containerNode, targetScenePath);
-            Node::Sptr targetNode = find<Node::Sptr>(targetNodePath);
-            assert(targetNode);
-            animationTracksSptr->emplace_back(AnimationTrack
-            {
-                ._target = targetNode,
-                ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
-            });
-        }
-
-        // activate this animation
-        containerNode->_activeAnimation = std::make_unique<ActiveAnimation>(
-            animationTracksSptr, e._repeats, e._speedScale);
-        activeChildrenAnimation(containerNode->_parent.lock());
-    }
-
-    // TODO: cover with tests
-    // - empty
-    // - "node"
-    // - "leaf"
-    // - "node"/"node"
-    // - "node"/"leaf"
-    // - "not-exist"
-    // - "node"/"not-exist"
-    // - "leaf"/"anything"
-    template<typename T>
-    T Scene::find(models::ScenePath const & path)
-    {
-        static_assert(std::is_same_v<T, Node::Child> ||
-                      std::is_same_v<T, Node::Sptr> ||
-                      std::is_same_v<T, MeshLeaf::Sptr> ||
-                      std::is_same_v<T, DirectionalLightLeaf::Sptr> ||
-                      std::is_same_v<T, PointLightLeaf::Sptr> ||
-                      std::is_same_v<T, PerspectiveCameraLeaf::Sptr> ||
-                      std::is_same_v<T, OrthographicCameraLeaf::Sptr> ||
-                      std::is_same_v<T, BillboardLeaf::Sptr> ||
-                      std::is_same_v<T, ChildIterator>,
-                      "unexpected result type");
-        T result;
-        Node::Child current = _root;
-        for(std::string const & component : path)
-        {
-            if (Node::Sptr * asNode = std::get_if<Node::Sptr>(&current);
-                asNode != nullptr)
-            {
-                assert(*asNode);
-                if (auto it = (*asNode)->_children.find(component);
-                    it != (*asNode)->_children.cend())
-                {
-                    if constexpr(std::is_same_v<T, ChildIterator>)
-                    {
-                        assert(std::holds_alternative<Node::Sptr>(current));
-                        result.first = std::get<Node::Sptr>(current);
-                        result.second = it;
-                    }
-                    current = it->second;
-                }
-                else
-                {
-                    // no such path element found
-                    MINIRE_THROW("no such scene element: {}", path);
-                }
-            }
-            else
-            {
-                // some leaf is alredy met, the path continues
-                MINIRE_THROW("no such scene element: {}", path);
-            }
-        }
-
-        if constexpr(std::is_same_v<T, Node::Sptr> ||
-                     std::is_same_v<T, MeshLeaf::Sptr> ||
-                     std::is_same_v<T, DirectionalLightLeaf::Sptr> ||
-                     std::is_same_v<T, PointLightLeaf::Sptr> ||
-                     std::is_same_v<T, PerspectiveCameraLeaf::Sptr> ||
-                     std::is_same_v<T, OrthographicCameraLeaf::Sptr> ||
-                     std::is_same_v<T, BillboardLeaf::Sptr>)
-        {
-            T * fetched = std::get_if<T>(&current);
-            MINIRE_INVARIANT(fetched, "element at path \"{}\" is not {}",
-                             path, utils::demangle<T>());
-            result = *fetched;
-            assert(result);
-        }
-        else if constexpr(!std::is_same_v<T, ChildIterator>)
-        {
-            result = current;
-        }
-
-        if constexpr (std::is_same_v<T, Node::Child>)
-        {
-            assert(std::visit([](auto const & i){ return i.operator bool(); }, result));
-        }
-
-        return result;
-    }
-
-    void Scene::setViewport(size_t weight, size_t height)
+    void SceneImpl::setViewport(size_t weight, size_t height)
     {
         _viewpoint.setViewport(weight, height);
     }
 
-    template<typename T>
-    void Scene::activate(T & item)
+    // TODO: don't revalidate invisible nodes
+    // TODO: don't revalidate culled-out nodes
+    void SceneImpl::revalidateModels(size_t epochNumber)
     {
-        item._activated = true;
-        activateParents(item._parent.lock());
-    }
-
-    void Scene::activateParents(Node::Sptr parent)
-    {
-        while(parent && !parent->_childActivated)
+        assert(_root);
+        std::vector<Node::Sptr> queue{_root};
+        queue.reserve(_nodesEstimate);  // TODO: it should be "max-depth-estimate" rather than nodes count
+        // TODO: !!! avoid full tree traverse !!!
+        while(!queue.empty())
         {
-            parent->_childActivated = true;
-            parent = parent->_parent.lock();
-        }
-    }
+            Node::Sptr node = queue.back();
+            queue.pop_back();
 
-    void Scene::activeChildrenAnimation(Node::Sptr parent)
-    {
-        while(parent && !parent->_hasActiveChildrenAnimation)
-        {
-            parent->_hasActiveChildrenAnimation = true;
-            parent = parent->_parent.lock();
-        }
-    }
+            assert(node);
+            node->revalidateModel(epochNumber);
 
-    void Scene::deactiveChildrenAnimation(Node::Sptr parent)
-    {
-        while(parent && parent->_hasActiveChildrenAnimation)
-        {
-            parent->_hasActiveChildrenAnimation = std::any_of(
-                parent->_children.cbegin(), parent->_children.cend(),
-                [](auto const & pair)
+            for(auto & [_, child] : node->_children)
+            {
+                std::visit(utils::Overloaded
                 {
-                    return std::visit(utils::Overloaded
+                    [&queue](Node::Sptr const & childNode)
                     {
-                        [](Node::Sptr const & i)
-                        {
-                            assert(i);
-                            return i->_hasActiveChildrenAnimation ||
-                                   i->_activeAnimation.operator bool();
-                        },
-                        [](auto const &) { return false; },
-                    }, pair.second);
-                });
-            parent = parent->_parent.lock();
+                        assert(childNode);
+                        queue.emplace_back(childNode);
+                    },
+                    [epochNumber](auto const & leafNode)
+                    {
+                        assert(leafNode);
+                        leafNode->revalidateModel(epochNumber);
+                    },
+                }, child);
+            }
         }
     }
 
     // TODO: don't animate invisible nodes
     // TODO: don't animate culled-out nodes
-    bool Scene::advanceAnimations(float delta /* seconds */, size_t epochNumber)
+    bool SceneImpl::advanceAnimations(float delta /* seconds */, size_t epochNumber)
     {
         assert(_root);
         std::vector<Node::Sptr> queue{_root};
@@ -629,8 +718,8 @@ namespace minire
                     AnimationTrack const & animationTrack = (*activeAnimation._animationTracks)[i];
                     ActiveAnimation::SequencerSet const & sequencerSet = activeAnimation._animationSequencers[i];
 
-                    Node::Sptr targetNode = animationTrack._target.lock();
-                    if (!targetNode) continue;
+                    Node::Sptr const & targetNode = animationTrack._target;
+                    if (!targetNode || targetNode->detached()) continue;
 
                     assert(animationTrack._animation);
                     scene::KeyframeAnimation const & anim = *animationTrack._animation;
@@ -667,7 +756,7 @@ namespace minire
                 }
 
                 // maybe deactive (if all sequencers are done)
-                bool hasNonDoneSequencer = std::any_of(
+                bool hasNonDoneSequencer = std::any_of( // TODO: ranges
                     activeAnimation._uniqueSequencers.cbegin(),
                     activeAnimation._uniqueSequencers.cend(),
                     [](ActiveAnimation::Sequencer::Sptr const & sequencer)
@@ -677,12 +766,12 @@ namespace minire
                     });
                 if (hasNonDoneSequencer)
                 {
-                    activeChildrenAnimation(node->_parent.lock());
+                    node->activeChildrenAnimation();
                 }
                 else
                 {
                     node->_activeAnimation.reset();
-                    deactiveChildrenAnimation(node->_parent.lock());
+                    node->deactiveChildrenAnimation();
                 }
             }
 
@@ -708,9 +797,25 @@ namespace minire
         return updated;
     }
 
+    template<typename T>
+    void SceneImpl::activate(T & item)
+    {
+        item._activated = true;
+        activateParents(item._parent.lock());
+    }
+
+    void SceneImpl::activateParents(Node::Sptr parent)
+    {
+        while(parent && !parent->_childActivated)
+        {
+            parent->_childActivated = true;
+            parent = parent->_parent.lock();
+        }
+    }
+
     // TODO: don't lerp invisible nodes
     // TODO: don't lerp culled-out nodes
-    void Scene::lerp(float weight, size_t epochNumber)
+    void SceneImpl::lerp(float weight, size_t epochNumber)
     {
         assert(_root);
 
@@ -729,7 +834,7 @@ namespace minire
             if (node->_activated)
             {
                 node->_activated = node->lerp(weight, epochNumber);
-                invalidateGlobalTransform(node);
+                node->invalidateGlobalTransform();
             }
 
             if (node->_childActivated)
@@ -761,29 +866,9 @@ namespace minire
         }
     }
 
-    void Scene::revalidateNodes()
-    {
-        updateGlobalTransforms();
-        actualizeViewpoint();
-    }
-
-    void Scene::invalidateGlobalTransform(Node::Sptr node)
-    {
-        assert(node);
-        node->_globalTransformState = Node::GlobalTransformState::kDirty;
-
-        node = node->_parent.lock();
-        while(node &&
-              Node::GlobalTransformState::kClean == node->_globalTransformState)
-        {
-            node->_globalTransformState = Node::GlobalTransformState::kGrey;
-            node = node->_parent.lock();
-        }
-    }
-
     // TODO: don't lerp invisible nodes
     // TODO: don't lerp culled-out nodes
-    void Scene::updateGlobalTransforms()
+    void SceneImpl::updateGlobalTransforms()
     {
         static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
         static const glm::vec4 kOrigin(0, 0, 0, 1);
@@ -802,7 +887,7 @@ namespace minire
 
             assert(node);
 
-            // actualize own global transform
+            // actualize own global transform (TODO: move into Node::)
             if (Node::GlobalTransformState::kDirty == node->_globalTransformState)
             {
                 models::Transform const & localTransform = node->_localTransform.current();
@@ -815,7 +900,7 @@ namespace minire
                 node->_globalPosition = node->_globalTransform * kOrigin; // will drop "w"
             }
 
-            // maybe schedule children actualization
+            // maybe schedule children actualization (TODO: move into Node::)
             if (Node::GlobalTransformState::kClean != node->_globalTransformState)
             {
                 bool const forceDirty = Node::GlobalTransformState::kDirty == node->_globalTransformState;
@@ -837,34 +922,25 @@ namespace minire
                 }
             }
 
-            // mark node as clean
+            // mark node as clean (TODO: move into Node::)
             node->_globalTransformState = Node::GlobalTransformState::kClean;
         }
-
-        //dump(*_root, "(root)");
     }
 
-    void Scene::dump(Scene::Node const & node, std::string const & id, size_t level) const
+    void SceneImpl::revalidateNodes()
     {
-        MINIRE_INFO(">{}{}: {}", std::string(level*2, ' '), id, node._globalTransform);
-        for(auto const & [childId, child] : node._children)
-        {
-            if (auto const * childSptr = std::get_if<Node::Sptr>(&child);
-                childSptr && *childSptr)
-            {
-                dump(**childSptr, childId, level + 1);
-            }
-        }
+        updateGlobalTransforms();
+        actualizeViewpoint();
     }
 
-    void Scene::actualizeViewpoint()
+    void SceneImpl::actualizeViewpoint()
     {
         std::visit(utils::Overloaded
         {
             [](std::monostate) {},
-            [this](auto const & wcamera)
+            [this](auto const & camera)
             {
-                if (auto camera = wcamera.lock(); camera)
+                if (camera && !camera->detached())
                 {
                     Node::Sptr parent = camera->_parent.lock();
                     MINIRE_INVARIANT(parent, "an active camera has no parent");
@@ -888,19 +964,21 @@ namespace minire
         }, _activeCamera);
     }
 
-    material::SkinningVector Scene::makeSkinningVector(Mesh const & mesh) const
+    // TODO: should be a static method?
+    material::SkinningVector
+    SceneImpl::makeSkinningVector(MeshLeaf const & mesh) const
     {
         static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
 
         material::SkinningVector result;
         result.reserve(mesh._skinBones.size());
 
-        for(Mesh::SkinBone const & skinBone : mesh._skinBones)
+        for(MeshLeaf::SkinBone const & skinBone : mesh._skinBones)
         {
-            if (Node::Sptr node = skinBone._node.lock();
-                node && node->hasGlobalTransform())
+            if (skinBone._node && !skinBone._node->detached() &&
+                skinBone._node->hasGlobalTransform())
             {
-                result.emplace_back(node->_globalTransform * skinBone._inverseBindMatrix);
+                result.emplace_back(skinBone._node->_globalTransform * skinBone._inverseBindMatrix);
             }
             else
             {

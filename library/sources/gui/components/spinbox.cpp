@@ -38,8 +38,8 @@ namespace minire::gui::components
         , _minimum(*this, -100.0f)
         , _maximum(*this, 100.0f)
         , _format(*this, "{}")
-        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController))
-        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController))
+        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController, false, true))
+        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController, false, true))
         , _editbox(std::make_shared<Editbox>("__edit__", theme, style, overlayController))
     {
         refreshView();
@@ -52,25 +52,27 @@ namespace minire::gui::components
         // build buttons
         assert(_decreaseButton);
         _decreaseButton->setParent(sharedThis);
-        _decreaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__spinbox__",
-            [this](Component const &, gui::events::OnClick const &)
+        _decreaseButton->setCallback(std::in_place_type<gui::OnClick>, "__spinbox__",
+            [this](Component const &, gui::OnClick const &)
             { stepDown(); });
-        _decreaseButton->icon() = theme().makeImage("spinbox", "i:decrease", style());
+        _decreaseButton->icon() =
+            theme().parameter<minire::models::sprite::MaybeImage>("spinbox", "i:decrease", style());
 
         assert(_increaseButton);
         _increaseButton->setParent(sharedThis);
-        _increaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__spinbox__",
-            [this](Component const &, gui::events::OnClick const &)
+        _increaseButton->setCallback(std::in_place_type<gui::OnClick>, "__spinbox__",
+            [this](Component const &, gui::OnClick const &)
             { stepUp(); });
-        _increaseButton->icon() = theme().makeImage("spinbox", "i:increase", style());
+        _increaseButton->icon() =
+            theme().parameter<minire::models::sprite::MaybeImage>("spinbox", "i:increase", style());
 
         // build editbox
         assert(_editbox);
         _editbox->setParent(sharedThis);
         _editbox->horizontal() = Arranger(position::Begin{}, dimension::Fill{});
         _editbox->vertical() = Arranger(position::Begin{}, dimension::Fill{});
-        _editbox->setCallback(std::in_place_type<minire::events::application::OnKeyDown>, "__spinbox__",
-            [this](Component const &, minire::events::application::OnKeyDown const & event)
+        _editbox->setCallback(std::in_place_type<application::OnKeyDown>, "__spinbox__",
+            [this](Component const &, application::OnKeyDown const & event)
             {
                 if (event._key == SDLK_RETURN)
                 {
@@ -92,8 +94,8 @@ namespace minire::gui::components
                 }
             });
 
-        _editbox->setCallback(std::in_place_type<gui::events::OnUnfocus>, "__spinbox__",
-            [this](Component const &, gui::events::OnUnfocus const &)
+        _editbox->setCallback(std::in_place_type<gui::OnUnfocus>, "__spinbox__",
+            [this](Component const &, gui::OnUnfocus const &)
             {
                 if (std::optional<float> newValue = parseFloat(_editbox->toUtf8());
                     newValue)
@@ -106,8 +108,8 @@ namespace minire::gui::components
                 }
             });
 
-        _editbox->setCallback(std::in_place_type<minire::events::application::OnMouseWheel>, "__spinbox__",
-            [this](Component const &, minire::events::application::OnMouseWheel const & event)
+        _editbox->setCallback(std::in_place_type<application::OnMouseWheel>, "__spinbox__",
+            [this](Component const &, application::OnMouseWheel const & event)
             {
                 int dy = event._dy;
                 if (dy > 0)
@@ -206,7 +208,7 @@ namespace minire::gui::components
             {
                 std::string valueStr = fmt::format(fmt::runtime(_format.get()),
                                                    _value.get());
-                text->assign(valueStr, _editbox->activeFormat());
+                text = text::FormattedString(valueStr, _editbox->activeFormat());
             });
     }
 }

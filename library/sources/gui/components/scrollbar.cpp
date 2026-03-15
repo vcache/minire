@@ -22,7 +22,7 @@ namespace minire::gui::components
             assert(_scrollbar._increaseButton);
             assert(_scrollbar._decreaseButton);
 
-            bool const vertical = _scrollbar._isVertical.get();
+            bool const vertical = _scrollbar._isVertical;
 
             if (&component == _scrollbar._increaseButton.get())
             {
@@ -91,21 +91,23 @@ namespace minire::gui::components
                          Theme::Style const & style,
                          OverlayController & overlayController,
                          bool isVertical)
-        : Component(id, theme, style, overlayController)
-        , _background(*this, theme.makeImage("scrollbar", "bg", style))
+        : Image(id, theme, style, overlayController,
+                theme.parameter<minire::models::sprite::MaybeImage>("scrollbar", "bg", style))
         , _step(*this, 0.1f)
         , _minSliderLength(*this, theme.parameter<float>("scrollbar", "min-slider-length", style))
-        , _isVertical(*this, isVertical)
         , _value(*this, 0.0f)
-        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController))
-        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController))
-        , _slider(std::make_shared<Button>("__slider__", theme, style, overlayController))
+        , _increaseButton(std::make_shared<Button>("__incBtn__", theme, style, overlayController, false, true)) // TODO: cascade style "scrollbar" <- "button"
+        , _decreaseButton(std::make_shared<Button>("__decBtn__", theme, style, overlayController, false, true)) // TODO: cascade style "scrollbar" <- "button"
+        , _slider(std::make_shared<Button>("__slider__", theme, style, overlayController, false, true))         // TODO: cascade style "scrollbar" <- "slider-bg"
+        , _isVertical(isVertical)
     {
         layout() = std::make_shared<CustomLayout>(*this);
     }
 
     void Scrollbar::initialize()
     {
+        Image::initialize();
+
         auto sharedThis = shared_from_this();
 
         // TODO: why create it here things that will be rewritten in revalidate()
@@ -113,69 +115,63 @@ namespace minire::gui::components
         // Increase button
         assert(_increaseButton);
         _increaseButton->setParent(sharedThis);
-        _increaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__scrollbar__",
-            [this](Component const &, gui::events::OnClick const &)
+        _increaseButton->setCallback(std::in_place_type<gui::OnClick>, "__scrollbar__",
+            [this](Component const &, gui::OnClick const &)
             { setValue(_value.get() + _step.get()); });
-        _increaseButton->icon() = theme().makeImage("scrollbar",
-            _isVertical.get() ? "i:arrow-down" : "i:arrow-right",
+        _increaseButton->icon() = theme().parameter<minire::models::sprite::MaybeImage>("scrollbar",
+            _isVertical ? "i:arrow-down" : "i:arrow-right",
             style());
-        _defaultIncreaseIcon = _increaseButton->icon().get();
 
         // Decrease button
         assert(_decreaseButton);
         _decreaseButton->setParent(sharedThis);
-        _decreaseButton->setCallback(std::in_place_type<gui::events::OnClick>, "__scrollbar__",
-            [this](Component const &, gui::events::OnClick const &)
+        _decreaseButton->setCallback(std::in_place_type<gui::OnClick>, "__scrollbar__",
+            [this](Component const &, gui::OnClick const &)
             { setValue(_value.get() - _step.get()); });
-        _decreaseButton->icon() = theme().makeImage("scrollbar",
-            _isVertical.get() ? "i:arrow-up" : "i:arrow-left",
+        _decreaseButton->icon() = theme().parameter<minire::models::sprite::MaybeImage>("scrollbar",
+            _isVertical ? "i:arrow-up" : "i:arrow-left",
             style());
-        _defaultDecreaseIcon = _decreaseButton->icon().get();
 
         // Slider button
         assert(_slider);
         _slider->setParent(sharedThis);
         _slider->isDraggable() = true;
-        _slider->setCallback(std::in_place_type<gui::events::OnDragBegin>, "__scrollbar__",
-            [this](Component const &, gui::events::OnDragBegin const &)
+        _slider->setCallback(std::in_place_type<gui::OnDragBegin>, "__scrollbar__",
+            [this](Component const &, gui::OnDragBegin const &)
             {
                 _dragInitialOffset = _sliderAreaBoundaries.first +
                     normify(_value.get()) * (_sliderAreaBoundaries.second - _sliderLength);
             });
 
-        _slider->setCallback(std::in_place_type<gui::events::OnDragMove>, "__scrollbar__",
-            [this](Component const &, gui::events::OnDragMove const & e)
+        _slider->setCallback(std::in_place_type<gui::OnDragMove>, "__scrollbar__",
+            [this](Component const &, gui::OnDragMove const & e)
             {
-                int const begin = _isVertical.get() ? e._begin._y
-                                                    : e._begin._x;
-                int const offset = _isVertical.get() ? e._event._absY
-                                                     : e._event._absX;
+                int const begin = _isVertical ? e._begin._y : e._begin._x;
+                int const offset = _isVertical ? e._event._absY : e._event._absX;
                 setValueFromPosition(static_cast<float>(
                     _dragInitialOffset + (offset - begin)));
             });
 
-        _slider->setCallback(std::in_place_type<minire::events::application::OnMouseWheel>,
+        _slider->setCallback(std::in_place_type<application::OnMouseWheel>,
             "__scrollbar__",
-            [this](Component const &, minire::events::application::OnMouseWheel const & e)
+            [this](Component const &, application::OnMouseWheel const & e)
             {
                 handle(e);
             });
 
         // Background interaction
         this->isDraggable() = true;
-        this->setCallback(std::in_place_type<gui::events::OnDragBegin>, "__scrollbar__",
-            [this](Component const &, gui::events::OnDragBegin const & e)
+        this->setCallback(std::in_place_type<gui::OnDragBegin>, "__scrollbar__",
+            [this](Component const &, gui::OnDragBegin const & e)
             {
-                int const abs = _isVertical.get() ? e._event._y
-                                                  : e._event._x;
+                int const abs = _isVertical ? e._event._y : e._event._x;
                 setValueFromPosition(static_cast<float>(abs - _sliderLength/2));
             });
 
-        this->setCallback(std::in_place_type<gui::events::OnDragMove>, "__scrollbar__",
-            [this](Component const &, gui::events::OnDragMove const & e)
+        this->setCallback(std::in_place_type<gui::OnDragMove>, "__scrollbar__",
+            [this](Component const &, gui::OnDragMove const & e)
             {
-                int const abs = _isVertical.get() ? e._event._absY
-                                                  : e._event._absX;
+                int const abs = _isVertical ? e._event._absY : e._event._absX;
                 setValueFromPosition(static_cast<float>(abs - _sliderLength/2));
             });
     }
@@ -209,53 +205,18 @@ namespace minire::gui::components
                                         Area const & contentArea,
                                         Area const & clippingWindow)
     {
-        // revalidate background (if any)
-        if (auto background = _background.get(); background)
-        {
-            if (_background.isInvalidated())
-            {
-                background->setContentInvalidator(shared_from_this());
-            }
-
-            background->setContentArea(contentArea);
-            background->setClippingWindow(clippingWindow);
-            background->setVisible(effectiveVisible);
-            zOffset = background->onZOrderChanged(zOffset);
-        }
-
-        // revalidate icons
-        // (update only if it is a default one, it won't overwrite custom icon)
-        if (_isVertical.isInvalidated())
-        {
-            assert(_increaseButton);
-            if (_increaseButton->icon().get() == _defaultIncreaseIcon.lock())
-            {
-                _increaseButton->icon() = theme().makeImage("scrollbar",
-                    _isVertical.get() ? "i:arrow-down" : "i:arrow-right",
-                    style());
-
-                _defaultIncreaseIcon = _increaseButton->icon().get();
-            }
-
-            assert(_decreaseButton);
-            if (_decreaseButton->icon().get() == _defaultDecreaseIcon.lock())
-            {
-                _decreaseButton->icon() = theme().makeImage("scrollbar",
-                    _isVertical.get() ? "i:arrow-up" : "i:arrow-left",
-                    style());
-                _defaultDecreaseIcon = _decreaseButton->icon().get();
-            }
-        }
+        zOffset = Image::revalidateContent(
+            zOffset, effectiveVisible, contentArea, clippingWindow);
 
         // calculate slider's max offset
         bool const hasIncBtn = _increaseButton->visible().get();
         bool const hasDecBtn = _decreaseButton->visible().get();
-        float const buttonSize = _isVertical.get() ? contentArea._width : contentArea._height;
+        float const buttonSize = _isVertical ? contentArea._width : contentArea._height;
         float const btnDeltas =  (hasIncBtn ? buttonSize : 0) + (hasDecBtn ? buttonSize : 0);
         Boundaries const sliderAreaBoundaries
         {
-            (_isVertical.get() ? contentArea._top    : contentArea._left)  + (hasDecBtn ? buttonSize : 0),
-            (_isVertical.get() ? contentArea._height : contentArea._width) - btnDeltas,
+            (_isVertical ? contentArea._top    : contentArea._left)  + (hasDecBtn ? buttonSize : 0),
+            (_isVertical ? contentArea._height : contentArea._width) - btnDeltas,
         };
 
         // revalidate slider size and position
@@ -276,19 +237,17 @@ namespace minire::gui::components
             Arranger vArranger(position::Constant{sliderOffset},
                                dimension::Constant{_sliderLength});
 
-            _slider->horizontal() = _isVertical.get() ? hArranger : vArranger;
-            _slider->vertical() = _isVertical.get() ? vArranger : hArranger;
+            _slider->horizontal() = _isVertical ? hArranger : vArranger;
+            _slider->vertical() = _isVertical ? vArranger : hArranger;
         }
 
         // finish
 
         _sliderAreaBoundaries = sliderAreaBoundaries;
 
-        _background.revalidate();
         _value.revalidate();
         _step.revalidate();
         _minSliderLength.revalidate();
-        _isVertical.revalidate();
 
         return zOffset;
     }
@@ -317,7 +276,7 @@ namespace minire::gui::components
         return *_decreaseButton;
     }
 
-    void Scrollbar::handle(minire::events::application::OnMouseWheel const & e)
+    void Scrollbar::handle(application::OnMouseWheel const & e)
     {
         setValue(_value.get() + _step.get() * static_cast<float>(-e._dy));
         Component::handle(e);

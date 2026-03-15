@@ -1,6 +1,5 @@
 #include <minire/application.hpp>
 
-#include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/camera.hpp>
@@ -20,7 +19,6 @@ namespace
 {
     struct Arguments
     {
-        size_t _maxCtrlFps;
         float  _velocity;
         bool   _useTexture;
         bool   _useGltf;
@@ -31,7 +29,6 @@ namespace
 
     class ArgsParser
     {
-        static constexpr char const * kMaxCtrlFps = "max-ctrl-fps";
         static constexpr char const * kVelocity = "velocity";
         static constexpr char const * kUseTexture = "use-texture";
         static constexpr char const * kUseGltf = "use-gltf";
@@ -44,9 +41,6 @@ namespace
                     "\nOptions")
         {
             _desc.add_options()
-                (kMaxCtrlFps,
-                    po::value<size_t>()->default_value(10),
-                    "FPS of a controller (main loop frequency)")
                 (kVelocity,
                     po::value<float>()->default_value(1.0f),
                     "a rotation velocity")
@@ -66,7 +60,6 @@ namespace
                       vm);
             po::notify(vm);
 
-            _result._maxCtrlFps = vm[kMaxCtrlFps].as<size_t>();
             _result._velocity = vm[kVelocity].as<float>();
             _result._useTexture = vm[kUseTexture].as<bool>();
             _result._useGltf = vm[kUseGltf].as<bool>();
@@ -89,7 +82,7 @@ namespace
 namespace
 {
     class RotatingCube
-        : public minire::BasicController
+        : public minire::Application
     {
     private:
         minire::models::Transform cameraTransform(float dist = 5.0f)
@@ -108,33 +101,35 @@ namespace
         }
 
     public:
-        explicit RotatingCube(minire::content::Manager & contentManager,
-                              Arguments const & arguments)
-            : BasicController(contentManager, arguments._maxCtrlFps)
+        template<typename... AppArgs>
+        explicit RotatingCube(Arguments const & arguments,
+                              AppArgs && ... appArgs)
+            : Application(std::forward<AppArgs>(appArgs)...)
             , _arguments(arguments)
         {}
 
-        void start() override
+        void onStart() override
         {
             using namespace minire::content;
-            using namespace minire::events::controller;
             using namespace minire::models;
 
-            minire::models::PerspectiveCamera camera{._yFov = glm::radians(45.0f),
-                                                     ._zNear = 0.001f,
-                                                     ._zFar = 1000.0f,
-                                                     ._aspectRatio = std::nullopt};
+            Application::onStart();
 
-            enqueue<SceneNewNode>("cam-node", ScenePath(), cameraTransform(5.0f), true);
-            enqueue<SceneNewPerspectiveCamera>("cam", ScenePath{"cam-node"}, camera, true);
-            enqueue<SceneActivateCamera>(ScenePath{"cam-node", "cam"});
+            PerspectiveCamera const cameraModel{._yFov = glm::radians(45.0f),
+                                                ._zNear = 0.001f,
+                                                ._zFar = 1000.0f,
+                                                ._aspectRatio = std::nullopt,
+                                                ._visible = true};
 
-            enqueue<SceneNewNode>("light-node", ScenePath(), Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
-            enqueue<SceneNewPointLight>("bulb", ScenePath{"light-node"}, PointLight(glm::vec4(1, 1, 1, 500), 2), true);
+            auto camNode = scene().root().newNode("cam-node", Node{cameraTransform(5.0f), true});
+            auto camera = camNode->newPerspectiveCamera(cameraModel);
+            camera->activate();
 
-            enqueue<SceneNewNode>("cube-node", ScenePath(), _cubeTransform, true);
-            enqueue<SceneNewMesh>("cube", ScenePath{"cube-node"},
-                Mesh
+            auto lightNode = scene().root().newNode(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
+            lightNode->newPointLight("bulb", PointLight(glm::vec4(1, 1, 1, 500), 2, std::nullopt, true));
+
+            _cubeNode = scene().root().newNode("cube-node", Node{Transform(), true});
+            _cubeNode->newMesh("cube", Mesh
                 {
                     ._source = _arguments._useGltf ? mkPath("cube.gltf", path::Special::kMeshes, path::Index(0))
                                                    : mkPath("cube.obj"),
@@ -152,26 +147,29 @@ namespace
                         result->_metallicFactor = 0.5f;
                         result->_roughnessFactor = 0.6f;
                         return result;
-                    }()
-                },
-                true);
+                    }(),
+                    ._skin = std::nullopt,
+                    ._visible = true,
+                });
         }
 
-        void step() override
+        bool onStep() override
         {
-            using namespace minire::events::controller;
             using namespace minire::models;
 
             float const delta = frameTime();
-            _cubeTransform._rotation = glm::rotate(_cubeTransform._rotation,
-                                                   delta * _arguments._velocity,
-                                                   glm::vec3{0, 1, 0});
-            enqueue<SceneSetTransform>(ScenePath{"cube-node"}, _cubeTransform);
+
+            Transform & origin = _cubeNode->origin();
+            origin._rotation = glm::rotate(origin._rotation,
+                                           delta * _arguments._velocity,
+                                           glm::vec3{0, 1, 0});
+
+            return true;
         }
 
     private:
         Arguments const &         _arguments;
-        minire::models::Transform _cubeTransform;
+        minire::scene::Node::Sptr _cubeNode;
     };
 }
 
@@ -196,8 +194,7 @@ int main(int argc, char ** argv)
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
 
         // Create and run the Application and its Controller
-        minire::Application application(1280, 720, "Rotating cube", manager);
-        application.setController<RotatingCube>(arguments);
+        RotatingCube application(arguments, 1280, 720, "Rotating cube", manager);
         application.setVsync(true);
         application.setGlDebug(false);
 

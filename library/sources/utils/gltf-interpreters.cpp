@@ -7,8 +7,7 @@
 #include <minire/models/image.hpp>
 #include <minire/models/pbr-material.hpp>
 #include <minire/models/sampler.hpp>
-
-#include <utils/uuid.hpp>
+#include <minire/utils/uuid.hpp>
 
 #include <algorithm>
 #include <initializer_list>

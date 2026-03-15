@@ -51,7 +51,6 @@ namespace minire::sdl
         , _width(width)
         , _height(height)
         , _title(title)
-        , _captureClipboard(false)
         , _working(true)
     {
         MINIRE_INVARIANT(width > 0 && height > 0,
@@ -115,9 +114,7 @@ namespace minire::sdl
 
     void Application::onMouseUp(int, int, bool, models::MouseButton) {}
 
-    void Application::onTextInput(std::string) {}
-
-    void Application::onClipboardUpdate(std::string, std::string) {}
+    void Application::onTextInput(std::string const &) {}
 
     void Application::onKeyUp(::SDL_Keycode, ::SDL_Scancode, uint16_t) {}
 
@@ -160,17 +157,18 @@ namespace minire::sdl
         }
     }
 
-    void Application::setCaptureClipboard(bool captureClipboard)
+    void Application::setClipboardText(std::string const & text) const
     {
-        _captureClipboard = captureClipboard;
-        maybeEmitClipboardUpdate();
+        if (int const result = ::SDL_SetClipboardText(text.c_str());
+            0 != result)
+        {
+            MINIRE_ERROR("Failed to set clipboard text: {}",
+                         ::SDL_GetError());
+        }
     }
 
-    void Application::maybeEmitClipboardUpdate()
+    std::string Application::clipboardText() const
     {
-        if (!_captureClipboard)
-            return;
-
         std::string clipboardText;
         if (::SDL_HasClipboardText())
         {
@@ -183,32 +181,7 @@ namespace minire::sdl
                 MINIRE_ERROR("failed to emit clipboard update: {}", ::SDL_GetError());
             }
         }
-
-        std::string primarySelection;
-        if (::SDL_HasPrimarySelectionText())
-        {
-            if (SdlUptr<char> text(::SDL_GetPrimarySelectionText()); text)
-            {
-                primarySelection = text.get();
-            }
-            else
-            {
-                MINIRE_ERROR("failed to emit primary selection update: {}", ::SDL_GetError());
-            }
-        }
-
-        onClipboardUpdate(std::move(clipboardText),
-                          std::move(primarySelection));
-    }
-
-    void Application::setClipboardText(std::string const & text) const
-    {
-        if (int const result = ::SDL_SetClipboardText(text.c_str());
-            0 != result)
-        {
-            MINIRE_ERROR("Failed to set clipboard text: {}",
-                         ::SDL_GetError());
-        }
+        return clipboardText;
     }
 
     void Application::setPrimarySelection(std::string const & text) const
@@ -221,6 +194,33 @@ namespace minire::sdl
         }
     }
 
+    std::string Application::primarySelection() const
+    {
+        std::string primarySelection;
+        if (::SDL_HasPrimarySelectionText())
+        {
+            if (SdlUptr<char> text(::SDL_GetPrimarySelectionText()); text)
+            {
+                primarySelection = text.get();
+            }
+            else
+            {
+                MINIRE_ERROR("failed to emit primary selection update: {}", ::SDL_GetError());
+            }
+        }
+        return primarySelection;
+    }
+
+    void Application::startTextInput() const
+    {
+        ::SDL_StartTextInput();
+    }
+
+    void Application::stopTextInput() const
+    {
+        ::SDL_StopTextInput();
+    }
+
     void Application::handleResize(int w, int h)
     {
         MINIRE_INVARIANT(w > 0 && h > 0,
@@ -230,7 +230,7 @@ namespace minire::sdl
         onResize(w, h);
     }
 
-    void Application::handle(SDL_WindowEvent const & e)
+    void Application::handleEvent(SDL_WindowEvent const & e)
     {
         switch(e.event)
         {
@@ -241,7 +241,7 @@ namespace minire::sdl
         }
     }
 
-    void Application::handle(SDL_Event const & e)
+    void Application::handleEvent(SDL_Event const & e)
     {
         // https://wiki.libsdl.org/SDL_Event
         switch(e.type)
@@ -251,7 +251,7 @@ namespace minire::sdl
                 break;
 
             case SDL_WINDOWEVENT:
-                handle(e.window);
+                handleEvent(e.window);
                 break;
 
             case SDL_KEYDOWN:
@@ -297,19 +297,20 @@ namespace minire::sdl
                 onTextInput(std::string(e.text.text));
                 break;
 
-            case SDL_CLIPBOARDUPDATE:
-                maybeEmitClipboardUpdate();
-                break;
-
             default:
                 MINIRE_DEBUG("Unhandled SDL event: {:#x}", e.type);
         }
     }
 
+    void Application::onStart() {}
+
+    void Application::onEnd() {}
+
     // TODO: add FPS limiter
     void Application::run()
     {
         utils::FpsCounter fpsCounter(2);
+        onStart();
         while(_working)
         {
             _frameTicks = SDL_GetTicks();
@@ -318,7 +319,7 @@ namespace minire::sdl
             ::SDL_Event event;
             while (::SDL_PollEvent(&event))
             {
-                handle(event);
+                handleEvent(event);
             }
 
             // paint frame
@@ -333,6 +334,7 @@ namespace minire::sdl
                 onFps(fps->first, fps->second);
             }
         }
+        onEnd();
     }
 
 }

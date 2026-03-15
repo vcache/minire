@@ -1,5 +1,7 @@
 #include <minire/utils/glyph-grid.hpp>
 
+#include <minire/errors.hpp>
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -41,8 +43,9 @@ namespace minire::utils
 
     utils::Rect const & TextLayout::layoutOf(size_t charIndex) const
     {
-        assert(charIndex < _heap.size());
-        return _heap.at(charIndex);
+        MINIRE_INVARIANT(charIndex < _heap.size(), "bad char index: {} >= {}",
+                         charIndex, _heap.size());
+        return _heap[charIndex];
     }
 
     std::pair<size_t, size_t> TextLayout::pixelsToGrid(float x, float y) const

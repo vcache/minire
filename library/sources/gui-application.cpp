@@ -1,47 +1,29 @@
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 
+#include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
-#include <minire/events/controller.hpp>
+#include <minire/gui/events.hpp>
 #include <minire/logging.hpp>
 
-#include <gui-controller/builtin-theme.hpp>
-#include <gui-controller/image-view.hpp>
-#include <gui-controller/text-view.hpp>
+#include <gui-application/builtin-theme.hpp>
+#include <minire/utils/rect.hpp>
+#include <text/measurer.hpp>
+#include <utils/overloaded.hpp>
 
 #include <cassert>
 
 namespace minire
 {
-    gui::ImageView::Sptr
-    GuiController::makeImageView(content::Id const & textureId,
-                                 utils::Patch const & patch)
+    GuiApplication::~GuiApplication()
     {
-        auto result = std::make_shared<gui_controller::ImageViewImpl>(
-            textureId, patch, *this);
-        result->initialize();
-        return result;
-    }
-
-    gui::TextView::Sptr
-    GuiController::makeTextView(text::FormattedString const & text,
-                                content::Id const & fontFace)
-    {
-        auto result = std::make_shared<gui_controller::TextViewImpl>(
-            text, fontFace, *this);
-        result->initialize();
-        return result;
-    }
-
-    GuiController::~GuiController()
-    {
-        while(_overlays.size() > 1)
+        while(_overlays.size() > 1) // don't pop the first one
         {
             guiPop();
         }
     }
 
-    gui::Component & GuiController::guiPush(
-        std::string tag, models::InputHandler::Wptr fallbackHandler)
+    gui::Component & GuiApplication::guiPush(
+        std::string tag, application::InputHandler::Wptr fallbackHandler)
     {
         // cancel all in-progress operation in a current Overlay
         if (!_overlays.empty())
@@ -53,14 +35,14 @@ namespace minire
             if (auto focused = overlay._focused.lock(); focused)
             {
                 focused->_hasFocus = false;
-                focused->handle(gui::events::OnUnfocus{});
+                focused->handle(gui::OnUnfocus{});
                 overlay._focused.reset();
             }
 
             if (auto hovered = overlay._hovered.lock(); hovered)
             {
                 hovered->_isHovered = false;
-                hovered->handle(gui::events::OnMouseLeave{});
+                hovered->handle(gui::OnMouseLeave{});
                 overlay._hovered.reset();
             }
 
@@ -69,7 +51,7 @@ namespace minire
                 if (clickTarget->_isDragging)
                 {
                     clickTarget->_isDragging = false;
-                    clickTarget->handle(gui::events::OnDragEnd{std::nullopt});
+                    clickTarget->handle(gui::OnDragEnd{std::nullopt});
                     _dragBegin = std::nullopt;
                 }
                 overlay._toClick.reset();
@@ -101,39 +83,52 @@ namespace minire
         return *root;
     }
 
-    void GuiController::guiPop()
+    void GuiApplication::guiPop()
     {
         MINIRE_INVARIANT(_overlays.size() > 1,
                          "cannot pop the latest GUI overlay");
         _overlays.pop_back();
     }
 
-    GuiController::Overlay & GuiController::topOverlay()
+    GuiApplication::Overlay & GuiApplication::topOverlay()
     {
         assert(!_overlays.empty());
         return _overlays.back();
     }
 
-    GuiController::Overlay const & GuiController::topOverlay() const
+    GuiApplication::Overlay const & GuiApplication::topOverlay() const
     {
         assert(!_overlays.empty());
         return _overlays.back();
     }
 
-    void GuiController::step()
+    bool GuiApplication::onStep()
     {
-        BasicController::step();
+        bool result = Application::onStep();
 
-        size_t offset = 1, i = 0;
-        for(Overlay & overlay : _overlays)
+        bool invalidated = true;
+        size_t iterations = 0;
+        while(invalidated && iterations < 5)
         {
-            assert(overlay._root);
-            offset = std::max(offset, i * 10'000'000'000);
-            offset = overlay._root->revalidate(offset, true, _windowArea, _windowArea);
-            i++;
+            invalidated = false;
+
+            size_t offset = 1, i = 0;
+            for(Overlay & overlay : _overlays)
+            {
+                assert(overlay._root);
+                offset = std::max(offset, i * 10'000'000'000);
+                offset = overlay._root->revalidate(offset, true, _windowArea, _windowArea);
+                i++;
+                invalidated |= overlay._root->invalidated();
+            }
+
+            iterations++;
         }
 
-        commitPendedViews();
+        if (iterations > 2)
+        {
+            MINIRE_WARNING("gui loop probably detected: {} iterations", iterations);
+        }
 
         // force recalc of hovered item
         _mouseUpdated = true;
@@ -142,26 +137,12 @@ namespace minire
         auto hoveredComp = hovered();
         setSystemCursor(hoveredComp ? hoveredComp->systemCursor()
                                     : models::SystemCursor::kArrow);
+
+        return result; // not add "true" since Gui don't need lerping
     }
 
-    void GuiController::handle(events::application::OnResize const & e)
+    bool GuiApplication::handle(application::OnMouseWheel const & e)
     {
-        BasicController::handle(e);
-        _windowArea = gui::Area{._left = 0, ._top = 0,
-                                 ._width = static_cast<float>(e._width),
-                                 ._height = static_cast<float>(e._height)};
-    }
-
-    void GuiController::handle(events::application::OnFps const & e)
-    {
-        BasicController::handle(e);
-    }
-
-    bool GuiController::handle(events::application::OnMouseWheel const & e)
-    {
-        if(BasicController::handle(e))
-            return true;
-
         Overlay & overlay = topOverlay();
 
         if (auto focused = overlay._focused.lock(); focused)
@@ -179,14 +160,11 @@ namespace minire
             return sink->handle(e);
         }
 
-        return false;
+        return Application::handle(e);
     }
 
-    bool GuiController::handle(events::application::OnMouseMove const & e)
+    bool GuiApplication::handle(application::OnMouseMove const & e)
     {
-        if(BasicController::handle(e))
-            return true;
-
         _mouseX = e._absX;
         _mouseY = e._absY;
         _mouseUpdated = true;
@@ -198,7 +176,7 @@ namespace minire
             clickTarget->_isDragging)
         {
             assert(_dragBegin);
-            clickTarget->handle(gui::events::OnDragMove{*_dragBegin, e});
+            clickTarget->handle(gui::OnDragMove{*_dragBegin, e});
         }
 
         if (auto destination = hovered(); destination)
@@ -211,14 +189,11 @@ namespace minire
             return sink->handle(e);
         }
 
-        return false;
+        return Application::handle(e);
     }
 
-    bool GuiController::handle(events::application::OnMouseDown const & e)
+    bool GuiApplication::handle(application::OnMouseDown const & e)
     {
-        if(BasicController::handle(e))
-            return true;
-
         Overlay & overlay = topOverlay();
 
         if (auto destination = hovered(); destination)
@@ -230,7 +205,7 @@ namespace minire
             {
                 assert(!destination->_isDragging);
                 destination->_isDragging = true;
-                destination->handle(gui::events::OnDragBegin{e});
+                destination->handle(gui::OnDragBegin{e});
                 _dragBegin = e;
             }
             destination->handle(e);
@@ -241,22 +216,19 @@ namespace minire
             return sink->handle(e);
         }
 
-        return false;
+        return Application::handle(e);
     }
 
-    bool GuiController::handle(events::application::OnMouseUp const & e)
+    bool GuiApplication::handle(application::OnMouseUp const & e)
     {
-        if(BasicController::handle(e))
-            return true;
-
         Overlay & overlay = topOverlay();
-
         auto clickTarget = overlay._toClick.lock();
+
         if (clickTarget && clickTarget->_isDraggable.get() &&
             clickTarget->_isDragging)
         {
             clickTarget->_isDragging = false;
-            clickTarget->handle(gui::events::OnDragEnd{e});
+            clickTarget->handle(gui::OnDragEnd{e});
             _dragBegin = std::nullopt;
             overlay._toClick.reset();
         }
@@ -273,7 +245,7 @@ namespace minire
 
                 // NOTE: must not use "overlay" after handler(),
                 //       because handle may close it
-                clickTarget->handle(gui::events::OnClick{});
+                clickTarget->handle(gui::OnClick{});
             }
             else
             {
@@ -289,14 +261,11 @@ namespace minire
             return sink->handle(e);
         }
 
-        return false;
+        return Application::handle(e);
     }
 
-    bool GuiController::handle(events::application::OnKeyUp const & e)
+    bool GuiApplication::handle(application::OnKeyUp const & e)
     {
-        if(BasicController::handle(e))
-            return true;
-
         Overlay & overlay = topOverlay();
         if (auto focused = overlay._focused.lock(); focused)
         {
@@ -308,14 +277,11 @@ namespace minire
             return sink->handle(e);
         }
 
-        return false;
+        return Application::handle(e);
     }
 
-    bool GuiController::handle(events::application::OnKeyDown const & e)
+    bool GuiApplication::handle(application::OnKeyDown const & e)
     {
-        if(BasicController::handle(e))
-            return true;
-
         // Hotkeys are only applicable for the "__base__" overlay,
         // TODO: maybe hotkeys should be stored in an Overlay and
         //       be used on a per-Overlay manner.
@@ -335,14 +301,11 @@ namespace minire
             return sink->handle(e);
         }
 
-        return false;
+        return Application::handle(e);
     }
 
-    bool GuiController::handle(events::application::OnTextInput const & e)
+    bool GuiApplication::handle(application::OnTextInput const & e)
     {
-        if(BasicController::handle(e))
-            return true;
-
         Overlay & overlay = topOverlay();
         if (auto focused = overlay._focused.lock(); focused)
         {
@@ -354,36 +317,10 @@ namespace minire
             return sink->handle(e);
         }
 
-        return false;
+        return Application::handle(e);
     }
 
-    bool GuiController::handle(events::application::OnClipboardUpdate const & e)
-    {
-        _clipboardState = e;
-
-        if(BasicController::handle(e))
-            return true;
-
-        Overlay & overlay = topOverlay();
-        if (auto focused = overlay._focused.lock(); focused)
-        {
-            focused->handle(e);
-            return true;
-        }
-        else if (auto sink = overlay._fallbackHandler.lock(); sink)
-        {
-            return sink->handle(e);
-        }
-
-        return false;
-    }
-
-    void GuiController::handle(events::application::OnRayCaster const & e)
-    {
-        BasicController::handle(e);
-    }
-
-    void GuiController::setFocus(gui::Component::Sptr const & component)
+    void GuiApplication::setFocus(gui::Component::Sptr const & component)
     {
         Overlay & overlay = topOverlay();
         auto focused = overlay._focused.lock();
@@ -396,17 +333,17 @@ namespace minire
         if (focused)
         {
             focused->_hasFocus = false;
-            focused->handle(gui::events::OnUnfocus{});
+            focused->handle(gui::OnUnfocus{});
         }
 
         if (component)
         {
             component->_hasFocus = true;
-            component->handle(gui::events::OnFocus{});
+            component->handle(gui::OnFocus{});
         }
     }
 
-    void GuiController::setHover(gui::Component::Sptr const & component)
+    void GuiApplication::setHover(gui::Component::Sptr const & component)
     {
         Overlay & overlay = topOverlay();
         auto hovered = overlay._hovered.lock();
@@ -419,18 +356,18 @@ namespace minire
         if (hovered)
         {
             hovered->_isHovered = false;
-            hovered->handle(gui::events::OnMouseLeave{});
+            hovered->handle(gui::OnMouseLeave{});
         }
 
         if (component)
         {
             component->_isHovered = true;
             component->handle(
-                gui::events::OnMouseEnter{component == overlay._toClick.lock()});
+                gui::OnMouseEnter{component == overlay._toClick.lock()});
         }
     }
 
-    gui::Component::Sptr GuiController::hovered()
+    gui::Component::Sptr GuiApplication::hovered()
     {
         Overlay & overlay = topOverlay();
 
@@ -460,147 +397,180 @@ namespace minire
         return {};
     }
 
-    gui::Component const & GuiController::guiRoot() const
+    gui::Component const & GuiApplication::guiRoot() const
     {
         assert(!_overlays.empty());
         assert(_overlays.front()._root);
         return *(_overlays.front()._root);
     }
 
-    gui::Component & GuiController::guiRoot()
+    gui::Component & GuiApplication::guiRoot()
     {
         assert(!_overlays.empty());
         assert(_overlays.front()._root);
         return *(_overlays.front()._root);
     }
 
-    gui::Component const & GuiController::guiTop() const
+    gui::Component const & GuiApplication::guiTop() const
     {
         Overlay const & overlay = topOverlay();
         assert(overlay._root);
         return *overlay._root;
     }
 
-    gui::Component & GuiController::guiTop()
+    gui::Component & GuiApplication::guiTop()
     {
         Overlay & overlay = topOverlay();
         assert(overlay._root);
         return *overlay._root;
     }
 
-    std::string const & GuiController::guiTopTag() const
+    std::string const & GuiApplication::guiTopTag() const
     {
         Overlay const & overlay = topOverlay();
         assert(overlay._root);
         return overlay._tag;
     }
 
-    gui::Component & GuiController::push(std::string const & tag,
-                                          models::InputHandler::Wptr fallbackHandler)
+    gui::Component & GuiApplication::push(std::string const & tag,
+                                          application::InputHandler::Wptr fallbackHandler)
     {
         return guiPush(tag,  fallbackHandler);
     }
 
-    std::string const & GuiController::topTag() const
+    std::string const & GuiApplication::topTag() const
     {
         return guiTopTag();
     }
 
-    void GuiController::pop()
+    void GuiApplication::pop()
     {
         guiPop();
     }
 
-    void GuiController::startTextInput()
+    void GuiApplication::startTextInput()
     {
-        enqueue<events::controller::StartTextInput>();
+        Application::startTextInput();
     }
 
-    void GuiController::stopTextInput()
+    void GuiApplication::stopTextInput()
     {
-        enqueue<events::controller::StopTextInput>();
+        Application::stopTextInput();
     }
 
-    void GuiController::startClipboardCapture()
+    void GuiApplication::setClipboardText(std::string const & text)
     {
-        _clipboardState.reset();
-        enqueue<events::controller::StartClipboardCapture>();
+        Application::setClipboardText(text);
     }
 
-    void GuiController::stopClipboardCapture()
+    void GuiApplication::setPrimarySelection(std::string const & text)
     {
-        enqueue<events::controller::StopClipboardCapture>();
-        _clipboardState.reset();
+        Application::setPrimarySelection(text);
     }
 
-    void GuiController::setClipboardText(std::string const & text)
+    std::string GuiApplication::clipboardText() const
     {
-        enqueue<events::controller::SetClipboardText>(text);
+        return Application::clipboardText();
     }
 
-    void GuiController::setPrimarySelection(std::string const & text)
+    std::string GuiApplication::primarySelection() const
     {
-        enqueue<events::controller::SetPrimarySelection>(text);
+        return Application::primarySelection();
     }
 
-    std::string const * GuiController::getClipboardText() const
-    {
-        return _clipboardState ? &_clipboardState->_clipboardText : nullptr;
-    }
-
-    std::string const * GuiController::getPrimarySelection() const
-    {
-        return _clipboardState ? &_clipboardState->_primarySelection : nullptr;
-    }
-
-    void GuiController::setSystemCursor(models::SystemCursor const systemCursor)
+    void GuiApplication::setSystemCursor(models::SystemCursor const systemCursor)
     {
         if (_systemCursor != systemCursor)
         {
             _systemCursor = systemCursor;
-            enqueue<events::controller::SetSystemCursor>(_systemCursor);
+            Application::setSystemCursor(_systemCursor);
         }
     }
 
-    void GuiController::unfocus()
+    void GuiApplication::unfocus()
     {
         setFocus({});
     }
 
-    gui::Area const & GuiController::topClientArea() const
+    gui::Area const & GuiApplication::topClientArea() const
     {
         return _windowArea;
     }
 
-    void GuiController::set(::SDL_Scancode key, uint16_t mods,
-                            gui::HotKeys::Handler handler)
+    void GuiApplication::set(::SDL_Scancode key, uint16_t mods,
+                             gui::HotKeys::Handler handler)
     {
         _hotKeys.set(key, mods, std::move(handler));
     }
 
-    void GuiController::enqueueView(gui::ContentView::Sptr const & contentView)
+    Sprite::Sptr GuiApplication::create(minire::models::Sprite model)
     {
-        if (contentView)
-        {
-            _uncommittedViews.emplace_back(contentView);
-        }
+        return Application::makeSprite(std::move(model));
     }
 
-    void GuiController::commitPendedViews()
+    Label::Sptr GuiApplication::create(minire::models::Label model)
     {
-        for (gui::ContentView::Wptr const & wcontentView : _uncommittedViews)
+        return Application::makeLabel(std::move(model));
+    }
+
+    std::pair<glm::vec2 /* min size */, bool /* resizable */>
+    GuiApplication::measure(minire::models::sprite::Image const & image) const
+    {
+        return std::visit(utils::Overloaded
         {
-            if (auto const & contentView = wcontentView.lock();
-                contentView)
+            [this, &image](std::monostate const &)
             {
-                contentView->commit();
-            }
-        }
-        _uncommittedViews.clear();
+                auto lease = contentManager().borrow(image._texture);
+                assert(lease);
+                minire::models::Image::Sptr const & picture = lease->as<minire::models::Image::Sptr>();
+                MINIRE_INVARIANT(picture, "not a valid image: {}", image._texture);
+                return std::make_pair(glm::vec2(picture->_width, picture->_height), false);
+            },
+
+            [this](utils::Rect const & tile)
+            {
+                return std::make_pair(glm::vec2(tile._right - tile._left + 1,
+                                                tile._bottom - tile._top + 1),
+                                      false);
+            },
+
+            [this](utils::NinePatch const & ninePatch)
+            {
+                return std::make_pair(utils::defaultSize(ninePatch), true);
+            },
+        }, image._patch);
     }
 
-    std::unique_ptr<gui::Theme> GuiController::makeBuiltinTheme()
+    glm::vec2 GuiApplication::measure(text::FormattedString const & text,
+                                      content::Id const & fontFace) const
     {
-        return gui_controller::makeDefaultTheme(contentManager(), *this);
+        return Application::measure(text, fontFace);
+    }
+
+    std::unique_ptr<utils::TextLayout> GuiApplication::layout(text::FormattedString const & text,
+                                                              content::Id const & fontFace) const
+    {
+        auto lease = contentManager().borrow(fontFace);
+        assert(lease);
+        models::FontFace const & fontData = lease->as<models::FontFace>();
+        return text::layout(text, fontData);
+    }
+
+    std::unique_ptr<gui::Theme> GuiApplication::makeBuiltinTheme()
+    {
+        return gui_application::makeDefaultTheme(contentManager());
+    }
+
+    bool GuiApplication::handle(application::OnResize const & e)
+    {
+        _windowArea = gui::Area
+        {
+            ._left = 0,
+            ._top = 0,
+            ._width = static_cast<float>(e._width),
+            ._height = static_cast<float>(e._height),
+        };
+
+        return Application::handle(e);
     }
 }

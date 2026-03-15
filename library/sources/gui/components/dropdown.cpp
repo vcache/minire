@@ -1,11 +1,11 @@
 #include <minire/gui/components/dropdown.hpp>
 
+#include <minire/application/input-handler.hpp>
 #include <minire/errors.hpp>
 #include <minire/gui/components/scrollbar.hpp>
 #include <minire/gui/layout.hpp>
 #include <minire/gui/overlay-controller.hpp>
 #include <minire/logging.hpp>
-#include <minire/models/input-handler.hpp>
 
 #include <glm/common.hpp> // for glm::clamp
 
@@ -21,27 +21,27 @@ namespace minire::gui::components
 
     // TODO: instead of this, onUnfocus + conditional hotKeys can be used
     class Dropdown::DefaultHandler
-        : public minire::models::InputHandler
+        : public application::InputHandler
     {
     public:
         explicit DefaultHandler(Dropdown & dropdown)
             : _dropdown(dropdown)
         {}
 
-        bool handle(minire::events::application::OnMouseUp const &)
+        bool handle(application::OnMouseUp const &)
         {
             _dropdown.closeTongue();
             return true;
         }
 
-        bool handle(minire::events::application::OnMouseWheel const & e)
+        bool handle(application::OnMouseWheel const & e)
         {
             _dropdown.wheelScroll(e._dy);
             return true;
         }
 
         // TODO: it will stop work if tongue would have a focus
-        bool handle(minire::events::application::OnKeyDown const & e)
+        bool handle(application::OnKeyDown const & e)
         {
             switch(e._key)
             {
@@ -133,8 +133,8 @@ namespace minire::gui::components
                        OverlayController & overlayController,
                        ItemBuilderCallback baseItemBuilder,
                        ItemBuilderCallback tongueItemBuilder)
-        : Component(id, theme, style, overlayController)
-        , _background(*this, theme.makeImage("dropdown", "bg", style))
+        : Image(id, theme, style, overlayController,
+                theme.parameter<minire::models::sprite::MaybeImage>("dropdown", "bg", style))
         , _tongue(*this, Tongue
             {
                 ._maxLines = theme.parameter<size_t>("dropdown", "t/max-lines", style),
@@ -145,8 +145,8 @@ namespace minire::gui::components
         , _lineHeight(*this, 0)
         , _activeItemContainer(std::make_shared<ActiveItemContainer>(
             kActiveItemContainerId, theme, style, overlayController))
-        , _dropButton(std::make_shared<Button>(
-            kBaseDropButtonId, theme, style, overlayController))
+        , _dropButton(std::make_shared<components::Button>(
+            kBaseDropButtonId, theme, style, overlayController, false, true)) //  TODO: cascaded style
         , _dropdownLayout(std::make_shared<layouts::VerticalTool>(
             kActiveItemContainerId, kBaseDropButtonId,
             theme.parameter<float>("dropdown", "drop-button-width", style),
@@ -165,21 +165,24 @@ namespace minire::gui::components
 
     void Dropdown::initialize()
     {
+        Image::initialize();
+
         assert(_activeItemContainer);
         _activeItemContainer->setParent(shared_from_this());
-        _activeItemContainer->setCallback(std::in_place_type<gui::events::OnClick>, "__open__",
-            [this](Component const &, gui::events::OnClick const &)
+        _activeItemContainer->setCallback(std::in_place_type<gui::OnClick>, "__open__",
+            [this](Component const &, gui::OnClick const &)
             { openTongue(); });
 
         assert(_dropButton);
         _dropButton->setParent(shared_from_this());
-        _dropButton->icon() = theme().makeImage("dropdown", "i:arrow-down", style());
-        _dropButton->setCallback(std::in_place_type<gui::events::OnClick>, "__open__",
-            [this](Component const &, gui::events::OnClick const &)
+        _dropButton->icon() = theme().parameter<minire::models::sprite::MaybeImage>(
+            "dropdown", "i:arrow-down", style());
+        _dropButton->setCallback(std::in_place_type<gui::OnClick>, "__open__",
+            [this](Component const &, gui::OnClick const &)
             { openTongue(); });
     }
 
-    void Dropdown::handle(gui::events::OnClick const & e)
+    void Dropdown::handle(gui::OnClick const & e)
     {
         openTongue();
         Component::handle(e);
@@ -224,6 +227,9 @@ namespace minire::gui::components
                                        Area const & contentArea,
                                        Area const & clippingWindow)
     {
+        zOffset = Image::revalidateContent(zOffset, effectiveVisible,
+                                           contentArea, clippingWindow);
+
         assert(_activeItemContainer);
 
         // maybe close the tongue
@@ -242,20 +248,6 @@ namespace minire::gui::components
             _activeItemContainer->setActiveItem({});
         }
 
-        // revalidate background (if any)
-        if (auto background = _background.get(); background)
-        {
-            if (_background.isInvalidated())
-            {
-                background->setContentInvalidator(shared_from_this());
-            }
-
-            background->setContentArea(contentArea);
-            background->setClippingWindow(clippingWindow);
-            background->setVisible(effectiveVisible);
-            zOffset = background->onZOrderChanged(zOffset);
-        }
-
         // actualize active element
         if (_selected && (!_activeItemContainer->hasActiveItem() || _contents.isInvalidated()))
         {
@@ -264,12 +256,10 @@ namespace minire::gui::components
             {
                 MINIRE_INVARIANT(_baseItemBuilderCallback, "no base item builder for \"{}\"", id());
                 activeItem = _baseItemBuilderCallback(_contents.get().at(*_selected), *_selected,
-                                                      theme(), style(), overlayController());
+                                                      theme(), style() /* TODO: cascade +dropdown */, overlayController());
                 if (activeItem)
                 {
-                    activeItem->setCallback(std::in_place_type<gui::events::OnClick>, "__open__",
-                        [this](Component const &, gui::events::OnClick const &)
-                        { openTongue(); });
+                    activeItem->setEventTransparent(true);
                 }
             }
             _activeItemContainer->setActiveItem(activeItem);
@@ -305,11 +295,9 @@ namespace minire::gui::components
                                              dimension::Constant{contentArea._width}),
             listview.vertical()   = Arranger(position::Constant{tongueTop},
                                              dimension::Constant{tongueHeight});
-
         }
 
         // finish
-        _background.revalidate();
         _tongue.revalidate();
         _contents.revalidate();
 
@@ -365,7 +353,6 @@ namespace minire::gui::components
         // actialize an active item
         assert(_activeItemContainer);
         _activeItemContainer->setActiveItem({});
-        invalidateContent();
 
         // notify subscribers
         handle(dropdown::OnSelectionChanged{previous, _selected});

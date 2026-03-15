@@ -252,19 +252,19 @@ namespace minire::content::readers
         path /= id; // TODO: this is pretty dangerous due possible ".."'s
                     // TODO: it won't work on non-Posix OS (i.e. *indows)
         MINIRE_INVARIANT(std::filesystem::exists(path),
-                         "file doesn't exist: {}", path.string());
+                         "a file doesn't exist: {}", path.string());
 
         std::string ext = path.extension();
         boost::algorithm::to_lower(ext);
 
-        MINIRE_INFO("Reading asset from file: {}", path.string());
+        MINIRE_INFO("Reading an asset from a file: {}", path.string());
         if (".png"  == ext ||
             ".jpg" == ext ||
             ".jpeg" == ext ||
             ".tga" == ext)
         {
             models::Image::Sptr image = formats::loadImage(path);
-            MINIRE_INVARIANT(image, "image not loaded: {}", path.string());
+            MINIRE_INVARIANT(image, "an image wasn't loaded: {}", path.string());
             return image;
         }
         else if (".obj"  == ext)

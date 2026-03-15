@@ -4,12 +4,13 @@
 #include <minire/gui/area.hpp>
 #include <minire/gui/arranger.hpp>
 #include <minire/gui/callbacks.hpp>
-#include <minire/gui/content-view.hpp>
 #include <minire/gui/layout.hpp>
 #include <minire/gui/property.hpp>
 #include <minire/gui/theme.hpp>
 #include <minire/models/system-cursor.hpp>
 #include <minire/utils/rect.hpp>
+
+#include <glm/vec2.hpp>
 
 #include <any>
 #include <cassert>
@@ -18,7 +19,7 @@
 #include <unordered_map>
 #include <utility>
 
-namespace minire { class GuiController; }
+namespace minire { class GuiApplication; }
 
 namespace minire::gui
 {
@@ -38,7 +39,6 @@ namespace minire::gui
      * */
     class Component
         : public CommonCallbacks<Component>
-        , public ContentInvalidator
         , public std::enable_shared_from_this<Component>
     {
     public:
@@ -50,7 +50,7 @@ namespace minire::gui
                   Theme const & theme,
                   Theme::Style const & style,
                   OverlayController & overlayController);
-        ~Component();
+        virtual ~Component();
 
         using CommonCallbacks::handle;
 
@@ -119,6 +119,7 @@ namespace minire::gui
         bool isHovered() const { return _isHovered; }
         bool isDragging() const { return _isHovered; }
         bool acceptFocus() const { return _acceptFocus; }
+        bool eventTransparent() const { return _eventTransparent; }
 
         models::SystemCursor systemCursor() const { return _systemCursor; }
         void setSystemCursor(models::SystemCursor const);
@@ -159,7 +160,7 @@ namespace minire::gui
         }
 
         // TODO: make all content measurable by default
-        virtual std::optional<std::pair<float, float>> measureContent() const
+        virtual std::optional<glm::vec2> measureContent() const
         {
             return std::nullopt;
         }
@@ -189,13 +190,12 @@ namespace minire::gui
         }
 
         void invalidate();
-
-        // By default, it will also call invalidate().
-        void invalidateContent() override;
+        void invalidateContent(); // it will also call invalidate()
 
         void erase(std::string const &);
-
         void clear();
+
+        void setEventTransparent(bool);
 
     protected:
         virtual void initialize() {}
@@ -214,17 +214,17 @@ namespace minire::gui
 
         OverlayController & overlayController() { return _overlayController; }
 
+        OverlayController const & overlayController() const { return _overlayController; }
+
         void setAcceptFocus(bool);
-
-        void startTextInput();
-
-        void stopTextInput();
 
     private:
         size_t revalidate(size_t zOffset,
                           bool effectiveVisible,
                           Area const & clientArea,
                           Area const & clippingWindow);
+
+        bool invalidated() const { return _invalidated; }
 
         // NOTE: Since this method can return a pointer to "this" w/o a const-qualifier,
         //       this method implicitly works as a "const cast" (TODO: it is not good probably?).
@@ -260,7 +260,8 @@ namespace minire::gui
         bool                      _isHovered;
         bool                      _isDragging;
         bool                      _acceptFocus;
+        bool                      _eventTransparent;
 
-        friend class minire::GuiController;
+        friend class minire::GuiApplication;
     };
 }

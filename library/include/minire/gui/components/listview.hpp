@@ -2,6 +2,7 @@
 
 #include <minire/gui/callbacks.hpp>
 #include <minire/gui/component.hpp>
+#include <minire/gui/components/image.hpp>
 #include <minire/gui/components/scrollbar.hpp>
 #include <minire/gui/components/text.hpp>
 #include <minire/gui/layouts/vertical-tool.hpp>
@@ -34,10 +35,9 @@ namespace minire::gui::components
                                        Theme const & theme, Theme::Style const & style,
                                        OverlayController & overlayController) const
             {
-                text::FormattedString caption = _stringify(value, index);
-                TextView::Sptr textView = theme.makeText("listview", "item-text", style, caption);
+                // TODO: cascaded style [listview, text]
                 auto result = std::make_shared<Text>("__simple_item__", theme, style,
-                                                     overlayController, textView);
+                                                     overlayController, _stringify(value, index));
                 result->horizontal() = Arranger(position::Begin{}, dimension::Fill{});
                 result->vertical() = Arranger(position::Center{}, dimension::Content{});
                 return result;
@@ -54,7 +54,7 @@ namespace minire::gui::components
     // TODO: implement smooth scrolling
 
     class ListView final
-        : public Component
+        : public Image
         , public Callback<ListView, listview::OnSelectionChanged>
     {
     public:
@@ -84,8 +84,8 @@ namespace minire::gui::components
         Scrollbar const & scrollbar() const { assert(_scrollbar); return *_scrollbar; }
         Scrollbar & scrollbar() { assert(_scrollbar); return *_scrollbar; }
 
-        Property<ImageView::Sptr> const & background() const { return _background; }
-        Property<ImageView::Sptr> & background() { return _background; }
+        Property<minire::models::sprite::MaybeImage> const & background() const { return Image::image(); }
+        Property<minire::models::sprite::MaybeImage> & background() { return Image::image(); }
 
         Property<Contents> const & contents() const { return _contents; }
         Property<Contents> & contents() { return _contents; }
@@ -135,12 +135,11 @@ namespace minire::gui::components
     private:
         class ListViewLayout;
 
-        Property<ImageView::Sptr>       _background;
         Property<Contents>              _contents;
         Property<size_t>                _offset;
         Property<float>                 _lineHeight;
 
-        Scrollbar::Sptr                 _scrollbar;
+        VerticalScrollbar::Sptr         _scrollbar;
         Component::Sptr                 _contentContainer;
         std::shared_ptr<ListViewLayout> _contentLayout;
         layouts::VerticalTool::Sptr     _verticalToolLayout;

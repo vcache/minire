@@ -48,5 +48,6 @@ namespace minire::models
         Content   _content;
         Placement _placement;
         size_t    _zOrder;
+        bool      _visible;
     };
 }

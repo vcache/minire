@@ -58,8 +58,8 @@ namespace minire::utils
 
         T const & current() const { return _current; }
 
-        using Sptr = std::shared_ptr<Lerpable<T>>;
-        using Wptr = std::weak_ptr<Lerpable<T>>;
+//        using Sptr = std::shared_ptr<Lerpable<T>>;
+//        using Wptr = std::weak_ptr<Lerpable<T>>;
         using ElementType = T;
 
     private:

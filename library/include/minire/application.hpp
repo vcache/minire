@@ -1,184 +1,144 @@
 #pragma once
 
-// public headers
-#include <minire/basic-controller.hpp>
+#include <minire/application/input-handler.hpp>
+#include <minire/content/id.hpp>
 #include <minire/errors.hpp>
-#include <minire/events/application.hpp>
-#include <minire/events/controller.hpp>
 #include <minire/instrumentation/histogram.hpp>
+#include <minire/label.hpp>
+#include <minire/models/vertex-buffer.hpp>
+#include <minire/scene.hpp>
 #include <minire/sdl/gl-application.hpp>
+#include <minire/sprite.hpp>
 
-// STLs
 #include <memory>
 #include <string>
 #include <type_traits>
 #include <utility> // for std::forward
 
 namespace minire::content { class Manager; }
+namespace minire::utils { class RayCaster; }
 
 namespace minire
 {
     class Rasterizer;
-    class Scene;
+    class SceneImpl;
 
-    class Application : public sdl::GlApplication
+    class Application
+        : public sdl::GlApplication
+        , public application::InputHandler
     {
     public:
+        // TODO: set max FPS
         Application(int width, int height,
                     std::string const & title,
                     content::Manager & contentManager,
                     models::MsaaParams const & = {});
         ~Application() override;
 
-    public:
-        template<typename Controller, typename... Args>
-        Controller & setController(Args && ... args)
-        {
-            static_assert(std::is_base_of_v<BasicController, Controller>,
-                          "Controller must be inherited from BasicController");
-            MINIRE_INVARIANT(!_controller, "Controller cannot be re-set");
+    protected:
+        // Descendants should call Application::on* at the begging of their
+        // own overrides.
+        void onStart() override;
+        virtual bool onStep() { return true; }
 
-            auto controller = std::make_unique<Controller>(_contentManager,
-                                                           std::forward<Args>(args)...);
-            controller->run(events::application::OnResize(width(), height()));
-            _controller = std::move(controller);
-            return static_cast<Controller &>(*_controller);
-        }
+    protected:
+        using RayCasterSptr = std::shared_ptr<utils::RayCaster>;
+        RayCasterSptr const & rayCaster() const;
 
-        void setSquashAdditiveEvents(bool enabled);
+        void setRayCaster(bool enabled);
 
-        bool squashAdditiveEvents() const;
-
-    private:
-        void onResize(size_t width, size_t height) override;
-        void onRender() override;
-
-        void onMouseWheel(int dx, int dy, uint32_t dir, ::SDL_Keymod) override;
-        void onMouseMove(int absX, int absY, int relX, int relY,
-                         bool left, bool middle, bool right,
-                         bool x1, bool x2) override;
-        void onMouseDown(int x, int y, bool doubleClick, models::MouseButton) override;
-        void onMouseUp(int x, int y, bool doubleClick, models::MouseButton) override;
-        void onKeyUp(::SDL_Keycode, ::SDL_Scancode,  uint16_t mod) override;
-        void onKeyDown(::SDL_Keycode, ::SDL_Scancode, uint16_t mod) override;
-        void onTextInput(std::string) override;
-        void onClipboardUpdate(std::string, std::string) override;
-
-        void onFps(size_t fps, double mft) override;
-
-    private:
-        void handle(BasicController::Batch const &);
-
-        void handle(events::controller::Quit const &);
-        void handle(events::controller::SetMouseMode const &);
-        void handle(events::controller::DebugDrawsUpdate const &);
-        void handle(events::controller::SetInstrumentation const &);
-        void handle(events::controller::NewResourceLayer const &);
-        void handle(events::controller::DisposeResourceLayer const &);
-        void handle(events::controller::ContentManagerCleanup const &);
-        void handle(events::controller::CreateVertexBuffer const &);
-        void handle(events::controller::DisposeVertexBuffer const &);
-        void handle(events::controller::CreateSprite const &);
-        void handle(events::controller::SetSpritePatch const &);
-        void handle(events::controller::SetSpriteTexture const &);
-        void handle(events::controller::ResizeSprite const &);
-        void handle(events::controller::MoveSprite const &);
-        void handle(events::controller::SetSpriteArea const &);
-        void handle(events::controller::SetSpriteClippingWindow const &);
-        void handle(events::controller::SetSpriteVisible const &);
-        void handle(events::controller::SetSpriteZOrder const &);
-        void handle(events::controller::RemoveSprite const &);
-        void handle(events::controller::BulkSetSpriteZOrders const &);
-        void handle(events::controller::CreateLabel const &);
-        void handle(events::controller::MoveLabel const &);
-        void handle(events::controller::SetLabelVisible const &);
-        void handle(events::controller::SetLabelFontFace const &);
-        void handle(events::controller::SetLabelClippingWindow const &);
-        void handle(events::controller::SetLabelZOrder const &);
-        void handle(events::controller::SetLabelText const &);
-        void handle(events::controller::RemoveLabel const &);
-        void handle(events::controller::BulkSetLabelZOrders const &);
-        void handle(events::controller::StartTextInput const &);
-        void handle(events::controller::StopTextInput const &);
-        void handle(events::controller::StartClipboardCapture const &);
-        void handle(events::controller::StopClipboardCapture const &);
-        void handle(events::controller::SetClipboardText const &);
-        void handle(events::controller::SetPrimarySelection const &);
-        void handle(events::controller::SetSystemCursor const &);
-        void handle(events::controller::SceneReset const &);
-        void handle(events::controller::SceneDispose const &);
-        void handle(events::controller::SceneActivateCamera const &);
-        void handle(events::controller::SceneSetAmbientLight const &);
-        void handle(events::controller::SceneNewNode const &);
-        void handle(events::controller::SceneNewFromSource const &);
-        void handle(events::controller::SceneNewMesh const &);
-        void handle(events::controller::SceneNewDirectionalLight const &);
-        void handle(events::controller::SceneNewPointLight const &);
-        void handle(events::controller::SceneNewPerspectiveCamera const &);
-        void handle(events::controller::SceneNewOrthographicCamera const &);
-        void handle(events::controller::SceneNewBillboard const &);
-        void handle(events::controller::SceneSetMeshEmissiveFactor const &);
-        void handle(events::controller::SceneSetMeshSkin const &);
-        void handle(events::controller::SceneSetParent const &);
-        void handle(events::controller::SceneSetVisibility const &);
-        void handle(events::controller::SceneSetTransform const &);
-        void handle(events::controller::SceneSetDirectionalLight const &);
-        void handle(events::controller::SceneSetPointLight const &);
-        void handle(events::controller::SceneSetPerspectiveCamera const &);
-        void handle(events::controller::SceneSetOrthographicCamera const &);
-        void handle(events::controller::SceneNewAnimationSet const &);
-        void handle(events::controller::ScenePlayAnimation const &);
-        void handle(events::controller::SceneStopAnimation const &);
-        void handle(events::controller::SceneInlineAnimation const &);
-        void handle(events::controller::SetRayCaster const &);
-
-        template<typename Event, typename... Args>
-        void postEvent(Args && ...);
-
-        template<typename Event>
-        Event * findEventToSquash();
-
-        void maybeIssueRayCaster();
-
+        void debugDrawsUpdate(std::vector<float> const & linesBuffer);
         void enableInstrumentation();
         void disableInstrumentation();
 
-        void pushPendedEvents();
+        void newResourceLayer(std::string const & name);
+        void disposeResourceLayer(std::string const & name);
+        void contentManagerCleanup(bool const force);
+
+        // Note that this command won't perform inter-frame lerping,
+        // therefore, animated meshes might appear jerky if Controller's FPS
+        // is lower that Raterizer FPS.
+        void createVertexBuffer(content::Id const & id,             // The VertexBuffer will be available by a path:
+                                                                    //  content::path::Special::kVertexBuffers/{_id}
+                                models::VertexBuffer vertexBuffer,  // Controller MUST NOT modify provided buffers,
+                                                                    // otherwise thread-safety will be broken.
+                                bool const override);               // If true, an existing one will be rewritten,
+                                                                    // otherwise, a runtime-error will be generated.
+        void disposeVertexBuffer(content::Id const & id);
+
+        // TODO: sprites and labels are also require some kind of "2D Scene"
+        //       (for a tree of transforms/visibility/etc). Gui should be built upon this "2D Scene".
+
+        // A 'name' can be optional. If a 'name' is empty(), a sprite will anonymouse.
+        Sprite::Sptr makeSprite(models::Sprite model) { return makeSprite({}, std::move(model)); }
+        Sprite::Sptr makeSprite(std::string const & name, models::Sprite);
+        Sprite::Sptr const & findSprite(std::string const & name);
+        Sprite::Sptr const & detachSprite(std::string const & name); // detached Sprite cannot be re-attached
+
+        // A 'name' can be optional. If a 'name' is empty(), a sprite will anonymouse.
+        Label::Sptr makeLabel(models::Label model) { return makeLabel({}, std::move(model)); }
+        Label::Sptr makeLabel(std::string const & name, models::Label);
+        Label::Sptr const & findLabel(std::string const & name);
+        Label::Sptr const & detachLabel(std::string const & name);
+
+        // TODO: really should be here? what about other measurers?
+        glm::vec2 measure(text::FormattedString const & text,
+                          content::Id const & fontFace) const;
+
+        // TODO: a Scene should be detachable. So that user might have several prepared scenes
+        //       which can be switched to an active.
+        // TODO: and maybe several scenes can be active?
+        Scene & scene() const;
+
+        content::Manager & contentManager() const { return _contentManager; }
+
+        size_t frame() const { return _frame; }
+        double frameTime() const { return _frameTime; }
+
+    private:
+        void startEpoch(); // for lerping
+        void maybeIssueRayCaster();
+
+        void onRender() override;
+
+        void onResize(size_t width, size_t height) override;
+        void onMouseWheel(int dx, int dy, uint32_t dir, ::SDL_Keymod) override;
+        void onMouseMove(int absX, int absY, int relX, int relY,
+                         bool left, bool middle, bool right, bool x1, bool x2) override;
+        void onMouseDown(int x, int y, bool doubleClick, models::MouseButton) override;
+        void onMouseUp(int x, int y, bool doubleClick, models::MouseButton) override;
+        void onTextInput(std::string const &) override;
+        void onKeyUp(::SDL_Keycode, ::SDL_Scancode, uint16_t mod) override;
+        void onKeyDown(::SDL_Keycode, ::SDL_Scancode, uint16_t mod) override;
 
     private:
         content::Manager          & _contentManager;
 
         // render (view)
         std::unique_ptr<Rasterizer> _rasterizer;
-        std::unique_ptr<Scene>      _scene;
+        std::unique_ptr<SceneImpl>  _scene;
 
         // controller (controller)
-        BasicController::Uptr       _controller;
-        BasicController::BatchQueue _controllerEvents;
-        double                      _batchPlayed = -1;
+        double                      _epochPlayed = 0; // seconds
+        double                      _epochDuration = 0; // seconds
         size_t                      _epochNumber = 0;
+        size_t                      _epochBegin = 0;   // microseconds
+        bool                        _epochStarted = true;
 
         // system
-        events::ApplicationQueue    _applicationEvents;
         size_t                      _frame = 0;
         size_t                      _frameBegin; // microseconds
-        size_t                      _frameEnd;   // microseconds
+        double                      _frameTime = 0;
         double                      _animationGap = 0; // seconds
 
         // scene queries
         bool                        _rayCasterEnabled = false;
         size_t                      _rayCasterRevision = 0;
         size_t                      _rayCasterLastEpoch = 0;
-
-        // state
-        size_t                      _mouseX = 0;
-        size_t                      _mouseY = 0;
+        RayCasterSptr               _rayCaster;
 
         // instrumentations
         instrumentation::Histogram<>::Sptr _timekeeper;
         size_t                             _pedanticGlCounter = 0;
-
-        // miscellaneous
-        bool                        _squashAdditiveEvents = true;
     };
 }

@@ -13,6 +13,12 @@ namespace minire::models
     ScenePath concat(ScenePath const & a, ScenePath const & b);
     ScenePath concat(ScenePath const & a, std::string const & b);
     ScenePath cutPrefix(ScenePath const & full, ScenePath const & prefix);
+
+    template<typename... Args>
+    ScenePath mkScenePath(Args && ... args)
+    {
+        return ScenePath{ {ScenePath::value_type(std::forward<Args>(args))...} };
+    }
 }
 
 namespace std

@@ -32,6 +32,9 @@ namespace minire::sdl
         void run();
 
     protected:
+        virtual void onStart();
+        virtual void onEnd();
+
         virtual void onRender();
         virtual void onResize(size_t width, size_t height);
         virtual void onMouseWheel(int dx, int dy, uint32_t dir, ::SDL_Keymod);
@@ -39,9 +42,7 @@ namespace minire::sdl
                                  bool left, bool middle, bool right, bool x1, bool x2);
         virtual void onMouseDown(int x, int y, bool doubleClick, models::MouseButton);
         virtual void onMouseUp(int x, int y, bool doubleClick, models::MouseButton);
-        virtual void onTextInput(std::string);
-        virtual void onClipboardUpdate(std::string clipboardText,
-                                       std::string primarySelection);
+        virtual void onTextInput(std::string const &);
 
         // https://wiki.libsdl.org/SDL_Keycode
         // https://wiki.libsdl.org/SDL_Keymod
@@ -57,11 +58,14 @@ namespace minire::sdl
 
         void setSystemCursor(models::SystemCursor const);
 
-        void setCaptureClipboard(bool);
-        void maybeEmitClipboardUpdate();
-
         void setClipboardText(std::string const &) const;
+        std::string clipboardText() const;
+
         void setPrimarySelection(std::string const &) const;
+        std::string primarySelection() const;
+
+        void startTextInput() const;
+        void stopTextInput() const;
 
     protected:
         uint32_t ticks() const { return _frameTicks; } // milliseconds, msec
@@ -72,8 +76,8 @@ namespace minire::sdl
         SDL_Window * window() const { return _window; }
 
     private:
-        void handle(SDL_Event const &);
-        void handle(SDL_WindowEvent const &);
+        void handleEvent(SDL_Event const &);
+        void handleEvent(SDL_WindowEvent const &);
         void handleResize(int w, int h);
 
         struct SdlCursorDeleter
@@ -90,7 +94,6 @@ namespace minire::sdl
         std::string   _title;
         uint32_t      _frameTicks;
         SdlCursorUptr _cursor;
-        bool          _captureClipboard;
         bool          _working;
     };
 }

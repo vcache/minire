@@ -10,7 +10,7 @@
 #include <rasterizer/textures.hpp>
 #include <utils/overloaded.hpp>
 
-#include <glm/gtc/type_ptr.hpp> // for gln::value_ptr
+#include <glm/gtc/type_ptr.hpp> // for glm::value_ptr
 #include <glm/mat4x4.hpp>
 
 #include <cassert>
@@ -124,115 +124,91 @@ namespace minire::rasterizer
         GLint           _clippingWindow;
     };
 
-    // Sprites::Sprite //
+    // Sprites::SpriteImpl //
 
-    class Sprites::Sprite : public Drawable
+    class Sprites::SpriteImpl final
+        : public Sprite
+        , public Drawable
     {
     public:
-        Sprite(Textures::Texture::Sptr texture,
-               utils::Patch patch,
-               glm::vec2 const & position,
-               glm::vec2 const & dimensions,
-               utils::MaybeRect const & clippingWindow,
-               bool visible, size_t z,
-               Program const & program)
-            : Drawable(z)
-            , _texture(texture)
-            , _patch(patch)
-            , _position(position)
-            , _dimensions(dimensions)
-            , _clippingWindow(clippingWindow)
-            , _visible(visible)
+        SpriteImpl(std::string const & name,
+                   models::Sprite model,
+                   Textures const & textures,
+                   Program const & program)
+            : Sprite(name, std::move(model))
+            , _textures(textures)
             , _program(program)
-            , _vertexBuffer(sprites::buildMesh(_patch, _position, _dimensions,
-                                               glm::vec2(_texture->width(), _texture->height())))
-            , _invalidated(false)
-        {
-            MINIRE_INVARIANT(_texture, "sprite created w/o a texture");
-        }
+            , _texture(fetchTexture())
+            , _vertexBuffer(buildMesh())
+        {}
 
     public:
-        bool visible() const { return _visible; }
-
-        void setPatch(utils::Patch const & patch)
+        void draw(glm::mat4 const & projection) override
         {
-            _patch = patch;
-            _invalidated = true;
-        }
-
-        void setTexture(Textures::Texture::Sptr const & texture)
-        {
-            assert(texture);
-            _texture = texture;
-            _invalidated = true;
-        }
-
-        void setPosition(glm::vec2 const & p)
-        {
-            _position = p;
-            _invalidated = true;
-        }
-
-        void setDimensions(glm::vec2 const & d)
-        {
-            if (std::holds_alternative<utils::Rect>(_patch))
-            {
-                MINIRE_THROW("should not set dimensions for a sprite!");
-            }
-
-            _dimensions = d;
-            _invalidated = true;
-        }
-
-        void setClippingWindow(utils::MaybeRect const & clippingWindow)
-        {
-            _clippingWindow = clippingWindow;
-        }
-
-        void setVisible(bool visible)
-        {
-            _visible = visible;
-        }
-
-        void draw(glm::mat4 const & projection) const override
-        {
-            revalidate();
+            tryRevalidate();
 
             _program.use();
             _program.setProjUniform(projection);
             _program.setTextureUniform(0);
-            _program.setClippingWindow(_clippingWindow);
+            _program.setClippingWindow(model()._clippingWindow);
 
             MINIRE_GL(glActiveTexture, GL_TEXTURE0);
+            assert(_texture);
             _texture->bind();
 
             _vertexBuffer.draw();
         }
 
     private:
-        void revalidate() const
+        void tryRevalidate()
         {
-            if (_invalidated)
+            if (invalidated())
             {
-                assert(_texture);
-                auto vertices = sprites::buildMesh(_patch, _position, _dimensions,
-                                                   glm::vec2(_texture->width(), _texture->height()));
-                _vertexBuffer.reload(vertices);
-                _invalidated = false;
+                bool textureResized = false;
+                if (invalidated(kTexture))
+                {
+                    assert(_texture);
+                    float oldWidth = _texture->width();
+                    float oldHeight = _texture->height();
+                    
+                    _texture = fetchTexture();
+                    
+                    assert(_texture);
+                    textureResized = oldWidth != _texture->width()
+                                  || oldHeight != _texture->height();
+                }
+
+                if (textureResized || invalidated(kPatch | kPosition | kDimensions))
+                {
+                    _vertexBuffer.reload(buildMesh());
+                }
+
+                revalidate();
             }
         }
 
-    private:
-        Textures::Texture::Sptr       _texture;
-        utils::Patch                  _patch;
-        glm::vec2                     _position;
-        glm::vec2                     _dimensions;
-        utils::MaybeRect              _clippingWindow;
-        bool                          _visible;
-        Program const &               _program;
+        Textures::Texture::Sptr fetchTexture() const
+        {
+            models::Sprite const & m = model();
+            Textures::Texture::Sptr result = _textures.get(m._image._texture, {}, false /* no mipmap */);
+            MINIRE_INVARIANT(result, "no texture found: {}", m._image._texture);
+            return result;
+        }
 
-        mutable sprites::VertexBuffer _vertexBuffer;
-        mutable bool                  _invalidated;
+        std::vector<sprites::Vertex> buildMesh() const
+        {
+            assert(_texture);
+            models::Sprite const & m = model();
+            return sprites::buildMesh(m._image._patch, m._position, m._dimensions,
+                                      glm::vec2(_texture->width(), _texture->height()));
+
+        }
+
+    private:
+        Textures const &        _textures;
+        Program const &         _program;
+        Textures::Texture::Sptr _texture;
+        sprites::VertexBuffer   _vertexBuffer;
     };
 
     // Sprites //
@@ -242,114 +218,76 @@ namespace minire::rasterizer
         , _program(std::make_unique<Program>())
     {}
 
+    // because of std::unique_ptr<Program>
     Sprites::~Sprites() = default;
 
-    void Sprites::create(std::string const & id,
-                         content::Id const & texture,
-                         utils::Patch const & patch,
-                         glm::vec2 const & position,
-                         glm::vec2 const & dimensions,
-                         utils::MaybeRect const & clippingWindow,
-                         bool const visible,
-                         size_t const zOrder)
+    Sprite::Sptr Sprites::make(std::string const & name,
+                               models::Sprite model)
     {
-        auto textureSptr = _textures.get(texture, {}, false /* no mipmap */);
-        MINIRE_INVARIANT(textureSptr, "no texture found for \"{}\": {}", id, texture);
+        assert(_program);
+        auto result = std::make_shared<SpriteImpl>(
+            name, std::move(model), _textures, *_program);
 
-        auto sprite = std::make_unique<Sprite>(
-            textureSptr, patch, position, dimensions,
-            clippingWindow, visible, zOrder, *_program);
+        if (!name.empty())
+        {
+            auto [_, inserted] = _index.emplace(name, result);
+            MINIRE_INVARIANT(inserted, "failed to create a make: \"{}\" (a duplicate?)", name);
+        }
 
-        auto [_, inserted] = _store.emplace(id, std::move(sprite));
-        MINIRE_INVARIANT(inserted, "sprite already exists: \"{}\"", id);
+        try
+        {
+            _heap.emplace_back(result);
+            return result;
+        }
+        catch(...)
+        {
+            _index.erase(name);
+            throw;
+        }
     }
 
-    void Sprites::setPatch(std::string const & id,
-                           utils::Patch const & patch)
+    Sprite::Sptr const & Sprites::find(std::string const & name) const
     {
-        Sprite & sprite = find(id);
-        sprite.setPatch(patch);
-    }
+        if (auto it = _index.find(name); it != _index.cend())
+        {
+            if (Sprite::Sptr const & result = it->second;
+                result && !result->detached())
+            {
+                assert(result->name() == name);
+                return result;
+            }
+        }
 
-    void Sprites::setTexture(std::string const & id,
-                             content::Id const & texture)
-    {
-        auto textureSptr = _textures.get(texture, {}, false /* no mipmap */);
-        MINIRE_INVARIANT(textureSptr, "no texture found for \"{}\": {}", id, texture);
-
-        Sprite & sprite = find(id);
-        sprite.setTexture(textureSptr);
-    }
-
-    void Sprites::move(std::string const & id,
-                       glm::vec2 const & position,
-                       utils::MaybeRect const & clippingWindow)
-    {
-        Sprite & sprite = find(id);
-        sprite.setPosition(position);
-        sprite.setClippingWindow(clippingWindow);
-    }
-
-    void Sprites::resize(std::string const & id,
-                         glm::vec2 const & dimensions,
-                         utils::MaybeRect const & clippingWindow)
-    {
-        Sprite & sprite = find(id);
-        sprite.setDimensions(dimensions);
-        sprite.setClippingWindow(clippingWindow);
-    }
-
-    void Sprites::setArea(std::string const & id,
-                          glm::vec2 const & position,
-                          glm::vec2 const & dimensions,
-                          utils::MaybeRect const & clippingWindow)
-    {
-        Sprite & sprite = find(id);
-        sprite.setPosition(position);
-        sprite.setDimensions(dimensions);
-        sprite.setClippingWindow(clippingWindow);
-    }
-
-    void Sprites::setClippingWindow(std::string const & id,
-                                    utils::MaybeRect const & clippingWindow)
-    {
-        Sprite & sprite = find(id);
-        sprite.setClippingWindow(clippingWindow);
-    }
-
-    void Sprites::visible(std::string const & id,
-                          bool visible)
-    {
-        find(id).setVisible(visible);
-    }
-
-    void Sprites::setZOrder(std::string const & id,
-                            size_t zOrder)
-    {
-        find(id).setZOrder(zOrder);
-    }
-
-    void Sprites::remove(std::string const & id)
-    {
-        _store.erase(id);
-    }
-
-    Sprites::Sprite & Sprites::find(std::string const & id) const
-    {
-        auto it = _store.find(id);
-        MINIRE_INVARIANT(it != _store.cend(), "no such sprite: \"{}\"", id);
-        return *it->second;
+        static Sprite::Sptr const kEmpty;
+        return kEmpty;
     }
 
     void Sprites::predraw(Drawable::PtrsList & out) const
     {
-        // TODO: sort by visibility
-        // TODO: sort by texture
-        for(auto const & sprite : _store)
+        // TODO: sort by visibility (skip invisibles)
+        // TODO: sort by a texture
+        auto it = _heap.begin();
+        while (it != _heap.end())
         {
-            if (sprite.second->visible())
+            SpriteImplSptr const & sprite = *it;
+            assert(sprite);
+
+            if (!sprite->detached())
             {
-                out.push_back(sprite.second.get());
+                if (sprite->visible())
+                {
+                    sprite->setEffectiveZOrder(sprite->zOrder());
+                    out.emplace_back(sprite.get());
+                }
+                it++;
+            }
+            else
+            {
+                if (!sprite->name().empty())
+                {
+                    _index.erase(sprite->name());
+                }
+                it = _heap.erase(it);
             }
         }
     }

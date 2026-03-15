@@ -2,7 +2,7 @@
 
 #include <minire/gui/component.hpp>
 #include <minire/gui/components/button.hpp>
-#include <minire/gui/content-view.hpp>
+#include <minire/gui/components/image.hpp>
 
 namespace minire::gui::components
 {
@@ -15,8 +15,8 @@ namespace minire::gui::components
         };
     }
 
-    class Scrollbar final
-        : public Component
+    class Scrollbar
+        : public components::Image
         , public Callback<Scrollbar, scrollbar::OnValueChanged>
     {
     public:
@@ -47,8 +47,8 @@ namespace minire::gui::components
         float value() const { return _value.get(); }
         void setValue(float value);
 
-        Property<ImageView::Sptr> const & background() const { return _background; }
-        Property<ImageView::Sptr> & background() { return _background; }
+        Property<minire::models::sprite::MaybeImage> const & background() const { return Image::image(); }
+        Property<minire::models::sprite::MaybeImage> & background() { return Image::image(); }
 
         Property<float> const & step() const { return _step; }
         Property<float> & step() { return _step; }
@@ -56,10 +56,9 @@ namespace minire::gui::components
         Property<float> const & minSliderLength() const { return _minSliderLength; }
         Property<float> & minSliderLength() { return _minSliderLength; }
 
-        Property<bool> const & isVertical() const { return _isVertical; }
-        Property<bool> & isVertical() { return _isVertical; }
+        bool isVertical() const { return _isVertical; }
 
-        virtual void handle(minire::events::application::OnMouseWheel const &) override;
+        virtual void handle(application::OnMouseWheel const &) override;
 
     protected:
         void initialize() override;
@@ -75,24 +74,52 @@ namespace minire::gui::components
     private:
         using Boundaries = std::pair<float, float>;
 
-        Property<ImageView::Sptr> _background;
-        Property<float>           _step;
-        Property<float>           _minSliderLength;
-        Property<bool>            _isVertical;
-        Property<float>           _value;
+        Property<float> _step;
+        Property<float> _minSliderLength;
+        Property<float> _value;
 
-        Button::Sptr              _increaseButton;
-        Button::Sptr              _decreaseButton;
-        Button::Sptr              _slider;
+        Button::Sptr    _increaseButton;
+        Button::Sptr    _decreaseButton;
+        Button::Sptr    _slider;
 
-        ImageView::Wptr           _defaultIncreaseIcon;
-        ImageView::Wptr           _defaultDecreaseIcon;
-
-        Boundaries                _sliderAreaBoundaries{0, 0};
-        float                     _sliderLength = 0;
-        float                     _dragInitialOffset = 0;
+        Boundaries      _sliderAreaBoundaries{0, 0};
+        float           _sliderLength = 0;
+        float           _dragInitialOffset = 0;
+        bool const      _isVertical;
 
         class CustomLayout;
         friend class CustomLayout;
+    };
+
+    // Handy shortcuts
+
+    class VerticalScrollbar final
+        : public Scrollbar
+    {
+    public:
+        VerticalScrollbar(std::string const & id,
+                          Theme const & theme,
+                          Theme::Style const & style,
+                          OverlayController & overlayController)
+            : Scrollbar(id, theme, style, overlayController, true)
+        {}
+
+        using Sptr = std::shared_ptr<VerticalScrollbar>;
+        using Wptr = std::weak_ptr<VerticalScrollbar>;
+    };
+
+    class HorizontalScrollbar final
+        : public Scrollbar
+    {
+    public:
+        HorizontalScrollbar(std::string const & id,
+                            Theme const & theme,
+                            Theme::Style const & style,
+                            OverlayController & overlayController)
+            : Scrollbar(id, theme, style, overlayController, false)
+        {}
+
+        using Sptr = std::shared_ptr<HorizontalScrollbar>;
+        using Wptr = std::weak_ptr<HorizontalScrollbar>;
     };
 }

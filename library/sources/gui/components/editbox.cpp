@@ -3,6 +3,7 @@
 #include <minire/gui/overlay-controller.hpp>
 #include <minire/logging.hpp>
 #include <minire/text/unicode.hpp>
+#include <minire/utils/glyph-grid.hpp>
 
 #include <glm/common.hpp> // for glm::clamp
 
@@ -41,17 +42,22 @@ namespace minire::gui::components
                      Theme::Style const & style,
                      OverlayController & overlayController)
         : Component(id, theme, style, overlayController)
-        , _bgNormal(*this, theme.makeImage("editbox", "bg-normal", style))
-        , _bgDisabled(*this, theme.makeImage("editbox", "bg-disabled", style))
-        , _cursorImageInsert(*this, theme.makeImage("editbox", "cursor-insert", style))
-        , _cursorImageReplace(*this, theme.makeImage("editbox", "cursor-replace", style))
-        , _selectionImage(*this, theme.makeImage("editbox", "selection-bg", style))
+        , _bgNormal(std::make_shared<Image>("__bg-normal__", theme, style, overlayController,
+                    theme.parameter<models::sprite::MaybeImage>("editbox", "bg-normal", style)))
+        , _bgDisabled(std::make_shared<Image>("__bg-disabled__", theme, style, overlayController,
+                      theme.parameter<models::sprite::MaybeImage>("editbox", "bg-disabled", style)))
+        , _cursorImageInsert(std::make_shared<Image>("__cursor-insert__", theme, style, overlayController,
+                             theme.parameter<models::sprite::MaybeImage>("editbox", "cursor-insert", style)))
+        , _cursorImageReplace(std::make_shared<Image>("__cursor-replace__", theme, style, overlayController,
+                              theme.parameter<models::sprite::MaybeImage>("editbox", "cursor-replace", style)))
+        , _selectionImage(std::make_shared<Image>("__selection__", theme, style, overlayController,
+                          theme.parameter<models::sprite::MaybeImage>("editbox", "selection-bg", style)))
         , _insertMode(*this, true)
         , _enabled(*this, true)
         , _passwordChar(*this, std::nullopt)
         , _contentPadding(*this, theme.parameter<utils::Rect>("editbox", "content-padding", style))
         , _text(*this)
-        , _textView()
+        , _textView(std::make_shared<Text>("__text__", theme, style, overlayController))
         , _activeFormat(theme.parameter<text::Format>("editbox", "active-format", style))
         , _cursorPos(0)
         , _selectionBegin(kNoIndex)
@@ -71,13 +77,45 @@ namespace minire::gui::components
         _selectionBegin = kNoIndex;
         _offset = 0;
         _insertMode = true;
-        _textView.reset();
+
+        assert(_textView);
+        _textView->text()->clear();
+    }
+
+    void Editbox::initialize()
+    {
+        auto sharedThis = shared_from_this();
+        // NOTE: adding to a parent() w.r.t. zOrder (bg->selection->text->cursor)
+
+        assert(_bgNormal);
+        _bgNormal->setParent(sharedThis);
+        _bgNormal->setEventTransparent(true);
+
+        assert(_bgDisabled);
+        _bgDisabled->setParent(sharedThis);
+        _bgDisabled->setEventTransparent(true);
+
+        assert(_selectionImage);
+        _selectionImage->setParent(sharedThis);
+        _selectionImage->setEventTransparent(true);
+
+        assert(_textView);
+        _textView->setParent(sharedThis);
+        _textView->setEventTransparent(true);
+
+        assert(_cursorImageInsert);
+        _cursorImageInsert->setParent(sharedThis);
+        _cursorImageInsert->setEventTransparent(true);
+
+        assert(_cursorImageReplace);
+        _cursorImageReplace->setParent(sharedThis);
+        _cursorImageReplace->setEventTransparent(true);
     }
 
     size_t Editbox::revalidateContent(size_t zOffset,
                                       bool const effectiveVisible,
                                       Area const & contentArea,
-                                      Area const & clippingWindow)
+                                      Area const & /*clippingWindow*/)
     {
         // calculate content padding
         utils::Rect const & contentPadding = _contentPadding.get();
@@ -88,45 +126,17 @@ namespace minire::gui::components
             ._width = contentArea._width - contentPadding._left - contentPadding._right,
             ._height = contentArea._height - contentPadding._top - contentPadding._bottom,
         };
-        Area const realContentClippingWindow = intersection(realContentArea, clippingWindow);
 
         _contentAreaOffset = glm::vec2(realContentArea._left,
                                        realContentArea._top);
 
         // revalidate background
-        bool const isNormalBg = _enabled.get() || !_bgDisabled.get();
-        if (auto bgNormal = _bgNormal.get(); bgNormal)
+        if (_enabled.isInvalidated())
         {
-            if (_bgNormal.isInvalidated())
-            {
-                bgNormal->setContentInvalidator(shared_from_this());
-            }
-
-            bgNormal->setVisible(effectiveVisible && isNormalBg);
-            if (effectiveVisible)
-            {
-                bgNormal->setContentArea(contentArea);
-                bgNormal->setClippingWindow(clippingWindow);
-            }
-
-            zOffset = bgNormal->onZOrderChanged(zOffset);
-        }
-
-        if (auto bgDisabled = _bgDisabled.get(); bgDisabled)
-        {
-            if (_bgDisabled.isInvalidated())
-            {
-                bgDisabled->setContentInvalidator(shared_from_this());
-            }
-
-            bgDisabled->setVisible(effectiveVisible && !isNormalBg);
-            if (effectiveVisible)
-            {
-                bgDisabled->setContentArea(contentArea);
-                bgDisabled->setClippingWindow(clippingWindow);
-            }
-
-            zOffset = bgDisabled->onZOrderChanged(zOffset);
+            assert(_bgNormal);
+            assert(_bgDisabled);
+            _bgNormal->visible() = _enabled.get();
+            _bgDisabled->visible() = !_enabled.get();
         }
 
         // maybe rebuild text view from
@@ -144,36 +154,28 @@ namespace minire::gui::components
             }
 
             assert(effectiveText);
-            _textView = theme().makeText("editbox", "text", style(), *effectiveText);
-            if (_textView)
-            {
-                _textView->setContentInvalidator(shared_from_this());
-            }
+            assert(_textView);
+            _textView->text() = *effectiveText;
             _offset = 0;
         }
 
         // fetch length of text's prefix (unitl the cursor)
         float prefixSize = 0;
-        if (_textView && !_text.get().empty())
+        if (!_text.get().empty())
         {
+            assert(_textView);
             utils::TextLayout const & textLayout = _textView->textLayout();
             assert(!textLayout.empty());
             prefixSize = _cursorPos != 0 ? textLayout.layoutOf(_cursorPos - 1)._right : 0;
         }
 
         // revalidate selection
-        if (auto selectionImage = _selectionImage.get();
-            selectionImage)
         {
-            if (_selectionImage.isInvalidated())
+            assert(_selectionImage);
+            _selectionImage->visible() = hasSelection();
+            if (_selectionImage->visible().get() && !_text.get().empty())
             {
-                selectionImage->setContentInvalidator(shared_from_this());
-            }
-
-            bool const isVisible = effectiveVisible && hasSelection();
-            selectionImage->setVisible(isVisible);
-            if (isVisible && _textView && !_text.get().empty())
-            {
+                assert(_textView);
                 utils::TextLayout const & textLayout = _textView->textLayout();
                 assert(!textLayout.empty());
                 float const selectionBeginSize =
@@ -182,100 +184,75 @@ namespace minire::gui::components
                 float selectionLeft = std::min(prefixSize, selectionBeginSize);
                 float selectionRight = std::max(prefixSize, selectionBeginSize);
 
-                selectionImage->setContentArea(Area
-                {
-                    ._left = realContentArea._left + selectionLeft + _offset,
-                    ._top = realContentArea._top + 1,
-                    ._width = selectionRight - selectionLeft + 1,
-                    ._height = realContentArea._height - 1 - 1,
-                });
-                selectionImage->setClippingWindow(realContentClippingWindow);
+                _selectionImage->horizontal() = Arranger(
+                    position::Constant{contentPadding._left + selectionLeft + _offset},
+                    dimension::Constant{selectionRight - selectionLeft + 1});
+                _selectionImage->vertical() = Arranger(
+                    position::Constant{contentPadding._top + 1},
+                    dimension::Constant{realContentArea._height - 1 - 1}); // TODO: what if _height<2 ?
             }
-
-            zOffset = selectionImage->onZOrderChanged(zOffset);
         }
 
         // revalidate text view
-        if (_textView)
+        if (effectiveVisible)
         {
-            _textView->setVisible(effectiveVisible);
-            if (effectiveVisible)
+            assert(_textView);
+            utils::Rect const & aabb = _textView->textLayout().aabb();
+            glm::vec2 const fullSize(aabb._right - aabb._left,
+                                     aabb._bottom - aabb._top);
+
+            float const pivot = prefixSize + _offset;
+            if (pivot >= realContentArea._width)
             {
-                utils::Rect const & aabb = _textView->textLayout().aabb();
-                glm::vec2 const fullSize(aabb._right - aabb._left,
-                                         aabb._bottom - aabb._top);
-
-                float const pivot = prefixSize + _offset;
-                if (pivot >= realContentArea._width)
-                {
-                    _offset -= (pivot - realContentArea._width);
-                }
-                else if (pivot < 0)
-                {
-                    _offset -= pivot;
-                }
-
-                _offset = glm::clamp(_offset, -fullSize.x, 0.0f);
-                _textView->setContentArea(Area
-                    {
-                        ._left = realContentArea._left + _offset,
-                        ._top = realContentArea._top + (realContentArea._height - fullSize.y) *.5f,
-                        ._width = fullSize.x,
-                        ._height = realContentArea._height,
-                    });
-                _textView->setClippingWindow(realContentClippingWindow);
+                _offset -= (pivot - realContentArea._width);
             }
-            zOffset = _textView->onZOrderChanged(zOffset);
+            else if (pivot < 0)
+            {
+                _offset -= pivot;
+            }
+
+            _offset = glm::clamp(_offset, -fullSize.x, 0.0f);
+            _textView->horizontal() = Arranger(
+                position::Constant{contentPadding._left + _offset},
+                dimension::Constant{fullSize.x});
+            _textView->vertical() = Arranger(
+                position::Constant{contentPadding._top + (realContentArea._height - fullSize.y) *.5f},
+                dimension::Constant{realContentArea._height});
         }
 
         // hide inactive cursor image
-        if (_insertMode.get())
+        if (_insertMode.isInvalidated())
         {
-            if (auto const & image = _cursorImageReplace.get(); image)
-                image->setVisible(false);
-        }
-        else
-        {
-            if (auto const & image = _cursorImageInsert.get(); image)
-                image->setVisible(false);
+            assert(_cursorImageReplace);
+            assert(_cursorImageInsert);
+            _cursorImageReplace->visible() = !_insertMode.get();
+            _cursorImageInsert->visible() = _insertMode.get();
         }
 
         // revalidate active cursor image
-        auto const & activeCursorProp = _insertMode.get() ? _cursorImageInsert
-                                                          : _cursorImageReplace;
-        if (auto const & activeCursor = activeCursorProp.get();
-            activeCursor)
         {
-            if (activeCursorProp.isInvalidated())
-            {
-                activeCursor->setContentInvalidator(shared_from_this());
-            }
+            auto const & activeCursor = _insertMode.get() ? _cursorImageInsert
+                                                          : _cursorImageReplace;
+            assert(activeCursor);
 
-            bool const isVisible = effectiveVisible && hasFocus();
-            activeCursor->setVisible(isVisible);
-            if (isVisible)
+            activeCursor->visible() = hasFocus();
+            if (activeCursor->visible().get())
             {
                 float const pivot = prefixSize + _offset;
                 float const width = _insertMode.get() ? 7 : 7;
                 // TODO: maybe customize horizontal padding (and width) for the cursor?
-                activeCursor->setContentArea(Area
-                    {
-                        ._left = realContentArea._left + pivot - (width * .5f),
-                        ._top = contentArea._top + 4,
-                        ._width = width, // magic size
-                        ._height = contentArea._height - 4 - 4,
-                    });
-                activeCursor->setClippingWindow(clippingWindow);
+                activeCursor->horizontal() = Arranger(
+                    position::Constant{contentPadding._left + pivot - (width * .5f)}, // TODO: must be relative
+                    dimension::Constant{width});
+                activeCursor->vertical() = Arranger(
+                    position::Constant{4},
+                    dimension::Constant{contentArea._height - 4 - 4});
             }
-
-            zOffset = activeCursor->onZOrderChanged(zOffset);
         }
 
         // finish
-        _bgNormal.revalidate();
-        _cursorImageInsert.revalidate();
-        _cursorImageReplace.revalidate();
         _insertMode.revalidate();
+        _enabled.revalidate();
         _passwordChar.revalidate();
         _contentPadding.revalidate();
         _text.revalidate();
@@ -521,24 +498,22 @@ namespace minire::gui::components
         return std::nullopt;
     }
 
-    void Editbox::handle(gui::events::OnFocus const & e)
+    void Editbox::handle(gui::OnFocus const & e)
     {
         overlayController().startTextInput();
-        overlayController().startClipboardCapture();
         invalidateContent();
         CommonCallbacks::handle(e);
     }
 
-    void Editbox::handle(gui::events::OnUnfocus const & e)
+    void Editbox::handle(gui::OnUnfocus const & e)
     {
         dropSelection();
-        overlayController().stopClipboardCapture();
         overlayController().stopTextInput();
         invalidateContent();
         CommonCallbacks::handle(e);
     }
 
-    void Editbox::handle(gui::events::OnDragMove const & e)
+    void Editbox::handle(gui::OnDragMove const & e)
     {
         auto const & mouseMove = e._event;
         if (std::optional<size_t> cursorPos = mouseToCursor(mouseMove._absX,
@@ -555,7 +530,7 @@ namespace minire::gui::components
         CommonCallbacks::handle(e);
     }
 
-    void Editbox::handle(minire::events::application::OnMouseDown const & e)
+    void Editbox::handle(application::OnMouseDown const & e)
     {
         bool const isSecret = _passwordChar.get() != std::nullopt;
 
@@ -576,10 +551,10 @@ namespace minire::gui::components
                 models::MouseButton::kMiddle == e._mouseButton)
             {
                 assert(!hasSelection());
-                if (std::string const * primarySelection = overlayController().getPrimarySelection();
-                    primarySelection)
+                if (std::string const & primarySelection = overlayController().primarySelection();
+                    !primarySelection.empty())
                 {
-                    processInput(text::toUnicode(*primarySelection));
+                    processInput(text::toUnicode(primarySelection));
                 }
             }
             else if (e._doubleClick)
@@ -603,13 +578,13 @@ namespace minire::gui::components
         CommonCallbacks::handle(e);
     }
 
-    void Editbox::handle(gui::events::OnDragEnd const & e)
+    void Editbox::handle(gui::OnDragEnd const & e)
     {
         actualizePrimarySelection();
         CommonCallbacks::handle(e);
     }
 
-    void Editbox::handle(minire::events::application::OnKeyDown const & e)
+    void Editbox::handle(application::OnKeyDown const & e)
     {
         bool const isSecret = _passwordChar.get() != std::nullopt;
         switch(e._key)
@@ -804,10 +779,10 @@ namespace minire::gui::components
                 }
                 else if (testMask(e._mod, KMOD_SHIFT))
                 {
-                    if (std::string const * primarySelection = overlayController().getPrimarySelection();
-                        primarySelection)
+                    if (std::string const & primarySelection = overlayController().primarySelection();
+                        !primarySelection.empty())
                     {
-                        processInput(text::toUnicode(*primarySelection));
+                        processInput(text::toUnicode(primarySelection));
                     }
                 }
                 break;
@@ -821,7 +796,6 @@ namespace minire::gui::components
                     actualizePrimarySelection();
                     invalidateContent();
                 }
-                actualizePrimarySelection();
                 break;
 
             case SDLK_c:
@@ -859,18 +833,15 @@ namespace minire::gui::components
                     break;
                 if (testMask(e._mod, KMOD_CTRL))
                 {
-                    if (std::string const * clipboardText = overlayController().getClipboardText();
-                        clipboardText)
-                    {
-                        processInput(text::toUnicode(*clipboardText));
-                    }
+                    std::string const & clipboardText = overlayController().clipboardText();
+                    processInput(text::toUnicode(clipboardText));
                 }
                 break;
         }
         CommonCallbacks::handle(e);
     }
 
-    void Editbox::handle(minire::events::application::OnTextInput const & e)
+    void Editbox::handle(application::OnTextInput const & e)
     {
         if (_enabled.get())
         {

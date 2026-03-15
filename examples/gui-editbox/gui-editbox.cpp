@@ -1,7 +1,5 @@
-#include <minire/application.hpp>
-
 #include <minire/content/manager.hpp>
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 #include <minire/gui/components/editbox.hpp>
 #include <minire/gui/layouts/grid.hpp>
 #include <minire/logging.hpp>
@@ -19,16 +17,16 @@ using namespace minire::utils;
 namespace
 {
     class GuiEditbox
-        : public minire::GuiController
+        : public minire::GuiApplication
     {
-        using GuiController::GuiController;
+        using GuiApplication::GuiApplication;
 
     protected:
-        void start() override
+        void onStart() override
         {
             using namespace minire::gui;
 
-            GuiController::start();
+            GuiApplication::onStart();
 
             // base container
 
@@ -54,8 +52,8 @@ namespace
                                     component.id(), event._current.unformat());
                     });
 
-                editbox1->setCallback(std::in_place_type<minire::events::application::OnKeyDown>, "keydown",
-                    [this](Component const & component, minire::events::application::OnKeyDown const & event)
+                editbox1->setCallback(std::in_place_type<minire::application::OnKeyDown>, "keydown",
+                    [this](Component const & component, minire::application::OnKeyDown const & event)
                     {
                         std::string kind = "UNKNOWN";
                         switch(event._key)
@@ -148,16 +146,13 @@ namespace
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-        minire::Application application(1280, 720, "GUI Editbox", manager);
-        application.setController<GuiEditbox>(kMaxCtrlFps);
+        GuiEditbox application(1280, 720, "GUI Editbox", manager);
         application.setVsync(true);
         application.setGlDebug(false);
 

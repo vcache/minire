@@ -1,7 +1,8 @@
 #pragma once
 
+#include <minire/content/id.hpp>
 #include <minire/errors.hpp>
-#include <minire/gui/content-view.hpp>
+#include <minire/models/sprite.hpp>
 #include <minire/text/text-format.hpp>
 #include <minire/utils/rect.hpp>
 
@@ -26,11 +27,12 @@ namespace minire::gui
                                    bool,
                                    int64_t,
                                    float,
-                                   std::string,
+                                   std::string, // also a content::Id
                                    glm::vec2,
                                    Location,
                                    utils::Rect,
-                                   text::Format>;
+                                   text::Format,
+                                   models::sprite::MaybeImage>;
 
         /**
          * \a _name - a primary name of a style (e.g. "builtin", "main-menu", "inventory", "hud", etc)
@@ -38,6 +40,15 @@ namespace minire::gui
          *                A ListView might be used as a separate component or as a part a Dropdown,
          *                and it might have different styles in both cases.
          * */
+
+        // TODO: instead "modifier", should use a std::vector<std::string>,
+        //       so that deeply nested styles can be defined. For example:
+        //          - ["dropdown", "listview"]
+        //          - ["text"]
+        //          - ["button", "text"]
+        //          - ["scrollbar", "button", "text"]
+        //          - ["dropdown", "button", "text"]
+
         struct Style
         {
             std::string _name;
@@ -52,6 +63,7 @@ namespace minire::gui
          * \a name - how component is used, component-specific (e.g. "normal", "hovered", "pressed", etc)
          * \a style - stylistic variant of a (component, name) pair (e.g., "builtin", "menu", "hud" etc)
          * */
+        // TODO: rename "parameter" -> "get"
         template<typename T>
         auto parameter(std::string const & component,
                        std::string const & name,
@@ -72,7 +84,7 @@ namespace minire::gui
         }
         catch(std::exception const &e)
         {
-            MINIRE_THROW("failed to fetch a param (\"{}\", \"{}\", \"{}\"/\"{}\"): {}",
+            MINIRE_THROW("failed to fetch a param (\"{}\", \"{}\", \"{}\"/\"{}\"):\n{}",
                          component, name, style._name, style._modifier, e.what());
         }
         catch(...)
@@ -81,55 +93,9 @@ namespace minire::gui
                          component, name, style._name, style._modifier);
         }
 
-        ImageView::Sptr makeImage(std::string const & component,
-                                  std::string const & name,
-                                  Style const & style) const
-        try
-        {
-            return makeImageImpl(component, name, style);
-        }
-        catch(std::exception const &e)
-        {
-            MINIRE_THROW("failed to make an image (\"{}\", \"{}\", \"{}\"/\"{}\"): {}",
-                         component, name, style._name, style._modifier, e.what());
-        }
-        catch(...)
-        {
-            MINIRE_THROW("failed to make an image (\"{}\", \"{}\", \"{}\"/\"{}\"): unknown exception",
-                         component, name, style._name, style._modifier);
-        }
-
-        TextView::Sptr makeText(std::string const & component,
-                                std::string const & name,
-                                Style const & style,
-                                text::FormattedString const & string) const
-        try
-        {
-            return makeTextImpl(component, name, style, string);
-        }
-        catch(std::exception const &e)
-        {
-            MINIRE_THROW("failed to make a text (\"{}\", \"{}\", \"{}\"/\"{}\"): {}",
-                         component, name, style._name, style._modifier, e.what());
-        }
-        catch(...)
-        {
-            MINIRE_THROW("failed to make a text (\"{}\", \"{}\", \"{}\"/\"{}\"): unknown exception",
-                         component, name, style._name, style._modifier);
-        }
-
     protected:
         virtual Value const & parameterImpl(std::string const & component,
                                             std::string const & name,
                                             Style const & style) const = 0;
-
-        virtual ImageView::Sptr makeImageImpl(std::string const & component,
-                                              std::string const & name,
-                                              Style const & style) const = 0;
-
-        virtual TextView::Sptr makeTextImpl(std::string const & component,
-                                            std::string const & name,
-                                            Style const & style,
-                                            text::FormattedString const &) const = 0;
     };
 }

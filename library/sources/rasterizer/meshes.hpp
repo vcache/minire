@@ -8,7 +8,7 @@
 
 #include <memory>
 
-namespace minire { class Scene; }
+namespace minire { class SceneImpl; }
 namespace minire::content { class Manager; }
 
 namespace minire::rasterizer
@@ -27,7 +27,7 @@ namespace minire::rasterizer
                         content::Manager &,
                         Resources &);
 
-        void draw(Scene const &,
+        void draw(SceneImpl const &,
                   material::TextureRefs const & directionalLightsShadowMaps,
                   material::TextureRefs const & pointLightsShadowMaps) const;
 

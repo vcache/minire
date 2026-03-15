@@ -1,14 +1,16 @@
 #pragma once
 
+#include <minire/label.hpp>
+
 #include <rasterizer/drawable.hpp>
-#include <rasterizer/label.hpp>
 
 #include <glm/mat4x4.hpp>
 
+#include <list>
 #include <memory>
 #include <unordered_map>
 
-namespace minire::text { class FormattedString; }
+namespace minire::content { class Manager; }
 
 namespace minire::rasterizer
 {
@@ -17,25 +19,31 @@ namespace minire::rasterizer
     class Labels
     {
     public:
-        explicit Labels(Fonts const &);
+        explicit Labels(Fonts const &,
+                        content::Manager &);
+
+        ~Labels();
+
+        Label::Sptr make(std::string const & name,
+                         models::Label model);
+
+        Label::Sptr const & find(std::string const & name) const;
 
     public:
-        Label & allocate(std::string, text::FormattedString const &,
-                         size_t z = 0, bool visible = true);
-
-        void deallocate(std::string const &);
-
-        Label & get(std::string const &);
-
-        Label const & get(std::string const &) const;
-
         void predraw(Drawable::PtrsList & out) const;
 
     private:
-        using LabelPtr = std::unique_ptr<Label>;
-        using Store = std::unordered_map<std::string, LabelPtr>;
+        class LabelImpl;
+        class Program;
 
-        Fonts const & _fonts;
-        Store         _store;
+        using LabelImplSptr = std::shared_ptr<LabelImpl>;
+        using Heap = std::list<LabelImplSptr>;
+        using Index = std::unordered_map<std::string, LabelImplSptr>;
+
+        Fonts const            & _fonts;
+        content::Manager       & _contentManager;
+        std::unique_ptr<Program> _program;
+        mutable Heap             _heap;
+        mutable Index            _index;
     };
 }

@@ -1,7 +1,5 @@
-#include <minire/application.hpp>
-
 #include <minire/content/manager.hpp>
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 #include <minire/gui/components/scrollbar.hpp>
 #include <minire/gui/layouts/grid.hpp>
 #include <minire/logging.hpp>
@@ -18,14 +16,14 @@ using namespace minire::utils;
 namespace
 {
     class GuiScrollbar
-        : public minire::GuiController
+        : public minire::GuiApplication
     {
-        using GuiController::GuiController;
+        using GuiApplication::GuiApplication;
 
     protected:
-        void start() override
+        void onStart() override
         {
-            GuiController::start();
+            GuiApplication::onStart();
 
             auto layout = std::make_shared<layouts::Grid>(2, 4);
             auto container = guiRoot().emplace<Component>("container");
@@ -126,16 +124,13 @@ namespace
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-        minire::Application application(1280, 720, "GUI Scrollbar", manager);
-        application.setController<GuiScrollbar>(kMaxCtrlFps);
+        GuiScrollbar application(1280, 720, "GUI Scrollbar", manager);
         application.setGlDebug(false);
         application.setVsync(true);
 

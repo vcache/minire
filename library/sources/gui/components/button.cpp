@@ -1,227 +1,236 @@
 #include <minire/gui/components/button.hpp>
 
+#include <minire/logging.hpp> // TODO: [X]
+
 #include <minire/errors.hpp>
+#include <minire/gui/layout.hpp>
+#include <minire/gui/layouts/array.hpp>
 
 namespace minire::gui::components
 {
     Button::Button(std::string const & id,
                    Theme const & theme,
                    Theme::Style const & style,
-                   OverlayController & overlayController)
+                   OverlayController & overlayController,
+                   bool const hasText,
+                   bool const hasIcon)
         : Component(id, theme, style, overlayController)
-        , _bgNormal(*this, theme.makeImage("button", "bg-normal", style))
-        , _bgHovered(*this, theme.makeImage("button", "bg-hovered", style))
-        , _bgPressed(*this, theme.makeImage("button", "bg-pressed", style))
-        , _text(*this)
-        , _icon(*this)
+        , _bgNormal(std::make_shared<components::Image>(
+                "__bg-normal__", theme, style, overlayController,
+                theme.parameter<minire::models::sprite::MaybeImage>("button", "bg-normal", style)))
+        , _bgHovered(std::make_shared<components::Image>(
+                "__bg-hovered__", theme, style, overlayController,
+                theme.parameter<minire::models::sprite::MaybeImage>("button", "bg-hovered", style)))
+        , _bgPressed(std::make_shared<components::Image>(
+                "__bg-pressed__", theme, style, overlayController,
+                theme.parameter<minire::models::sprite::MaybeImage>("button", "bg-pressed", style)))
+        , _content(hasIcon || hasText ? std::make_shared<Component>("__content__", theme, style, overlayController)
+                                      : Component::Sptr{})
+        , _text(hasText ? std::make_shared<components::Text>("__caption__", theme, style, overlayController)
+                        : components::Text::Sptr{}) // TODO: cascaded style: text <- button
+        , _icon(hasIcon ? std::make_shared<components::Image>("__icon__", theme, style, overlayController, std::nullopt)
+                        : components::Image::Sptr{}) // TODO: cascaded style: text <- button
         , _iconLocation(*this, theme.parameter<Theme::Location>("button", "icon-location", style))
         , _iconSpacing(*this, theme.parameter<float>("button", "icon-spacing", style))
         , _pressOffset(*this, theme.parameter<glm::vec2>("button", "press-offset", style))
+        , _contentPadding(*this, theme.parameter<utils::Rect>("button", "content-padding", style))
+        , _hasText(hasText)
+        , _hasIcon(hasIcon)
     {
-        padding() = theme.parameter<utils::Rect>("button", "padding", style);
+        isDraggable() = true;
     }
 
-    template<typename T>
-    void Button::actualize(Property<std::shared_ptr<T>> & contentView)
+    void Button::initialize()
     {
-        if (contentView.isInvalidated() && contentView.get())
+        auto sharedThis = shared_from_this();
+
+        assert(_bgNormal);
+        _bgNormal->setParent(sharedThis);
+        _bgNormal->setEventTransparent(true);
+
+        assert(_bgHovered);
+        _bgHovered->setParent(sharedThis);
+        _bgHovered->setEventTransparent(true);
+
+        assert(_bgPressed);
+        _bgPressed->setParent(sharedThis);
+        _bgPressed->setEventTransparent(true);
+
+        if (_content)
         {
-            contentView.get()->setContentInvalidator(shared_from_this());
+            _content->setParent(sharedThis);
+            _content->setEventTransparent(true);
         }
+
+        if(_text)
+        {
+            assert(_content);
+            _text->setParent(_content);
+            _text->setEventTransparent(true);
+            _text->horizontal() = _text->vertical() =
+                Arranger(position::Center{}, dimension::Content{});
+        }
+
+        if(_icon)
+        {
+            assert(_content);
+            _icon->setParent(_content);
+            _icon->setEventTransparent(true);
+            _icon->horizontal() = _icon->vertical() =
+                Arranger(position::Center{}, dimension::Content{});
+        }
+
+        rebuildLayout();
+        updateArrangers();
+        updateBackground();
     }
 
     size_t Button::revalidateContent(size_t zOffset,
-                                     bool const effectiveVisible,
-                                     Area const & contentArea,
-                                     Area const & clippingWindow)
+                                     bool const /*effectiveVisible*/,
+                                     Area const & /*contentArea*/,
+                                     Area const & /*clippingWindow*/)
     {
-        // update content invalidator
-        actualize(_bgNormal);
-        actualize(_bgHovered);
-        actualize(_bgPressed);
-        actualize(_text);
-        actualize(_icon);
+        if (_iconLocation.isInvalidated() ||
+            _iconSpacing.isInvalidated() ||
+            _contentPadding.isInvalidated())
+        {
+            rebuildLayout();
+            updateArrangers();
+        }
 
-        // revalidate visibility
-        ImageView::Sptr const & background = activeBackground();
-        if (auto const & p = _bgNormal.get()) p->setVisible((_bgNormal.get() == background) && effectiveVisible);
-        if (auto const & p = _bgHovered.get()) p->setVisible((_bgHovered.get() == background) && effectiveVisible);
-        if (auto const & p = _bgPressed.get()) p->setVisible((_bgPressed.get() == background) && effectiveVisible);
+        if (_pressOffset.isInvalidated())
+        {
+            updateArrangers();
+        }
 
-        if (auto const & icon = _icon.get()) icon->setVisible(effectiveVisible);
-        if (auto const & text = _text.get()) text->setVisible(effectiveVisible);
-
-        // revalidate positions
-        revalidatePositions(contentArea, clippingWindow);
-
-        // revalidate zOrder
-        if (auto const & p = _bgNormal.get()) zOffset = p->onZOrderChanged(zOffset);
-        if (auto const & p = _bgHovered.get()) zOffset = p->onZOrderChanged(zOffset);
-        if (auto const & p = _bgPressed.get()) zOffset = p->onZOrderChanged(zOffset);
-        if (auto const & p = _text.get()) zOffset = p->onZOrderChanged(zOffset);
-        if (auto const & p = _icon.get()) zOffset = p->onZOrderChanged(zOffset);
-
-        // finish
-        _bgNormal.revalidate();
-        _bgHovered.revalidate();
-        _bgPressed.revalidate();
-        _text.revalidate();
-        _icon.revalidate();
         _iconLocation.revalidate();
         _iconSpacing.revalidate();
         _pressOffset.revalidate();
+        _contentPadding.revalidate();
 
         return zOffset;
     }
 
-    std::optional<std::pair<float, float>> Button::measureContent() const
+    void Button::rebuildLayout()
     {
-        float const extraWidth = padding().get()._left + padding().get()._right;
-        float const extraHeight = padding().get()._top + padding().get()._bottom;
-        bool const hasIcon = _icon.get().operator bool();
-        bool const hasText = _text.get().operator bool();
-
-        if (!hasIcon && !hasText)
+        if (_hasIcon && _hasText)
         {
-            return std::make_pair(extraWidth, extraHeight);
+            // an icon and a text
+            assert(_content);
+            assert(_hasIcon && _icon);
+            assert(_hasText && _text);
+            switch(_iconLocation.get())
+            {
+                case Theme::Location::kLeft:
+                    _content->newLayout<layouts::Row>()->pushBack(_icon, dimension::Content{})
+                                                        .pushBack(dimension::Constant{_iconSpacing.get()})
+                                                        .pushBack(_text, dimension::Fill{});
+                    break;
+
+                case Theme::Location::kTop:
+                    _content->newLayout<layouts::Column>()->pushBack(_icon, dimension::Content{})
+                                                           .pushBack(dimension::Constant{_iconSpacing.get()})
+                                                           .pushBack(_text, dimension::Fill{});
+                    break;
+
+                case Theme::Location::kRight:
+                    _content->newLayout<layouts::Row>()->pushBack(_text, dimension::Fill{})
+                                                        .pushBack(dimension::Constant{_iconSpacing.get()})
+                                                        .pushBack(_icon, dimension::Content{});
+                    break;
+
+                case Theme::Location::kBottom:
+                    _content->newLayout<layouts::Column>()->pushBack(_text, dimension::Fill{})
+                                                           .pushBack(dimension::Constant{_iconSpacing.get()})
+                                                           .pushBack(_icon, dimension::Content{});
+                    break;
+            }
         }
-        else if (!hasIcon)
+        else if (_content)
+        {
+            _content->newLayout<LinearLayout>();
+        }
+    }
+
+    void Button::updateArrangers()
+    {
+        if(_content)
+        {
+            bool const displaced = State::kPressed == _state;
+            std::optional<glm::vec2> size = measureContent();
+
+            assert(size);
+            _content->horizontal() = Arranger(position::Center{},
+                                              dimension::Constant{size->x},
+                                              displaced ? _pressOffset.get().x : 0);
+            _content->vertical() = Arranger(position::Center{},
+                                            dimension::Constant{size->y},
+                                            displaced ? _pressOffset.get().y : 0);
+        }
+    }
+
+    void Button::updateBackground()
+    {
+        assert(_bgNormal);
+        _bgNormal->visible()  = State::kNormal == _state;
+
+        assert(_bgHovered);
+        _bgHovered->visible() = State::kHovered == _state;
+
+        assert(_bgPressed);
+        _bgPressed->visible() = State::kPressed == _state;
+    }
+
+    // TODO: it should be calculated automatically by the Layout
+    // TODO: cache this value
+    std::optional<glm::vec2> Button::measureContent() const
+    {
+        float const extraWidth = _contentPadding.get()._left + _contentPadding.get()._right;
+        float const extraHeight = _contentPadding.get()._top + _contentPadding.get()._bottom;
+
+        if (!_hasIcon && !_hasText)
+        {
+            assert(!_text && !_icon);
+            return glm::vec2(extraWidth, extraHeight);
+        }
+        else if (!_hasIcon)
         {
             // only a text
-            assert(hasText && _text.get());
-            auto [size, _] = _text.get()->measure();
-            return std::make_pair(size.x + extraWidth, size.y + extraHeight);
+            assert(_hasText && _text && !_icon);
+            auto const & size = _text->measureContent();
+            assert(size);
+            return glm::vec2(size->x + extraWidth, size->y + extraHeight);
         }
-        else if (!hasText)
+        else if (!_hasText)
         {
             // only an icon
-            assert(hasIcon && _icon.get());
-            auto [size, _] = _icon.get()->measure();
-            return std::make_pair(size.x + extraWidth, size.y + extraHeight);
+            assert(_hasIcon && !_text && _icon);
+            auto const & size = _icon->measureContent();
+            assert(size);
+            return glm::vec2(size->x + extraWidth, size->y + extraHeight);
         }
         else
         {
             // an icon and a text
-            assert(hasIcon && _icon.get());
-            assert(hasText && _text.get());
-            auto [textSize, _] = _text.get()->measure();
-            auto [iconSize, __] = _icon.get()->measure();
+            assert(_hasIcon && _icon);
+            assert(_hasText && _text);
+            auto const & textSize = _text->measureContent();
+            auto const & iconSize = _icon->measureContent();
+            assert(textSize && iconSize);
             switch(_iconLocation.get())
             {
                 case Theme::Location::kLeft:
                 case Theme::Location::kRight:
-                    return std::make_pair(iconSize.x + textSize.x + _iconSpacing.get() + extraWidth,
-                                          std::max(iconSize.y, textSize.y) + extraHeight);
+                    return glm::vec2(iconSize->x + textSize->x + _iconSpacing.get() + extraWidth,
+                                     std::max(iconSize->y, textSize->y) + extraHeight);
 
                 case Theme::Location::kTop:
                 case Theme::Location::kBottom:
-                    return std::make_pair(std::max(iconSize.x, textSize.x) + extraWidth,
-                                          iconSize.y + textSize.y + _iconSpacing.get() + extraHeight);
+                    return glm::vec2(std::max(iconSize->x, textSize->x) + extraWidth,
+                                     iconSize->y + textSize->y + _iconSpacing.get() + extraHeight);
             }
 
             MINIRE_THROW("unknown icon position: {}", static_cast<int>(_iconLocation.get()));
-        }
-    }
-
-    ImageView::Sptr const & Button::activeBackground() const
-    {
-        switch(_state)
-        {
-            case State::kNormal:  return _bgNormal.get();
-            case State::kHovered: return _bgHovered.get();
-            case State::kPressed: return _bgPressed.get();
-        }
-        MINIRE_THROW("unknown button state: {}", static_cast<int>(_state));
-    }
-
-    void Button::revalidatePositions(Area const & contentArea,
-                                     Area const & clippingWindow)
-    {
-        for (auto const & bg : {_bgNormal.get(), _bgHovered.get(), _bgPressed.get()})
-        {
-            if (!bg) continue;
-            bg->setContentArea(contentArea);
-            bg->setClippingWindow(clippingWindow);
-        }
-
-        auto const & icon = _icon.get();
-        auto const & text = _text.get();
-        bool const hasIcon = icon.operator bool();
-        bool const hasText = text.operator bool();
-
-        glm::vec2 const offset = _state == State::kPressed ? _pressOffset.get()
-                                                           : glm::vec2();
-
-        if (!hasIcon && !hasText)
-        {
-            // nothing to do
-        }
-        else if (!hasIcon)
-        {
-            // only a text
-            assert(hasText && text);
-            auto [size, _] = text->measure();
-            _textPosition.x = contentArea._left + (contentArea._width - size.x) / 2.0f;
-            _textPosition.y = contentArea._top + (contentArea._height - size.y) / 2.0f;
-            text->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
-            text->setClippingWindow(clippingWindow);
-        }
-        else if (!hasText)
-        {
-            // only an icon
-            assert(hasIcon && icon);
-            auto [size, _] = icon->measure();
-            _iconPosition.x = contentArea._left + (contentArea._width - size.x) / 2.0f;
-            _iconPosition.y = contentArea._top + (contentArea._height - size.y) / 2.0f;
-            icon->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
-            icon->setClippingWindow(clippingWindow);
-        }
-        else
-        {
-            // an icon and a text
-            assert(hasIcon && icon);
-            assert(hasText && text);
-            auto [textSize, _] = text->measure();
-            auto [iconSize, __] = icon->measure();
-
-            float const totalWidth = iconSize.x + textSize.x + _iconSpacing.get();
-            float const totalHeight = iconSize.y + textSize.y + _iconSpacing.get();
-
-            switch(_iconLocation.get())
-            {
-                case Theme::Location::kLeft:
-                    _iconPosition.x = contentArea._left + (contentArea._width - totalWidth) / 2.0f;
-                    _textPosition.x = _iconPosition.x + iconSize.x + _iconSpacing.get();
-                    _iconPosition.y = contentArea._top + (contentArea._height - iconSize.y) / 2.0f;
-                    _textPosition.y = contentArea._top + (contentArea._height - textSize.y) / 2.0f;
-                    break;
-
-                case Theme::Location::kTop:
-                    _iconPosition.x = contentArea._left + (contentArea._width - iconSize.x) / 2.0f;
-                    _textPosition.x = contentArea._left + (contentArea._width - textSize.x) / 2.0f;
-                    _iconPosition.y = contentArea._top + (contentArea._height - totalHeight) / 2.0f;
-                    _textPosition.y = _iconPosition.y + iconSize.y + _iconSpacing.get();
-                    break;
-
-                case Theme::Location::kRight:
-                    _textPosition.x = contentArea._left + (contentArea._width - totalWidth) / 2.0f;
-                    _iconPosition.x = _textPosition.x + textSize.x + _iconSpacing.get();
-                    _iconPosition.y = contentArea._top + (contentArea._height - iconSize.y) / 2.0f;
-                    _textPosition.y = contentArea._top + (contentArea._height - textSize.y) / 2.0f;
-                    break;
-
-                case Theme::Location::kBottom:
-                    _iconPosition.x = contentArea._left + (contentArea._width - iconSize.x) / 2.0f;
-                    _textPosition.x = contentArea._left + (contentArea._width - textSize.x) / 2.0f;
-                    _textPosition.y = contentArea._top + (contentArea._height - totalHeight) / 2.0f;
-                    _iconPosition.y = _textPosition.y + textSize.y + _iconSpacing.get();
-                    break;
-            }
-
-            text->setContentPosition(_textPosition.x + offset.x, _textPosition.y + offset.y);
-            text->setClippingWindow(clippingWindow);
-            icon->setContentPosition(_iconPosition.x + offset.x, _iconPosition.y + offset.y);
-            icon->setClippingWindow(clippingWindow);
         }
     }
 
@@ -230,37 +239,10 @@ namespace minire::gui::components
         if (state == _state)
             return;
 
-        if (_state == State::kPressed)
-        {
-            if (auto const & text = _text.get())
-            {
-                text->setContentPosition(_textPosition.x, _textPosition.y);
-            }
-
-            if (auto const & icon = _icon.get())
-            {
-                icon->setContentPosition(_iconPosition.x, _iconPosition.y);
-            }
-        }
-
         _state = state;
 
-       if (_state == State::kPressed)
-        {
-            if (auto const & text = _text.get())
-            {
-                glm::vec2 textPosition = _textPosition + _pressOffset.get();
-                text->setContentPosition(textPosition.x, textPosition.y);
-            }
-
-            if (auto const & icon = _icon.get())
-            {
-                glm::vec2 iconPosition = _iconPosition + _pressOffset.get();
-                icon->setContentPosition(iconPosition.x, iconPosition.y);
-            }
-        }
-
-        invalidateContent();
+        updateArrangers();
+        updateBackground();
     }
 
     void Button::handle(models::checkable::OnCheckedChanged const & e)
@@ -271,7 +253,7 @@ namespace minire::gui::components
         Checkable::handle(e);
     }
 
-    void Button::handle(minire::events::application::OnMouseDown const & e)
+    void Button::handle(application::OnMouseDown const & e)
     {
         if (e._mouseButton == minire::models::MouseButton::kLeft)
         {
@@ -292,7 +274,7 @@ namespace minire::gui::components
         CommonCallbacks::handle(e);
     }
 
-    void Button::handle(gui::events::OnDragEnd const & e)
+    void Button::handle(gui::OnDragEnd const & e)
     {
         setState(checkable() && checked() ? State::kPressed
                                           : (isHovered() ? State::kHovered
@@ -300,7 +282,7 @@ namespace minire::gui::components
         CommonCallbacks::handle(e);
     }
 
-    void Button::handle(gui::events::OnMouseEnter const & e)
+    void Button::handle(gui::OnMouseEnter const & e)
     {
         bool isClickReturn = e._isClickReturn;
 
@@ -313,7 +295,7 @@ namespace minire::gui::components
         CommonCallbacks::handle(e);
     }
 
-    void Button::handle(gui::events::OnMouseLeave const & e)
+    void Button::handle(gui::OnMouseLeave const & e)
     {
         if (!isDragging())
         {
@@ -323,7 +305,7 @@ namespace minire::gui::components
         CommonCallbacks::handle(e);
     }
 
-    void Button::handle(gui::events::OnClick const & e)
+    void Button::handle(gui::OnClick const & e)
     {
         if (checkable())
             toggleCheck();

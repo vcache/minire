@@ -1,12 +1,14 @@
 #pragma once
 
-namespace minire { class Scene; }
+#include <minire/content/path.hpp>
+
 namespace minire::content { class Manager; }
-namespace minire::events::controller { class SceneNewFromSource; }
+namespace minire::scene { class Node; }
 
 namespace minire::scene
 {
-    void instantiateGltf(Scene & scene,
-                         events::controller::SceneNewFromSource const &,
-                         content::Manager &);
+    void instantiateGltf(scene::Node & parent,
+                         content::Path const & source,
+                         content::Manager &,
+                         bool visible);
 }

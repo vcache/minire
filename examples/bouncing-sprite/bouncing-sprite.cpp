@@ -1,6 +1,5 @@
 #include <minire/application.hpp>
 
-#include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/image.hpp>
@@ -12,42 +11,51 @@ namespace
 {
     static size_t const kMaxCtrlFps = 120;
     static float const kVelocity = 150.0f;
-    static std::string const kSpriteId = "my-sprite";
     static std::string const kSpriteFile = "tux.png";
 
     class BouncingSprite
-        : public minire::BasicController
+        : public minire::Application
     {
-        using BasicController::BasicController;
+        using Application::Application;
 
-        void handle(minire::events::application::OnResize const & onResize) override
+        bool handle(minire::application::OnResize const & e) override
         {
-            _windowSize.x = onResize._width;
-            _windowSize.y = onResize._height;
+            _windowSize.x = e._width;
+            _windowSize.y = e._height;
+
+            return Application::handle(e);
         }
 
-        void start() override
+        void onStart() override
         {
-            auto lease = borrow(kSpriteFile);
+            Application::onStart();
+
+            auto lease = contentManager().borrow(kSpriteFile);
             assert(lease);
             minire::models::Image::Sptr image = lease->as<minire::models::Image::Sptr>();
             MINIRE_INVARIANT(image, "not a valid image: {}", kSpriteFile);
             _imageSize = glm::vec2(image->_width, image->_height);
 
-            enqueue<minire::events::controller::CreateSprite>(
-                kSpriteId, kSpriteFile, std::monostate(), _position, glm::vec2(0),
-                std::nullopt, true, 0);
+            _sprite = makeSprite(minire::models::Sprite
+            {
+                ._image = minire::models::sprite::Image{kSpriteFile, std::monostate()},
+                ._position = _position,
+                ._dimensions = glm::vec2(0),
+                ._clippingWindow = std::nullopt,
+                ._zOrder = 0,
+                ._visible = true,
+            });
         }
 
-        void step() override
+        bool onStep() override
         {
             float const delta = frameTime();
 
             _position += _direction * delta * kVelocity;
             _position = glm::clamp(_position, glm::vec2{0, 0}, _windowSize - _imageSize);
 
-            enqueue<minire::events::controller::MoveSprite>(
-                kSpriteId, _position, std::nullopt);
+            assert(_sprite);
+            _sprite->setPosition(_position);
 
             if (_position.x + _imageSize.x >= _windowSize.x)
             {
@@ -66,13 +74,16 @@ namespace
             {
                 _direction.y = 1.0f;
             }
+
+            return true;
         }
 
     private:
-        glm::vec2 _windowSize{0, 0};
-        glm::vec2 _position{0, 0};
-        glm::vec2 _direction{1, 1};
-        glm::vec2 _imageSize{0, 0};
+        minire::Sprite::Sptr _sprite;
+        glm::vec2            _windowSize{0, 0};
+        glm::vec2            _position{0, 0};
+        glm::vec2            _direction{1, 1};
+        glm::vec2            _imageSize{0, 0};
     };
 }
 
@@ -84,8 +95,7 @@ int main()
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-        minire::Application application(1280, 720, "Bouncing sprite", manager);
-        application.setController<BouncingSprite>(kMaxCtrlFps);
+        BouncingSprite application(1280, 720, "Bouncing sprite", manager);
         application.setVsync(true);
 
         // Main loop
