@@ -257,13 +257,8 @@ namespace minire
             virtual OrthographicCamera::Sptr make(std::string const &, models::OrthographicCamera) = 0;
             virtual Billboard::Sptr make(std::string const & name, models::Billboard) = 0;
 
-            Node::Sptr make(models::Node model) { return make(utils::newUuid(), std::move(model)); }
-            Mesh::Sptr make(models::Mesh model) { return make(utils::newUuid(), std::move(model)); }
-            DirectionalLight::Sptr make(models::DirectionalLight model) { return make(utils::newUuid(), std::move(model)); }
-            PointLight::Sptr make(models::PointLight model) { return make(utils::newUuid(), std::move(model)); }
-            PerspectiveCamera::Sptr make(models::PerspectiveCamera model) { return make(utils::newUuid(), std::move(model)); }
-            OrthographicCamera::Sptr make(models::OrthographicCamera model) { return make(utils::newUuid(), std::move(model)); }
-            Billboard::Sptr make(models::Billboard model) { return make(utils::newUuid(), std::move(model)); }
+            template<typename T>
+            auto make(T model) { return make(utils::newUuid(), std::move(model)); }
 
             virtual void makeFromSource(content::Path const &, content::Manager &, bool visible) = 0;
 

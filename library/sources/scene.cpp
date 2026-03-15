@@ -234,7 +234,7 @@ namespace minire
         instantiateGltf(*this, source, contentManager, visible);
     }
 
-    void SceneImpl::Node::makeAnimationSet(models::AnimationSet animationSet) // const ref?
+    void SceneImpl::Node::makeAnimationSet(models::AnimationSet animationSet) // TODO: const ref?
     {
         // drop any current active animation
         if (_activeAnimation)
