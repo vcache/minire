@@ -20,12 +20,23 @@
 
 namespace minire
 {
-    // TODO: store/calculate absolute path for nodes/leaves (and use them for logging)
+    // TODO: too many passes, should re-design into a single traverse that re-validates all components
+    //       Plan:
+    //          - add flags offset for Object
+    //          - move bool vars of Node into Object flags
+    //              kActivated - performs lerping
+    //              kChildActivated - has childern to be lerped
+    //              kHasActiveChildrenAnimation - ???
+    //              kModelInvalidated - not needed
+    //              kDirtyGlobalTransform
+    //              kGreyGlobalTransform
+    //          - single tree traverse:
+    //              ???
 
     // TODO: Node::visible is broken, it won't hide its children when visible=false
     //       (should evaluate effective visibility as in GUI)
 
-    // TODO: too many passes, should re-design into a single traverse that re-validates all components
+    // TODO: store/calculate absolute path for nodes/leaves (and use them for logging)
 
     // SceneImpl::Leaf //
 
@@ -36,6 +47,7 @@ namespace minire
         auto oldParent = _parent.lock();
         MINIRE_INVARIANT(oldParent, "an un-parented scene leaf cannot be re-parented: \"{}\"", name());
         auto oldIterator = oldParent->_children.find(name());
+        assert(oldIterator != oldParent->_children.cend());
 
         // find a new parent and insert element to a new parent's children
         SceneImpl::Node::Sptr newParent = std::static_pointer_cast<SceneImpl::Node>(newParentIface);
@@ -55,7 +67,8 @@ namespace minire
 
         if (newParent)
         {
-            if (ObjectType::invalidated()) propagate();
+            if (ObjectType::invalidated()) propagate(); // TODO: it should be forced,
+                                                        //       to prevent half-propagated state
             // TODO: also should re-activate other stuff of a parent 
         }
     }
@@ -337,7 +350,8 @@ namespace minire
 
         if (newParent)
         {
-            if (invalidated()) propagate();
+            if (invalidated()) propagate(); // TODO: it should be forced,
+                                            //       to prevent half-propagated state
             // TODO: also should re-activate other stuff of a parent
         }
     }
@@ -644,7 +658,7 @@ namespace minire
     // TODO: don't revalidate culled-out nodes
     void SceneImpl::revalidateModels()
     {
-        std::vector<Node::Sptr> queue;
+        std::vector<Node::Sptr> queue; // TODO: Node* should be faster
         queue.reserve(_nodesEstimate);
 
         assert(_root);
@@ -689,7 +703,7 @@ namespace minire
     bool SceneImpl::advanceAnimations(float delta /* seconds */)
     {
         assert(_root);
-        std::vector<Node::Sptr> queue{_root};
+        std::vector<Node::Sptr> queue{_root}; // TODO: Node* should be faster
         queue.reserve(_nodesEstimate);
 
         bool updated = false;
@@ -829,7 +843,7 @@ namespace minire
         if (!_root->_activated && !_root->_childActivated)
             return;
 
-        std::vector<Node::Sptr> queue{_root};
+        std::vector<Node::Sptr> queue{_root}; // TODO: Node* should be faster
         queue.reserve(_nodesEstimate);
         while(!queue.empty())
         {
@@ -887,7 +901,7 @@ namespace minire
         if (Node::GlobalTransformState::kClean == _root->_globalTransformState)
             return;
 
-        std::vector<Node::Sptr> queue{_root};
+        std::vector<Node::Sptr> queue{_root}; // TODO: Node* should be faster
         queue.reserve(_nodesEstimate);
         while (!queue.empty())
         {
