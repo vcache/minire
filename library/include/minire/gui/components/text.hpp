@@ -29,6 +29,9 @@ namespace minire::gui::components
 
         ~Text() override;
 
+        // TODO: make make chaned initilizers (like in FormattedString) ?
+        //       Actually, just need to add a single method like Text & text(text::FormattedString &&)
+
         Property<text::FormattedString> const & text() const { return _text; }
         Property<text::FormattedString> & text() { return _text; }
 

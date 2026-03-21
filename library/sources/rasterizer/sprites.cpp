@@ -246,7 +246,7 @@ namespace minire::rasterizer
         }
     }
 
-    Sprite::Sptr const & Sprites::find(std::string const & name) const
+    Sprite::Sptr Sprites::find(std::string const & name) const
     {
         if (auto it = _index.find(name); it != _index.cend())
         {
@@ -258,8 +258,7 @@ namespace minire::rasterizer
             }
         }
 
-        static Sprite::Sptr const kEmpty;
-        return kEmpty;
+        return {};
     }
 
     void Sprites::predraw(Drawable::PtrsList & out) const

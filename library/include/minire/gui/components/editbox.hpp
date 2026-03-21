@@ -21,6 +21,7 @@ namespace minire::gui::components
     // TODO: unicode combos
     // TODO: blinking
     // TODO: context menu
+    // TODO: drop selection once system's primary selection changed
     namespace editbox
     {
         struct OnTextChanged

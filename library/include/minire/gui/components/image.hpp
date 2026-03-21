@@ -20,12 +20,12 @@ namespace minire::gui::components
                        Theme const & theme,
                        Theme::Style const & style,
                        OverlayController & overlayController,
-                       models::sprite::MaybeImage image);
+                       minire::models::sprite::MaybeImage image);
 
         ~Image() override;
 
-        Property<models::sprite::MaybeImage> const & image() const { return _image; }
-        Property<models::sprite::MaybeImage> & image() { return _image; }
+        Property<minire::models::sprite::MaybeImage> const & image() const { return _image; }
+        Property<minire::models::sprite::MaybeImage> & image() { return _image; }
 
         std::optional<glm::vec2> measureContent() const override;
 
@@ -39,8 +39,8 @@ namespace minire::gui::components
         void dropSprite();
 
     private:
-        Property<models::sprite::MaybeImage> _image;
-        Sprite::Sptr                         _sprite;
-        mutable std::optional<glm::vec2>     _contentSize;
+        Property<minire::models::sprite::MaybeImage> _image;
+        Sprite::Sptr                                 _sprite;
+        mutable std::optional<glm::vec2>             _contentSize;
     };
 }

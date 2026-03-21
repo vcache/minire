@@ -41,6 +41,16 @@ namespace minire::gui::components
         isDraggable() = true;
     }
 
+    Button::Button(std::string const & id,
+                   Theme const & theme,
+                   Theme::Style const & style,
+                   OverlayController & overlayController,
+                   Mode mode)
+        : Button(id, theme, style, overlayController,
+                 mode == Mode::kText || mode == Mode::kBoth,
+                 mode == Mode::kIcon || mode == Mode::kBoth)
+    {}
+
     void Button::initialize()
     {
         auto sharedThis = shared_from_this();

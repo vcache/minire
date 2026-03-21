@@ -317,7 +317,7 @@ namespace minire::rasterizer
         }
     }
 
-    Label::Sptr const & Labels::find(std::string const & name) const
+    Label::Sptr Labels::find(std::string const & name) const
     {
         if (auto it = _index.find(name); it != _index.cend())
         {
@@ -329,8 +329,7 @@ namespace minire::rasterizer
             }
         }
 
-        static Label::Sptr const kEmpty;
-        return kEmpty;
+        return {};
     }
 
     void Labels::predraw(Drawable::PtrsList & out) const

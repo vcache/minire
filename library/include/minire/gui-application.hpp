@@ -32,12 +32,15 @@ namespace minire
         void setFocus(gui::Component::Sptr const & = {});
 
     protected:
-        // NOTE: Descendant classes SHOUDL not add "true" into the result,
+        // NOTE: Descendant classes SHOULD not add "true" into the result,
         //       unless they really need to start a new epoch
         //       (since Gui don't need lerping);
         // NOTE: call GuiApplication::onStep() at the end of overrided method,
         //       so that, GuiApplication will revalide components immediately.
         bool onStep() override;
+
+        // See onStep's notes.
+        void onStart() override;
 
         // NOTE: Descendant classes SHOULD call GuiApplication::handle(*)
         //       before its own implementation.

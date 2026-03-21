@@ -205,15 +205,17 @@ namespace
                     for(float const spacing : {0.0f, 10.0f})
                     {
                         std::string cellId = fmt::format("{}x{}", row++, i);
-                        auto button = container->at<Component>(cellId).emplace<Button>("btn", true, true);
-                        button->horizontal() = kArrangers[i].first;
-                        button->vertical() = kArrangers[i].second;
-                        button->text() = caption;
-                        button->fontFace() = kFontFace;
-                        button->icon() = minire::models::sprite::Image(kAtlas, kIconRect);
-                        button->iconLocation() = location;
-                        button->iconSpacing() = spacing;
-                        button->setCheckable(isCheckable);
+                        auto button = container->at<Component>(cellId).emplace<Button>("btn",
+                            Button::Mode::kBoth,
+                            options::Text{caption},
+                            options::FontFace{kFontFace},
+                            options::IconLocation{location},
+                            options::IconSpacing{spacing},
+                            options::Icon{minire::models::sprite::Image(kAtlas, kIconRect)},
+                            options::Horizontal{kArrangers[i].first},
+                            options::Vertical{kArrangers[i].second},
+                            options::Checkable{isCheckable},
+                            options::ExclusiveGroup{exclGroup});
 
                         button->setCallback(std::in_place_type<OnClick>, "foo",
                                             [cellId](Component &, OnClick const &)
@@ -223,7 +225,6 @@ namespace
                             [cellId](models::Checkable & c, models::checkable::OnCheckedChanged const & e)
                             { MINIRE_INFO("Check at {}: {}, {}", cellId, c.checked(), e._checked); } );
 
-                        button->setExclusiveGroup(exclGroup);
                         _buttons.push_back(button);
                     }
                 }

@@ -27,7 +27,7 @@ namespace minire::rasterizer
         Label::Sptr make(std::string const & name,
                          models::Label model);
 
-        Label::Sptr const & find(std::string const & name) const;
+        Label::Sptr find(std::string const & name) const;
 
     public:
         void predraw(Drawable::PtrsList & out) const;

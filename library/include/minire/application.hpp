@@ -61,6 +61,7 @@ namespace minire
         // Note that this command won't perform inter-frame lerping,
         // therefore, animated meshes might appear jerky if Controller's FPS
         // is lower that Raterizer FPS.
+        // TODO: allow anonymouse VertexBuffer
         void createVertexBuffer(content::Id const & id,             // The VertexBuffer will be available by a path:
                                                                     //  content::path::Special::kVertexBuffers/{_id}
                                 models::VertexBuffer vertexBuffer,  // Controller MUST NOT modify provided buffers,
@@ -75,14 +76,14 @@ namespace minire
         // A 'name' can be optional. If a 'name' is empty(), a sprite will anonymouse.
         Sprite::Sptr make(models::Sprite model) { return make({}, std::move(model)); }
         Sprite::Sptr make(std::string const & name, models::Sprite);
-        Sprite::Sptr const & findSprite(std::string const & name);
-        Sprite::Sptr const & detachSprite(std::string const & name); // detached Sprite cannot be re-attached
+        Sprite::Sptr findSprite(std::string const & name);
+        Sprite::Sptr detachSprite(std::string const & name); // detached Sprite cannot be re-attached
 
         // A 'name' can be optional. If a 'name' is empty(), a sprite will anonymouse.
         Label::Sptr make(models::Label model) { return make({}, std::move(model)); }
         Label::Sptr make(std::string const & name, models::Label);
-        Label::Sptr const & findLabel(std::string const & name);
-        Label::Sptr const & detachLabel(std::string const & name);
+        Label::Sptr findLabel(std::string const & name);
+        Label::Sptr detachLabel(std::string const & name);
 
         glm::vec2 measure(text::FormattedString const & text,
                           content::Id const & fontFace) const;
@@ -104,10 +105,10 @@ namespace minire
 
         size_t frame() const { return _frame; }
         double frameTime() const { return _frameTime; }
+        double absoluteTime() const { return _absoluteTime; }
 
     private:
         void startEpoch(); // for lerping
-        void maybeIssueRayCaster();
 
         void onRender() override;
 
@@ -140,12 +141,13 @@ namespace minire
         size_t                      _frameBegin; // microseconds
         double                      _frameTime = 0;
         double                      _animationGap = 0; // seconds
+        double                      _absoluteTime = 0; // seconds
 
         // scene queries
         bool                        _rayCasterEnabled = false;
-        size_t                      _rayCasterRevision = 0;
-        size_t                      _rayCasterLastEpoch = 0;
-        RayCasterSptr               _rayCaster;
+        mutable size_t              _rayCasterRevision = 0;
+        mutable size_t              _rayCasterLastEpoch = 0;
+        mutable RayCasterSptr       _rayCaster;
 
         // instrumentations
         instrumentation::Histogram<>::Sptr _timekeeper;

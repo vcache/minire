@@ -68,6 +68,8 @@ namespace minire
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
 
+            void detach() { setParent({}); }
+
         private:
             glm::vec3 _emissiveFactor = glm::vec3(0);
         };
@@ -93,6 +95,8 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+
+            void detach() { setParent({}); }
         };
 
         class PointLight
@@ -123,6 +127,8 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+
+            void detach() { setParent({}); }
         };
 
         class PerspectiveCamera
@@ -160,6 +166,8 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+
+            void detach() { setParent({}); }
         };
 
         class OrthographicCamera
@@ -194,6 +202,8 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+
+            void detach() { setParent({}); }
         };
 
         class Billboard
@@ -218,6 +228,8 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+
+            void detach() { setParent({}); }
         };
 
         class Node
@@ -251,6 +263,7 @@ namespace minire
             // Generally, user code should store pointers to these objects as Wptr,
             // but it won't hurt storing as Sptr if the user understands possible pitfalls.
 
+            // make -> insert to align w/ stl naming
             virtual Node::Sptr make(std::string const & name, models::Node) = 0;
             virtual Mesh::Sptr make(std::string const & name, models::Mesh) = 0;
             virtual DirectionalLight::Sptr make(std::string const &, models::DirectionalLight) = 0;
@@ -345,14 +358,16 @@ namespace minire
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
 
-            virtual void dispose(models::ScenePath const &) = 0;
-            virtual void disposeAll() = 0;
+            virtual void erase(models::ScenePath const &) = 0;
+            virtual void clear() = 0;
 
             template<typename... Path>
-            void dispose(Path && ... path) requires kNotScenePath<Path...>
+            void erase(Path && ... path) requires kNotScenePath<Path...>
             {
-                dispose(models::mkScenePath(std::forward<Path>(path)...));
+                erase(models::mkScenePath(std::forward<Path>(path)...));
             }
+
+            void detach() { setParent({}); }
         };
     }
 

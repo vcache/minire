@@ -80,10 +80,17 @@ namespace minire
 
     Application::~Application() = default;
 
-    void Application::maybeIssueRayCaster()
+    Application::RayCasterSptr const & Application::rayCaster() const
     {
         assert(_scene);
-        if (_rayCasterEnabled && _rayCasterLastEpoch < _epochNumber)
+
+        if (!_rayCasterEnabled)
+        {
+            _rayCaster.reset();
+            return _rayCaster;
+        }
+
+        if (!_rayCaster || _rayCasterLastEpoch < _epochNumber)
         {
             scene::Viewpoint const & vp = _scene->viewpoint();
             if (size_t const vpRevision = vp.revision();
@@ -95,6 +102,8 @@ namespace minire
                 _rayCasterLastEpoch = _epochNumber;
             }
         }
+
+        return _rayCaster;
     }
 
     void Application::enableInstrumentation()
@@ -159,16 +168,16 @@ namespace minire
         return _rasterizer->sprites().make(name, std::move(model));
     }
 
-    Sprite::Sptr const & Application::findSprite(std::string const & name)
+    Sprite::Sptr Application::findSprite(std::string const & name)
     {
         assert(_rasterizer);
         return _rasterizer->sprites().find(name);
     }
 
-    Sprite::Sptr const & Application::detachSprite(std::string const & name)
+    Sprite::Sptr Application::detachSprite(std::string const & name)
     {
         assert(_rasterizer);
-        Sprite::Sptr const & result = _rasterizer->sprites().find(name);
+        Sprite::Sptr result = _rasterizer->sprites().find(name);
         if (result)
         {
             result->detach();
@@ -183,16 +192,16 @@ namespace minire
         return _rasterizer->labels().make(name, std::move(model));
     }
 
-    Label::Sptr const & Application::findLabel(std::string const & name)
+    Label::Sptr Application::findLabel(std::string const & name)
     {
         assert(_rasterizer);
         return _rasterizer->labels().find(name);
     }
     
-    Label::Sptr const & Application::detachLabel(std::string const & name)
+    Label::Sptr Application::detachLabel(std::string const & name)
     {
         assert(_rasterizer);
-        Label::Sptr const & result = _rasterizer->labels().find(name);
+        Label::Sptr result = _rasterizer->labels().find(name);
         if (result)
         {
             result->detach();
@@ -263,6 +272,10 @@ namespace minire
         if (_rayCasterEnabled)
         {
             _rayCasterRevision = 0;
+        }
+        else
+        {
+            _rayCaster.reset();
         }
     }
 
@@ -369,12 +382,6 @@ namespace minire
             _timekeeper ? std::make_unique<instrumentation::Stopwatch<>>("total", _timekeeper)
                         : std::unique_ptr<instrumentation::Stopwatch<>>();
 
-        // maybe issue a ray caster
-        {
-            instrumentation::Stopwatch<> stopwatch("ray-caster", _timekeeper);
-            maybeIssueRayCaster();
-        }
-
         // perform controller's logic
         {
             instrumentation::Stopwatch<> stopwatch("step", _timekeeper);
@@ -433,6 +440,7 @@ namespace minire
         assert(_frameTime > 0);
         _epochPlayed += _frameTime;
         _animationGap += _frameTime;
+        _absoluteTime += _frameTime;
 
         _frame++;
 

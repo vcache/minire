@@ -356,7 +356,7 @@ namespace minire
         }
     }
 
-    void SceneImpl::Node::dispose(models::ScenePath const & path)
+    void SceneImpl::Node::erase(models::ScenePath const & path)
     {
         if (auto it = findIterator(path); !it.empty())
         {
@@ -364,7 +364,7 @@ namespace minire
         }
     }
 
-    void SceneImpl::Node::disposeAll()
+    void SceneImpl::Node::clear()
     {
         _children.clear();
     }
@@ -510,8 +510,12 @@ namespace minire
             _localTransform.update(_scene._epochNumber, origin());
             _scene.activate(*this); // NOTE: will also invalidate global transform
         }
-        MINIRE_INVARIANT(visible(), "TODO: node visibility is broken "
-                                    "(effective visibility doesn't evaluate)");
+        if (!visible())
+        {
+            // TODO: FIX IT
+            MINIRE_WARNING("TODO: node visibility is broken "
+                           "(effective visibility doesn't evaluate)");
+        }
         Object::revalidate();
     }
 

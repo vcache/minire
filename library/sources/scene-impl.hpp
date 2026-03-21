@@ -432,8 +432,8 @@ namespace minire
             scene::Node::Wptr parent() const override { return _parent; }
             void setParent(scene::Node::Sptr const & newParent) override;
 
-            void dispose(models::ScenePath const &) override;
-            void disposeAll() override;
+            void erase(models::ScenePath const &) override;
+            void clear() override;
 
         private:
             SceneItem find(models::ScenePath const &) const override;

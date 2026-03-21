@@ -102,6 +102,12 @@ namespace minire
         return _overlays.back();
     }
 
+    void GuiApplication::onStart()
+    {
+        Application::onStart();
+        GuiApplication::onStep();
+    }
+
     bool GuiApplication::onStep()
     {
         bool result = Application::onStep();

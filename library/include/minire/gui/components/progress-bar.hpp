@@ -27,7 +27,7 @@ namespace minire::gui::components
                     Theme const & theme,
                     Theme::Style const & style,
                     OverlayController &,
-                    Direction const);
+                    Direction const = Direction::kLeftToRight);
 
         Property<minire::models::sprite::MaybeImage> const & background() const { return Image::image(); }
         Property<minire::models::sprite::MaybeImage> & background() { return Image::image(); }

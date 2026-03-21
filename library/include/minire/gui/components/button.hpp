@@ -30,6 +30,27 @@ namespace minire::gui::components
                bool const hasText,
                bool const hasIcon);
 
+        // Just a handy synonym (Enum instead two bools)
+        enum class Mode { kNone, kText, kIcon, kBoth };
+        Button(std::string const & id,
+               Theme const & theme,
+               Theme::Style const & style,
+               OverlayController &,
+               Mode mode);
+
+        // Experimental interface
+        template<typename... Options>
+        Button(std::string const & id,
+               Theme const & theme,
+               Theme::Style const & style,
+               OverlayController & overlayController,
+               Mode mode,
+               Options && ... options)
+            : Button(id, theme, style, overlayController, mode)
+        {
+            (options(*this), ...);
+        }
+
         using Sptr = std::shared_ptr<Button>;
         using Wptr = std::weak_ptr<Button>;
 
@@ -57,26 +78,26 @@ namespace minire::gui::components
 
         Property<text::FormattedString> const & text() const
         {
-            MINIRE_INVARIANT(_hasText, "a button doesn't have a text");
+            MINIRE_INVARIANT(_hasText, "a button doesn't have a text: \"{}\"", id());
             assert(_text);
             return _text->text();
         }
         Property<text::FormattedString> & text()
         {
-            MINIRE_INVARIANT(_hasText, "a button doesn't have a text");
+            MINIRE_INVARIANT(_hasText, "a button doesn't have a text: \"{}\"", id());
             assert(_text);
             return _text->text();
         }
 
         Property<content::Id> const & fontFace() const
         {
-            MINIRE_INVARIANT(_hasText, "a button doesn't have a text");
+            MINIRE_INVARIANT(_hasText, "a button doesn't have a text: \"{}\"", id());
             assert(_text);
             return _text->fontFace();
         }
         Property<content::Id> & fontFace()
         {
-            MINIRE_INVARIANT(_hasText, "a button doesn't have a text");
+            MINIRE_INVARIANT(_hasText, "a button doesn't have a text: \"{}\"", id());
             assert(_text);
             return _text->fontFace();
         }
@@ -85,36 +106,36 @@ namespace minire::gui::components
 
         Property<minire::models::sprite::MaybeImage> const & icon() const
         {
-            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon");
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
             assert(_icon);
             return _icon->image();
         }
         Property<minire::models::sprite::MaybeImage> & icon()
         {
-            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon");
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
             assert(_icon);
             return _icon->image();
         }
 
         Property<Theme::Location> const & iconLocation() const
         {
-            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon");
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
             return _iconLocation;
         }
         Property<Theme::Location> & iconLocation()
         {
-            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon");
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
             return _iconLocation;
         }
 
         Property<float> const & iconSpacing() const
         {
-            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon");
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
             return _iconSpacing;
         }
         Property<float> & iconSpacing()
         {
-            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon");
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
             return _iconSpacing;
         }
 
@@ -177,4 +198,83 @@ namespace minire::gui::components
         bool const                _hasText;
         bool const                _hasIcon;
     };
+
+    // TODO: This is an experimental interface,
+    //       if it proves successful, it should be extended to other components.
+    // TODO: maybe try chain-initializer (as in layouts::Array or FormattedString)?
+    namespace options
+    {
+        template<typename T>
+        struct Base { T _value; };
+
+        struct Text : public Base<text::FormattedString>
+        {
+            void operator()(Button & b) const { b.text() = _value; }
+        };
+
+        struct BgNormal : public Base<minire::models::sprite::MaybeImage>
+        {
+            void operator()(Button & b) const { b.bgNormal() = _value; }
+        };
+
+        struct BgHovered : public Base<minire::models::sprite::MaybeImage>
+        {
+            void operator()(Button & b) const { b.bgHovered() = _value; }
+        };
+
+        struct BgPressed : public Base<minire::models::sprite::MaybeImage>
+        {
+            void operator()(Button & b) const { b.bgPressed() = _value; }
+        };
+
+        struct FontFace : public Base<content::Id>
+        {
+            void operator()(Button & b) const { b.fontFace() = _value; }
+        };
+
+        struct Icon : public Base<minire::models::sprite::MaybeImage>
+        {
+            void operator()(Button & b) const { b.icon() = _value; }
+        };
+
+        struct IconLocation : public Base<Theme::Location>
+        {
+            void operator()(Button & b) const { b.iconLocation() = _value; }
+        };
+
+        struct IconSpacing : public Base<float>
+        {
+            void operator()(Button & b) const { b.iconSpacing() = _value; }
+        };
+
+        struct PressOffset : public Base<glm::vec2>
+        {
+            void operator()(Button & b) const { b.pressOffset() = _value; }
+        };
+
+        struct ContentPadding : public Base<utils::Rect>
+        {
+            void operator()(Button & b) const { b.contentPadding() = _value; }
+        };
+
+        struct Horizontal : public Base<Arranger>
+        {
+            void operator()(Button & b) const { b.horizontal() = _value; }
+        };
+
+        struct Vertical : public Base<Arranger>
+        {
+            void operator()(Button & b) const { b.vertical() = _value; }
+        };
+
+        struct Checkable : public Base<bool>
+        {
+            void operator()(Button & b) const { b.setCheckable(_value); }
+        };
+
+        struct ExclusiveGroup : public Base<gui::models::Checkable::ExclusiveGroupSptr>
+        {
+            void operator()(Button & b) const { b.setExclusiveGroup(_value); }
+        };
+    }
 }
