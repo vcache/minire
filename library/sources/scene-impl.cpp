@@ -20,19 +20,6 @@
 
 namespace minire
 {
-    // TODO: too many passes, should re-design into a single traverse that re-validates all components
-    //       Plan:
-    //          - add flags offset for Object
-    //          - move bool vars of Node into Object flags
-    //              kActivated - performs lerping
-    //              kChildActivated - has childern to be lerped
-    //              kHasActiveChildrenAnimation - ???
-    //              kModelInvalidated - not needed
-    //              kDirtyGlobalTransform
-    //              kGreyGlobalTransform
-    //          - single tree traverse:
-    //              ???
-
     /**
      * PLAN:
      *  - optimize flags
@@ -74,7 +61,7 @@ namespace minire
 
         if (newParent)
         {
-            if (ObjectType::invalidated()) propagate(); // TODO: it should be forced,
+            if (ObjectType::invalidated()) propagate(ObjectType::invalidatedFlags()); // TODO: it should be forced,
                                                         //       to prevent half-propagated state
             // TODO: also should re-activate other stuff of a parent 
         }
@@ -357,7 +344,7 @@ namespace minire
 
         if (newParent)
         {
-            if (invalidated()) propagate(); // TODO: it should be forced,
+            if (invalidated()) propagate(invalidatedFlags()); // TODO: it should be forced,
                                             //       to prevent half-propagated state
             // TODO: also should re-activate other stuff of a parent
         }
@@ -398,7 +385,7 @@ namespace minire
         , _parent(parent)
     {
         // calling at the end, to avoid unwanted calls to virtual methods
-        Node::propagate(); // must be called before "setAllowPropagation" !
+        Node::propagate(invalidatedFlags()); // must be called before "setAllowPropagation" !
         setAllowPropagation(true);
     }
 
@@ -512,12 +499,12 @@ namespace minire
 
     void SceneImpl::Node::invalidateVisibility()
     {
-        _visibilityInvalidated = true;
+        invalidate(kEffectiveVisibility);
         for(auto parent = _parent.lock();
-            parent && !parent->_visibilityInvalidated;
+            parent && !parent->invalidated(kEffectiveVisibility);
             parent = parent->_parent.lock())
         {
-            parent->_visibilityInvalidated = true;
+            parent->invalidate(kEffectiveVisibility);
         }
     }
 
@@ -529,22 +516,22 @@ namespace minire
             _scene.activate(*this); // NOTE: will also invalidate global transform
         }
 
-        if (invalidated(kVisible))
-        {
-            invalidateVisibility();
-        }
+        bool const dirtyVisibility = invalidated(kVisible);
 
+        // NOTE: this call will zero all flags
         Object::revalidate();
+
+        if (dirtyVisibility) invalidateVisibility(); // TODO: it will also call propagate()
     }
 
-    void SceneImpl::Node::propagate()
+    void SceneImpl::Node::propagate(Mask)
     {
-        _modelInvalidated = true;
+        invalidate(kChildrenModel);
         for(auto parent = _parent.lock();
-            parent && !parent->_modelInvalidated;
+            parent && !parent->invalidated(kChildrenModel);
             parent = parent->_parent.lock())
         {
-            parent->_modelInvalidated = true;
+            parent->invalidate(kChildrenModel);
         }
     }
 
@@ -684,7 +671,7 @@ namespace minire
         queue.reserve(_nodesEstimate);
 
         assert(_root);
-        if (_root->_modelInvalidated)
+        if (_root->invalidated())
             queue.emplace_back(_root.get());
 
         while(!queue.empty())
@@ -694,7 +681,6 @@ namespace minire
             queue.pop_back();
 
             node->revalidate();
-            node->_modelInvalidated = false;
 
             for(auto & [_, child] : node->_children)
             {
@@ -703,7 +689,7 @@ namespace minire
                     [&queue](Node::Sptr const & childNode)
                     {
                         assert(childNode);
-                        if (childNode->_modelInvalidated)
+                        if (childNode->invalidated())
                         {
                             queue.emplace_back(childNode.get());
                         }
@@ -990,7 +976,6 @@ namespace minire
             node->_effectiveVisible = node->visible()
                                    && (parent ? parent->_effectiveVisible : true);
             bool const effectiveVisibleChanged = oldEffectiveVisible != node->_effectiveVisible;
-
             for(auto & [_, child] : node->_children)
             {
                 if (Node::Sptr * pchild = std::get_if<Node::Sptr>(&child); pchild)
@@ -998,23 +983,16 @@ namespace minire
                     Node::Sptr childSptr = *pchild;
                     assert(childSptr);
                     if (effectiveVisibleChanged ||
-                        childSptr->_visibilityInvalidated)
+                        childSptr->invalidated(Node::kEffectiveVisibility))
                     {
                         queue.push_back(childSptr.get());
                     }
                 }
             }
 
-            node->_visibilityInvalidated = false;
+            node->revalidateMask(Node::kEffectiveVisibility);
             _nodesEstimate = std::max(_nodesEstimate, queue.size());
         }
-    }
-
-    void SceneImpl::revalidateNodes()
-    {
-        updateGlobalTransforms();
-        updateVisibility();
-        actualizeViewpoint();
     }
 
     void SceneImpl::actualizeViewpoint()
@@ -1046,6 +1024,55 @@ namespace minire
                 }
             },
         }, _activeCamera);
+    }
+
+    /**
+     * - objects that were set directly (via setOrigin() and such),
+     *   will be lerped (where applicable). Such objects are affected by
+     *   the Epoch change.
+     * - objects that are controlled by an Animation will be,
+     *   will be advanced by the Animation (i.e. won't be lerped).
+     *   Such objects are only affected by an elapsed frame time.
+     * 
+     * An Epoch consists of one or more Frames.
+     * */
+    void SceneImpl::advance(size_t const epochNumber,
+                            double const epochTime,
+                            double const epochDuration,
+                            double const frameTime)
+    {
+        // 1. advance directly set values for a new Epoch or
+        //    perform lerping for continuing Epoch
+
+        // detect epoch start
+        assert(epochNumber >= _epochNumber);
+        bool const epochStarted = epochNumber != _epochNumber;
+        _epochNumber = epochNumber;
+
+        if (epochStarted)
+        {
+            // transfer accumulated models state into scene instances
+            revalidateModels(); // TODO: peform lerp
+        }
+
+        if (epochTime < epochDuration)
+        {
+            // maybe perform lerp operation on lerpable objects
+            double const weight = epochDuration != 0 ? epochTime / epochDuration : 1.0;
+            assert(weight >= 0);
+            lerp(weight);
+        }
+
+        // 2. advance animable objects
+
+        advanceAnimations(frameTime);
+
+        // 3. revalidate effective values
+        //    (transforms, viewport, visibility, etc)
+
+        updateGlobalTransforms();
+        updateVisibility();
+        actualizeViewpoint();
     }
 
     // TODO: should be a static method?

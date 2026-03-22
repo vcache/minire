@@ -12,9 +12,6 @@ namespace minire::utils
              bool kImmutable = false> 
     class Object
     {
-        using Mask = size_t;
-        static constexpr Mask kAllFlags = std::numeric_limits<Mask>::max();
-
     public:
         using Sptr = std::shared_ptr<Derived>;
         using Wptr = std::weak_ptr<Derived>;
@@ -50,6 +47,9 @@ namespace minire::utils
         virtual void revalidate() { _flags = 0; }
 
     protected:
+        using Mask = size_t;
+        static constexpr Mask kAllFlags = std::numeric_limits<Mask>::max();
+
         static constexpr Mask mkMask(size_t index)
         {
             static_assert(sizeof(Mask) == 8, "unexpected size of size_t");
@@ -58,7 +58,7 @@ namespace minire::utils
         }
 
         bool invalidated() const { return _flags != 0; }
-        bool invalidated(Mask mask) const { return _flags & mask; }
+        bool invalidated(Mask mask) const { return (_flags & mask) == mask; }
 
         // NOTE: since "invalidate" calls a virtual methods,
         //       it shouldn't be called from a constructor.
@@ -67,20 +67,25 @@ namespace minire::utils
         {
             bool wasInvalidated = invalidated();
             _flags = kAllFlags;
-            if (_allowPropagation && !wasInvalidated) propagate();
+            if (_allowPropagation && !wasInvalidated) propagate(kAllFlags);
         }
 
         void invalidate(Mask mask)
         {
             bool wasInvalidated = invalidated();
             _flags |= mask;
-            if (_allowPropagation && !wasInvalidated) propagate();
+            if (_allowPropagation && !wasInvalidated) propagate(mask);
         }
+
+        // TODO: delete this method. Should just use revalidate()
+        void revalidateMask(Mask mask) { _flags &= ~mask; }
 
         void setAllowPropagation(bool v) { _allowPropagation = v; }
 
+        Mask invalidatedFlags() const { return _flags; }
+
         // called once any flag set, but just once
-        virtual void propagate() {}
+        virtual void propagate(Mask) {}
 
     protected:
         Model & model(Mask mask)

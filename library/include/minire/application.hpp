@@ -3,7 +3,6 @@
 #include <minire/application/input-handler.hpp>
 #include <minire/content/id.hpp>
 #include <minire/errors.hpp>
-#include <minire/instrumentation/histogram.hpp>
 #include <minire/label.hpp>
 #include <minire/models/vertex-buffer.hpp>
 #include <minire/scene.hpp>
@@ -51,8 +50,6 @@ namespace minire
         void setRayCaster(bool enabled);
 
         void debugDrawsUpdate(std::vector<float> const & linesBuffer);
-        void enableInstrumentation();
-        void disableInstrumentation();
 
         void newResourceLayer(std::string const & name);
         void disposeResourceLayer(std::string const & name);
@@ -130,18 +127,16 @@ namespace minire
         std::unique_ptr<SceneImpl>  _scene;
 
         // controller (controller)
-        double                      _epochPlayed = 0; // seconds
+        double                      _epochTime = 0;     // seconds
         double                      _epochDuration = 0; // seconds
         size_t                      _epochNumber = 0;
-        size_t                      _epochBegin = 0;   // microseconds
-        bool                        _epochStarted = true;
+        size_t                      _epochBegin = 0;    // microseconds
 
         // system
         size_t                      _frame = 0;
-        size_t                      _frameBegin; // microseconds
+        size_t                      _frameBegin;        // microseconds
         double                      _frameTime = 0;
-        double                      _animationGap = 0; // seconds
-        double                      _absoluteTime = 0; // seconds
+        double                      _absoluteTime = 0;  // seconds
 
         // scene queries
         bool                        _rayCasterEnabled = false;
@@ -150,7 +145,6 @@ namespace minire
         mutable RayCasterSptr       _rayCaster;
 
         // instrumentations
-        instrumentation::Histogram<>::Sptr _timekeeper;
-        size_t                             _pedanticGlCounter = 0;
+        size_t                      _pedanticGlCounter = 0;
     };
 }

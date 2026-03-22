@@ -26,17 +26,6 @@ namespace minire
 {
     class Rasterizer;
 
-    /**
-     * TODO: why are they split? Maybe make a single public call
-     * Main loop's expected call sequence:
-     *
-     *  revalidateModels()  // mandatory
-     *  advanceAnimations() // optional
-     *  lerp()              // optional (mandatory if animations advanced)
-     *  revalidateNode()    // mandatory
-     *  cullModels(...)
-     *
-     * */
     class SceneImpl
         : public Scene
     {
@@ -55,15 +44,11 @@ namespace minire
 
         scene::Viewpoint const & viewpoint() const { return _viewpoint; }
 
-        void setEpochNumber(size_t epochNumber) { _epochNumber = epochNumber; }
-
-        void lerp(float weight);
-
-        void revalidateModels();
-
-        void revalidateNodes();
-
-        bool advanceAnimations(float delta /* seconds */);
+    public:
+        void advance(size_t const epochNumber,
+                     double const epochTime,         // seconds elapsed since an Epoch start
+                     double const epochDuration,     // seconds duration of a (previous) Epoch
+                     double const frameTime);        // seconds duration of a (previous) frame
 
     public:
         template<typename Callable>
@@ -202,6 +187,9 @@ namespace minire
         }
 
     private:
+        void lerp(float weight);
+        void revalidateModels();
+        bool advanceAnimations(float delta /* seconds */);
         void updateGlobalTransforms();
         void updateVisibility();
         void actualizeViewpoint();
@@ -232,7 +220,10 @@ namespace minire
             void setParent(scene::Node::Sptr const & newParent) override;
 
         private:
-            void propagate() override { if (auto p = _parent.lock(); p) p->propagate(); }
+            void propagate(ObjectType::Mask m) override
+            {
+                if (auto p = _parent.lock(); p) p->propagate(m);
+            }
 
         private:
             std::weak_ptr<Node> _parent;
@@ -455,7 +446,7 @@ namespace minire
             void invalidateVisibility();
 
             void revalidate() override;
-            void propagate() override;
+            void propagate(Object::Mask) override;
 
         private:
             using Child = std::variant<Node::Sptr,
@@ -468,6 +459,11 @@ namespace minire
 
             using ChildrenMap = std::unordered_map<std::string, Child>;
             using LerpableTransform = utils::Lerpable<models::Transform>;
+
+            // recalc nested visibility
+            static constexpr size_t kEffectiveVisibility = mkMask(kFlagsCount + 1);
+            // pseudo-flag just to trigger parent's revalidateModels()
+            static constexpr size_t kChildrenModel       = mkMask(kFlagsCount + 2);
 
             enum class GlobalTransformState
             {
@@ -488,8 +484,6 @@ namespace minire
             bool                  _activated = false; // for _localTransform
             bool                  _childActivated = false;
             bool                  _hasActiveChildrenAnimation = false;
-            bool                  _modelInvalidated = false; // Object::invalidated
-            bool                  _visibilityInvalidated = false;
             bool                  _effectiveVisible = true;
             // TODO: too many flags, consider migration to std::bitset
 

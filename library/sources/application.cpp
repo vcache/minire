@@ -67,11 +67,6 @@ namespace minire
 
         MINIRE_INFO("Minire Application started, [{}] build", kDebug ? "DEBUG" : "RELEASE");
 
-        if (kDebug)
-        {
-            enableInstrumentation();
-        }
-
         if (!kDebug)
         {
             opengl::setGlErrorCheckMode(false);
@@ -104,20 +99,6 @@ namespace minire
         }
 
         return _rayCaster;
-    }
-
-    void Application::enableInstrumentation()
-    {
-        if (!_timekeeper)
-        {
-            _timekeeper = std::make_shared<instrumentation::Histogram<>>(
-                std::chrono::seconds(5));
-        }
-    }
-
-    void Application::disableInstrumentation()
-    {
-        _timekeeper.reset();
     }
 
     void Application::debugDrawsUpdate(std::vector<float> const & linesBuffer)
@@ -363,8 +344,7 @@ namespace minire
         _epochDuration = static_cast<double>(now - _epochBegin) / 1000000.0; // sec;
         _epochBegin = now;
         _epochNumber++;
-        _epochPlayed = 0;
-        _epochStarted = true;
+        _epochTime = 0;
     }
 
     void Application::onStart()
@@ -378,54 +358,16 @@ namespace minire
     {
         assert(_scene);
 
-        auto totalStopwatch =
-            _timekeeper ? std::make_unique<instrumentation::Stopwatch<>>("total", _timekeeper)
-                        : std::unique_ptr<instrumentation::Stopwatch<>>();
-
         // perform controller's logic
+        if (onStep())
         {
-            instrumentation::Stopwatch<> stopwatch("step", _timekeeper);
-            if (onStep())
-            {
-                startEpoch();
-            }
+            startEpoch();
         }
 
-        _scene->setEpochNumber(_epochNumber);
-
-        // transfer accumulated models state into scene instances
-        if (_epochStarted)
-        {
-            instrumentation::Stopwatch<> stopwatch("models-revalidation", _timekeeper);
-            _scene->revalidateModels();
-        }
-
-        // fetch and handle events from controller if any
-        bool performLerp = _epochPlayed < _epochDuration;
-        if (_epochStarted)
-        {
-            instrumentation::Stopwatch<> stopwatch("animation-advance", _timekeeper);
-            performLerp |= _scene->advanceAnimations(_animationGap);
-            _animationGap = 0;
-            _epochStarted = false;
-        }
-
-        if (performLerp)
-        {
-            instrumentation::Stopwatch<> stopwatch("scene-lerping", _timekeeper);
-            double const weight = _epochDuration != 0 ? _epochPlayed / _epochDuration : 1.0;
-            assert(weight >= 0);
-            _scene->lerp(weight);
-        }
-
-        {
-            instrumentation::Stopwatch<> stopwatch("scene-revalidation", _timekeeper);
-            _scene->revalidateNodes();
-        }
+        _scene->advance(_epochNumber, _epochTime, _epochDuration, _frameTime);
 
         // draw a frame
         {
-            instrumentation::Stopwatch<> stopwatch("scene-rendering", _timekeeper);
             _rasterizer->draw(*_scene);
             ::SDL_GL_SwapWindow(window());
         }
@@ -438,21 +380,10 @@ namespace minire
 
         // advance interpolator epoch
         assert(_frameTime > 0);
-        _epochPlayed += _frameTime;
-        _animationGap += _frameTime;
+        _epochTime += _frameTime;
         _absoluteTime += _frameTime;
 
         _frame++;
-
-        // maybe print performance data
-        totalStopwatch.reset();
-        if (_timekeeper)
-        {
-            if (auto aggregation = _timekeeper->fetch(); aggregation)
-            {
-                MINIRE_INFO("{}", instrumentation::tabulate<double>(*aggregation));
-            }
-        }
 
         // ensure that frame was rendered fine (TODO: maybe move this to Rasterizer?)
         if (!kDebug)
@@ -468,7 +399,7 @@ namespace minire
                     _pedanticGlCounter = 0;
                 }
             }
-            else if (opengl::havePendedGlError())
+            else if (opengl::havePendedGlError()) // TODO: maybe check it only N-th frame
             {
                 opengl::setGlErrorCheckMode(true);
                 MINIRE_ERROR("Unknown GL error detected! Pendatic mode is activated");

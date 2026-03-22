@@ -238,6 +238,7 @@ namespace minire
         protected:
             static constexpr size_t kOrigin  = mkMask(0);
             static constexpr size_t kVisible = mkMask(1);
+            static constexpr size_t kFlagsCount = 1; // an offset for descendants
 
             using SceneItem = std::variant<std::monostate,
                                            std::shared_ptr<Mesh>,
