@@ -84,12 +84,14 @@ namespace minire
 
                         MINIRE_INVARIANT(parent, "a mesh doesn't have a parent");
                         assert(parent->hasGlobalTransform());
-
-                        // perform rendering
-                        assert(mesh->_mesh);
-                        callable(*mesh->_mesh, mesh->emissiveFactor(),
-                                 parent->_globalTransform,
-                                 makeSkinningVector(*mesh));
+                        if (parent->_effectiveVisible)
+                        {
+                            // perform rendering
+                            assert(mesh->_mesh);
+                            callable(*mesh->_mesh, mesh->emissiveFactor(),
+                                     parent->_globalTransform,
+                                     makeSkinningVector(*mesh));
+                        }
                     }
 
                     ++it;
@@ -201,6 +203,7 @@ namespace minire
 
     private:
         void updateGlobalTransforms();
+        void updateVisibility();
         void actualizeViewpoint();
 
     private:
@@ -449,6 +452,7 @@ namespace minire
             void invalidateGlobalTransform();
             void deactiveChildrenAnimation();
             void activeChildrenAnimation();
+            void invalidateVisibility();
 
             void revalidate() override;
             void propagate() override;
@@ -485,6 +489,8 @@ namespace minire
             bool                  _childActivated = false;
             bool                  _hasActiveChildrenAnimation = false;
             bool                  _modelInvalidated = false; // Object::invalidated
+            bool                  _visibilityInvalidated = false;
+            bool                  _effectiveVisible = true;
             // TODO: too many flags, consider migration to std::bitset
 
         private:

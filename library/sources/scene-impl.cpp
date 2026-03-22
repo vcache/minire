@@ -503,6 +503,17 @@ namespace minire
         }
     }
 
+    void SceneImpl::Node::invalidateVisibility()
+    {
+        _visibilityInvalidated = true;
+        for(auto parent = _parent.lock();
+            parent && !parent->_visibilityInvalidated;
+            parent = parent->_parent.lock())
+        {
+            parent->_visibilityInvalidated = true;
+        }
+    }
+
     void SceneImpl::Node::revalidate()
     {
         if (invalidated(kOrigin))
@@ -510,12 +521,12 @@ namespace minire
             _localTransform.update(_scene._epochNumber, origin());
             _scene.activate(*this); // NOTE: will also invalidate global transform
         }
-        if (!visible())
+
+        if (invalidated(kVisible))
         {
-            // TODO: FIX IT
-            MINIRE_WARNING("TODO: node visibility is broken "
-                           "(effective visibility doesn't evaluate)");
+            invalidateVisibility();
         }
+
         Object::revalidate();
     }
 
@@ -956,9 +967,49 @@ namespace minire
         }
     }
 
+    // TODO: don't lerp invisible nodes
+    // TODO: don't lerp culled-out nodes
+    void SceneImpl::updateVisibility()
+    {
+        assert(_root);
+
+        std::vector<Node *> queue{_root.get()};
+        queue.reserve(_nodesEstimate);
+        while (!queue.empty())
+        {
+            Node * node = queue.back();
+            assert(node);
+            queue.pop_back();
+
+            Node::Sptr parent = node->_parent.lock();
+            bool const oldEffectiveVisible = node->_effectiveVisible;
+            node->_effectiveVisible = node->visible()
+                                   && (parent ? parent->_effectiveVisible : true);
+            bool const effectiveVisibleChanged = oldEffectiveVisible != node->_effectiveVisible;
+
+            for(auto & [_, child] : node->_children)
+            {
+                if (Node::Sptr * pchild = std::get_if<Node::Sptr>(&child); pchild)
+                {
+                    Node::Sptr childSptr = *pchild;
+                    assert(childSptr);
+                    if (effectiveVisibleChanged ||
+                        childSptr->_visibilityInvalidated)
+                    {
+                        queue.push_back(childSptr.get());
+                    }
+                }
+            }
+
+            node->_visibilityInvalidated = false;
+            _nodesEstimate = std::max(_nodesEstimate, queue.size());
+        }
+    }
+
     void SceneImpl::revalidateNodes()
     {
         updateGlobalTransforms();
+        updateVisibility();
         actualizeViewpoint();
     }
 
