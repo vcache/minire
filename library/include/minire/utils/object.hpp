@@ -58,7 +58,9 @@ namespace minire::utils
         }
 
         bool invalidated() const { return _flags != 0; }
-        bool invalidated(Mask mask) const { return (_flags & mask) == mask; }
+
+        // checks if ANY flags is set
+        bool invalidated(Mask mask) const { return _flags & mask; }
 
         // NOTE: since "invalidate" calls a virtual methods,
         //       it shouldn't be called from a constructor.
