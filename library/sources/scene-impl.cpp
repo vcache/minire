@@ -33,8 +33,15 @@ namespace minire
     //          - single tree traverse:
     //              ???
 
-    // TODO: Node::visible is broken, it won't hide its children when visible=false
-    //       (should evaluate effective visibility as in GUI)
+    /**
+     * PLAN:
+     *  - optimize flags
+     *  - optimize passes
+     *  - think about sorting (per program/per material/per texture)
+     *  - visible/invisible different lists: nodes, sprites, labels
+     *  - think culling index abstraction
+     * */
+
 
     // TODO: store/calculate absolute path for nodes/leaves (and use them for logging)
 
@@ -673,19 +680,19 @@ namespace minire
     // TODO: don't revalidate culled-out nodes
     void SceneImpl::revalidateModels()
     {
-        std::vector<Node::Sptr> queue; // TODO: Node* should be faster
+        std::vector<Node *> queue;
         queue.reserve(_nodesEstimate);
 
         assert(_root);
         if (_root->_modelInvalidated)
-            queue.emplace_back(_root);
+            queue.emplace_back(_root.get());
 
         while(!queue.empty())
         {
-            Node::Sptr node = queue.back();
+            Node * node = queue.back();
+            assert(node);
             queue.pop_back();
 
-            assert(node);
             node->revalidate();
             node->_modelInvalidated = false;
 
@@ -698,7 +705,7 @@ namespace minire
                         assert(childNode);
                         if (childNode->_modelInvalidated)
                         {
-                            queue.emplace_back(childNode);
+                            queue.emplace_back(childNode.get());
                         }
                     },
                     [this](auto const & leafNode)
@@ -718,16 +725,15 @@ namespace minire
     bool SceneImpl::advanceAnimations(float delta /* seconds */)
     {
         assert(_root);
-        std::vector<Node::Sptr> queue{_root}; // TODO: Node* should be faster
+        std::vector<Node *> queue{_root.get()};
         queue.reserve(_nodesEstimate);
 
         bool updated = false;
         while(!queue.empty())
         {
-            Node::Sptr node = queue.back();
-            queue.pop_back();
-
+            Node * node = queue.back();
             assert(node);
+            queue.pop_back();
 
             if (node->_activeAnimation)
             {
@@ -821,7 +827,7 @@ namespace minire
                         if (node->_hasActiveChildrenAnimation ||
                             node->_activeAnimation.operator bool())
                         {
-                            queue.emplace_back(node);
+                            queue.emplace_back(node.get());
                         }
                     }
                 }
@@ -858,14 +864,13 @@ namespace minire
         if (!_root->_activated && !_root->_childActivated)
             return;
 
-        std::vector<Node::Sptr> queue{_root}; // TODO: Node* should be faster
+        std::vector<Node *> queue{_root.get()};
         queue.reserve(_nodesEstimate);
         while(!queue.empty())
         {
-            Node::Sptr node = queue.back();
-            queue.pop_back();
-
+            Node * node = queue.back();
             assert(node);
+            queue.pop_back();
 
             if (node->_activated)
             {
@@ -883,7 +888,7 @@ namespace minire
                         [&queue](Node::Sptr & child) -> bool
                         {
                             assert(child);
-                            queue.emplace_back(child);
+                            queue.emplace_back(child.get());
                             return false; // lerping status is not known yet
                         },
                         [weight, this](auto & child) -> bool
@@ -916,14 +921,13 @@ namespace minire
         if (Node::GlobalTransformState::kClean == _root->_globalTransformState)
             return;
 
-        std::vector<Node::Sptr> queue{_root}; // TODO: Node* should be faster
+        std::vector<Node *> queue{_root.get()};
         queue.reserve(_nodesEstimate);
         while (!queue.empty())
         {
-            Node::Sptr node = queue.back();
-            queue.pop_back();
-
+            Node * node = queue.back();
             assert(node);
+            queue.pop_back();
 
             // actualize own global transform (TODO: move into Node::)
             if (Node::GlobalTransformState::kDirty == node->_globalTransformState)
@@ -954,7 +958,7 @@ namespace minire
                         }
                         if (Node::GlobalTransformState::kClean != node->_globalTransformState)
                         {
-                            queue.push_back(node);
+                            queue.push_back(node.get());
                         }
                     }
                 }

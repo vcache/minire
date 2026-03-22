@@ -25,7 +25,7 @@ namespace
 
     public:
         using TestbedApplication::TestbedApplication;
- 
+
         void onStart() override
         {
             TestbedApplication::onStart();
@@ -128,7 +128,7 @@ namespace
         minire::scene::Node::Sptr _joint2;
     };
 }
- 
+
 int main(int, char **)
 {
     return minire::examples::main<ComplexScene>("Complex Scene");
