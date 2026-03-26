@@ -440,6 +440,9 @@ namespace minire
             void invalidateChildren(Mask);
             bool advanceAnimation();
 
+            AnimationTracksSptr
+            instantiateTracks(models::AnimationTracks const &) const;
+
         private:
             using Child = std::variant<Node::Sptr,
                                        MeshLeaf::Sptr,

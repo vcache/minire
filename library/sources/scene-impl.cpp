@@ -253,6 +253,24 @@ namespace minire
         instantiateGltf(*this, source, contentManager, visible);
     }
 
+    SceneImpl::AnimationTracksSptr
+    SceneImpl::Node::instantiateTracks(models::AnimationTracks const & animationTracks) const
+    {
+        AnimationTracksSptr result = std::make_shared<AnimationTracks>();
+        result->reserve(animationTracks.size());
+        for(auto const & [target, keyframeAnimation] : animationTracks)
+        {
+            auto const & targetSptr = nodeFromPointer(target);
+            MINIRE_INVARIANT(targetSptr, "no valid animation target: {}", target);
+            result->emplace_back(AnimationTrack
+            {
+                ._target = targetSptr,
+                ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
+            });
+        }
+        return result;
+    }
+
     void SceneImpl::Node::makeAnimationSet(models::AnimationSet animationSet) // TODO: const ref?
     {
         // drop any current active animation
@@ -266,20 +284,8 @@ namespace minire
         newAnimationSet.reserve(animationSet.size());
         for(auto const & [animationId, animationTracks] : animationSet)
         {
-            // TODO: code dup
-            AnimationTracksSptr animationTracksSptr = std::make_shared<AnimationTracks>();
-            animationTracksSptr->reserve(animationTracks.size());
-            for(auto const & [target, keyframeAnimation] : animationTracks)
-            {
-                auto const & targetSptr = nodeFromPointer(target);
-                MINIRE_INVARIANT(targetSptr, "no valid animation target: {}", target);
-                animationTracksSptr->emplace_back(AnimationTrack
-                {
-                    ._target = targetSptr,
-                    ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
-                });
-            }
-            newAnimationSet.emplace(animationId, animationTracksSptr);
+            newAnimationSet.emplace(animationId,
+                                    instantiateTracks(animationTracks));
         }
         _animationSet = std::move(newAnimationSet);
     }
@@ -308,24 +314,8 @@ namespace minire
     void SceneImpl::Node::inlineAnimation(models::AnimationTracks animationTracks,
                                           size_t repeats, float speedScale)
     {
-        // transform animation set from abstract (model) into a concrete one
-        // TODO: code dup
-        AnimationTracksSptr animationTracksSptr = std::make_shared<AnimationTracks>();
-        animationTracksSptr->reserve(animationTracks.size());
-        for(auto const & [target, keyframeAnimation] : animationTracks)
-        {
-            auto const & targetSptr = nodeFromPointer(target);
-            MINIRE_INVARIANT(targetSptr, "no valid animation target: {}", target);
-            animationTracksSptr->emplace_back(AnimationTrack
-            {
-                ._target = targetSptr,
-                ._animation = scene::makeKeyframeAnimation(keyframeAnimation),
-            });
-        }
-
-        // activate this animation
         _activeAnimation = std::make_unique<ActiveAnimation>(
-            animationTracksSptr, repeats, speedScale);
+            instantiateTracks(animationTracks), repeats, speedScale);
         invalidate(kAnimation);
     }
 
@@ -392,7 +382,7 @@ namespace minire
                           SceneImpl & scene)
         : scene::Node(std::move(name), std::move(model))
         , _scene(scene)
-        , _localTransform(origin()) // TODO: maybe use model's origin() instead of _localTransform
+        , _localTransform(origin())
         , _parent(parent)
     {
         // calling at the end, to avoid unwanted calls to virtual methods
@@ -527,9 +517,8 @@ namespace minire
         }
 
         // test if all sequencers are done
-        bool hasNonDoneSequencer = std::any_of( // TODO: ranges
-            activeAnimation._uniqueSequencers.cbegin(),
-            activeAnimation._uniqueSequencers.cend(),
+        bool hasNonDoneSequencer = std::ranges::any_of(
+            activeAnimation._uniqueSequencers,
             [](ActiveAnimation::Sequencer::Sptr const & sequencer)
             {
                 assert(sequencer);
@@ -768,7 +757,6 @@ namespace minire
         _viewpoint.setCamera(camera.current());
     }
 
-    // TODO: code duplication
     void SceneImpl::setActiveCamera(OrthographicCameraLeaf & camera)
     {
         _activeCamera = ActiveCamera(camera.weak_from_this());
