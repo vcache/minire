@@ -211,13 +211,13 @@ namespace minire::rasterizer
             );
         }
 
-        void revalidate() override
+        void revalidate(Mask mask = kAllFlags) override
         {
             if (invalidated())
             {
                 models::Label const & m = model();
 
-                if (invalidated(kFontFace))
+                if (invalidatedAny(kFontFace))
                 {
                     auto lease = _contentManager.borrow(m._fontFace);
                     assert(lease);
@@ -251,7 +251,7 @@ namespace minire::rasterizer
                 assert(_fontBold);
                 assert(_fontItalic);
 
-                if (invalidated(kFontFace | kText))
+                if (invalidatedAny(kFontFace | kText))
                 {
                     // TODO: don't re-create VAO/VBO, but update the existing ones
                     auto const & vertices = labels::buildMesh(
@@ -259,7 +259,7 @@ namespace minire::rasterizer
                     _vertexBuffer = std::make_unique<labels::VertexBuffer>(vertices);
                 }
 
-                Object::revalidate();
+                Object::revalidate(mask);
             }
         }
 

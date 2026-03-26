@@ -1,5 +1,3 @@
-// TODO: this class is a mess, should refactor it
-
 #include <scene-impl.hpp>
 
 #include <rasterizer.hpp>
@@ -22,13 +20,10 @@ namespace minire
 {
     /**
      * PLAN:
-     *  - optimize flags
-     *  - optimize passes
      *  - think about sorting (per program/per material/per texture)
      *  - visible/invisible different lists: nodes, sprites, labels
      *  - think culling index abstraction
      * */
-
 
     // TODO: store/calculate absolute path for nodes/leaves (and use them for logging)
 
@@ -61,42 +56,60 @@ namespace minire
 
         if (newParent)
         {
-            if (ObjectType::invalidated()) propagate(ObjectType::invalidatedFlags()); // TODO: it should be forced,
-                                                        //       to prevent half-propagated state
-            // TODO: also should re-activate other stuff of a parent 
+            ObjectType::propagate();
+        }
+    }
+
+    template<typename Derived, typename ObjectType>
+    void SceneImpl::Leaf<Derived, ObjectType>::propagate(ObjectType::Mask mask)
+    {
+        assert(!mask || (mask & ObjectType::kBaseMask)); (void)mask;
+        invalidateParent(Node::kHasPendedActivation);
+    }
+
+    template<typename Derived, typename ObjectType>
+    void SceneImpl::Leaf<Derived, ObjectType>::invalidateParent(ObjectType::Mask mask)
+    {
+        if (auto parent = _parent.lock(); parent)
+        {
+            parent->invalidate(mask);
         }
     }
 
     // SceneImpl::*Leaf //
 
-    void SceneImpl::DirectionalLightLeaf::revalidate()
+    void SceneImpl::DirectionalLightLeaf::revalidate(Mask mask)
     {
-        if (invalidated(kColor))
+        if (invalidatedAny(mask & kColor))
         {
+            // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
-            _scene.activate(*this); // TODO: why?
         }
-        Object::revalidate();
+
+        Object::revalidate(mask);
     }
 
-    void SceneImpl::PointLightLeaf::revalidate()
+    void SceneImpl::PointLightLeaf::revalidate(Mask mask)
     {
-        if (invalidated(kColor | kAttenuation))
+        if (invalidatedAny(mask & (kColor | kAttenuation)))
         {
+            // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
-            _scene.activate(*this); // TODO: why?
         }
-        Object::revalidate();
+
+        Object::revalidate(mask);
     }
 
-    void SceneImpl::PerspectiveCameraLeaf::revalidate()
+    // TODO: re-actualize active camera when its visibility changed?
+    void SceneImpl::PerspectiveCameraLeaf::revalidate(Mask mask)
     {
-        if (invalidated(kYFov /*| kZNear | kZFar | kAspectRatio*/))
+        if (invalidatedAny(mask & (kYFov /*| kZNear | kZFar | kAspectRatio*/)))
         {
+            // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
-            _scene.activate(*this);
         }
-        Object::revalidate();
+
+        Object::revalidate(mask);
     }
 
     void SceneImpl::PerspectiveCameraLeaf::activate()
@@ -104,14 +117,16 @@ namespace minire
         _scene.setActiveCamera(*this);
     }
 
-    void SceneImpl::OrthographicCameraLeaf::revalidate()
+    // TODO: re-actualize active camera when its visibility changed?
+    void SceneImpl::OrthographicCameraLeaf::revalidate(Mask mask)
     {
-        if (invalidated(kXMag | kYMag /* | kZNear | kZFar*/))
+        if (invalidatedAny(mask & (kXMag | kYMag /* | kZNear | kZFar*/)))
         {
+            // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
-            _scene.activate(*this);
         }
-        Object::revalidate();
+
+        Object::revalidate(mask);
     }
 
     void SceneImpl::OrthographicCameraLeaf::activate()
@@ -127,7 +142,7 @@ namespace minire
         Node::Sptr node = std::make_shared<Node>(name, std::move(model), weak_from_this(), _scene);
         auto [_, inserted] = _children.emplace(name, node);
         MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
-        invalidateGlobalTransform();
+        node->invalidate(kGlobalTransformDirty);
         return node;
     }
     
@@ -138,7 +153,7 @@ namespace minire
                                                         model._defaultMaterial);
         assert(mesh);
 
-        auto meshLeaf = std::make_shared<MeshLeaf>(name, model, weak_from_this(), mesh);
+        auto meshLeaf = std::make_shared<MeshLeaf>(name, model, weak_from_this(), mesh, _scene);
         auto [_, inserted] = _children.emplace(name, meshLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
         _scene._meshLeaves.push_back(meshLeaf);
@@ -219,7 +234,7 @@ namespace minire
         auto billboard = _scene._rasterizer.billboards().create(model);
         assert(billboard);
 
-        auto billboardLeaf = std::make_shared<BillboardLeaf>(name, model, weak_from_this(), billboard);
+        auto billboardLeaf = std::make_shared<BillboardLeaf>(name, model, weak_from_this(), billboard, _scene);
         auto [_, inserted] = _children.emplace(name, billboardLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
 
@@ -244,7 +259,6 @@ namespace minire
         if (_activeAnimation)
         {
             _activeAnimation.reset();
-            deactiveChildrenAnimation();
         }
 
         // transform animation set from abstract (model) into a concrete one
@@ -280,7 +294,7 @@ namespace minire
         assert(it->second);
         _activeAnimation = std::make_unique<ActiveAnimation>(
             it->second, repeats, speedScale);
-        activeChildrenAnimation();
+        invalidate(kAnimation);
     }
     
     void SceneImpl::Node::stopAnimation()
@@ -288,7 +302,6 @@ namespace minire
         if (_activeAnimation)
         {
             _activeAnimation.reset();
-            deactiveChildrenAnimation();
         }
     }
     
@@ -313,7 +326,7 @@ namespace minire
         // activate this animation
         _activeAnimation = std::make_unique<ActiveAnimation>(
             animationTracksSptr, repeats, speedScale);
-        activeChildrenAnimation();
+        invalidate(kAnimation);
     }
 
     // TODO: code duplicated w/ Left::setParent
@@ -344,9 +357,7 @@ namespace minire
 
         if (newParent)
         {
-            if (invalidated()) propagate(invalidatedFlags()); // TODO: it should be forced,
-                                            //       to prevent half-propagated state
-            // TODO: also should re-activate other stuff of a parent
+            Object::propagate();
         }
     }
 
@@ -385,7 +396,7 @@ namespace minire
         , _parent(parent)
     {
         // calling at the end, to avoid unwanted calls to virtual methods
-        Node::propagate(invalidatedFlags()); // must be called before "setAllowPropagation" !
+        Object::propagate(); // must be called before "setAllowPropagation" !
         setAllowPropagation(true);
     }
 
@@ -446,92 +457,241 @@ namespace minire
     SceneImpl::Node::nodeFromPointer(models::NodePointer const & nodePointer) const
     {
         return std::visit(utils::Overloaded
+        {
+            [this](models::ScenePath const & p) { return findInternal<Node>(p); },
+            [](scene::Node::Sptr const & p) { return std::static_pointer_cast<Node>(p); },
+        }, nodePointer);
+    }
+
+    bool SceneImpl::Node::advanceAnimation()
+    {
+        if (!_activeAnimation)
+            return false;
+
+        ActiveAnimation & activeAnimation = *_activeAnimation;
+
+        // advance all sequencers (that aren't done)
+        for(auto sequencer : activeAnimation._uniqueSequencers)
+        {
+            assert(sequencer);
+            if (!sequencer->isDone())
             {
-                [this](models::ScenePath const & p) { return findInternal<Node>(p); },
-                [](scene::Node::Sptr const & p) { return std::static_pointer_cast<Node>(p); },
-            }, nodePointer);
-    }
-
-    void SceneImpl::Node::invalidateGlobalTransform()
-    {
-        _globalTransformState = GlobalTransformState::kDirty;
-        for(auto node = _parent.lock();
-            node && GlobalTransformState::kClean == node->_globalTransformState;
-            node = node->_parent.lock())
-        {
-            node->_globalTransformState = GlobalTransformState::kGrey;
+                sequencer->advance(_scene._frameTime);
+            }
         }
-    }
 
-    void SceneImpl::Node::deactiveChildrenAnimation()
-    {
-        for(auto parent = _parent.lock();
-            parent && parent->_hasActiveChildrenAnimation;
-            parent = parent->_parent.lock())
+        // update transformation
+        assert(activeAnimation._animationTracks);
+        assert(activeAnimation._animationSequencers.size() == activeAnimation._animationTracks->size());
+        for(size_t i = 0; i < activeAnimation._animationTracks->size(); ++i)
         {
-            parent->_hasActiveChildrenAnimation = std::any_of(
-                parent->_children.cbegin(), parent->_children.cend(),
-                [](auto const & pair)
+            AnimationTrack & animationTrack = (*activeAnimation._animationTracks)[i];
+            ActiveAnimation::SequencerSet const & sequencerSet = activeAnimation._animationSequencers[i];
+
+            if (Node::Sptr const & targetNode = animationTrack._target.lock();
+                targetNode)
+            {
+                assert(animationTrack._animation);
+                scene::KeyframeAnimation const & anim = *animationTrack._animation;
+                models::Transform current = targetNode->_localTransform.current();
+
+                bool hasTrack = false;
+                if (anim._translation && sequencerSet._translation &&
+                    !sequencerSet._translation->isDone())
                 {
-                    return std::visit(utils::Overloaded
-                    {
-                        [](Node::Sptr const & i)
-                        {
-                            assert(i);
-                            return i->_hasActiveChildrenAnimation ||
-                                   i->_activeAnimation.operator bool();
-                        },
-                        [](auto const &) { return false; },
-                    }, pair.second);
-                });
+                    current._translation = sequencerSet._translation->current(*anim._translation);
+                    hasTrack |= true;
+                }
+
+                if (anim._rotation && sequencerSet._rotation &&
+                    !sequencerSet._rotation->isDone())
+                {
+                    current._rotation = sequencerSet._rotation->current(*anim._rotation);
+                    hasTrack |= true;
+                }
+
+                if (anim._scale && sequencerSet._scale &&
+                    !sequencerSet._scale->isDone())
+                {
+                    current._scale = sequencerSet._scale->current(*anim._scale);
+                    hasTrack |= true;
+                }
+
+                if (hasTrack)
+                {
+                    // NOTE: don't perform actual lerp for animable targets
+                    targetNode->_localTransform.update(_scene._epochNumber, current);
+                    targetNode->invalidate(kGlobalTransformDirty);
+                }
+            }
+        }
+
+        // test if all sequencers are done
+        bool hasNonDoneSequencer = std::any_of( // TODO: ranges
+            activeAnimation._uniqueSequencers.cbegin(),
+            activeAnimation._uniqueSequencers.cend(),
+            [](ActiveAnimation::Sequencer::Sptr const & sequencer)
+            {
+                assert(sequencer);
+                return !sequencer->isDone();
+            });
+
+        if (!hasNonDoneSequencer)
+        {
+            _activeAnimation.reset();
+        }
+
+        return hasNonDoneSequencer;
+    }
+
+    void SceneImpl::Node::revalidate(Mask mask)
+    {
+        Mask newMask = 0;
+        Mask dropMask = 0;
+
+        auto parent = _parent.lock();
+
+        // Animation
+
+        if (mask & kAnimation) // is it an Animation pass?
+        {
+            if (advanceAnimation())
+            {
+                // animation can be advanced again
+                newMask |= kAnimation;
+            }
+            else
+            {
+                // animation is terminated
+                dropMask |= kAnimation;
+            }
+        }
+
+        // Lerping
+
+        if (invalidatedAny(mask & (kHasPendedActivation | kOrigin)))
+        {
+            if (invalidatedAny(mask & kOrigin))
+            {
+                _localTransform.update(_scene._epochNumber, origin());
+                newMask |= kHasActivateChildren;
+
+                dropMask |= kOrigin;
+            }
+            dropMask |= kHasPendedActivation;
+        }
+
+        if (invalidatedAny(mask & kHasActivateChildren))
+        {
+            if (lerp(_scene._lerpWeight, _scene._epochNumber))
+            {
+                newMask |= (kHasActivateChildren | kGlobalTransformDirty);
+            }
+            else
+            {
+                dropMask |= kHasActivateChildren;
+            }
+        }
+
+        // Global transform
+
+        if (invalidatedAny(mask & kGlobalTransformDirty))
+        {
+            static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
+            static const glm::vec4 kGlobalOrigin(0, 0, 0, 1);
+
+            models::Transform const & localTransform = _localTransform.current();
+
+            glm::mat4 localTransformMatrix = localTransform.matrix();
+            assert(!parent || parent->hasGlobalTransform());
+            glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransform
+                                                             : kIdentityMatrix;
+            _globalTransform = parentGlobalTransform * localTransformMatrix;
+            _globalPosition = _globalTransform * kGlobalOrigin; // will drop "w"
+
+            dropMask |= kGlobalTransformDirty;
+            invalidateChildren(kGlobalTransformDirty);
+        }
+
+        if (invalidatedAny(mask & kGlobalTransformGray))
+        {
+            dropMask |= kGlobalTransformGray;
+        }
+
+        // Visibility
+
+        if (invalidatedAny(mask & kChildVisibilityInvalidated))
+        {
+            // just drop the flag
+            dropMask |= kChildVisibilityInvalidated;
+        }
+
+        if (invalidatedAny(mask & (kVisible | kParentVisibilityInvalidated)))
+        {
+            bool const oldEffectiveVisible = _effectiveVisible;
+            _effectiveVisible = visible() && (parent ? parent->_effectiveVisible : true);
+            if (oldEffectiveVisible != _effectiveVisible)
+            {
+                invalidateChildren(kParentVisibilityInvalidated);
+            }
+            dropMask |= (kParentVisibilityInvalidated | kVisible);
+        }
+
+        Object::revalidate(dropMask);
+        invalidate(newMask);
+    }
+
+    void SceneImpl::Node::propagate(Mask mask)
+    {
+        assert(invalidatedAll(mask));
+
+        // don't propagate model's flags to parents
+        Mask newParentMask = mask & ~kBaseMask;
+
+        if (mask & kOrigin)
+        {
+            newParentMask |= kHasPendedActivation;
+        }
+
+        if (mask & kVisible)
+        {
+            newParentMask |= kChildVisibilityInvalidated;
+        }
+
+        if (mask & kGlobalTransformDirty)
+        {
+            newParentMask |= kGlobalTransformGray;
+            newParentMask &= ~kGlobalTransformDirty;
+        }
+
+        // propagate flags upwards (own flags and by-pass ones)
+        invalidateParent(newParentMask);
+    }
+
+    // NOTE: won't propagate upwards, only updates flags of given children
+    void SceneImpl::Node::invalidateChildren(Mask mask)
+    {
+        for(auto const & [_, child] : _children)
+        {
+            if (Node::Sptr const * node = std::get_if<Node::Sptr>(&child);
+                node)
+            {
+                assert(*node);
+                (*node)->invalidate(mask, false);
+            }
         }
     }
 
-    void SceneImpl::Node::activeChildrenAnimation()
+    // TODO: make it non-recursive
+    void SceneImpl::Node::invalidateParent(Mask mask)
     {
-        for(auto parent = _parent.lock();
-            parent && !parent->_hasActiveChildrenAnimation;
-            parent = parent->_parent.lock())
+        if (mask)
         {
-            parent->_hasActiveChildrenAnimation = true;
-        }
-    }
-
-    void SceneImpl::Node::invalidateVisibility()
-    {
-        invalidate(kEffectiveVisibility);
-        for(auto parent = _parent.lock();
-            parent && !parent->invalidated(kEffectiveVisibility);
-            parent = parent->_parent.lock())
-        {
-            parent->invalidate(kEffectiveVisibility);
-        }
-    }
-
-    void SceneImpl::Node::revalidate()
-    {
-        if (invalidated(kOrigin))
-        {
-            _localTransform.update(_scene._epochNumber, origin());
-            _scene.activate(*this); // NOTE: will also invalidate global transform
-        }
-
-        bool const dirtyVisibility = invalidated(kVisible);
-
-        // NOTE: this call will zero all flags
-        Object::revalidate();
-
-        if (dirtyVisibility) invalidateVisibility(); // TODO: it will also call propagate()
-    }
-
-    void SceneImpl::Node::propagate(Mask)
-    {
-        invalidate(kChildrenModel);
-        for(auto parent = _parent.lock();
-            parent && !parent->invalidated(kChildrenModel);
-            parent = parent->_parent.lock())
-        {
-            parent->invalidate(kChildrenModel);
+            if(auto parent = _parent.lock();
+                parent && !parent->invalidatedAll(mask))
+            {
+                parent->invalidate(mask);
+            }
         }
     }
 
@@ -663,338 +823,6 @@ namespace minire
         _viewpoint.setViewport(weight, height);
     }
 
-    // TODO: don't revalidate invisible nodes
-    // TODO: don't revalidate culled-out nodes
-    void SceneImpl::revalidateModels()
-    {
-        std::vector<Node *> queue;
-        queue.reserve(_nodesEstimate);
-
-        assert(_root);
-        if (_root->invalidated())
-            queue.emplace_back(_root.get());
-
-        while(!queue.empty())
-        {
-            Node * node = queue.back();
-            assert(node);
-            queue.pop_back();
-
-            node->revalidate();
-
-            for(auto & [_, child] : node->_children)
-            {
-                std::visit(utils::Overloaded
-                {
-                    [&queue](Node::Sptr const & childNode)
-                    {
-                        assert(childNode);
-                        if (childNode->invalidated())
-                        {
-                            queue.emplace_back(childNode.get());
-                        }
-                    },
-                    [this](auto const & leafNode)
-                    {
-                        assert(leafNode);
-                        leafNode->revalidate();
-                    },
-                }, child);
-            }
-
-            _nodesEstimate = std::max(_nodesEstimate, queue.size());
-        }
-    }
-
-    // TODO: don't animate invisible nodes
-    // TODO: don't animate culled-out nodes
-    bool SceneImpl::advanceAnimations(float delta /* seconds */)
-    {
-        assert(_root);
-        std::vector<Node *> queue{_root.get()};
-        queue.reserve(_nodesEstimate);
-
-        bool updated = false;
-        while(!queue.empty())
-        {
-            Node * node = queue.back();
-            assert(node);
-            queue.pop_back();
-
-            if (node->_activeAnimation)
-            {
-                ActiveAnimation & activeAnimation = *node->_activeAnimation;
-
-                // advance all sequencers (that aren't done)
-                for(auto sequencer : activeAnimation._uniqueSequencers)
-                {
-                    assert(sequencer);
-                    if (!sequencer->isDone())
-                    {
-                        sequencer->advance(delta);
-                    }
-                }
-
-                // update transformation
-                assert(activeAnimation._animationTracks);
-                assert(activeAnimation._animationSequencers.size() == activeAnimation._animationTracks->size());
-                for(size_t i = 0; i < activeAnimation._animationTracks->size(); ++i)
-                {
-                    AnimationTrack & animationTrack = (*activeAnimation._animationTracks)[i];
-                    ActiveAnimation::SequencerSet const & sequencerSet = activeAnimation._animationSequencers[i];
-
-                    if (Node::Sptr const & targetNode = animationTrack._target.lock();
-                        targetNode)
-                    {
-                        assert(animationTrack._animation);
-                        scene::KeyframeAnimation const & anim = *animationTrack._animation;
-                        models::Transform current = targetNode->_localTransform.current();
-
-                        bool hasTrack = false;
-                        if (anim._translation && sequencerSet._translation &&
-                            !sequencerSet._translation->isDone())
-                        {
-                            current._translation = sequencerSet._translation->current(*anim._translation);
-                            hasTrack |= true;
-                        }
-
-                        if (anim._rotation && sequencerSet._rotation &&
-                            !sequencerSet._rotation->isDone())
-                        {
-                            current._rotation = sequencerSet._rotation->current(*anim._rotation);
-                            hasTrack |= true;
-                        }
-
-                        if (anim._scale && sequencerSet._scale &&
-                            !sequencerSet._scale->isDone())
-                        {
-                            current._scale = sequencerSet._scale->current(*anim._scale);
-                            hasTrack |= true;
-                        }
-
-                        if (hasTrack)
-                        {
-                            targetNode->_localTransform.update(_epochNumber, current);
-                            activate(*targetNode);
-                            updated |= true;
-                        }
-                    }
-                }
-
-                // maybe deactive (if all sequencers are done)
-                bool hasNonDoneSequencer = std::any_of( // TODO: ranges
-                    activeAnimation._uniqueSequencers.cbegin(),
-                    activeAnimation._uniqueSequencers.cend(),
-                    [](ActiveAnimation::Sequencer::Sptr const & sequencer)
-                    {
-                        assert(sequencer);
-                        return !sequencer->isDone();
-                    });
-                if (hasNonDoneSequencer)
-                {
-                    node->activeChildrenAnimation();
-                }
-                else
-                {
-                    node->_activeAnimation.reset();
-                    node->deactiveChildrenAnimation();
-                }
-            }
-
-            if (node->_hasActiveChildrenAnimation)
-            {
-                for(auto & [_, child] : node->_children)
-                {
-                    if (auto * nodePtr = std::get_if<Node::Sptr>(&child);
-                        nodePtr)
-                    {
-                        Node::Sptr node = *nodePtr;
-                        assert(node);
-                        if (node->_hasActiveChildrenAnimation ||
-                            node->_activeAnimation.operator bool())
-                        {
-                            queue.emplace_back(node.get());
-                        }
-                    }
-                }
-            }
-
-            _nodesEstimate = std::max(_nodesEstimate, queue.size());
-        }
-
-        return updated;
-    }
-
-    template<typename T>
-    void SceneImpl::activate(T & item)
-    {
-        item._activated = true;
-        activateParents(item._parent.lock());
-    }
-
-    void SceneImpl::activateParents(Node::Sptr parent)
-    {
-        while(parent && !parent->_childActivated)
-        {
-            parent->_childActivated = true;
-            parent = parent->_parent.lock();
-        }
-    }
-
-    // TODO: don't lerp invisible nodes
-    // TODO: don't lerp culled-out nodes
-    void SceneImpl::lerp(float weight)
-    {
-        assert(_root);
-
-        if (!_root->_activated && !_root->_childActivated)
-            return;
-
-        std::vector<Node *> queue{_root.get()};
-        queue.reserve(_nodesEstimate);
-        while(!queue.empty())
-        {
-            Node * node = queue.back();
-            assert(node);
-            queue.pop_back();
-
-            if (node->_activated)
-            {
-                node->_activated = node->lerp(weight, _epochNumber);
-                node->invalidateGlobalTransform();
-            }
-
-            if (node->_childActivated)
-            {
-                node->_childActivated = false;
-                for(auto & [_, child] : node->_children)
-                {
-                    node->_childActivated |= std::visit(utils::Overloaded
-                    {
-                        [&queue](Node::Sptr & child) -> bool
-                        {
-                            assert(child);
-                            queue.emplace_back(child.get());
-                            return false; // lerping status is not known yet
-                        },
-                        [weight, this](auto & child) -> bool
-                        {
-                            assert(child);
-                            return child->lerp(weight, _epochNumber);
-                        }
-                    }, child);
-                }
-            }
-
-            if (node->_activated || node->_childActivated)
-            {
-                activateParents(node->_parent.lock());
-            }
-
-            _nodesEstimate = std::max(_nodesEstimate, queue.size());
-        }
-    }
-
-    // TODO: don't lerp invisible nodes
-    // TODO: don't lerp culled-out nodes
-    void SceneImpl::updateGlobalTransforms()
-    {
-        static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
-        static const glm::vec4 kOrigin(0, 0, 0, 1);
-
-        assert(_root);
-
-        if (Node::GlobalTransformState::kClean == _root->_globalTransformState)
-            return;
-
-        std::vector<Node *> queue{_root.get()};
-        queue.reserve(_nodesEstimate);
-        while (!queue.empty())
-        {
-            Node * node = queue.back();
-            assert(node);
-            queue.pop_back();
-
-            // actualize own global transform (TODO: move into Node::)
-            if (Node::GlobalTransformState::kDirty == node->_globalTransformState)
-            {
-                models::Transform const & localTransform = node->_localTransform.current();
-                glm::mat4 localTransformMatrix = localTransform.matrix();
-                Node::Sptr parent = node->_parent.lock();
-                assert(!parent || parent->_globalTransformState == Node::GlobalTransformState::kClean);
-                glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransform
-                                                                 : kIdentityMatrix;
-                node->_globalTransform = parentGlobalTransform * localTransformMatrix;
-                node->_globalPosition = node->_globalTransform * kOrigin; // will drop "w"
-            }
-
-            // maybe schedule children actualization (TODO: move into Node::)
-            if (Node::GlobalTransformState::kClean != node->_globalTransformState)
-            {
-                bool const forceDirty = Node::GlobalTransformState::kDirty == node->_globalTransformState;
-                for(auto & [_, child] : node->_children)
-                {
-                    if (Node::Sptr * pnode = std::get_if<Node::Sptr>(&child); pnode)
-                    {
-                        Node::Sptr node = *pnode;
-                        assert(node);
-                        if (forceDirty)
-                        {
-                            node->_globalTransformState = Node::GlobalTransformState::kDirty;
-                        }
-                        if (Node::GlobalTransformState::kClean != node->_globalTransformState)
-                        {
-                            queue.push_back(node.get());
-                        }
-                    }
-                }
-            }
-
-            // mark node as clean (TODO: move into Node::)
-            node->_globalTransformState = Node::GlobalTransformState::kClean;
-
-            _nodesEstimate = std::max(_nodesEstimate, queue.size());
-        }
-    }
-
-    // TODO: don't lerp invisible nodes
-    // TODO: don't lerp culled-out nodes
-    void SceneImpl::updateVisibility()
-    {
-        assert(_root);
-
-        std::vector<Node *> queue{_root.get()};
-        queue.reserve(_nodesEstimate);
-        while (!queue.empty())
-        {
-            Node * node = queue.back();
-            assert(node);
-            queue.pop_back();
-
-            Node::Sptr parent = node->_parent.lock();
-            bool const oldEffectiveVisible = node->_effectiveVisible;
-            node->_effectiveVisible = node->visible()
-                                   && (parent ? parent->_effectiveVisible : true);
-            bool const effectiveVisibleChanged = oldEffectiveVisible != node->_effectiveVisible;
-            for(auto & [_, child] : node->_children)
-            {
-                if (Node::Sptr * pchild = std::get_if<Node::Sptr>(&child); pchild)
-                {
-                    Node::Sptr childSptr = *pchild;
-                    assert(childSptr);
-                    if (effectiveVisibleChanged ||
-                        childSptr->invalidated(Node::kEffectiveVisibility))
-                    {
-                        queue.push_back(childSptr.get());
-                    }
-                }
-            }
-
-            node->revalidateMask(Node::kEffectiveVisibility);
-            _nodesEstimate = std::max(_nodesEstimate, queue.size());
-        }
-    }
-
     void SceneImpl::actualizeViewpoint()
     {
         std::visit(utils::Overloaded
@@ -1026,6 +854,67 @@ namespace minire
         }, _activeCamera);
     }
 
+    void SceneImpl::revalidate(Node * root, Node::Mask mask)
+    {
+        std::vector<Node *> queue{root};
+        queue.reserve(_nodesEstimate);
+        while (!queue.empty())
+        {
+            // fetch a node
+            Node * node = queue.back();
+            assert(node);
+            queue.pop_back();
+
+            // revalidate the node itself
+            // (it may set/drop children flags)
+            if (node->invalidatedAny(mask))
+            {
+                node->revalidate(mask);
+            }
+
+            // schedule children for revalidation
+            bool setHasActivateLeaf = false;
+            for(auto & [_, child] : node->_children)
+            {
+                std::visit(utils::Overloaded
+                {
+                    [&queue, mask](Node::Sptr & childNode)
+                    {
+                        assert(childNode);
+                        if (childNode->invalidatedAny(mask))
+                        {
+                            queue.emplace_back(childNode.get());
+                        }
+                    },
+                    [this, mask, &setHasActivateLeaf](auto & leaf)
+                    {
+                        assert(leaf);
+                        if ((Node::kHasPendedActivation & mask) &&
+                            leaf->invalidated())
+                        {
+                            leaf->revalidate(mask);
+                        }
+
+                        if (Node::kHasActivateChildren & mask)
+                        {
+                            if (leaf->lerp(_lerpWeight, _epochNumber))
+                            {
+                                setHasActivateLeaf |= true;
+                            }
+                        }
+                    },
+                }, child);
+            }
+
+            if (setHasActivateLeaf)
+            {
+                node->invalidate(Node::kHasActivateChildren);
+            }
+
+            _nodesEstimate = std::max(_nodesEstimate, queue.size());
+        }
+    }
+
     /**
      * - objects that were set directly (via setOrigin() and such),
      *   will be lerped (where applicable). Such objects are affected by
@@ -1041,38 +930,74 @@ namespace minire
                             double const epochDuration,
                             double const frameTime)
     {
-        // 1. advance directly set values for a new Epoch or
-        //    perform lerping for continuing Epoch
+        assert(_root);
 
         // detect epoch start
         assert(epochNumber >= _epochNumber);
         bool const epochStarted = epochNumber != _epochNumber;
         _epochNumber = epochNumber;
 
+        // 1. advance animable objects
+
+        _frameTime = frameTime;
+        revalidate(_root.get(), Node::kAnimation);
+
+        // 2. advance directly set values for a new Epoch or
+        //    perform lerping for continuing Epoch
+
+        // maybe perform lerp operation on lerpable objects
+        // (advance lerping or just drop the flag)
+
         if (epochStarted)
         {
             // transfer accumulated models state into scene instances
-            revalidateModels(); // TODO: peform lerp
+            revalidate(_root.get(), Node::kHasPendedActivation | Node::kOrigin);
         }
 
-        if (epochTime < epochDuration)
-        {
-            // maybe perform lerp operation on lerpable objects
-            double const weight = epochDuration != 0 ? epochTime / epochDuration : 1.0;
-            assert(weight >= 0);
-            lerp(weight);
-        }
-
-        // 2. advance animable objects
-
-        advanceAnimations(frameTime);
+        _lerpWeight = epochDuration != 0 ? epochTime / epochDuration : 1.0;
+        assert(_lerpWeight >= 0);
+        revalidate(_root.get(), Node::kHasActivateChildren);
 
         // 3. revalidate effective values
         //    (transforms, viewport, visibility, etc)
 
-        updateGlobalTransforms();
-        updateVisibility();
+        revalidate(_root.get(), Node::kVisible |
+                                Node::kParentVisibilityInvalidated |
+                                Node::kChildVisibilityInvalidated);
+
+        revalidate(_root.get(), Node::kGlobalTransformDirty |
+                                Node::kGlobalTransformGray);
+
         actualizeViewpoint();
+
+#       ifndef NDEBUG
+        // for debug-only: ensure that no nodes has been left invalidated
+        std::vector<Node const *> queue;
+        queue.reserve(_nodesEstimate);
+        while(!queue.empty())
+        {
+            Node const * node = queue.back();
+            queue.pop_back();
+
+            // NOTE: Node::kAnimation may be stored between iterations
+            assert(node);
+            assert(node->invalidatedAny(Node::kAnimation) ||
+                   !node->invalidated());
+
+            for(auto & [_, child] : node->_children)
+            {
+                std::visit(utils::Overloaded
+                {
+                    [&queue](Node::Sptr & childNode)
+                    {
+                        assert(childNode);
+                        queue.emplace_back(childNode.get());
+                    },
+                    [](auto & leaf) { assert(leaf && !leaf->invalidated()); },
+                }, child);
+            }
+        }
+#       endif
     }
 
     // TODO: should be a static method?

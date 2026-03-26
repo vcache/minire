@@ -47,8 +47,13 @@ namespace minire
             : public utils::Object<Mesh, models::Mesh, true /* immutable model */> 
         {
         protected:
-            static constexpr size_t kEmmisiveFactor = mkMask(0);
-            static constexpr size_t kVisible        = mkMask(1);
+            static constexpr Mask kEmmisiveFactor = mkMask(0);
+            static constexpr Mask kVisible        = mkMask(1);
+
+            static constexpr Mask kBaseMask = kEmmisiveFactor
+                                            | kVisible;
+
+            static constexpr size_t kFlagsCount = 2; // an offset for descendants
 
         public:
             using Object::Object;
@@ -58,12 +63,21 @@ namespace minire
             glm::vec3 const & emissiveFactor() const { return _emissiveFactor; }
             void setEmissiveFactor(glm::vec3 const & emissiveFactor)
             {
-                _emissiveFactor = emissiveFactor;
-                invalidate(kEmmisiveFactor);
+                if (this->emissiveFactor() != emissiveFactor)
+                {
+                    _emissiveFactor = emissiveFactor;
+                    invalidate(kEmmisiveFactor);
+                }
             }
 
             bool visible() const { return model()._visible; }
-            void setVisible(bool visible) { model(kVisible)._visible = visible; }
+            void setVisible(bool visible)
+            {
+                if (this->visible() != visible)
+                {
+                    model(kVisible)._visible = visible;
+                }
+            }
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
@@ -78,20 +92,37 @@ namespace minire
             : public utils::Object<DirectionalLight, models::DirectionalLight>
         {
         protected:
-            static constexpr size_t kColor        = mkMask(0);
-            static constexpr size_t kVisible      = mkMask(1);
+            static constexpr Mask kColor        = mkMask(0);
+            static constexpr Mask kVisible      = mkMask(1);
+
+            static constexpr Mask kBaseMask = kColor
+                                            | kVisible;
+
+            static constexpr size_t kFlagsCount = 2; // an offset for descendants
 
         public:
             using Object::Object;
 
             glm::vec3 const & color() const { return model()._color; }
-            void setColor(glm::vec3 const & color) { model(kColor)._color = color; }
+            void setColor(glm::vec3 const & color)
+            {
+                if (this->color() != color)
+                {
+                    model(kColor)._color = color;
+                }
+            }
 
             // NOTE: shadowParams are immutable yet
             models::MaybeShadowParams const & shadowParams() const { return model()._shadowParams; }
 
             bool visible() const { return model()._visible; }
-            void setVisible(bool visible) { model(kVisible)._visible = visible; }
+            void setVisible(bool visible)
+            {
+                if (this->visible() != visible)
+                {
+                    model(kVisible)._visible = visible;
+                }
+            }
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
@@ -103,27 +134,48 @@ namespace minire
             : public utils::Object<PointLight, models::PointLight>
         {
         protected:
-            static constexpr size_t kColor        = mkMask(0);
-            static constexpr size_t kAttenuation  = mkMask(1);
-            static constexpr size_t kVisible      = mkMask(2);
+            static constexpr Mask kColor        = mkMask(0);
+            static constexpr Mask kAttenuation  = mkMask(1);
+            static constexpr Mask kVisible      = mkMask(2);
+
+            static constexpr Mask kBaseMask = kColor
+                                            | kAttenuation
+                                            | kVisible;
+
+            static constexpr size_t kFlagsCount = 3; // an offset for descendants
 
         public:
             using Object::Object;
 
             glm::vec4 const & color() const { return model()._color; }
-            void setColor(glm::vec4 const & color) { model(kColor)._color = color; }
+            void setColor(glm::vec4 const & color)
+            {
+                if (this->color() != color)
+                {
+                    model(kColor)._color = color;
+                }
+            }
 
             glm::vec4 const & attenuation() const { return model()._attenuation; }
             void setAttenuation(glm::vec4 const & attenuation)
             {
-                model(kAttenuation)._attenuation = attenuation;
+                if (this->attenuation() != attenuation)
+                {
+                    model(kAttenuation)._attenuation = attenuation;
+                }
             }
 
             // NOTE: shadowParams are immutable yet
             models::MaybeShadowParams const & shadowParams() const { return model()._shadowParams; }
 
             bool visible() const { return model()._visible; }
-            void setVisible(bool visible) { model(kVisible)._visible = visible; }
+            void setVisible(bool visible)
+            {
+                if (this->visible() != visible)
+                {
+                    model(kVisible)._visible = visible;
+                }
+            }
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
@@ -135,32 +187,64 @@ namespace minire
             : public utils::Object<PerspectiveCamera, models::PerspectiveCamera>
         {
         protected:
-            static constexpr size_t kYFov        = mkMask(0);
-            static constexpr size_t kZNear       = mkMask(1);
-            static constexpr size_t kZFar        = mkMask(2);
-            static constexpr size_t kAspectRatio = mkMask(3);
-            static constexpr size_t kVisible     = mkMask(4);
+            static constexpr Mask kYFov        = mkMask(0);
+            static constexpr Mask kZNear       = mkMask(1);
+            static constexpr Mask kZFar        = mkMask(2);
+            static constexpr Mask kAspectRatio = mkMask(3);
+            static constexpr Mask kVisible     = mkMask(4);
+
+            static constexpr Mask kBaseMask = kYFov | kZNear | kZFar
+                                            | kAspectRatio | kVisible;
+
+            static constexpr size_t kFlagsCount = 5; // an offset for descendants
 
         public:
             using Object::Object;
 
             float yFov() const { return model()._yFov; }
-            void setYFov(float const yFov) { model(kYFov)._yFov = yFov; }
+            void setYFov(float const yFov)
+            {
+                if (this->yFov() != yFov)
+                {
+                    model(kYFov)._yFov = yFov;
+                }
+            }
 
             float zNear() const { return model()._zNear; }
-            void setZNear(float const zNear) { model(kZNear)._zNear = zNear; }
+            void setZNear(float const zNear)
+            {
+                if (this->zNear() != zNear)
+                {
+                    model(kZNear)._zNear = zNear;
+                }
+            }
 
             std::optional<float> zFar() const { return model()._zFar; }
-            void setZFar(std::optional<float> const zFar) { model(kZFar)._zFar = zFar; }
+            void setZFar(std::optional<float> const zFar)
+            {
+                if (this->zFar() != zFar)
+                {
+                    model(kZFar)._zFar = zFar;
+                }
+            }
 
             std::optional<float> aspectRatio() const { return model()._aspectRatio; }
             void setAspectRatio(std::optional<float> const aspectRatio)
             {
-                model(kAspectRatio)._aspectRatio = aspectRatio;
+                if (this->aspectRatio() != aspectRatio)
+                {
+                    model(kAspectRatio)._aspectRatio = aspectRatio;
+                }
             }
 
             bool visible() const { return model()._visible; }
-            void setVisible(bool visible) { model(kVisible)._visible = visible; }
+            void setVisible(bool visible)
+            {
+                if (this->visible() != visible)
+                {
+                    model(kVisible)._visible = visible;
+                }
+            }
 
             virtual void activate() = 0;
 
@@ -174,29 +258,64 @@ namespace minire
             : public utils::Object<OrthographicCamera, models::OrthographicCamera>
         {
         protected:
-            static constexpr size_t kXMag    = mkMask(0);
-            static constexpr size_t kYMag    = mkMask(1);
-            static constexpr size_t kZNear   = mkMask(2);
-            static constexpr size_t kZFar    = mkMask(3);
-            static constexpr size_t kVisible = mkMask(4);
+            static constexpr Mask kXMag    = mkMask(0);
+            static constexpr Mask kYMag    = mkMask(1);
+            static constexpr Mask kZNear   = mkMask(2);
+            static constexpr Mask kZFar    = mkMask(3);
+            static constexpr Mask kVisible = mkMask(4);
+
+            static constexpr Mask kBaseMask = kXMag | kYMag | kZNear | kZFar
+                                            | kVisible;
+
+            static constexpr size_t kFlagsCount = 5; // an offset for descendants
 
         public:
             using Object::Object;
 
             float xMag() const { return model()._xMag; }
-            void setXMag(float const xMag) { model(kXMag)._xMag = xMag; }
+            void setXMag(float const xMag)
+            {
+                if (this->xMag() != xMag)
+                {
+                    model(kXMag)._xMag = xMag;
+                }
+            }
 
             float yMag() const { return model()._yMag; }
-            void setYMag(float const yMag) { model(kYMag)._yMag = yMag; }
+            void setYMag(float const yMag)
+            {
+                if (this->yMag() != yMag)
+                {
+                    model(kYMag)._yMag = yMag;
+                }
+            }
 
             float zNear() const { return model()._zNear; }
-            void setZNear(float const zNear) { model(kZNear)._zNear = zNear; }
+            void setZNear(float const zNear)
+            {
+                if (this->zNear() != zNear)
+                {
+                    model(kZNear)._zNear = zNear;
+                }
+            }
 
             float zFar() const { return model()._zFar; }
-            void setZFar(float const zFar) { model(kZFar)._zFar = zFar; }
+            void setZFar(float const zFar)
+            {
+                if (this->zFar() != zFar)
+                {
+                    model(kZFar)._zFar = zFar;
+                }
+            }
 
             bool visible() const { return model()._visible; }
-            void setVisible(bool visible) { model(kVisible)._visible = visible; }
+            void setVisible(bool visible)
+            {
+                if (this->visible() != visible)
+                {
+                    model(kVisible)._visible = visible;
+                }
+            }
 
             virtual void activate() = 0;
 
@@ -210,7 +329,11 @@ namespace minire
             : public utils::Object<Billboard, models::Billboard>
         {
         protected:
-            static constexpr size_t kVisible = mkMask(1);
+            static constexpr Mask kVisible = mkMask(0);
+
+            static constexpr Mask kBaseMask = kVisible;
+
+            static constexpr size_t kFlagsCount = 1; // an offset for descendants
 
         public:
             using Object::Object;
@@ -224,7 +347,13 @@ namespace minire
             size_t zOrder() const { return model()._zOrder; }
 
             bool visible() const { return model()._visible; }
-            void setVisible(bool visible) { model(kVisible)._visible = visible; }
+            void setVisible(bool visible)
+            {
+                if (this->visible() != visible)
+                {
+                    model(kVisible)._visible = visible;
+                }
+            }
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
@@ -236,9 +365,13 @@ namespace minire
             : public utils::Object<Node, models::Node>
         {
         protected:
-            static constexpr size_t kOrigin  = mkMask(0);
-            static constexpr size_t kVisible = mkMask(1);
-            static constexpr size_t kFlagsCount = 1; // an offset for descendants
+            static constexpr Mask kOrigin  = mkMask(0);
+            static constexpr Mask kVisible = mkMask(1);
+
+            static constexpr Mask kBaseMask = kOrigin
+                                            | kVisible;
+
+            static constexpr size_t kFlagsCount = 2; // an offset for descendants
 
             using SceneItem = std::variant<std::monostate,
                                            std::shared_ptr<Mesh>,
@@ -255,10 +388,23 @@ namespace minire
 
             models::Transform const & origin() const { return model()._origin; }
             models::Transform & origin() { return model(kOrigin)._origin; }
-            void setOrigin(models::Transform origin) { model(kOrigin)._origin = std::move(origin); }
+            
+            void setOrigin(models::Transform origin)
+            {
+                if (this->origin() != origin)
+                {
+                    model(kOrigin)._origin = std::move(origin);
+                }
+            }
 
             bool visible() const { return model()._visible; }
-            void setVisible(bool visible) { model(kVisible)._visible = visible; }
+            void setVisible(bool visible)
+            {
+                if (this->visible() != visible)
+                {
+                    model(kVisible)._visible = visible;
+                }
+            }
 
         public:
             // Generally, user code should store pointers to these objects as Wptr,
@@ -279,7 +425,7 @@ namespace minire
             virtual void makeFromSource(content::Path const &, content::Manager &, bool visible) = 0;
 
         public:
-            static constexpr size_t kInfinitely = std::numeric_limits<size_t>::max();
+            static constexpr Mask kInfinitely = std::numeric_limits<size_t>::max();
 
             // NOTE: will replace any existing animations, i.e.
             //       this command has "assign" semantics.

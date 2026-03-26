@@ -160,12 +160,12 @@ namespace minire::rasterizer
         }
 
     private:
-        void revalidate() override
+        void revalidate(Mask mask = kAllFlags) override
         {
             if (invalidated())
             {
                 bool textureResized = false;
-                if (invalidated(kTexture))
+                if (invalidatedAny(kTexture))
                 {
                     assert(_texture);
                     float oldWidth = _texture->width();
@@ -178,12 +178,12 @@ namespace minire::rasterizer
                                   || oldHeight != _texture->height();
                 }
 
-                if (textureResized || invalidated(kPatch | kPosition | kDimensions))
+                if (textureResized || invalidatedAny(kPatch | kPosition | kDimensions))
                 {
                     _vertexBuffer.reload(buildMesh());
                 }
 
-                Object::revalidate();
+                Object::revalidate(mask);
             }
         }
 

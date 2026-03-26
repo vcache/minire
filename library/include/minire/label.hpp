@@ -12,12 +12,12 @@ namespace minire
         , public utils::Detachable
     {
     protected:
-        static constexpr size_t kText           = mkMask(0);
-        static constexpr size_t kFontFace       = mkMask(1);
-        static constexpr size_t kPosition       = mkMask(2);
-        static constexpr size_t kClippingWindow = mkMask(3);
-        static constexpr size_t kZOrder         = mkMask(4);
-        static constexpr size_t kVisible        = mkMask(5);
+        static constexpr Mask kText           = mkMask(0);
+        static constexpr Mask kFontFace       = mkMask(1);
+        static constexpr Mask kPosition       = mkMask(2);
+        static constexpr Mask kClippingWindow = mkMask(3);
+        static constexpr Mask kZOrder         = mkMask(4);
+        static constexpr Mask kVisible        = mkMask(5);
 
     public:
         using Object::Object;

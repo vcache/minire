@@ -43,51 +43,50 @@ namespace minire::utils
             invalidate();
         }
 
-        // NOTE: Descendants should also call Object::revalidate()
-        virtual void revalidate() { _flags = 0; }
-
     protected:
         using Mask = size_t;
         static constexpr Mask kAllFlags = std::numeric_limits<Mask>::max();
 
+        // NOTE: Descendants should also call Object::revalidate()
+        virtual void revalidate(Mask mask = kAllFlags) { _flags &= ~mask; }
+
         static constexpr Mask mkMask(size_t index)
         {
             static_assert(sizeof(Mask) == 8, "unexpected size of size_t");
-            assert(index < 64);
+            static_assert(std::numeric_limits<Mask>::radix == 2,
+                          "std::numeric_limits<T>::digits is in unexpected radix");
+            assert(index < std::numeric_limits<Mask>::digits);
             return (1ULL << index);
         }
 
+        // TODO: maybe change semantics from invalidate/revalidate to set/clear?
+
         bool invalidated() const { return _flags != 0; }
 
-        // checks if ANY flags is set
-        bool invalidated(Mask mask) const { return _flags & mask; }
+        bool invalidatedAny(Mask mask) const { return 0 != (_flags & mask); }
+        bool invalidatedAll(Mask mask) const { return mask == (_flags & mask); }
 
         // NOTE: since "invalidate" calls a virtual methods,
         //       it shouldn't be called from a constructor.
 
         void invalidate()
         {
-            bool wasInvalidated = invalidated();
             _flags = kAllFlags;
-            if (_allowPropagation && !wasInvalidated) propagate(kAllFlags);
+            if (_allowPropagation) propagate(kAllFlags);
         }
 
-        void invalidate(Mask mask)
+        void invalidate(Mask mask, bool allowPropagation = true)
         {
-            bool wasInvalidated = invalidated();
             _flags |= mask;
-            if (_allowPropagation && !wasInvalidated) propagate(mask);
+            if (_allowPropagation && allowPropagation && mask) propagate(mask);
         }
-
-        // TODO: delete this method. Should just use revalidate()
-        void revalidateMask(Mask mask) { _flags &= ~mask; }
 
         void setAllowPropagation(bool v) { _allowPropagation = v; }
 
-        Mask invalidatedFlags() const { return _flags; }
-
-        // called once any flag set, but just once
+        // called only for a newly set flags only
         virtual void propagate(Mask) {}
+
+        void propagate() { propagate(_flags); }
 
     protected:
         Model & model(Mask mask)

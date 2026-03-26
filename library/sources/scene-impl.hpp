@@ -187,14 +187,6 @@ namespace minire
         }
 
     private:
-        void lerp(float weight);
-        void revalidateModels();
-        bool advanceAnimations(float delta /* seconds */);
-        void updateGlobalTransforms();
-        void updateVisibility();
-        void actualizeViewpoint();
-
-    private:
         class Node;
 
         template<typename Derived,
@@ -211,23 +203,23 @@ namespace minire
 
             explicit Leaf(std::string name,
                           typename ObjectType::ModelType const & model,
-                          std::weak_ptr<Node> parent)
+                          std::weak_ptr<Node> parent,
+                          SceneImpl & scene)
                 : ObjectType(std::move(name), model)
                 , _parent(parent)
+                , _scene(scene)
             {}
 
             scene::Node::Wptr parent() const override { return _parent; }
             void setParent(scene::Node::Sptr const & newParent) override;
 
         private:
-            void propagate(ObjectType::Mask m) override
-            {
-                if (auto p = _parent.lock(); p) p->propagate(m);
-            }
+            void propagate(ObjectType::Mask) override;
+            void invalidateParent(ObjectType::Mask);
 
         private:
             std::weak_ptr<Node> _parent;
-            bool                _activated = false;
+            SceneImpl         & _scene;
 
             friend class SceneImpl;
         };
@@ -240,12 +232,15 @@ namespace minire
             explicit MeshLeaf(std::string name,
                               models::Mesh const & model,
                               std::weak_ptr<Node> parent,
-                              std::shared_ptr<rasterizer::Mesh> const & mesh)
-                : Leaf(std::move(name), model, parent)
+                              std::shared_ptr<rasterizer::Mesh> const & mesh,
+                              SceneImpl & scene)
+                : Leaf(std::move(name), model, parent, scene)
                 , _mesh(mesh)
             {}
 
             bool lerp(float, size_t) { return false; } // just for compatibility
+
+            bool isLerpable(size_t) const { return false; }
 
             // TODO: lerpable _emissiveFactor
 
@@ -271,16 +266,12 @@ namespace minire
         {
         public:
             explicit LerpableLeaf(std::string name,
-                                 ModelType const & model,
-                                 std::weak_ptr<Node> parent,
-                                 SceneImpl & scene)
-                : Leaf<Derived, SceneType>(std::move(name), model, parent)
+                                  ModelType const & model,
+                                  std::weak_ptr<Node> parent,
+                                  SceneImpl & scene)
+                : Leaf<Derived, SceneType>(std::move(name), model, parent, scene)
                 , utils::Lerpable<ModelType>(model)
-                , _scene(scene)
             {}
-
-        protected:
-            SceneImpl & _scene;
         };
 
         class DirectionalLightLeaf final
@@ -291,7 +282,7 @@ namespace minire
         public:
             using LerpableLeaf::LerpableLeaf;
 
-            void revalidate() override;
+            void revalidate(Mask = kAllFlags) override;
         };
 
         class PointLightLeaf final
@@ -302,7 +293,7 @@ namespace minire
         public:
             using LerpableLeaf::LerpableLeaf;
 
-            void revalidate() override;
+            void revalidate(Mask = kAllFlags) override;
         };
 
         class PerspectiveCameraLeaf final
@@ -314,7 +305,7 @@ namespace minire
             using LerpableLeaf::LerpableLeaf;
 
             void activate() override;
-            void revalidate() override;
+            void revalidate(Mask = kAllFlags) override;
         };
 
         class OrthographicCameraLeaf final
@@ -326,7 +317,7 @@ namespace minire
             using LerpableLeaf::LerpableLeaf;
 
             void activate() override;
-            void revalidate() override;
+            void revalidate(Mask = kAllFlags) override;
         };
 
         class BillboardLeaf final
@@ -336,12 +327,15 @@ namespace minire
             explicit BillboardLeaf(std::string name,
                                    models::Billboard model,
                                    std::weak_ptr<Node> parent,
-                                   std::shared_ptr<rasterizer::Billboard> const & billboard)
-                : Leaf(std::move(name), std::move(model), parent)
+                                   std::shared_ptr<rasterizer::Billboard> const & billboard,
+                                   SceneImpl & scene)
+                : Leaf(std::move(name), std::move(model), parent, scene)
                 , _billboard(billboard)
             {}
 
             bool lerp(float, size_t) { return false; } // just for compatibility
+
+            bool isLerpable(size_t) const { return false; }
 
             auto const & billboard() const { return _billboard; }
 
@@ -437,16 +431,14 @@ namespace minire
 
             bool hasGlobalTransform() const
             {
-                return GlobalTransformState::kClean == _globalTransformState;
+                return !invalidatedAny(kGlobalTransformDirty | kGlobalTransformGray);
             }
 
-            void invalidateGlobalTransform();
-            void deactiveChildrenAnimation();
-            void activeChildrenAnimation();
-            void invalidateVisibility();
-
-            void revalidate() override;
+            void revalidate(Mask = kAllFlags) override;
             void propagate(Object::Mask) override;
+            void invalidateParent(Mask);
+            void invalidateChildren(Mask);
+            bool advanceAnimation();
 
         private:
             using Child = std::variant<Node::Sptr,
@@ -460,17 +452,27 @@ namespace minire
             using ChildrenMap = std::unordered_map<std::string, Child>;
             using LerpableTransform = utils::Lerpable<models::Transform>;
 
-            // recalc nested visibility
-            static constexpr size_t kEffectiveVisibility = mkMask(kFlagsCount + 1);
-            // pseudo-flag just to trigger parent's revalidateModels()
-            static constexpr size_t kChildrenModel       = mkMask(kFlagsCount + 2);
+            // set if a Node has some Leaf or inner Node which can be lerped
+            static constexpr Mask kHasActivateChildren         = mkMask(kFlagsCount + 0);
 
-            enum class GlobalTransformState
-            {
-                kClean, // both own and every children's are up to date
-                kDirty, // own transform is outdated
-                kGrey,  // own is clean, but some children are outdated
-            };
+            // some Leaves or Nodes has values to be revalidated at the new epoch
+            static constexpr Mask kHasPendedActivation         = mkMask(kFlagsCount + 1);
+
+            // effective visibility of a node should be re-evaluated
+            // due to change of some of parent's effective visibility
+            static constexpr Mask kParentVisibilityInvalidated = mkMask(kFlagsCount + 2);
+
+            // recalc visibility of some of nested nodes
+            static constexpr Mask kChildVisibilityInvalidated  = mkMask(kFlagsCount + 3);
+            
+            // own transform is outdated
+            static constexpr Mask kGlobalTransformDirty        = mkMask(kFlagsCount + 4);
+
+            // own transform is clean, but some children are outdated
+            static constexpr Mask kGlobalTransformGray         = mkMask(kFlagsCount + 5);
+
+            // node itself or some of its children (maybe nested) has an active animation
+            static constexpr Mask kAnimation                   = mkMask(kFlagsCount + 6);
 
             SceneImpl           & _scene;
             LerpableTransform     _localTransform;
@@ -480,12 +482,7 @@ namespace minire
             ChildrenMap           _children;
             AnimationSet          _animationSet;
             ActiveAnimation::Uptr _activeAnimation;
-            GlobalTransformState  _globalTransformState = GlobalTransformState::kDirty;
-            bool                  _activated = false; // for _localTransform
-            bool                  _childActivated = false;
-            bool                  _hasActiveChildrenAnimation = false;
             bool                  _effectiveVisible = true;
-            // TODO: too many flags, consider migration to std::bitset
 
         private:
             struct ItemIterator
@@ -514,11 +511,11 @@ namespace minire
             friend class SceneImpl;
         };
 
+    private:
         using ActiveCamera = std::variant<std::monostate,
                                           PerspectiveCameraLeaf::Wptr,
                                           OrthographicCameraLeaf::Wptr>;
 
-    private:
         using BillboardsLeafRecord = std::pair<size_t, BillboardLeaf::Wptr>;
 
         using MeshLeaves = std::list<MeshLeaf::Wptr>;
@@ -526,11 +523,9 @@ namespace minire
         using DirectionalLightLeaves = std::list<DirectionalLightLeaf::Wptr>;
         using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
 
-        template<typename T>
-        void activate(T &);
-
-        void activateParents(Node::Sptr);
-
+    private:
+        void revalidate(Node *, Node::Mask);
+        void actualizeViewpoint();
         material::SkinningVector makeSkinningVector(MeshLeaf const &) const;
 
         // TODO: lerpable _ambientLight
@@ -541,6 +536,8 @@ namespace minire
         ActiveCamera                   _activeCamera;
         scene::Viewpoint               _viewpoint;
         size_t                         _epochNumber = 0;
+        double                         _lerpWeight = 0;
+        double                         _frameTime = 0;
         size_t                         _nodesEstimate = 1;
 
         mutable MeshLeaves             _meshLeaves;
