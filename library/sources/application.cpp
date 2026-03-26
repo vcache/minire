@@ -178,7 +178,7 @@ namespace minire
         assert(_rasterizer);
         return _rasterizer->labels().find(name);
     }
-    
+
     Label::Sptr Application::detachLabel(std::string const & name)
     {
         assert(_rasterizer);

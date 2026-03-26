@@ -145,7 +145,7 @@ namespace minire
         node->invalidate(kGlobalTransformDirty);
         return node;
     }
-    
+
     scene::Mesh::Sptr SceneImpl::Node::make(std::string const & name, models::Mesh model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
@@ -184,7 +184,7 @@ namespace minire
         }
         return meshLeaf;
     }
-    
+
     scene::DirectionalLight::Sptr SceneImpl::Node::make(std::string const & name,
                                                         models::DirectionalLight model)
     {
@@ -206,7 +206,7 @@ namespace minire
         _scene._pointLightLeaves.push_back(pointLightLeaf);
         return pointLightLeaf;
     }
-    
+
     scene::PerspectiveCamera::Sptr SceneImpl::Node::make(std::string const & name,
                                                          models::PerspectiveCamera model)
     {
@@ -216,7 +216,7 @@ namespace minire
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
         return perspectiveCameraLeaf;
     }
-    
+
     scene::OrthographicCamera::Sptr SceneImpl::Node::make(std::string const & name,
                                                           models::OrthographicCamera model)
     {
@@ -226,7 +226,7 @@ namespace minire
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
         return orthographicCameraLeaf;
     }
-    
+
     scene::Billboard::Sptr SceneImpl::Node::make(std::string const & name,
                                                  models::Billboard model)
     {
@@ -283,7 +283,7 @@ namespace minire
         }
         _animationSet = std::move(newAnimationSet);
     }
-    
+
     void SceneImpl::Node::playAnimation(models::AnimationId const & animationId,
                                         size_t repeats, float speedScale)
     {
@@ -296,7 +296,7 @@ namespace minire
             it->second, repeats, speedScale);
         invalidate(kAnimation);
     }
-    
+
     void SceneImpl::Node::stopAnimation()
     {
         if (_activeAnimation)
@@ -304,7 +304,7 @@ namespace minire
             _activeAnimation.reset();
         }
     }
-    
+
     void SceneImpl::Node::inlineAnimation(models::AnimationTracks animationTracks,
                                           size_t repeats, float speedScale)
     {
@@ -810,7 +810,7 @@ namespace minire
             }, it.item());
         }
     }
-    
+
     void SceneImpl::reset()
     {
         _root = std::make_shared<Node>("(the root)",
@@ -922,7 +922,7 @@ namespace minire
      * - objects that are controlled by an Animation will be,
      *   will be advanced by the Animation (i.e. won't be lerped).
      *   Such objects are only affected by an elapsed frame time.
-     * 
+     *
      * An Epoch consists of one or more Frames.
      * */
     void SceneImpl::advance(size_t const epochNumber,
@@ -944,9 +944,6 @@ namespace minire
 
         // 2. advance directly set values for a new Epoch or
         //    perform lerping for continuing Epoch
-
-        // maybe perform lerp operation on lerpable objects
-        // (advance lerping or just drop the flag)
 
         if (epochStarted)
         {

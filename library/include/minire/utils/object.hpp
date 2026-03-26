@@ -9,7 +9,7 @@ namespace minire::utils
 {
     template<typename Derived,
              typename Model,
-             bool kImmutable = false> 
+             bool kImmutable = false>
     class Object
     {
     public:

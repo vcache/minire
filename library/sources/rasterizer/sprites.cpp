@@ -170,9 +170,9 @@ namespace minire::rasterizer
                     assert(_texture);
                     float oldWidth = _texture->width();
                     float oldHeight = _texture->height();
-                    
+
                     _texture = fetchTexture();
-                    
+
                     assert(_texture);
                     textureResized = oldWidth != _texture->width()
                                   || oldHeight != _texture->height();

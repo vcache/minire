@@ -456,7 +456,7 @@ namespace minire::gui
         assert(_impl);
 
         if (!_visible.get() ||
-            _eventTransparent || 
+            _eventTransparent ||
             !_impl->_contentArea.contains(x, y))
         {
             return Sptr();

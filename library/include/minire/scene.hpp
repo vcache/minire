@@ -44,7 +44,7 @@ namespace minire
         class Node;
 
         class Mesh
-            : public utils::Object<Mesh, models::Mesh, true /* immutable model */> 
+            : public utils::Object<Mesh, models::Mesh, true /* immutable model */>
         {
         protected:
             static constexpr Mask kEmmisiveFactor = mkMask(0);
@@ -388,7 +388,7 @@ namespace minire
 
             models::Transform const & origin() const { return model()._origin; }
             models::Transform & origin() { return model(kOrigin)._origin; }
-            
+
             void setOrigin(models::Transform origin)
             {
                 if (this->origin() != origin)

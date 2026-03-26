@@ -85,7 +85,7 @@ namespace minire::gui::components
                 _contentSize.reset();
                 _textLayout.reset();
             }
-            
+
             if (_fontFace.isInvalidated())
             {
                 _label->setFontFace(_fontFace.get());

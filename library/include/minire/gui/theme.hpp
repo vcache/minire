@@ -40,7 +40,7 @@ namespace minire::gui
          * Style defines alternation for a given (componen, property) pair. Styles may be cascaded,
          * so that, the properties are inherited from common contexts and are overriden by more
          * specific contexts. The last style has the most priority.
-         * 
+         *
          * For example,
          *  - component="text", property="font-face" and style could be:
          *    - []                                  - just a default text
@@ -48,7 +48,7 @@ namespace minire::gui
          *    - ["listview"]                        - text on a listview component
          *    - ["dropdown", "listview"]            - text on a listview component of a dropdown's tongue
          *    - ["dropdown", "listview", "button"]  - text on a button of a listview component of a dropdown's tongue
-         * 
+         *
          * Or for example: ["dropdown", "listview", "scrollbar"] - a scrollbar of a listview of a dropdown.
          * */
         using Style = std::vector<std::string>;

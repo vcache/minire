@@ -464,7 +464,7 @@ namespace minire
 
             // recalc visibility of some of nested nodes
             static constexpr Mask kChildVisibilityInvalidated  = mkMask(kFlagsCount + 3);
-            
+
             // own transform is outdated
             static constexpr Mask kGlobalTransformDirty        = mkMask(kFlagsCount + 4);
 

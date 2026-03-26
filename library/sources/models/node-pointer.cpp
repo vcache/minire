@@ -17,7 +17,6 @@ namespace minire::models
             {
                 return fmt::format("NodePointer(ScenePath, {})", p);
             },
-            
             [](scene::Node::Sptr const & p)
             {
                 return fmt::format("NodePointer(Node::Sptr, {})",

@@ -77,5 +77,5 @@ namespace minire
                 model(kVisible)._visible = visible;
             }
         }
-    };    
+    };
 }

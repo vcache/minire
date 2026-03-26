@@ -1,13 +1,13 @@
 #pragma once
-    
+
 #include <minire/models/mouse-button.hpp>
-    
+
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_scancode.h>
-    
+
 #include <cstddef>
 #include <string>
- 
+
 namespace minire::application
 {
     struct OnResize
@@ -22,14 +22,14 @@ namespace minire::application
         ::SDL_Scancode _code;
         uint16_t       _mod;
     };
- 
+
     struct OnKeyUp
     {
         ::SDL_Keycode  _key;
         ::SDL_Scancode _code;
         uint16_t       _mod;
     };
- 
+
     struct OnMouseDown
     {
         int                 _x;
@@ -37,7 +37,7 @@ namespace minire::application
         models::MouseButton _mouseButton;
         bool                _doubleClick;
     };
- 
+
     struct OnMouseMove
     {
         int  _absX;
@@ -50,7 +50,7 @@ namespace minire::application
         bool _x1;
         bool _x2;
     };
- 
+
     struct OnMouseUp
     {
         int                 _x;
@@ -58,7 +58,7 @@ namespace minire::application
         models::MouseButton _mouseButton;
         bool                _doubleClick;
     };
- 
+
     struct OnMouseWheel
     {
         int          _dx;
@@ -66,7 +66,7 @@ namespace minire::application
         uint32_t     _dir; // Set to one of the SDL_MOUSEWHEEL_* defines.
         ::SDL_Keymod _mod;
     };
- 
+
     struct OnTextInput
     {
         std::string _text; // utf-8
