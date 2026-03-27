@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minire/models/interpolation.hpp>
+#include <minire/models/node-pointer.hpp>
 #include <minire/models/scene-path.hpp>
 
 #include <glm/gtc/quaternion.hpp>
@@ -10,6 +11,8 @@
 #include <optional>
 #include <unordered_map>
 #include <vector>
+
+namespace minire::scene { class Node; }
 
 namespace minire::models
 {
@@ -59,12 +62,8 @@ namespace minire::models
         //       can be playing at any given moment.
     };
 
-    // NOTE: the ScenePath is relative to a node with AnimationSet,
-    //       and can be empty (to affect a container node itself).
-    using AnimationTracks = std::unordered_map<ScenePath,
+    using AnimationTracks = std::unordered_map<NodePointer,
                                                KeyframeAnimation>;
-
     using AnimationId = std::string;
-
     using AnimationSet = std::unordered_map<AnimationId, AnimationTracks>;
 }

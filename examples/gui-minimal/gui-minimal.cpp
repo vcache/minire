@@ -1,7 +1,5 @@
-#include <minire/application.hpp>
-
 #include <minire/content/manager.hpp>
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 #include <minire/gui/components/image.hpp>
 #include <minire/logging.hpp>
 
@@ -10,21 +8,23 @@
 namespace
 {
     class GuiMinimal
-        : public minire::GuiController
+        : public minire::GuiApplication
     {
-        using GuiController::GuiController;
+        using GuiApplication::GuiApplication;
 
     protected:
-        void start() override
+        void onStart() override
         {
-            GuiController::start();
+            GuiApplication::onStart();
+
+            using namespace minire::models;
 
             guiRoot().emplace<minire::gui::components::Image>(
-                "center-center-example", makeImageView("center-center.png"));
+                "center-center-example", sprite::Image("center-center.png"));
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "center-less-example", makeImageView("center-less.png"));
+                    "center-less-example", sprite::Image("center-less.png"));
                 comp->horizontal()->_position = minire::gui::position::Center{};
                 comp->vertical()->_position = minire::gui::position::Begin{};
                 comp->vertical()->_marginMin = 10;
@@ -32,7 +32,7 @@ namespace
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "center-more-example", makeImageView("center-more.png"));
+                    "center-more-example", sprite::Image("center-more.png"));
                 comp->horizontal()->_position = minire::gui::position::Center{};
                 comp->vertical()->_position = minire::gui::position::End{};
                 comp->vertical()->_marginMax = 10;
@@ -40,7 +40,7 @@ namespace
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "less-center-example", makeImageView("less-center.png"));
+                    "less-center-example", sprite::Image("less-center.png"));
                 comp->horizontal()->_position = minire::gui::position::Begin{};
                 comp->horizontal()->_marginMin = 10;
                 comp->vertical()->_position = minire::gui::position::Center{};
@@ -48,7 +48,7 @@ namespace
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "more-center-example", makeImageView("more-center.png"));
+                    "more-center-example", sprite::Image("more-center.png"));
                 comp->horizontal()->_position = minire::gui::position::End{};
                 comp->horizontal()->_marginMax = 10;
                 comp->vertical()->_position = minire::gui::position::Center{};
@@ -56,7 +56,7 @@ namespace
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "less-less-example", makeImageView("less-less.png"));
+                    "less-less-example", sprite::Image("less-less.png"));
                 comp->horizontal()->_position = minire::gui::position::Begin{};
                 comp->horizontal()->_marginMin = 100;
                 comp->vertical()->_position = minire::gui::position::Begin{};
@@ -65,7 +65,7 @@ namespace
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "less-more-example", makeImageView("less-more.png"));
+                    "less-more-example", sprite::Image("less-more.png"));
                 comp->horizontal()->_position = minire::gui::position::Begin{};
                 comp->horizontal()->_marginMin = 100;
                 comp->vertical()->_position = minire::gui::position::End{};
@@ -74,7 +74,7 @@ namespace
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "more-less-example", makeImageView("more-less.png"));
+                    "more-less-example", sprite::Image("more-less.png"));
                 comp->horizontal()->_position = minire::gui::position::End{};
                 comp->horizontal()->_marginMax = 100;
                 comp->vertical()->_position = minire::gui::position::Begin{};
@@ -83,7 +83,7 @@ namespace
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "more-more-example", makeImageView("more-more.png"));
+                    "more-more-example", sprite::Image("more-more.png"));
                 comp->horizontal()->_position = minire::gui::position::End{};
                 comp->horizontal()->_marginMax = 100;
                 comp->vertical()->_position = minire::gui::position::End{};
@@ -92,20 +92,21 @@ namespace
 
             {
                 auto comp = guiRoot().emplace<minire::gui::components::Image>(
-                    "origin-example", makeImageView("origin.png"));
+                    "origin-example", sprite::Image("origin.png"));
                 comp->horizontal() =  minire::gui::Arranger(minire::gui::position::Constant{0});
                 comp->vertical() = minire::gui::Arranger(minire::gui::position::Constant{0});
             }
 
             _bottomRight = guiRoot().emplace<minire::gui::components::Image>(
-                "bottom-right-example", makeImageView("bottom-right.png"));
+                "bottom-right-example", sprite::Image("bottom-right.png"));
             _bottomRight->horizontal() = minire::gui::Arranger(minire::gui::position::Constant{0});
             _bottomRight->vertical() = minire::gui::Arranger(minire::gui::position::Constant{0});
         }
 
-        void handle(minire::events::application::OnResize const & e) override
+        bool handle(minire::application::OnResize const & e) override
         {
-            GuiController::handle(e);
+            if (GuiApplication::handle(e))
+                return true;
 
             assert(_bottomRight);
 
@@ -113,6 +114,8 @@ namespace
                 minire::gui::position::Constant{static_cast<float>(e._width - 50)};
             _bottomRight->vertical()->_position =
                 minire::gui::position::Constant{static_cast<float>(e._height - 50)};
+
+            return true;
         }
 
     private:
@@ -122,16 +125,13 @@ namespace
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-        minire::Application application(1280, 720, "GUI Minimal", manager);
-        application.setController<GuiMinimal>(kMaxCtrlFps);
+        GuiMinimal application(1280, 720, "GUI Minimal", manager);
         application.setVsync(true);
 
         // Main loop

@@ -11,68 +11,59 @@ namespace minire::gui::components
                              Theme::Style const & style,
                              OverlayController & overlayController,
                              Direction const direction)
-        : Component(id, theme, style, overlayController)
-        , _background(*this, theme.makeImage("progress-bar", "bg", style))
-        , _slider(*this, theme.makeImage("progress-bar", "slider", style))
+        : Image(id, theme, style, overlayController,
+                theme.get<models::sprite::MaybeImage>(kName, "bg", style))
+        , _slider(std::make_shared<Image>("__slider__", theme, style, overlayController,
+                  theme.get<models::sprite::MaybeImage>(kName, "slider", style)))
         , _value(*this, 0.0f)
         , _direction(*this, direction)
-        , _sliderPadding(*this, theme.parameter<utils::Rect>("progress-bar", "slider-padding", style))
+        , _sliderPadding(*this, theme.get<utils::Rect>(kName, "slider-padding", style))
     {}
+
+    void ProgressBar::initialize()
+    {
+        Image::initialize();
+
+        assert(_slider);
+        _slider->setParent(shared_from_this());
+    }
 
     size_t ProgressBar::revalidateContent(size_t zOffset,
                                           bool const effectiveVisible,
                                           Area const & contentArea,
                                           Area const & clippingWindow)
     {
-        // revalidate background
-        if (auto background = _background.get(); background)
-        {
-            if (_background.isInvalidated())
-            {
-                background->setContentInvalidator(shared_from_this());
-            }
-
-            background->setVisible(effectiveVisible);
-            if (effectiveVisible)
-            {
-                background->setContentArea(contentArea);
-                background->setClippingWindow(clippingWindow);
-            }
-
-            zOffset = background->onZOrderChanged(zOffset);
-        }
+        zOffset = Image::revalidateContent(
+            zOffset, effectiveVisible, contentArea, clippingWindow);
 
         // revalidate a slider
-        if (auto slider = _slider.get(); slider)
+        if (_value.isInvalidated() ||
+            _direction.isInvalidated() ||
+            _sliderPadding.isInvalidated())
         {
-            if (_slider.isInvalidated())
-            {
-                slider->setContentInvalidator(shared_from_this());
-            }
+            assert(_slider);
 
-            bool const sliderVisible = effectiveVisible && _value.get() > 0;
-            slider->setVisible(sliderVisible);
-            if (sliderVisible)
+            _slider->visible() = effectiveVisible && _value.get() > 0;
+            if (_slider->visible().get())
             {
                 utils::Rect const & sliderPadding = _sliderPadding.get();
-                Area const realContentArea
+                Area const realContentArea // relative to the parent
                 {
-                    ._left = contentArea._left + sliderPadding._left,
-                    ._top = contentArea._top + sliderPadding._top,
+                    ._left = sliderPadding._left,
+                    ._top = sliderPadding._top,
                     ._width = contentArea._width - sliderPadding._left - sliderPadding._right,
                     ._height = contentArea._height - sliderPadding._top - sliderPadding._bottom,
                 };
 
-                slider->setContentArea(evalSliderArea(realContentArea));
-                slider->setClippingWindow(realContentArea);
+                Area const sliderArea = evalSliderArea(realContentArea);
+                _slider->horizontal() = Arranger(position::Constant{sliderArea._left},
+                                                 dimension::Constant{sliderArea._width});
+                _slider->vertical() = Arranger(position::Constant{sliderArea._top},
+                                               dimension::Constant{sliderArea._height});
             }
-
-            zOffset = slider->onZOrderChanged(zOffset);
         }
 
         // finish
-        _background.revalidate();
-        _slider.revalidate();
         _value.revalidate();
         _direction.revalidate();
         _sliderPadding.revalidate();

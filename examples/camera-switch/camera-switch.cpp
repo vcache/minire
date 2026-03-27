@@ -1,33 +1,27 @@
 #include "../common/testbed.hpp"
 
-#include <minire/models/mesh.hpp>
-
-#include <cstdlib> // for EXIT_SUCCESS
-
 namespace
 {
     class CameraSwitch
-        : public minire::examples::TestbedController
+        : public minire::examples::TestbedApplication
     {
     public:
-        using TestbedController::TestbedController;
+        using TestbedApplication::TestbedApplication;
 
-        void start() override
+        void onStart() override
         {
-            using namespace minire::content;
-            using namespace minire::events::controller;
-            using namespace minire::models;
+            TestbedApplication::onStart();
 
-            TestbedController::start();
-
-            enqueue<SceneNewNode>("cube-node", ScenePath(), Transform(), true);
-            enqueue<SceneNewMesh>("cube", ScenePath{"cube-node"},
-                Mesh
+            scene().root().make("cube",
+                minire::models::Mesh
                 {
-                    ._source = mkPath("Box.glb", path::Special::kMeshes, path::Index(0)),
+                    ._source = minire::content::mkPath("Box.glb",
+                                                       minire::content::path::Special::kMeshes,
+                                                       minire::content::path::Index(0)),
                     ._defaultMaterial = nullptr,
-                },
-                true);
+                    ._skin = std::nullopt,
+                    ._visible = true,
+                });
         }
     };
 }

@@ -1,7 +1,5 @@
-#include <minire/application.hpp>
-
 #include <minire/content/manager.hpp>
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 #include <minire/gui/components/listview.hpp>
 #include <minire/gui/components/text.hpp>
 #include <minire/gui/layouts/grid.hpp>
@@ -23,12 +21,12 @@ namespace
     static std::string const kFontFace = "ucs-6x13-example";
 
     class GuiViewlist
-        : public minire::GuiController
+        : public minire::GuiApplication
     {
     public:
         template<typename ... Args>
         GuiViewlist(Args &&... args)
-            : GuiController(std::forward<Args>(args)...)
+            : GuiApplication(std::forward<Args>(args)...)
             , _cases
             {
                 std::vector<std::any>{},
@@ -65,9 +63,9 @@ namespace
         {}
 
     protected:
-        void start() override
+        void onStart() override
         {
-            GuiController::start();
+            GuiApplication::onStart();
 
             // base container
 
@@ -112,8 +110,6 @@ namespace
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
@@ -130,8 +126,7 @@ int main()
                 ._glyphHeight = 13,
             });
 
-        minire::Application application(1280, 720, "GUI Dropdown", manager);
-        application.setController<GuiViewlist>(kMaxCtrlFps);
+        GuiViewlist application(1280, 720, "GUI Dropdown", manager);
         application.setVsync(true);
         application.setGlDebug(false);
 

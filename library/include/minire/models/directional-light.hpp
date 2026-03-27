@@ -10,14 +10,9 @@ namespace minire::models
     {
         glm::vec3         _color;
         MaybeShadowParams _shadowParams;
+        bool              _visible;
 
-        DirectionalLight(glm::vec3 const & color,
-                         MaybeShadowParams shadowParams = std::nullopt)
-            : _color(color)
-            , _shadowParams(shadowParams)
-        {}
-
-         void lerp(DirectionalLight const & prev,
+        void lerp(DirectionalLight const & prev,
                    DirectionalLight const & last,
                    float const weight)
         {

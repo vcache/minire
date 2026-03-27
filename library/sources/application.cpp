@@ -4,15 +4,17 @@
 #include <minire/instrumentation/formatters.hpp>
 #include <minire/instrumentation/stopwatch.hpp>
 #include <minire/logging.hpp>
+#include <minire/utils/aabb-tools.hpp>
 #include <minire/utils/geometry.hpp>
 #include <minire/utils/ray-caster.hpp>
 #include <minire/utils/unow.hpp>
 
 #include <opengl.hpp>
 #include <rasterizer.hpp>
-#include <scene.hpp>
-#include <scene/gltf-instantiator.hpp>
-#include <scene/viewpoint.hpp>
+#include <scene-impl.hpp>
+#include <scene-impl/gltf-instantiator.hpp>
+#include <scene-impl/viewpoint.hpp>
+#include <text/measurer.hpp>
 #include <utils/overloaded.hpp>
 
 #include <fmt/format.h>
@@ -38,7 +40,7 @@ namespace minire
         : sdl::GlApplication(width, height, title, msaaParams)
         , _contentManager(contentManager)
         , _rasterizer(std::make_unique<Rasterizer>(contentManager))
-        , _scene(std::make_unique<Scene>(*_rasterizer))
+        , _scene(std::make_unique<SceneImpl>(*_rasterizer))
     {
         setVsync(true); // TODO: into parameters
 
@@ -61,14 +63,9 @@ namespace minire
         ::SDL_StopTextInput();
 
         _frameBegin = utils::uNow();
-        _frameEnd = 0;
+        startEpoch(); // just an initialization (actual start will be in onStart)
 
         MINIRE_INFO("Minire Application started, [{}] build", kDebug ? "DEBUG" : "RELEASE");
-
-        if (kDebug)
-        {
-            enableInstrumentation();
-        }
 
         if (!kDebug)
         {
@@ -76,676 +73,317 @@ namespace minire
         }
     }
 
-    Application::~Application()
+    Application::~Application() = default;
+
+    Application::RayCasterSptr const & Application::rayCaster() const
     {
-        // explicitly destroy controller until everything else start to tear down
-        if (_controller)
+        assert(_scene);
+
+        if (!_rayCasterEnabled)
         {
-            _controller->shutdown();
-            _controller.reset();
+            _rayCaster.reset();
+            return _rayCaster;
         }
-    }
 
-    void Application::setSquashAdditiveEvents(bool enabled)
-    {
-        _squashAdditiveEvents = enabled;
-    }
-
-    bool Application::squashAdditiveEvents() const
-    {
-        return _squashAdditiveEvents;
-    }
-
-    template<typename Event, typename... Args>
-    void Application::postEvent(Args && ... args)
-    {
-        _applicationEvents.emplace_back(Event(std::forward<Args>(args)...));
-        if (_controller && _controller->lowLatencyInput())
+        if (!_rayCaster || _rayCasterLastEpoch < _epochNumber)
         {
-            pushPendedEvents();
+            scene::Viewpoint const & vp = _scene->viewpoint();
+            if (size_t const vpRevision = vp.revision();
+                _rayCasterRevision < vpRevision)
+            {
+                _rayCaster = std::make_shared<utils::RayCaster>(
+                    vp.width(), vp.height(), vp.view(), vp.projection());
+                _rayCasterRevision = vpRevision;
+                _rayCasterLastEpoch = _epochNumber;
+            }
         }
+
+        return _rayCaster;
     }
 
-    template<typename Event>
-    Event * Application::findEventToSquash()
+    void Application::debugDrawsUpdate(std::vector<float> const & linesBuffer)
     {
-        if (_squashAdditiveEvents && !_applicationEvents.empty())
+        assert(_rasterizer);
+        _rasterizer->lines().update(linesBuffer);
+    }
+
+
+    void Application::newResourceLayer(std::string const & name)
+    {
+        assert(_rasterizer);
+        _rasterizer->newResourceLayer(name);
+        _contentManager.newLayer(name);
+    }
+
+    void Application::disposeResourceLayer(std::string const & name)
+    {
+        assert(_rasterizer);
+        _rasterizer->disposeResourceLayer(name);
+        _contentManager.disposeLayer(name);
+    }
+
+    void Application::contentManagerCleanup(bool const force)
+    {
+        _contentManager.cleanup(force);
+    }
+
+    // TODO: RAII-approach for vertexBuffer
+    // TODO: rename to makeVertexBuffer
+    void Application::createVertexBuffer(content::Id const & id,
+                                         models::VertexBuffer vertexBuffer,
+                                         bool const override)
+    {
+        assert(_rasterizer);
+        _rasterizer->vertexBuffers().create(id, vertexBuffer, override); // TODO: rename to make()
+    }
+
+    void Application::disposeVertexBuffer(content::Id const & id)
+    {
+        _rasterizer->vertexBuffers().dispose(id);
+    }
+
+    Sprite::Sptr Application::make(std::string const & name,
+                                   models::Sprite model)
+    {
+        assert(_rasterizer);
+        return _rasterizer->sprites().make(name, std::move(model));
+    }
+
+    Sprite::Sptr Application::findSprite(std::string const & name)
+    {
+        assert(_rasterizer);
+        return _rasterizer->sprites().find(name);
+    }
+
+    Sprite::Sptr Application::detachSprite(std::string const & name)
+    {
+        assert(_rasterizer);
+        Sprite::Sptr result = _rasterizer->sprites().find(name);
+        if (result)
         {
-            return std::get_if<Event>(&_applicationEvents.back());
+            result->detach();
         }
-        return nullptr;
+        return result;
     }
 
-    void Application::onKeyUp(::SDL_Keycode key, ::SDL_Scancode code, uint16_t mod)
+    Label::Sptr Application::make(std::string const & name,
+                                  models::Label model)
     {
-        postEvent<events::application::OnKeyUp>(key, code, mod);
+        assert(_rasterizer);
+        return _rasterizer->labels().make(name, std::move(model));
     }
 
-    void Application::onKeyDown(::SDL_Keycode key, ::SDL_Scancode code, uint16_t mod)
+    Label::Sptr Application::findLabel(std::string const & name)
     {
-        postEvent<events::application::OnKeyDown>(key, code, mod);
+        assert(_rasterizer);
+        return _rasterizer->labels().find(name);
     }
 
-    void Application::onTextInput(std::string str)
+    Label::Sptr Application::detachLabel(std::string const & name)
     {
-        if (!str.empty())
+        assert(_rasterizer);
+        Label::Sptr result = _rasterizer->labels().find(name);
+        if (result)
         {
-            postEvent<events::application::OnTextInput>(std::move(str));
+            result->detach();
         }
+        return result;
     }
 
-    void Application::onClipboardUpdate(std::string clipboardText,
-                                        std::string primarySelection)
+    glm::vec2 Application::measure(text::FormattedString const & text,
+                                   content::Id const & fontFace) const
     {
-        postEvent<events::application::OnClipboardUpdate>(std::move(clipboardText),
-                                                          std::move(primarySelection));
+        auto lease = _contentManager.borrow(fontFace);
+        assert(lease);
+        models::FontFace const & fontData = lease->as<models::FontFace>();
+        return text::measure(text, fontData);
     }
 
-    void Application::onMouseWheel(int dx, int dy, uint32_t dir, ::SDL_Keymod mod)
+    std::pair<glm::vec2, bool>
+    Application::measure(models::sprite::Image const & image) const
     {
-        postEvent<events::application::OnMouseWheel>(dx, dy, dir, mod);
-    }
-
-    void Application::onMouseMove(int absX, int absY, int relX, int relY,
-                                  bool left, bool middle, bool right,
-                                  bool x1, bool x2)
-    {
-        using namespace events::application;
-
-        _mouseX = absX;
-        _mouseY = absY;
-
-        if (auto * last = findEventToSquash<OnMouseMove>();
-            last && last->_left == left && last->_middle == middle &&
-            last->_right == right && last->_x1 == x1 && last->_x2 == x2)
+        return std::visit(utils::Overloaded
         {
-            last->_absX = absX;
-            last->_absY = absY;
-            last->_relX += relX;
-            last->_relY += relY;
+            [this, &image](std::monostate const &)
+            {
+                auto lease = contentManager().borrow(image._texture);
+                assert(lease);
+                minire::models::Image::Sptr const & picture = lease->as<minire::models::Image::Sptr>();
+                MINIRE_INVARIANT(picture, "not a valid image: {}", image._texture);
+                return std::make_pair(glm::vec2(picture->_width, picture->_height), false);
+            },
+
+            [this](utils::Rect const & tile)
+            {
+                return std::make_pair(glm::vec2(tile._right - tile._left + 1,
+                                                tile._bottom - tile._top + 1),
+                                      false);
+            },
+
+            [this](utils::NinePatch const & ninePatch)
+            {
+                return std::make_pair(utils::defaultSize(ninePatch), true);
+            },
+        }, image._patch);
+    }
+
+    std::unique_ptr<utils::TextLayout> Application::layout(text::FormattedString const & text,
+                                                           content::Id const & fontFace) const
+    {
+        auto lease = contentManager().borrow(fontFace);
+        assert(lease);
+        models::FontFace const & fontData = lease->as<models::FontFace>();
+        return text::layout(text, fontData);
+    }
+
+    utils::Aabb Application::measure(content::Path const & path) const
+    {
+        return utils::buildAabb(_contentManager, path);
+    }
+
+    Scene & Application::scene() const
+    {
+        assert(_scene);
+        return *_scene;
+    }
+
+    void Application::setRayCaster(bool enabled)
+    {
+        _rayCasterEnabled = enabled;
+        if (_rayCasterEnabled)
+        {
+            _rayCasterRevision = 0;
         }
         else
         {
-            postEvent<OnMouseMove>(absX, absY, relX, relY, left, middle, right, x1, x2);
+            _rayCaster.reset();
         }
-    }
-
-    void Application::onMouseDown(int x, int y, bool doubleClick,
-                                  models::MouseButton mouseButton)
-    {
-        _mouseX = x;
-        _mouseY = y;
-        postEvent<events::application::OnMouseDown>(
-            x, y, mouseButton, doubleClick);
-    }
-
-    void Application::onMouseUp(int x, int y, bool doubleClick,
-                                models::MouseButton mouseButton)
-    {
-        _mouseX = x;
-        _mouseY = y;
-        postEvent<events::application::OnMouseUp>(
-            x, y, mouseButton, doubleClick);
     }
 
     void Application::onResize(size_t width, size_t height)
     {
+        GlApplication::onResize(width, height);
+
         // required for a Projection matrix
         _scene->setViewport(width, height);
 
         // projection for 2D gui
         _rasterizer->setScreenSize(width, height);
 
-        // send event to controller
-        if (auto * last = findEventToSquash<events::application::OnResize>(); last)
+        handle(application::OnResize{width, height});
+    }
+
+    void Application::onMouseWheel(int dx, int dy, uint32_t dir, ::SDL_Keymod mod)
+    {
+        GlApplication::onMouseWheel(dx, dy, dir, mod);
+        handle(application::OnMouseWheel{._dx = dx, ._dy = dy, ._dir = dir, ._mod = mod});
+    }
+
+    void Application::onMouseMove(int absX, int absY, int relX, int relY,
+                                  bool left, bool middle, bool right,
+                                  bool x1, bool x2)
+    {
+        GlApplication::onMouseMove(absX, absY, relX, relY, left, middle, right, x1, x2);
+        handle(application::OnMouseMove
         {
-            last->_width = width;
-            last->_height = height;
-        }
-        else
+            ._absX = absX,
+            ._absY = absY,
+            ._relX = relX,
+            ._relY = relY,
+            ._left = left,
+            ._middle = middle,
+            ._right = right,
+            ._x1 = x1,
+            ._x2 = x2,
+        });
+    }
+
+    void Application::onMouseDown(int x, int y, bool doubleClick,
+                                  models::MouseButton mouseButton)
+    {
+        GlApplication::onMouseDown(x, y, doubleClick, mouseButton);
+        handle(application::OnMouseDown{._x = x, ._y = y,
+                                        ._mouseButton = mouseButton,
+                                        ._doubleClick = doubleClick});
+    }
+
+    void Application::onMouseUp(int x, int y, bool doubleClick,
+                               models::MouseButton mouseButton)
+    {
+        GlApplication::onMouseUp(x, y, doubleClick, mouseButton);
+        handle(application::OnMouseUp{._x = x, ._y = y,
+                                      ._mouseButton = mouseButton,
+                                      ._doubleClick = doubleClick});
+    }
+
+    void Application::onKeyUp(::SDL_Keycode key, ::SDL_Scancode code, uint16_t mod)
+    {
+        GlApplication::onKeyUp(key, code, mod);
+        handle(application::OnKeyUp{._key = key, ._code = code, ._mod = mod});
+    }
+
+    void Application::onKeyDown(::SDL_Keycode key, ::SDL_Scancode code, uint16_t mod)
+    {
+        GlApplication::onKeyDown(key, code, mod);
+        handle(application::OnKeyDown{._key = key, ._code = code, ._mod = mod});
+    }
+
+    void Application::onTextInput(std::string const & text)
+    {
+        GlApplication::onTextInput(text);
+        if (!text.empty())
         {
-            postEvent<events::application::OnResize>(width, height);
-        }
-    }
-
-    void Application::onFps(size_t fps, double mft)
-    {
-        postEvent<events::application::OnFps>(fps, mft, _frame);
-    }
-
-    void Application::maybeIssueRayCaster()
-    {
-        assert(_scene);
-        if (_rayCasterEnabled && _rayCasterLastEpoch < _epochNumber)
-        {
-            scene::Viewpoint const & vp = _scene->viewpoint();
-            if (size_t const vpRevision = vp.revision();
-                _rayCasterRevision < vpRevision)
-            {
-                auto rayCaster = std::make_shared<utils::RayCaster>(
-                    vp.width(), vp.height(), vp.view(), vp.projection());
-                postEvent<events::application::OnRayCaster>(rayCaster);
-                _rayCasterRevision = vpRevision;
-                _rayCasterLastEpoch = _epochNumber;
-            }
-        }
-    }
-
-    void Application::enableInstrumentation()
-    {
-        if (!_timekeeper)
-        {
-            _timekeeper = std::make_shared<instrumentation::Histogram<>>(
-                std::chrono::seconds(5));
-        }
-    }
-
-    void Application::disableInstrumentation()
-    {
-        _timekeeper.reset();
-    }
-
-    void Application::handle(events::controller::Quit const &)
-    {
-        MINIRE_THROW("TODO: not implemented");
-    }
-
-    void Application::handle(events::controller::SetMouseMode const & e)
-    {
-        MINIRE_DEBUG("set mouse mode: grab: {}, show: {}, relative: {}",
-                     e._windowGrab, e._showCursor, e._relativeMode);
-        bool const result = setMouseMode(e._windowGrab, e._showCursor, e._relativeMode);
-        if (!result)
-        {
-            MINIRE_ERROR("failed to set mouse mode");
-        }
-    }
-
-    void Application::handle(events::controller::DebugDrawsUpdate const & e)
-    {
-        _rasterizer->lines().update(e._linesBuffer);
-    }
-
-    void Application::handle(events::controller::SetInstrumentation const & e)
-    {
-        if (e._enabled)
-        {
-            enableInstrumentation();
-        }
-        else
-        {
-            disableInstrumentation();
+            handle(application::OnTextInput{._text = text});
         }
     }
 
-    void Application::handle(events::controller::NewResourceLayer const & e)
+    void Application::startEpoch()
     {
-        _rasterizer->newResourceLayer(e._name);
-        _contentManager.newLayer(e._name);
+        size_t const now = utils::uNow();
+        assert(now >= _epochBegin);
+        _epochDuration = static_cast<double>(now - _epochBegin) / 1000000.0; // sec;
+        _epochBegin = now;
+        _epochNumber++;
+        _epochTime = 0;
     }
 
-    void Application::handle(events::controller::DisposeResourceLayer const & e)
+    void Application::onStart()
     {
-        _rasterizer->disposeResourceLayer(e._name);
-        _contentManager.disposeLayer(e._name);
-    }
-
-    void Application::handle(events::controller::ContentManagerCleanup const & e)
-    {
-        _contentManager.cleanup(e._force);
-    }
-
-    void Application::handle(events::controller::CreateVertexBuffer const & e)
-    {
-        _rasterizer->vertexBuffers().create(e._id, e._vertexBuffer, e._override);
-    }
-
-    void Application::handle(events::controller::DisposeVertexBuffer const & e)
-    {
-        _rasterizer->vertexBuffers().dispose(e._id);
-    }
-
-    void Application::handle(events::controller::CreateSprite const & e)
-    {
-        _rasterizer->sprites().create(e._id, e._texture, e._source, e._position,
-                                      e._dimensions, e._clippingWindow, e._visible,
-                                      e._zOrder);
-    }
-
-    void Application::handle(events::controller::SetSpritePatch const & e)
-    {
-        _rasterizer->sprites().setPatch(e._id, e._source);
-    }
-
-    void Application::handle(events::controller::SetSpriteTexture const & e)
-    {
-        _rasterizer->sprites().setTexture(e._id, e._texture);
-    }
-
-    void Application::handle(events::controller::ResizeSprite const & e)
-    {
-        _rasterizer->sprites().resize(e._id, e._dimensions, e._clippingWindow);
-    }
-
-    void Application::handle(events::controller::MoveSprite const & e)
-    {
-        _rasterizer->sprites().move(e._id, e._position, e._clippingWindow);
-    }
-
-    void Application::handle(events::controller::SetSpriteArea const & e)
-    {
-        _rasterizer->sprites().setArea(e._id, e._position, e._dimensions,
-                                       e._clippingWindow);
-    }
-
-    void Application::handle(events::controller::SetSpriteClippingWindow const & e)
-    {
-        _rasterizer->sprites().setClippingWindow(e._id, e._clippingWindow);
-    }
-
-    void Application::handle(events::controller::SetSpriteVisible const & e)
-    {
-        _rasterizer->sprites().visible(e._id, e._visible);
-    }
-
-    void Application::handle(events::controller::SetSpriteZOrder const & e)
-    {
-        MINIRE_DEBUG("setting Z for sprite \"{}\" to {}", e._id, e._zOrder);
-        _rasterizer->sprites().setZOrder(e._id, e._zOrder);
-    }
-
-    void Application::handle(events::controller::RemoveSprite const & e)
-    {
-        _rasterizer->sprites().remove(e._id);
-    }
-
-    void Application::handle(events::controller::BulkSetSpriteZOrders const & e)
-    {
-        for(std::pair<std::string, size_t> const & i : e._items)
-        {
-            MINIRE_DEBUG("setting Z for sprite \"{}\" to {}", i.first, i.second);
-            _rasterizer->sprites().setZOrder(i.first, i.second);
-        }
-    }
-
-    void Application::handle(events::controller::CreateLabel const & e)
-    {
-        rasterizer::Label & label = _rasterizer->labels().allocate(e._id, e._text, e._zOrder, e._visible);
-        label.setFontFace(e._fontFace, _contentManager);
-        label.setPosition(e._position);
-    }
-
-    void Application::handle(events::controller::MoveLabel const & e)
-    {
-        _rasterizer->labels().get(e._id).setPosition(e._position);
-    }
-
-    void Application::handle(events::controller::SetLabelVisible const & e)
-    {
-        _rasterizer->labels().get(e._id).setVisible(e._visible);
-    }
-
-    void Application::handle(events::controller::SetLabelFontFace const & e)
-    {
-        _rasterizer->labels().get(e._id).setFontFace(e._fontFace, _contentManager);
-    }
-
-    void Application::handle(events::controller::SetLabelClippingWindow const & e)
-    {
-        _rasterizer->labels().get(e._id).setClippingWindow(e._clippingWindow);
-    }
-
-    void Application::handle(events::controller::SetLabelZOrder const & e)
-    {
-        MINIRE_DEBUG("setting Z for label \"{}\" to {}", e._id, e._zOrder);
-        _rasterizer->labels().get(e._id).setZOrder(e._zOrder);
-    }
-
-    void Application::handle(events::controller::SetLabelText const & e)
-    {
-        _rasterizer->labels().get(e._id).setText(e._text);
-    }
-
-    void Application::handle(events::controller::RemoveLabel const & e)
-    {
-        _rasterizer->labels().deallocate(e._id);
-    }
-
-    void Application::handle(events::controller::BulkSetLabelZOrders const & e)
-    {
-        for(std::pair<std::string, size_t> const & i : e._items)
-        {
-            MINIRE_DEBUG("setting Z for label \"{}\" to {}", i.first, i.second);
-            _rasterizer->labels().get(i.first).setZOrder(i.second);
-        }
-    }
-
-    void Application::handle(events::controller::StartTextInput const &)
-    {
-        ::SDL_StartTextInput();
-    }
-
-    void Application::handle(events::controller::StopTextInput const &)
-    {
-        ::SDL_StopTextInput();
-    }
-
-    void Application::handle(events::controller::StartClipboardCapture const &)
-    {
-        setCaptureClipboard(true);
-    }
-
-    void Application::handle(events::controller::StopClipboardCapture const &)
-    {
-        setCaptureClipboard(false);
-    }
-
-    void Application::handle(events::controller::SetClipboardText const & e)
-    {
-        setClipboardText(e._text);
-    }
-
-    void Application::handle(events::controller::SetPrimarySelection const & e)
-    {
-        setPrimarySelection(e._text);
-    }
-
-    void Application::handle(events::controller::SetSystemCursor const & e)
-    {
-        setSystemCursor(e._systemCursor);
-    }
-
-    void Application::handle(events::controller::SceneReset const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneDispose const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneActivateCamera const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneSetAmbientLight const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneNewNode const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneNewFromSource const & e)
-    {
-        scene::instantiateGltf(*_scene, e, _contentManager);
-    }
-
-    void Application::handle(events::controller::SceneNewMesh const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneNewDirectionalLight const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneNewPointLight const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneNewPerspectiveCamera const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneNewOrthographicCamera const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneNewBillboard const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneSetMeshEmissiveFactor const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneSetMeshSkin const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneSetParent const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneSetVisibility const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneSetTransform const & e)
-    {
-        _scene->handle(e, _epochNumber);
-    }
-
-    void Application::handle(events::controller::SceneSetDirectionalLight const & e)
-    {
-        _scene->handle(e, _epochNumber);
-    }
-
-    void Application::handle(events::controller::SceneSetPointLight const & e)
-    {
-        _scene->handle(e, _epochNumber);
-    }
-
-    void Application::handle(events::controller::SceneSetPerspectiveCamera const & e)
-    {
-        _scene->handle(e, _epochNumber);
-    }
-
-    void Application::handle(events::controller::SceneSetOrthographicCamera const & e)
-    {
-        _scene->handle(e, _epochNumber);
-    }
-
-    void Application::handle(events::controller::SceneNewAnimationSet const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::ScenePlayAnimation const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneStopAnimation const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SceneInlineAnimation const & e)
-    {
-        _scene->handle(e);
-    }
-
-    void Application::handle(events::controller::SetRayCaster const & e)
-    {
-        _rayCasterEnabled = e._enabled;
-        if (_rayCasterEnabled)
-        {
-            _rayCasterRevision = 0;
-        }
-    }
-
-    void Application::handle(BasicController::Batch const & batch)
-    {
-#       ifndef NDEBUG
-        if (batch._events.size() > 1000)
-        {
-            MINIRE_DEBUG("Got {} event inm controller's batch",
-                         batch._events.size());
-        }
-#       endif
-
-        for(events::Controller const & event: batch._events)
-        {
-            // TODO: it might throw
-            std::visit([this](auto const & e) { handle(e); }, event);
-        }
-    }
-
-    void Application::pushPendedEvents()
-    {
-        // TODO: does it have to be called when the queue is empty?
-        size_t const pendedEvents = _applicationEvents.size(); // TODO: reserve max or p99
-        _controller->push(std::move(_applicationEvents));
-        _applicationEvents = events::ApplicationQueue();
-        _applicationEvents.reserve(pendedEvents);
+        // starting an actual epoch (just before onRender)
+        startEpoch();
+        _epochDuration = 0;     // initial epoch has no duration,
     }
 
     void Application::onRender()
     {
-        assert(_controller);
+        assert(_scene);
 
-        auto totalStopwatch =
-            _timekeeper ? std::make_unique<instrumentation::Stopwatch<>>("total", _timekeeper)
-                        : std::unique_ptr<instrumentation::Stopwatch<>>();
-
-        // maybe issue a ray caster
+        // perform controller's logic
+        if (onStep())
         {
-            instrumentation::Stopwatch<> stopwatch("ray-caster", _timekeeper);
-            maybeIssueRayCaster();
+            startEpoch();
         }
 
-        // notify logic thread about new events
-        {
-            instrumentation::Stopwatch<> stopwatch("controller-notify", _timekeeper);
-            pushPendedEvents();
-        }
-
-        // fetch and handle events from controller if any
-        {
-            instrumentation::Stopwatch<> stopwatch("batch-fetching", _timekeeper);
-            BasicController::BatchQueue batchQueue = _controller->pull();
-            std::move(batchQueue.begin(), batchQueue.end(),
-                      std::back_inserter(_controllerEvents));
-        }
-
-        bool performLerp = false;
-        bool newEpochStarted = false;
-        if (!_controllerEvents.empty())
-        {
-            instrumentation::Stopwatch<> stopwatch("events-handling", _timekeeper);
-            if (_batchPlayed < 0)
-            {
-                // very first batch and very slow controller case
-                handle(_controllerEvents.front());
-                _batchPlayed = 0;
-                performLerp = true;
-            }
-            else if (_batchPlayed < _controllerEvents.front()._duration)
-            {
-                // middle of a batch
-                assert(_batchPlayed >= 0);
-                assert(_controllerEvents.front()._duration != 0);
-                performLerp = true;
-            }
-            else
-            {
-                assert(_batchPlayed >= _controllerEvents.front()._duration);
-
-                // purge currently played batch
-                _batchPlayed -= _controllerEvents.front()._duration;
-                _controllerEvents.pop_front();
-
-                // fast-forward hidden ones (they will be invisible,
-                // but they might containt important events)
-                while(!_controllerEvents.empty() &&
-                      _batchPlayed >= _controllerEvents.front()._duration)
-                {
-                    handle(_controllerEvents.front());
-                    _batchPlayed -= _controllerEvents.front()._duration;
-                    _controllerEvents.pop_front();
-                }
-
-                _epochNumber++;
-                newEpochStarted = true;
-
-                if (_controllerEvents.empty())
-                {
-                    _batchPlayed = -1;
-                }
-                else
-                {
-                    assert(_batchPlayed >= 0);
-                    handle(_controllerEvents.front());
-                    performLerp = true;
-                }
-            }
-        }
-
-        if (newEpochStarted)
-        {
-            instrumentation::Stopwatch<> stopwatch("animation-advance", _timekeeper);
-            performLerp |= _scene->advanceAnimations(_animationGap, _epochNumber);
-            _animationGap = 0;
-        }
-
-        if (performLerp)
-        {
-            instrumentation::Stopwatch<> stopwatch("scene-lerping", _timekeeper);
-            double const duration = !_controllerEvents.empty() ? _controllerEvents.front()._duration : 0;
-            double const weight = duration != 0 ? _batchPlayed / duration : 1.0;
-            assert(weight >= 0);
-            _scene->lerp(weight, _epochNumber);
-        }
-
-        {
-            instrumentation::Stopwatch<> stopwatch("scene-revalidation", _timekeeper);
-            _scene->revalidateNodes();
-        }
+        _scene->advance(_epochNumber, _epochTime, _epochDuration, _frameTime);
 
         // draw a frame
         {
-            instrumentation::Stopwatch<> stopwatch("scene-rendering", _timekeeper);
             _rasterizer->draw(*_scene);
             ::SDL_GL_SwapWindow(window());
         }
 
         // calc frame time
-        _frameEnd = utils::uNow();
-        double frameTime = double(_frameEnd - _frameBegin) / 1000000.0; // sec
-        frameTime = std::min(1.0, frameTime); // prevent from going haywire
-        _frameBegin = _frameEnd;
+        size_t const frameEnd = utils::uNow();
+        _frameTime = double(frameEnd - _frameBegin) / 1000000.0; // sec
+        _frameTime = std::min(1.0, _frameTime); // prevent from going haywire
+        _frameBegin = frameEnd;
 
         // advance interpolator epoch
-        assert(frameTime > 0);
-        _batchPlayed += frameTime;
-        _animationGap += frameTime;
+        assert(_frameTime > 0);
+        _epochTime += _frameTime;
+        _absoluteTime += _frameTime;
 
         _frame++;
-
-        // maybe print performance data
-        totalStopwatch.reset();
-        if (_timekeeper)
-        {
-            if (auto aggregation = _timekeeper->fetch(); aggregation)
-            {
-                MINIRE_INFO("{}", instrumentation::tabulate<double>(*aggregation));
-            }
-        }
 
         // ensure that frame was rendered fine (TODO: maybe move this to Rasterizer?)
         if (!kDebug)
@@ -761,7 +399,7 @@ namespace minire
                     _pedanticGlCounter = 0;
                 }
             }
-            else if (opengl::havePendedGlError())
+            else if (opengl::havePendedGlError()) // TODO: maybe check it only N-th frame
             {
                 opengl::setGlErrorCheckMode(true);
                 MINIRE_ERROR("Unknown GL error detected! Pendatic mode is activated");

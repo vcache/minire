@@ -1,6 +1,5 @@
 #include <minire/application.hpp>
 
-#include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/image.hpp>
@@ -13,72 +12,72 @@
 
 namespace
 {
-    static size_t const kMaxCtrlFps = 120;
-
     class LabelsUsage
-        : public minire::BasicController
+        : public minire::Application
     {
-        using BasicController::BasicController;
+        using Application::Application;
 
         struct LabelData
         {
-            std::string _id;
-            glm::vec2   _position{0, 0};
-            glm::vec2   _size{0, 0};
+            minire::Label::Sptr _label;
+            glm::vec2           _size{0, 0};
         };
 
-        LabelData makeLabel(minire::text::FormattedString const & text)
+        LabelData buildLabel(minire::text::FormattedString const & text)
         {
-            static size_t kCount = 0;
-            LabelData result
+            minire::Label::Sptr label = make(minire::models::Label
             {
-                ._id = fmt::format("label-{}", kCount++),
+                ._text = text,
+                ._fontFace = "ucs-6x13-example",
                 ._position = glm::vec2(0),
-                ._size = measure(text, "ucs-6x13-example"),
+                ._clippingWindow = std::nullopt,
+                ._zOrder = 0,
+                ._visible = true,
+            });
+
+            return LabelData
+            {
+                ._label = label,
+                ._size = measure(text, label->fontFace()),
             };
-            enqueue<minire::events::controller::CreateLabel>(
-                result._id, text, "ucs-6x13-example", result._position, true, 0);
-            return result;
         }
 
     protected:
-
-        void handle(minire::events::application::OnResize const & onResize) override
+        bool handle(minire::application::OnResize const & e) override
         {
-            _windowSize.x = onResize._width;
-            _windowSize.y = onResize._height;
+            if (Application::handle(e))
+                return true;
 
-            _centeral._position = (_windowSize - _centeral._size) / 2.0f;
-            enqueue<minire::events::controller::MoveLabel>(_centeral._id,
-                                                           _centeral._position);
+            _windowSize.x = e._width;
+            _windowSize.y = e._height;
 
-            _rightBottom._position = _windowSize - _rightBottom._size - glm::vec2(1);
-            enqueue<minire::events::controller::MoveLabel>(_rightBottom._id,
-                                                           _rightBottom._position);
+            _centeral._label->setPosition((_windowSize - _centeral._size) / 2.0f);
+            _rightBottom._label->setPosition(_windowSize - _rightBottom._size - glm::vec2(1));
+            _clipping._label->setPosition(glm::vec2{(_windowSize.x - _clipping._size.x) / 2.0f, 0.0f});
 
-            _clipping._position.x = (_windowSize.x - _clipping._size.x) / 2.0f;
-            _clipping._position.y = 0;
-            enqueue<minire::events::controller::MoveLabel>(_clipping._id,
-                                                           _clipping._position);
+            return true;
         }
 
-        void step()
+        bool onStep() override
         {
             minire::utils::Rect clipping(
-                _clipping._position.x,
-                _clipping._position.y,
-                _clipping._position.x + _clipping._size.x * (1.0 + std::cos(_clipPhase)) / 2.0f,
-                _clipping._position.y + _clipping._size.y * (1.0 + std::cos(_clipPhase / 2.0f)) / 2.0f);
-            enqueue<minire::events::controller::SetLabelClippingWindow>(
-                _clipping._id, clipping);
+                _clipping._label->position().x,
+                _clipping._label->position().y,
+                _clipping._label->position().x + _clipping._size.x * (1.0 + std::cos(_clipPhase)) / 2.0f,
+                _clipping._label->position().y + _clipping._size.y * (1.0 + std::cos(_clipPhase / 2.0f)) / 2.0f);
+            _clipping._label->setClippingWindow(clipping);
             _clipPhase += frameTime();
+
+            return true;
         }
 
-        void start() override
+        void onStart() override
         {
-            _leftTop = makeLabel(L"<- Hello world");
-            _rightBottom = makeLabel(L"Hello world ->");
-            _centeral = makeLabel(
+            Application::onStart();
+
+            _leftTop = buildLabel(L"<- Hello world");
+            _rightBottom = buildLabel(L"Hello world ->");
+            _centeral = buildLabel(
                 L"        /\\       \n"
                 L"<- Hello world ->\n"
                 L"        \\/       \n"
@@ -98,7 +97,7 @@ namespace
                 loremIpsum.append("cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est\n",
                                   minire::text::Format().invertColors(true));
                 loremIpsum.append("laborum.");
-                _clipping = makeLabel(loremIpsum);
+                _clipping = buildLabel(loremIpsum);
             }
         }
 
@@ -128,8 +127,7 @@ int main()
                 ._glyphWidth = 6,
                 ._glyphHeight = 13,
             });
-        minire::Application application(1280, 720, "Labels Usage", manager);
-        application.setController<LabelsUsage>(kMaxCtrlFps);
+        LabelsUsage application(1280, 720, "Labels Usage", manager);
         application.setVsync(true);
 
         // Main loop

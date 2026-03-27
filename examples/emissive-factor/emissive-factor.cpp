@@ -1,24 +1,13 @@
-#include <minire/application.hpp>
-
-#include <minire/basic-controller.hpp>
-#include <minire/content/manager.hpp>
-#include <minire/logging.hpp>
-#include <minire/models/camera.hpp>
-#include <minire/models/mesh.hpp>
-#include <minire/models/pbr-material.hpp>
-#include <minire/models/point-light.hpp>
-#include <minire/models/transform.hpp>
+#include "../common/testbed.hpp"
 
 #include <glm/gtc/quaternion.hpp>
 
 #include <cmath>
-#include <cstdlib> // for EXIT_SUCCESS
-#include <iostream>
 
 namespace
 {
     class MeshEmissiveFactor
-        : public minire::BasicController
+        : public minire::examples::TestbedApplication
     {
     private:
         minire::models::Transform cameraTransform(float dist = 5.0f)
@@ -37,8 +26,9 @@ namespace
         }
 
     public:
-        explicit MeshEmissiveFactor(minire::content::Manager & contentManager)
-            : BasicController(contentManager, 60)
+        template<typename... Args>
+        explicit MeshEmissiveFactor(Args && ... args)
+            : TestbedApplication(std::forward<Args>(args)...)
             , _emissiveFactors
             {
                 glm::vec3(0, 0, 0),
@@ -52,26 +42,15 @@ namespace
             }
         {}
 
-        void start() override
+        void onStart() override
         {
             using namespace minire::content;
-            using namespace minire::events::controller;
             using namespace minire::models;
 
-            minire::models::PerspectiveCamera camera{._yFov = glm::radians(45.0f),
-                                                     ._zNear = 0.001f,
-                                                     ._zFar = 1000.0f,
-                                                     ._aspectRatio = std::nullopt};
+            TestbedApplication::onStart();
 
-            enqueue<SceneNewNode>("cam-node", ScenePath(), cameraTransform(5.0f), true);
-            enqueue<SceneNewPerspectiveCamera>("cam", ScenePath{"cam-node"}, camera, true);
-            enqueue<SceneActivateCamera>(ScenePath{"cam-node", "cam"});
-
-            enqueue<SceneNewNode>("light-node", ScenePath(), Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
-            enqueue<SceneNewPointLight>("bulb", ScenePath{"light-node"}, PointLight(glm::vec4(1, 1, 1, 500), 2), true);
-
-            enqueue<SceneNewNode>("cube-node", ScenePath(), _cubeTransform, true);
-            enqueue<SceneNewMesh>("cube", ScenePath{"cube-node"},
+            _cubeNode = scene().root().make(Node{_cubeTransform, true});
+            _cubeMesh = _cubeNode->make(
                 Mesh
                 {
                     ._source = mkPath("cube.gltf", path::Special::kMeshes, path::Index(0)),
@@ -82,16 +61,15 @@ namespace
                         result->_metallicFactor = 0.5f;
                         result->_roughnessFactor = 0.6f;
                         return result;
-                    }()
-                },
-                true);
+                    }(),
+                    ._skin = std::nullopt,
+                    ._visible = true,
+                });
         }
 
-        bool handle(minire::events::application::OnKeyDown const & e) override
+        bool handle(minire::application::OnKeyDown const & e) override
         {
-            using namespace minire::events::controller;
-
-            if (BasicController::handle(e))
+            if (TestbedApplication::handle(e))
                 return true;
 
             if (e._key == SDLK_TAB)
@@ -104,9 +82,8 @@ namespace
             return true;
         }
 
-        void step() override
+        bool onStep() override
         {
-            using namespace minire::events::controller;
             using namespace minire::models;
 
             float const delta = frameTime();
@@ -114,15 +91,17 @@ namespace
             _cubeTransform._rotation = glm::rotate(_cubeTransform._rotation,
                                                    delta * 0.5f,
                                                    glm::vec3{0, 1, 0});
-            enqueue<SceneSetTransform>(ScenePath{"cube-node"}, _cubeTransform);
+            _cubeNode->setOrigin(_cubeTransform);
 
             float const w = (1.0f + std::sin(_absoluteTime * 10.0f)) / 2.0f;
-            enqueue<SceneSetMeshEmissiveFactor>(
-                ScenePath{"cube-node", "cube"},
-                _emissiveFactors[_emissiveFactorsIndex] * w);
+            _cubeMesh->setEmissiveFactor(_emissiveFactors[_emissiveFactorsIndex] * w);
+
+            return true;
         }
 
     private:
+        minire::scene::Node::Sptr    _cubeNode;
+        minire::scene::Mesh::Sptr    _cubeMesh;
         size_t                       _emissiveFactorsIndex = 0;
         std::vector<glm::vec3> const _emissiveFactors;
         minire::models::Transform    _cubeTransform;
@@ -130,37 +109,7 @@ namespace
     };
 }
 
-int main()
+int main(int, char **)
 {
-    try
-    {
-        // Initialization
-        minire::logging::setVerbosity(minire::logging::Level::kDebug);
-
-        // Setup content manager
-        minire::content::Manager manager;
-        manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-
-        // Create and run the Application and its Controller
-        minire::Application application(1280, 720, "Emissive Factor", manager);
-        application.setController<MeshEmissiveFactor>();
-        application.setVsync(true);
-        application.setGlDebug(false);
-
-        // Main loop
-        application.run();
-
-        // Finish
-        return EXIT_SUCCESS;
-    }
-    catch(std::exception const & e)
-    {
-        MINIRE_ERROR("Fatal error:\n{}", e.what());
-    }
-    catch(...)
-    {
-        MINIRE_ERROR("Fatal error: (unknown error)");
-    }
-
-    return EXIT_FAILURE;
+    return minire::examples::main<MeshEmissiveFactor>("Emissive Factor");
 }

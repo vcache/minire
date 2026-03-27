@@ -1,6 +1,7 @@
 #include <rasterizer/materials/pbr.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/logging.hpp>
 #include <minire/models/mesh-features.hpp>
 
 #include <opengl.hpp>

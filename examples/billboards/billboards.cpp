@@ -10,10 +10,10 @@
 namespace
 {
     class Billboards
-        : public minire::examples::TestbedController
+        : public minire::examples::TestbedApplication
     {
     public:
-        using TestbedController::TestbedController;
+        using TestbedApplication::TestbedApplication;
 
         auto makeText() const
         {
@@ -25,35 +25,30 @@ namespace
                                       .foreground(glm::vec4(1, 0, 0, 0)));
         }
 
-        void start() override
+        void onStart() override
         {
             using namespace minire::content;
-            using namespace minire::events::controller;
             using namespace minire::models;
 
-            TestbedController::start();
+            TestbedApplication::onStart();
 
-            size_t counter = 0;
             auto mkSample = [&](glm::vec3 origin,
                                 glm::vec3 billboardNodeOrigin,
                                 std::vector<Billboard> billboards)
             {
-                std::string rootNode = fmt::format("cube-node-{}", counter++);
-                enqueue<SceneNewNode>(rootNode, ScenePath(), Transform(origin), true);
-                enqueue<SceneNewMesh>("cube", ScenePath{rootNode},
-                    Mesh
+                minire::scene::Node::Sptr base = scene().root().make(Node{Transform(origin), true});
+                base->make(Mesh
                     {
                         ._source = mkPath("Box.glb", path::Special::kMeshes, path::Index(0)),
                         ._defaultMaterial = nullptr,
-                    },
-                    true);
+                        ._skin = {},
+                        ._visible = true,
+                    });
 
-                enqueue<SceneNewNode>("billboard-node", ScenePath{rootNode}, Transform(billboardNodeOrigin), true);
+                minire::scene::Node::Sptr billboardNode = base->make(Node{Transform(billboardNodeOrigin), true});
                 for(Billboard const & billboard : billboards)
                 {
-                    enqueue<SceneNewBillboard>(fmt::format("billboard-{}", (void const *)&billboard),
-                                               ScenePath{rootNode, "billboard-node"},
-                                               billboard, true);
+                    billboardNode->make(billboard);
                 }
             };
 
@@ -73,37 +68,37 @@ namespace
 
                 mkSample(glm::vec3(-4, 0, 0), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"single-box.png", std::monostate(), {}},
-                                    Billboard::World({0, .25}, {.5, .5}), 0}});
+                                    Billboard::World({0, .25}, {.5, .5}), 0, true}});
 
                 mkSample(glm::vec3(-2, 0, 0), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"single-rectangular.png", std::monostate(), {}},
-                                    Billboard::World({0, .25}, {.5, .5}), 0}});
+                                    Billboard::World({0, .25}, {.5, .5}), 0, true}});
 
                 // Part of image
 
                 mkSample(glm::vec3(0, 0, 0), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"atlas.png", kRect, {}},
-                                    Billboard::World({0, .25}, {.5, .5}), 0}});
+                                    Billboard::World({0, .25}, {.5, .5}), 0, true}});
 
                 // NinePatch
                 mkSample(glm::vec3(2, 0, 0), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"atlas.png", kNinePatch, glm::vec2(200, 200)},
-                                    Billboard::World({0, .25}, {.5, .5}), 0}});
+                                    Billboard::World({0, .25}, {.5, .5}), 0, true}});
 
                 // Z-Ordering
                 mkSample(glm::vec3(4, 0, 0), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"atlas.png", kNinePatch, glm::vec2(200, 200)},
-                                    Billboard::World({0, .25}, {.5, .5}), 0},
+                                    Billboard::World({0, .25}, {.5, .5}), 0, true},
                           Billboard{Billboard::Sprite{"single-box.png", std::monostate(), {}},
-                                    Billboard::World({0, .25}, {.4, .4}), 1},
+                                    Billboard::World({0, .25}, {.4, .4}), 1, true},
                           Billboard{Billboard::Sprite{"atlas.png", kRect, {}},
-                                    Billboard::World({0, .25}, {.3, .3}), 2}});
+                                    Billboard::World({0, .25}, {.3, .3}), 2, true}});
 
                 // Text
 
                 mkSample(glm::vec3(6, 0, 0), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Label{makeText(), minire::examples::kFontFace},
-                                    Billboard::World({0, .25}, {.5, .5}), 0}});
+                                    Billboard::World({0, .25}, {.5, .5}), 0, true}});
 
                 // TODO: Animations (scale, rotate, translate, update image)
             }
@@ -115,39 +110,39 @@ namespace
 
                 mkSample(glm::vec3(-4, 0, 2), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"single-box.png", std::monostate(), {}},
-                                    Billboard::Screen({0, 16}), 0}});
+                                    Billboard::Screen({0, 16}), 0, true}});
 
                 mkSample(glm::vec3(-2, 0, 2), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"single-rectangular.png", std::monostate(), {}},
-                                    Billboard::Screen({0, 16}), 0}});
+                                    Billboard::Screen({0, 16}), 0, true}});
 
                 // Part of image
 
                 mkSample(glm::vec3(0, 0, 2), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"atlas.png", kRect, {}},
-                                    Billboard::Screen({0, 16}), 0}});
+                                    Billboard::Screen({0, 16}), 0, true}});
 
                 // NinePatch
 
                 mkSample(glm::vec3(2, 0, 2), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"atlas.png", kNinePatch, glm::vec2(200, 200)},
-                                    Billboard::Screen({0, 100}), 0}});
+                                    Billboard::Screen({0, 100}), 0, true}});
 
                 // Z-Ordering
 
                 mkSample(glm::vec3(4, 0, 2), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Sprite{"atlas.png", kNinePatch, glm::vec2(200, 200)},
-                                    Billboard::Screen({0, 100}), 0},
+                                    Billboard::Screen({0, 100}), 0, true},
                           Billboard{Billboard::Sprite{"single-box.png", std::monostate(), {}},
-                                    Billboard::Screen({0, 50}), 1},
+                                    Billboard::Screen({0, 50}), 1, true},
                           Billboard{Billboard::Sprite{"atlas.png", kRect, {}},
-                                    Billboard::Screen({10, 60}), 2}});
+                                    Billboard::Screen({10, 60}), 2, true}});
 
                 // Text
 
                 mkSample(glm::vec3(6, 0, 2), glm::vec3(0, .5, 0),
                          {Billboard{Billboard::Label{makeText(), minire::examples::kFontFace},
-                                    Billboard::Screen({0, 10}), 0}});
+                                    Billboard::Screen({0, 10}), 0, true}});
 
                 // TODO: Animations (scale, rotate, translate, update image)
             }

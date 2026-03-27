@@ -1,7 +1,6 @@
 #pragma once
 
 #include <minire/application.hpp>
-#include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/grips/orbiting.hpp>
 #include <minire/grips/panning.hpp>
@@ -20,8 +19,8 @@ namespace minire::examples
 {
     static constexpr auto kFontFace = "ucs-6x13-example";
 
-    class TestbedController
-        : public minire::BasicController
+    class TestbedApplication
+        : public minire::Application
     {
         glm::quat lookAt(glm::vec3 lookFrom, glm::vec3 lookTo,
                          glm::vec3 worldUp =  glm::vec3(0.0f, 1.0f, 0.0f))
@@ -32,38 +31,55 @@ namespace minire::examples
         }
 
     public:
-        explicit TestbedController(minire::content::Manager & contentManager)
-            : BasicController(contentManager, 30 /* controller fps */)
+        explicit TestbedApplication(int width, int height,
+                                    std::string const & title,
+                                    content::Manager & contentManager)
+            : Application(width, height, title, contentManager)
             , _target(0.0f, 0.0f, 0.0f)
             , _orbiting(_target, 10)
-            , _orthographicCamera{._xMag = _orbiting.distance() / 2,
-                                  ._yMag = _orbiting.distance() / 2,
-                                  ._zNear = 0.1f,
-                                  ._zFar = 100.0f}
-            , _perspectiveCamera{._yFov = glm::radians(45.0f),
-                                 ._zNear = 0.1f,
-                                 ._zFar = 100.0f,
-                                 ._aspectRatio = std::nullopt}
             , _isDirectLightEnabled(false)
             , _isPointLightEnabled(true)
             , _isFloorPlaneEnabled(true)
             , _isPerspective(true)
         {}
 
-        void start() override
+        void onStart() override
         {
+            Application::onStart();
+
             using namespace minire::content;
-            using namespace minire::events::controller;
             using namespace minire::models;
 
-            _orbiting.evaluate(_cameraTransform);
-            enqueue<SceneNewNode>("cam-node", ScenePath(), _cameraTransform, true);
-            enqueue<SceneNewPerspectiveCamera>("persp-cam", ScenePath{"cam-node"}, _perspectiveCamera, true);
-            enqueue<SceneNewOrthographicCamera>("ortho-cam", ScenePath{"cam-node"}, _orthographicCamera, true);
-            enqueue<SceneActivateCamera>(ScenePath{"cam-node", "persp-cam"});
+            auto & root = scene().root();
 
-            enqueue<SceneNewNode>("floor-node", ScenePath(), Transform(glm::vec3(0, -.5, 0)), true);
-            enqueue<SceneNewMesh>("floor-plane", ScenePath{"floor-node"},
+            _orbiting.evaluate(_cameraTransform);
+
+            _cameraNode = root.make("cam-node", Node{_cameraTransform, true});
+            {
+                _perspectiveCamera = _cameraNode->make("persp-cam",
+                    PerspectiveCamera
+                    {
+                        ._yFov = glm::radians(45.0f),
+                        ._zNear = 0.1f,
+                        ._zFar = 100.0f,
+                        ._aspectRatio = std::nullopt,
+                        ._visible = true,
+                    });
+
+                _orthographicCamera = _cameraNode->make("ortho-cam",
+                    OrthographicCamera
+                    {   ._xMag = _orbiting.distance() / 2,
+                        ._yMag = _orbiting.distance() / 2,
+                        ._zNear = 0.1f,
+                        ._zFar = 100.0f,
+                        ._visible = true,
+                    });
+
+                _perspectiveCamera->activate();
+            }
+
+            auto floorNode = root.make("floor-node", Node{Transform(glm::vec3(0, -.5, 0)), true});
+            floorNode->make("floor-plane",
                 Mesh
                 {
                     ._source = mkPath("../common/floor-plane.glb", path::Special::kMeshes, path::Index(0)),
@@ -74,51 +90,56 @@ namespace minire::examples
                         result->_metallicFactor = 0.0f;
                         result->_roughnessFactor = 1.0f;
                         return result;
-                    }()
-                },
-                _isFloorPlaneEnabled);
+                    }(),
+                    ._skin = {},
+                    ._visible = _isFloorPlaneEnabled,
+                });
 
+            auto directlightNode = root.make("directlight-node",
+                Node{Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))), true});
+            directlightNode->make("sun",
+                DirectionalLight(glm::vec3(0, 10, 0), ShadowParams{4096, false}, _isDirectLightEnabled));
 
-            enqueue<SceneNewNode>("directlight-node", ScenePath(),
-                                  Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))),
-                                  true);
-            enqueue<SceneNewDirectionalLight>("sun", ScenePath{"directlight-node"},
-                                              DirectionalLight(glm::vec3(0, 10, 0), ShadowParams{4096, false}),
-                                              _isDirectLightEnabled);
-
-            enqueue<SceneNewNode>("pointlight-node", ScenePath(),
-                                  Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true);
-            enqueue<SceneNewPointLight>("bulb", ScenePath{"pointlight-node"},
-                                        PointLight(glm::vec4(1, 1, 1, 500), 2, ShadowParams{}),
-                                        _isPointLightEnabled);
+            auto pointlightNode = root.make("pointlight-node",
+                Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
+            pointlightNode->make("bulb",
+                PointLight(glm::vec4(1, 1, 1, 500), 2, ShadowParams{}, _isPointLightEnabled));
         }
 
-        bool handle(minire::events::application::OnMouseMove const & event) override
+        bool onStep() override
         {
-            using namespace minire::events::controller;
-            using namespace minire::models;
+            // Update scene 5 times slower to show how
+            // interpolation compensates a gap between
+            // a render and a controller timings.
 
+            return 0 == (frame() % 5);
+        }
+
+        bool handle(application::OnMouseMove const & e) override
+        {
             bool updated = false;
-            if (event._left)
+            if (e._left)
             {
-                _orbiting.updateAngles(0.01f * static_cast<float>(event._relX),
-                                       0.01f * static_cast<float>(event._relY));
+                _orbiting.updateAngles(0.01f * static_cast<float>(e._relX),
+                                       0.01f * static_cast<float>(e._relY));
                 updated = true;
             }
-            else if (event._right && _panning)
+            else if (e._right && _panning)
             {
                 if (_isPerspective)
                 {
-                    _orbiting.target() = _panning.update(event._absX, event._absY,
+                    assert(_perspectiveCamera);
+                    _orbiting.target() = _panning.update(e._absX, e._absY,
                                                          _cameraTransform.matrix(),
-                                                         _target, _perspectiveCamera,
+                                                         _target, _perspectiveCamera->model(),
                                                          _windowSize, _cameraTransform._translation);
                 }
                 else
                 {
-                    _orbiting.target() = _panning.update(event._absX, event._absY,
+                    assert(_orthographicCamera);
+                    _orbiting.target() = _panning.update(e._absX, e._absY,
                                                          _cameraTransform.matrix(),
-                                                         _target, _orthographicCamera,
+                                                         _target, _orthographicCamera->model(),
                                                          _windowSize, _cameraTransform._translation);
                 }
                 updated = true;
@@ -127,15 +148,17 @@ namespace minire::examples
             if (updated)
             {
                 _orbiting.evaluate(_cameraTransform);
-                enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
+
+                assert(_cameraNode);
+                _cameraNode->setOrigin(_cameraTransform);
             }
 
             return true;
         }
 
-        bool handle(minire::events::application::OnMouseDown const & e) override
+        bool handle(application::OnMouseDown const & e) override
         {
-            if (e._mouseButton == minire::models::MouseButton::kRight)
+            if (models::MouseButton::kRight == e._mouseButton)
             {
                 _panning.start(e._x, e._y);
             }
@@ -143,7 +166,7 @@ namespace minire::examples
             return true;
         }
 
-        bool handle(minire::events::application::OnMouseUp const &) override
+        bool handle(application::OnMouseUp const &) override
         {
             if (_panning)
             {
@@ -152,88 +175,88 @@ namespace minire::examples
             return true;
         }
 
-        bool handle(minire::events::application::OnMouseWheel const & event) override
+        bool handle(application::OnMouseWheel const & e) override
         {
-            using namespace minire::events::controller;
-            using namespace minire::models;
-
-            _orbiting.updateDistance(-0.5f * event._dy);
+            _orbiting.updateDistance(-0.5f * e._dy);
             _orbiting.evaluate(_cameraTransform);
-            enqueue<SceneSetTransform>(ScenePath{"cam-node"}, _cameraTransform);
 
-            _orthographicCamera._xMag = _orthographicCamera._yMag = _orbiting.distance() / 2.0f;
-            enqueue<SceneSetOrthographicCamera>(ScenePath{"cam-node", "ortho-cam"},
-                                                _orthographicCamera);
+            auto & camNode = scene().root().at<scene::Node>({"cam-node"});
+            camNode.setOrigin(_cameraTransform);
+
+            assert(_orthographicCamera);
+            float const zoom = _orbiting.distance() / 2.0f;
+            _orthographicCamera->setXMag(zoom);
+            _orthographicCamera->setYMag(zoom);
+
             return true;
         }
 
-        void handle(minire::events::application::OnResize const & e) override
+        bool handle(application::OnResize const & e) override
         {
             _windowSize.x = static_cast<float>(e._width);
             _windowSize.y = static_cast<float>(e._height);
+            return true;
         }
 
-        bool handle(minire::events::application::OnKeyDown const & e)
+        bool handle(application::OnKeyDown const & e) override
         {
-            using namespace minire::events::controller;
-            using namespace minire::models;
             switch(e._key)
             {
                 case SDLK_c:
                     _isPerspective = !_isPerspective;
-                    MINIRE_INFO("Camera is switched to {}", _isPerspective ? "PERSPECTIVE"
-                                                                           : "ORTHOGRAPHIC");
-                    enqueue<SceneActivateCamera>(ScenePath{"cam-node", _isPerspective ? "persp-cam" : "ortho-cam"});
+                    MINIRE_INFO("Camera is switched to {}", _isPerspective ? "PERSPECTIVE" : "ORTHOGRAPHIC");
+                    scene().setActiveCamera({"cam-node", _isPerspective ? "persp-cam" : "ortho-cam"});
                     break;
 
                 case SDLK_d:
                     _isDirectLightEnabled = !_isDirectLightEnabled;
                     MINIRE_INFO("Toggle direct light: {}", _isDirectLightEnabled);
-                    enqueue<SceneSetVisibility>(ScenePath{"directlight-node", "sun"}, _isDirectLightEnabled);
+                    scene().root().at<scene::DirectionalLight>("directlight-node", "sun").setVisible(_isDirectLightEnabled);
                     break;
 
                 case SDLK_p:
                     _isPointLightEnabled = !_isPointLightEnabled;
                     MINIRE_INFO("Toggle point light: {}", _isPointLightEnabled);
-                    enqueue<SceneSetVisibility>(ScenePath{"pointlight-node", "bulb"}, _isPointLightEnabled);
+                    scene().root().at<scene::PointLight>("pointlight-node", "bulb").setVisible(_isPointLightEnabled);
                     break;
 
                 case SDLK_f:
                     _isFloorPlaneEnabled = !_isFloorPlaneEnabled;
                     MINIRE_INFO("Toggle floor plane: {}", _isFloorPlaneEnabled);
-                    enqueue<SceneSetVisibility>(ScenePath{"floor-node", "floor-plane"}, _isFloorPlaneEnabled);
+                    scene().root().at<scene::Mesh>(models::ScenePath{"floor-node", "floor-plane"}).setVisible(_isFloorPlaneEnabled);
                     break;
             }
-            return true;
+            return false;
         }
 
     private:
-        glm::vec3                          _target;
-        minire::grips::Orbiting            _orbiting;
-        minire::models::OrthographicCamera _orthographicCamera;
-        minire::models::PerspectiveCamera  _perspectiveCamera;
-        minire::models::Transform          _cameraTransform;
-        minire::grips::Panning<false>      _panning;
-        glm::vec2                          _windowSize;
-        bool                               _isDirectLightEnabled;
-        bool                               _isPointLightEnabled;
-        bool                               _isFloorPlaneEnabled;
-        bool                               _isPerspective;
+        glm::vec3                       _target;
+        grips::Orbiting                 _orbiting;
+        scene::Node::Sptr               _cameraNode;
+        scene::PerspectiveCamera::Sptr  _perspectiveCamera;
+        scene::OrthographicCamera::Sptr _orthographicCamera;
+        models::Transform               _cameraTransform;
+        grips::Panning<false>           _panning;
+        glm::vec2                       _windowSize;
+        bool                            _isDirectLightEnabled;
+        bool                            _isPointLightEnabled;
+        bool                            _isFloorPlaneEnabled;
+        bool                            _isPerspective;
     };
 
-    template<typename ControllerType>
+    template<typename ApplicationType>
     int main(std::string const & title)
     {
        try
         {
             // Initialization
-            minire::logging::setVerbosity(minire::logging::Level::kDebug);
+            logging::setVerbosity(logging::Level::kDebug);
 
             // Setup content manager
-            minire::content::Manager manager;
-            manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
+            content::Manager manager;
+            manager.setReader<content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
 
-            auto lease = manager.upload(kFontFace, minire::models::FontFace
+            auto lease = manager.upload(kFontFace, models::FontFace
                 {
                     ._regular = "../common/6x13.bdf",
                     ._bold = "../common/6x13B.bdf",
@@ -243,8 +266,7 @@ namespace minire::examples
                 });
 
             // Create and run the Application and its Controller
-            minire::Application application(1280, 720, title, manager);
-            application.setController<ControllerType>();
+            ApplicationType application(1280, 720, title, manager);
             application.setVsync(true);
             application.setGlDebug(false);
 

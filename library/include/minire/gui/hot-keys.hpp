@@ -1,6 +1,6 @@
 #pragma once
 
-#include <minire/events/application.hpp>
+#include <minire/application/events.hpp>
 #include <minire/models/key-combo.hpp>
 
 #include <functional>
@@ -16,7 +16,7 @@ namespace minire::gui
         void set(::SDL_Scancode key, uint16_t mods, Handler handler);
 
     public:
-        bool handle(minire::events::application::OnKeyDown const & e) const;
+        bool handle(application::OnKeyDown const & e) const;
 
     private:
         std::unordered_map<minire::models::KeyCombo, Handler> _store;

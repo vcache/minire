@@ -1,7 +1,5 @@
-#include <minire/application.hpp>
-
 #include <minire/content/manager.hpp>
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 #include <minire/gui/components/progress-bar.hpp>
 #include <minire/gui/layouts/grid.hpp>
 #include <minire/logging.hpp>
@@ -18,14 +16,14 @@ using namespace minire::utils;
 namespace
 {
     class GuiProgressBar
-        : public minire::GuiController
+        : public minire::GuiApplication
     {
-        using GuiController::GuiController;
-
     protected:
-        void start() override
+        using GuiApplication::GuiApplication;
+
+        void onStart() override
         {
-            GuiController::start();
+            GuiApplication::onStart();
 
             auto layout = std::make_shared<layouts::Grid>(2, 2);
             auto container = guiRoot().emplace<Component>("container");
@@ -63,10 +61,8 @@ namespace
             makeProgressBar(1, 1, ProgressBar::Direction::kBottomToTop, "kBottomToTop");
         }
 
-        void step() override
+        bool onStep() override
         {
-            GuiController::step();
-
             float value = (1.0f + std::sin(_phase)) / 2.0f;
 
             for(auto const & wprogressBar : _progressBars)
@@ -79,18 +75,18 @@ namespace
             }
 
             _phase += frameTime();
+
+            return GuiApplication::onStep();
         }
 
     private:
-        double _phase = 0;
+        double                         _phase = 0;
         std::vector<ProgressBar::Wptr> _progressBars;
     };
 }
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
@@ -98,8 +94,7 @@ int main()
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
 
-        minire::Application application(1280, 720, "GUI ProgressBar", manager);
-        application.setController<GuiProgressBar>(kMaxCtrlFps);
+        GuiProgressBar application(1280, 720, "GUI ProgressBar", manager);
         application.setGlDebug(false);
         application.setVsync(true);
 

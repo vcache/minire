@@ -7,7 +7,6 @@
 #include <rasterizer/drawable.hpp>
 #include <rasterizer/flat-shadow-map.hpp>
 #include <rasterizer/fonts.hpp>
-#include <rasterizer/label.hpp>
 #include <rasterizer/labels.hpp>
 #include <rasterizer/lines.hpp>
 #include <rasterizer/materials.hpp>
@@ -26,7 +25,7 @@ namespace minire::content { class Manager; }
 
 namespace minire
 {
-    class Scene;
+    class SceneImpl;
 
     class Rasterizer
     {
@@ -34,7 +33,7 @@ namespace minire
         explicit Rasterizer(content::Manager &,
                             content::Ids const & fontsPreload = {});
 
-        void draw(Scene const &);
+        void draw(SceneImpl const &);
 
         void setScreenSize(size_t const width,
                            size_t const height);
@@ -53,20 +52,20 @@ namespace minire
         rasterizer::Resources::LayerId const & currentResourceLayer() const { return _resources.current(); }
 
     private:
-        rasterizer::CulledDirectionalLights cullDirectionalLights(Scene const &);
-        rasterizer::CulledPointLights cullPointLights(Scene const &);
-        rasterizer::CulledPrimitives cullPrimitives(Scene const &);
+        rasterizer::CulledDirectionalLights cullDirectionalLights(SceneImpl const &);
+        rasterizer::CulledPointLights cullPointLights(SceneImpl const &);
+        rasterizer::CulledPrimitives cullPrimitives(SceneImpl const &);
 
     private:
-        void shadowPass(Scene const &,
+        void shadowPass(SceneImpl const &,
                         rasterizer::CulledPrimitives const &,
                         rasterizer::CulledDirectionalLights &,
                         rasterizer::CulledPointLights &);
 
-        void colorPass(Scene const &,
+        void colorPass(SceneImpl const &,
                        rasterizer::CulledDirectionalLights const &,
                        rasterizer::CulledPointLights const &);
-        void draw3d(Scene const &, material::TextureRefs const &,
+        void draw3d(SceneImpl const &, material::TextureRefs const &,
                     material::TextureRefs const &);
         void draw2d();
 

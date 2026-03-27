@@ -1,6 +1,5 @@
 #include <minire/application.hpp>
 
-#include <minire/basic-controller.hpp>
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
 
@@ -9,23 +8,20 @@
 namespace
 {
     class DummyController
-        : public minire::BasicController
+        : public minire::Application
     {
-        using BasicController::BasicController;
+        using Application::Application;
     };
 }
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         minire::Application application(1280, 720, "Hello world", manager);
-        application.setController<DummyController>(kMaxCtrlFps);
 
         application.setVsync(false); // Turn on to v-sync to benchmark max FPS
 

@@ -28,21 +28,26 @@ namespace minire::models
         glm::vec4         _color; // rgb + w is intesity
         glm::vec4         _attenuation;
         MaybeShadowParams _shadowParams;
+        bool              _visible;
 
         PointLight(glm::vec4 const & color,
                    glm::vec3 const & attenuation,
-                   MaybeShadowParams shadowParams = std::nullopt)
+                   MaybeShadowParams shadowParams = std::nullopt,
+                   bool const visible = true)
             : _color(color)
             , _attenuation(attenuation, 0.0f)
             , _shadowParams(shadowParams)
+            , _visible(visible)
         {}
 
         PointLight(glm::vec4 const & color,
                    float const range,
-                   MaybeShadowParams shadowParams = std::nullopt)
+                   MaybeShadowParams shadowParams = std::nullopt,
+                   bool const visible = true)
             : _color(color)
             , _attenuation(attFromRange(range), 0.0f)
             , _shadowParams(shadowParams)
+            , _visible(visible)
         {}
 
         static glm::vec3 attFromRange(float range)

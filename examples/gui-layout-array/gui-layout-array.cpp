@@ -1,7 +1,5 @@
-#include <minire/application.hpp>
-
 #include <minire/content/manager.hpp>
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 #include <minire/gui/components/image.hpp>
 #include <minire/gui/layouts/array.hpp>
 #include <minire/gui/layouts/grid.hpp>
@@ -13,18 +11,19 @@
 
 namespace
 {
-    class GuiLayoutFlow
-        : public minire::GuiController
+    class GuiLayoutArray
+        : public minire::GuiApplication
     {
-        using GuiController::GuiController;
+        using GuiApplication::GuiApplication;
 
     protected:
-        void start() override
+        void onStart() override
         {
-            GuiController::start();
+            GuiApplication::onStart();
 
             using namespace minire::gui::layouts;
             using namespace minire::gui;
+            using namespace minire::models;
 
             static minire::utils::NinePatch const kHud9P
             {
@@ -57,7 +56,7 @@ namespace
                     for(auto const & id : {"first", "second", "third"})
                     {
                         auto image = sample->emplace<components::Image>(
-                            id, makeImageView("image.png"));
+                            id, sprite::Image("image.png"));
                         image->vertical() = Arranger(position::Center{}, dimension::Content{});
                         image->horizontal() = Arranger(position::Center{}, dimension::Content{});
                     }
@@ -82,7 +81,7 @@ namespace
                                                   std::make_pair("second", Position(position::Center{})),
                                                   std::make_pair("third", Position(position::End{}))})
                     {
-                        auto image = sample->emplace<components::Image>(id, makeImageView("image.png"));
+                        auto image = sample->emplace<components::Image>(id, sprite::Image("image.png"));
                         image->vertical() = Arranger(pos, dimension::Content{});
                         image->horizontal() = Arranger(pos, dimension::Content{});
                     }
@@ -103,9 +102,9 @@ namespace
                         fmt::format("sample-{}-{}", column, row));
                     sample->layout() = layout;
 
-                    sample->emplace<components::Image>("first", makeImageView("image.png"));
-                    sample->emplace<components::Image>("second", makeImageView("hud.png", kHud9P));
-                    sample->emplace<components::Image>("third", makeImageView("image.png"));
+                    sample->emplace<components::Image>("first", sprite::Image("image.png"));
+                    sample->emplace<components::Image>("second", sprite::Image("hud.png", kHud9P));
+                    sample->emplace<components::Image>("third", sprite::Image("image.png"));
 
                     baseLayout->set(row++, column, sample->id());
                 }
@@ -125,9 +124,9 @@ namespace
                         fmt::format("sample-{}-{}", column, row));
                     sample->layout() = layout;
 
-                    sample->emplace<components::Image>("first", makeImageView("image.png"));
-                    sample->emplace<components::Image>("second", makeImageView("hud.png", kHud9P));
-                    sample->emplace<components::Image>("third", makeImageView("image.png"));
+                    sample->emplace<components::Image>("first", sprite::Image("image.png"));
+                    sample->emplace<components::Image>("second", sprite::Image("hud.png", kHud9P));
+                    sample->emplace<components::Image>("third", sprite::Image("image.png"));
 
                     baseLayout->set(row++, column, sample->id());
                 }
@@ -145,8 +144,8 @@ namespace
                         fmt::format("sample-{}-{}", column, row));
                     sample->layout() = layout;
 
-                    sample->emplace<components::Image>("first", makeImageView("image.png"));
-                    sample->emplace<components::Image>("third", makeImageView("image.png"));
+                    sample->emplace<components::Image>("first", sprite::Image("image.png"));
+                    sample->emplace<components::Image>("third", sprite::Image("image.png"));
 
                     baseLayout->set(row++, column, sample->id());
                 }
@@ -157,16 +156,13 @@ namespace
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-        minire::Application application(1280, 720, "GUI Flow Layout", manager);
-        application.setController<GuiLayoutFlow>(kMaxCtrlFps);
+        GuiLayoutArray application(1280, 720, "GUI Array Layout", manager);
         application.setVsync(true);
 
         // Main loop

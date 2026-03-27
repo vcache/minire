@@ -1,7 +1,8 @@
 #pragma once
 
+#include <minire/application/events.hpp>
 #include <minire/errors.hpp>
-#include <minire/events/application.hpp>
+#include <minire/gui/events.hpp>
 #include <minire/utils/demangle.hpp>
 
 #include <cassert>
@@ -13,38 +14,6 @@
 
 namespace minire::gui
 {
-    namespace events
-    {
-        struct OnDragBegin
-        {
-            minire::events::application::OnMouseDown _event;
-        };
-
-        struct OnDragMove
-        {
-            minire::events::application::OnMouseDown _begin;
-            minire::events::application::OnMouseMove _event;
-        };
-
-        struct OnDragEnd
-        {
-            std::optional<minire::events::application::OnMouseUp> _event;
-        };
-
-        struct OnMouseEnter
-        {
-            bool _isClickReturn;    // TODO: maybe use Drag logics instead?
-        };
-
-        struct OnMouseLeave {};
-
-        struct OnFocus {};
-
-        struct OnUnfocus {};
-
-        struct OnClick {};
-    }
-
     template<typename Derived, typename Event>
     class Callback
     {
@@ -94,22 +63,22 @@ namespace minire::gui
     template<typename Derived>
     class CommonCallbacks
         : public CallbacksBuilder<Derived,
-                                  minire::events::application::OnMouseWheel,
-                                  minire::events::application::OnMouseMove,
-                                  minire::events::application::OnMouseDown,
-                                  minire::events::application::OnMouseUp,
-                                  minire::events::application::OnKeyUp,
-                                  minire::events::application::OnKeyDown,
-                                  minire::events::application::OnTextInput,
-                                  minire::events::application::OnClipboardUpdate,
-                                  gui::events::OnDragBegin,
-                                  gui::events::OnDragMove,
-                                  gui::events::OnDragEnd,
-                                  gui::events::OnMouseEnter,
-                                  gui::events::OnMouseLeave,
-                                  gui::events::OnFocus,
-                                  gui::events::OnUnfocus,
-                                  gui::events::OnClick>
+                                  application::OnResize,
+                                  application::OnMouseWheel,
+                                  application::OnMouseMove,
+                                  application::OnMouseDown,
+                                  application::OnMouseUp,
+                                  application::OnKeyUp,
+                                  application::OnKeyDown,
+                                  application::OnTextInput,
+                                  gui::OnDragBegin,
+                                  gui::OnDragMove,
+                                  gui::OnDragEnd,
+                                  gui::OnMouseEnter,
+                                  gui::OnMouseLeave,
+                                  gui::OnFocus,
+                                  gui::OnUnfocus,
+                                  gui::OnClick>
     {};
 
     // A RAII-like handler for a Callback.

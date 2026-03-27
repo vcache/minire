@@ -38,11 +38,11 @@ namespace minire::gui::layouts
 
                 if (std::holds_alternative<dimension::Content>(slot._element._dimension))
                 {
-                    std::optional<std::pair<float, float>> const & sz = component.measureContent();
+                    std::optional<glm::vec2> const & sz = component.measureContent();
                     MINIRE_INVARIANT(sz, "Array layout requires measurable children, but \"{}\" is not",
                                      component.id());
-                    slot._width = sz->first;
-                    slot._height = sz->second;
+                    slot._width = sz->x;
+                    slot._height = sz->y;
                 }
             }
             else

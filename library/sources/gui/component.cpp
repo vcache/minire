@@ -132,6 +132,7 @@ namespace minire::gui
         , _isHovered(false)
         , _isDragging(false)
         , _acceptFocus(false)
+        , _eventTransparent(false)
     {
         _children.reserve(kExpectedChildren);
         invalidate();
@@ -201,7 +202,6 @@ namespace minire::gui
         //       so that the _invalidated can be already set.
         //       But there is a guarantee, that every parent Component
         //       has been revalidated.
-
         _invalidated = true;
 
         for (auto p = parent(); p && !p->_invalidated; p = p->parent())
@@ -249,6 +249,11 @@ namespace minire::gui
     {
         _acceptFocus = acceptFocus;
         // TODO: drop focus (if any) when it become false
+    }
+
+    void Component::setEventTransparent(bool eventTransparent)
+    {
+        _eventTransparent = eventTransparent;
     }
 
     void Component::setSystemCursor(models::SystemCursor const systemCursor)
@@ -309,16 +314,16 @@ namespace minire::gui
         {
             if (_impl->_visible)
             {
-                std::optional<std::pair<float, float>> contentSize = measureContent();
+                std::optional<glm::vec2> contentSize = measureContent();
 
                 auto [left, width] = _horizontal.get()(clientArea._left,
                                                        clientArea._width,
-                                                       contentSize ? std::optional<float>(contentSize->first)
+                                                       contentSize ? std::optional<float>(contentSize->x)
                                                                    : std::nullopt);
 
                 auto [top, height] = _vertical.get()(clientArea._top,
                                                      clientArea._height,
-                                                     contentSize ? std::optional<float>(contentSize->second)
+                                                     contentSize ? std::optional<float>(contentSize->y)
                                                                  : std::nullopt);
 
                 Area contentArea
@@ -378,6 +383,7 @@ namespace minire::gui
 
         utils::Rect const padding = _padding.get(); //  TODO: maybe padding should affect _contentArea instead?
                                                     //        (or just decrease clientArea)
+
         Area const childrenClientArea = Area
         {
             ._left = _impl->_contentArea._left + padding._left,
@@ -450,6 +456,7 @@ namespace minire::gui
         assert(_impl);
 
         if (!_visible.get() ||
+            _eventTransparent ||
             !_impl->_contentArea.contains(x, y))
         {
             return Sptr();
@@ -462,6 +469,10 @@ namespace minire::gui
             ++it)
         {
             assert(*it);
+
+            if ((*it)->eventTransparent())
+                continue;
+
             result = (*it)->findUnderCursor(x, y);
         }
 

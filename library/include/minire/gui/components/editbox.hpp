@@ -2,10 +2,12 @@
 
 #include <minire/gui/callbacks.hpp>
 #include <minire/gui/component.hpp>
-#include <minire/gui/content-view.hpp>
+#include <minire/gui/components/image.hpp>
+#include <minire/gui/components/text.hpp>
 #include <minire/text/formatted-string.hpp>
 #include <minire/text/text-format.hpp>
 
+#include <cassert>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -19,6 +21,7 @@ namespace minire::gui::components
     // TODO: unicode combos
     // TODO: blinking
     // TODO: context menu
+    // TODO: drop selection once system's primary selection changed
     namespace editbox
     {
         struct OnTextChanged
@@ -36,6 +39,8 @@ namespace minire::gui::components
         using Sptr = std::shared_ptr<Editbox>;
         using Wptr = std::weak_ptr<Editbox>;
 
+        static constexpr std::string kName = "Editbox";
+
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
         using CommonCallbacks::eraseCallback;
@@ -50,20 +55,20 @@ namespace minire::gui::components
                 Theme::Style const & style,
                 OverlayController &);
 
-        Property<ImageView::Sptr> const & bgNormal() const { return _bgNormal; }
-        Property<ImageView::Sptr> & bgNormal() { return _bgNormal; }
+        Property<minire::models::sprite::MaybeImage> const & bgNormal() const { assert(_bgNormal); return _bgNormal->image(); }
+        Property<minire::models::sprite::MaybeImage> & bgNormal() { assert(_bgNormal); return _bgNormal->image(); }
 
-        Property<ImageView::Sptr> const & bgDisabled() const { return _bgDisabled; }
-        Property<ImageView::Sptr> & bgDisabled() { return _bgDisabled; }
+        Property<minire::models::sprite::MaybeImage> const & bgDisabled() const { assert(_bgDisabled); return _bgDisabled->image(); }
+        Property<minire::models::sprite::MaybeImage> & bgDisabled() { assert(_bgDisabled); return _bgDisabled->image(); }
 
-        Property<ImageView::Sptr> const & cursorImageInsert() const { return _cursorImageInsert; }
-        Property<ImageView::Sptr> & cursorImageInsert() { return _cursorImageInsert; }
+        Property<minire::models::sprite::MaybeImage> const & cursorImageInsert() const { assert(_cursorImageInsert); return _cursorImageInsert->image(); }
+        Property<minire::models::sprite::MaybeImage> & cursorImageInsert() { assert(_cursorImageInsert); return _cursorImageInsert->image(); }
 
-        Property<ImageView::Sptr> const & cursorImageReplace() const { return _cursorImageReplace; }
-        Property<ImageView::Sptr> & cursorImageReplace() { return _cursorImageReplace; }
+        Property<minire::models::sprite::MaybeImage> const & cursorImageReplace() const { assert(_cursorImageReplace); return _cursorImageReplace->image(); }
+        Property<minire::models::sprite::MaybeImage> & cursorImageReplace() { assert(_cursorImageReplace); return _cursorImageReplace->image(); }
 
-        Property<ImageView::Sptr> const & selectionImage() const { return _selectionImage; }
-        Property<ImageView::Sptr> & selectionImage() { return _selectionImage; }
+        Property<minire::models::sprite::MaybeImage> const & selectionImage() const { assert(_selectionImage); return _selectionImage->image(); }
+        Property<minire::models::sprite::MaybeImage> & selectionImage() { assert(_selectionImage); return _selectionImage->image(); }
 
         // true -> insert; false -> replace
         Property<bool> const & insertMode() const { return _insertMode; }
@@ -103,18 +108,19 @@ namespace minire::gui::components
         void clear();
 
     protected:
+        void initialize() override;
         size_t revalidateContent(size_t zOffset,
                                  bool const effectiveVisible,
                                  Area const & contentArea,
                                  Area const & clippingWindow) override;
 
-        void handle(gui::events::OnFocus const &) override;
-        void handle(gui::events::OnUnfocus const &) override;
-        void handle(gui::events::OnDragMove const &) override;
-        void handle(gui::events::OnDragEnd const &) override;
-        void handle(minire::events::application::OnMouseDown const &) override;
-        void handle(minire::events::application::OnKeyDown const &) override;
-        void handle(minire::events::application::OnTextInput const &) override;
+        void handle(gui::OnFocus const &) override;
+        void handle(gui::OnUnfocus const &) override;
+        void handle(gui::OnDragMove const &) override;
+        void handle(gui::OnDragEnd const &) override;
+        void handle(application::OnMouseDown const &) override;
+        void handle(application::OnKeyDown const &) override;
+        void handle(application::OnTextInput const &) override;
 
     private:
         void handleTextChange();
@@ -146,18 +152,18 @@ namespace minire::gui::components
     private:
         static constexpr size_t kNoIndex = std::numeric_limits<size_t>::max();
 
-        Property<ImageView::Sptr>       _bgNormal;
-        Property<ImageView::Sptr>       _bgDisabled;
-        Property<ImageView::Sptr>       _cursorImageInsert;
-        Property<ImageView::Sptr>       _cursorImageReplace;
-        Property<ImageView::Sptr>       _selectionImage;
+        components::Image::Sptr         _bgNormal;
+        components::Image::Sptr         _bgDisabled;
+        components::Image::Sptr         _cursorImageInsert;
+        components::Image::Sptr         _cursorImageReplace;
+        components::Image::Sptr         _selectionImage;
         Property<bool>                  _insertMode;
         Property<bool>                  _enabled;
         Property<PasswordChar>          _passwordChar;
         Property<utils::Rect>           _contentPadding;
 
         Property<text::FormattedString> _text;
-        TextView::Sptr                  _textView;
+        components::Text::Sptr          _textView;
         text::Format                    _activeFormat;
         size_t                          _cursorPos; //  TODO: make it Property (public) + avoid invalidateContent()s
         size_t                          _selectionBegin;

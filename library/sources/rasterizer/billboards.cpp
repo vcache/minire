@@ -13,7 +13,7 @@
 #include <rasterizer/labels/vertex-buffer.hpp>
 #include <rasterizer/sprites/vertex-buffer.hpp>
 #include <rasterizer/textures.hpp>
-#include <scene.hpp>
+#include <scene-impl.hpp>
 #include <utils/overloaded.hpp>
 
 #include <glm/mat4x4.hpp>
@@ -708,7 +708,7 @@ namespace minire::rasterizer
         }, billboard._placement);
     }
 
-    void Billboards::draw(Scene const & scene) const
+    void Billboards::draw(SceneImpl const & scene) const
     {
         scene::Viewpoint const & viewpoint = scene.viewpoint();
         assert(viewpoint.hasCamera());

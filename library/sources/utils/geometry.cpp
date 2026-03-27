@@ -1,6 +1,6 @@
 #include <minire/utils/geometry.hpp>
 
-#include <scene/viewpoint.hpp>
+#include <scene-impl/viewpoint.hpp>
 
 #include <fmt/format.h>
 #include <glm/common.hpp>

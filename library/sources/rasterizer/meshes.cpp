@@ -5,7 +5,7 @@
 #include <minire/logging.hpp>
 
 #include <rasterizer/resources.hpp>
-#include <scene.hpp>
+#include <scene-impl.hpp>
 
 #include <cassert>
 #include <algorithm>
@@ -50,7 +50,7 @@ namespace minire::rasterizer
                                       _vertexBuffers);
     }
 
-    void Meshes::draw(Scene const & scene,
+    void Meshes::draw(SceneImpl const & scene,
                       material::TextureRefs const & directionalLightsShadowMaps,
                       material::TextureRefs const & pointLightsShadowMaps) const
     {

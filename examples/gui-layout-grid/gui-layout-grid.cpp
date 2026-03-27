@@ -1,7 +1,5 @@
-#include <minire/application.hpp>
-
 #include <minire/content/manager.hpp>
-#include <minire/gui-controller.hpp>
+#include <minire/gui-application.hpp>
 #include <minire/gui/components/image.hpp>
 #include <minire/gui/layouts/grid.hpp>
 #include <minire/logging.hpp>
@@ -13,14 +11,14 @@
 namespace
 {
     class GuiLayoutGrid
-        : public minire::GuiController
+        : public minire::GuiApplication
     {
-        using GuiController::GuiController;
+        using GuiApplication::GuiApplication;
 
     protected:
-        void start() override
+        void onStart() override
         {
-            GuiController::start();
+            GuiApplication::onStart();
 
             auto layout = std::make_shared<minire::gui::layouts::Grid>(3, 4);
             auto container = guiRoot().emplace<minire::gui::Component>("container");
@@ -31,7 +29,8 @@ namespace
                 for(size_t col = 0; col < layout->cols(); col++)
                 {
                     auto image = container->emplace<minire::gui::components::Image>(
-                        fmt::format("cell-{}x{}", row, col), makeImageView("image.png"));
+                        fmt::format("cell-{}x{}", row, col),
+                        minire::models::sprite::Image("image.png"));
                     image->vertical() = minire::gui::Arranger(minire::gui::position::Center{},
                                                               minire::gui::dimension::Content{});
                     image->horizontal() = minire::gui::Arranger(minire::gui::position::Center{},
@@ -45,16 +44,13 @@ namespace
 
 int main()
 {
-    static size_t const kMaxCtrlFps = 60;
-
     try
     {
         // Initialization
         minire::logging::setVerbosity(minire::logging::Level::kDebug);
         minire::content::Manager manager;
         manager.setReader<minire::content::readers::Filesystem>(MINIRE_EXAMPLE_PREFIX);
-        minire::Application application(1280, 720, "GUI Layout Grid", manager);
-        application.setController<GuiLayoutGrid>(kMaxCtrlFps);
+        GuiLayoutGrid application(1280, 720, "GUI Layout Grid", manager);
         application.setVsync(true);
 
         // Main loop

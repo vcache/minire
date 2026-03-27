@@ -35,6 +35,7 @@ namespace minire::gui
                                Targets const &) const = 0;
     };
 
+    // TODO: put into "gui::layouts" namespace and rename to layouts::Linear
     class LinearLayout
         :  public Layout
     {

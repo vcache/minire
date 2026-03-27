@@ -1,8 +1,14 @@
 #pragma once
 
+#include <minire/errors.hpp>
 #include <minire/gui/component.hpp>
-#include <minire/gui/content-view.hpp>
+#include <minire/gui/components/image.hpp>
+#include <minire/gui/components/text.hpp>
 #include <minire/gui/models/checkable.hpp>
+#include <minire/label.hpp>
+#include <minire/models/sprite.hpp>
+#include <minire/sprite.hpp>
+#include <minire/text/formatted-string.hpp>
 #include <minire/utils/rect.hpp>
 
 #include <glm/vec2.hpp>
@@ -11,6 +17,7 @@
 
 namespace minire::gui::components
 {
+    // TODO: make hasText and hasIcon mutable
     class Button final
         : public Component
         , public models::Checkable
@@ -19,10 +26,35 @@ namespace minire::gui::components
         Button(std::string const & id,
                Theme const & theme,
                Theme::Style const & style,
-               OverlayController &);
+               OverlayController &,
+               bool const hasText,
+               bool const hasIcon);
+
+        // Just a handy synonym (Enum instead two bools)
+        enum class Mode { kNone, kText, kIcon, kBoth };
+        Button(std::string const & id,
+               Theme const & theme,
+               Theme::Style const & style,
+               OverlayController &,
+               Mode mode);
+
+        // Experimental interface
+        template<typename... Options>
+        Button(std::string const & id,
+               Theme const & theme,
+               Theme::Style const & style,
+               OverlayController & overlayController,
+               Mode mode,
+               Options && ... options)
+            : Button(id, theme, style, overlayController, mode)
+        {
+            (options(*this), ...);
+        }
 
         using Sptr = std::shared_ptr<Button>;
         using Wptr = std::weak_ptr<Button>;
+
+        static constexpr std::string kName = "Button";
 
         using CommonCallbacks::handle;
         using CommonCallbacks::setCallback;
@@ -31,44 +63,106 @@ namespace minire::gui::components
         using Checkable::setCallback;
         using Checkable::eraseCallback;
 
-        Property<ImageView::Sptr> const & bgNormal() const { return _bgNormal; }
-        Property<ImageView::Sptr> & bgNormal() { return _bgNormal; }
+        // Background
 
-        Property<ImageView::Sptr> const & bgHovered() const { return _bgHovered; };
-        Property<ImageView::Sptr> & bgHovered() { return _bgHovered; };
+        Property<minire::models::sprite::MaybeImage> const & bgNormal() const { assert(_bgNormal); return _bgNormal->image(); }
+        Property<minire::models::sprite::MaybeImage> & bgNormal() { assert(_bgNormal); return _bgNormal->image(); }
 
-        Property<ImageView::Sptr> const & bgPressed() const { return _bgPressed; }
-        Property<ImageView::Sptr> & bgPressed() { return _bgPressed; }
+        Property<minire::models::sprite::MaybeImage> const & bgHovered() const { assert(_bgHovered); return _bgHovered->image(); };
+        Property<minire::models::sprite::MaybeImage> & bgHovered() { assert(_bgHovered);  return _bgHovered->image(); };
 
-        Property<TextView::Sptr> const & text() const { return _text; }
-        Property<TextView::Sptr> & text() { return _text; }
+        Property<minire::models::sprite::MaybeImage> const & bgPressed() const { assert(_bgPressed); return _bgPressed->image(); }
+        Property<minire::models::sprite::MaybeImage> & bgPressed() {assert(_bgPressed); return _bgPressed->image(); }
 
-        Property<ImageView::Sptr> const & icon() const { return _icon; }
-        Property<ImageView::Sptr> & icon() { return _icon; }
+        // Caption
 
-        Property<Theme::Location> const & iconLocation() const { return _iconLocation; }
-        Property<Theme::Location> & iconLocation() { return _iconLocation; }
+        Property<text::FormattedString> const & text() const
+        {
+            MINIRE_INVARIANT(_hasText, "a button doesn't have a text: \"{}\"", id());
+            assert(_text);
+            return _text->text();
+        }
+        Property<text::FormattedString> & text()
+        {
+            MINIRE_INVARIANT(_hasText, "a button doesn't have a text: \"{}\"", id());
+            assert(_text);
+            return _text->text();
+        }
 
-        Property<float> const & iconSpacing() const { return _iconSpacing; }
-        Property<float> & iconSpacing() { return _iconSpacing; }
+        Property<content::Id> const & fontFace() const
+        {
+            MINIRE_INVARIANT(_hasText, "a button doesn't have a text: \"{}\"", id());
+            assert(_text);
+            return _text->fontFace();
+        }
+        Property<content::Id> & fontFace()
+        {
+            MINIRE_INVARIANT(_hasText, "a button doesn't have a text: \"{}\"", id());
+            assert(_text);
+            return _text->fontFace();
+        }
+
+        // Icon
+
+        Property<minire::models::sprite::MaybeImage> const & icon() const
+        {
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
+            assert(_icon);
+            return _icon->image();
+        }
+        Property<minire::models::sprite::MaybeImage> & icon()
+        {
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
+            assert(_icon);
+            return _icon->image();
+        }
+
+        Property<Theme::Location> const & iconLocation() const
+        {
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
+            return _iconLocation;
+        }
+        Property<Theme::Location> & iconLocation()
+        {
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
+            return _iconLocation;
+        }
+
+        Property<float> const & iconSpacing() const
+        {
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
+            return _iconSpacing;
+        }
+        Property<float> & iconSpacing()
+        {
+            MINIRE_INVARIANT(_hasIcon, "a button doesn't have an icon: \"{}\"", id());
+            return _iconSpacing;
+        }
+
+        // Miscellaneous
 
         Property<glm::vec2> const & pressOffset() const { return _pressOffset; }
         Property<glm::vec2> & pressOffset() { return _pressOffset; }
 
-        std::optional<std::pair<float, float>> measureContent() const override;
+        Property<utils::Rect> const & contentPadding() const { return _contentPadding; }
+        Property<utils::Rect> & contentPadding() { return _contentPadding; }
 
     protected:
+        void initialize() override;
+
         size_t revalidateContent(size_t zOffset,
                                  bool const effectiveVisible,
                                  Area const & contentArea,
                                  Area const & clippingWindow) override;
 
+        std::optional<glm::vec2> measureContent() const override;
+
         void handle(models::checkable::OnCheckedChanged const &) override;
-        void handle(minire::events::application::OnMouseDown const & e) override;
-        void handle(gui::events::OnDragEnd const &) override;
-        void handle(gui::events::OnMouseEnter const &) override;
-        void handle(gui::events::OnMouseLeave const &) override;
-        void handle(gui::events::OnClick const &) override;
+        void handle(application::OnMouseDown const & e) override;
+        void handle(gui::OnDragEnd const &) override;
+        void handle(gui::OnMouseEnter const &) override;
+        void handle(gui::OnMouseLeave const &) override;
+        void handle(gui::OnClick const &) override;
 
     private:
         enum State
@@ -76,29 +170,111 @@ namespace minire::gui::components
             kNormal, kHovered, kPressed,
         };
 
-        ImageView::Sptr const & activeBackground() const;
-        void revalidatePositions(Area const & contentArea,
-                                 Area const & clippingWindow);
         void setState(State state);
 
-        template<typename T>
-        void actualize(Property<std::shared_ptr<T>> & contentView);
+        void rebuildLayout();
+        void updateArrangers();
+        void updateBackground();
 
     private:
-        Property<ImageView::Sptr> _bgNormal;
-        Property<ImageView::Sptr> _bgHovered;
-        Property<ImageView::Sptr> _bgPressed;
+        components::Image::Sptr   _bgNormal;
+        components::Image::Sptr   _bgHovered;
+        components::Image::Sptr   _bgPressed;
         // TODO: focused, hovered while pressed, and etc
 
-        Property<TextView::Sptr>  _text;
-        Property<ImageView::Sptr> _icon;
+        Component::Sptr           _content; // container for text+icon
+        components::Text::Sptr    _text;
+        components::Image::Sptr   _icon;
+
         Property<Theme::Location> _iconLocation;
         Property<float>           _iconSpacing;
-
         Property<glm::vec2>       _pressOffset;
+        Property<utils::Rect>     _contentPadding;
 
         State                     _state = State::kNormal;
         glm::vec2                 _textPosition{0, 0};
         glm::vec2                 _iconPosition{0, 0};
+
+        bool const                _hasText;
+        bool const                _hasIcon;
     };
+
+    // TODO: This is an experimental interface,
+    //       if it proves successful, it should be extended to other components.
+    // TODO: maybe try chain-initializer (as in layouts::Array or FormattedString)?
+    namespace options
+    {
+        template<typename T>
+        struct Base { T _value; };
+
+        struct Text : public Base<text::FormattedString>
+        {
+            void operator()(Button & b) const { b.text() = _value; }
+        };
+
+        struct BgNormal : public Base<minire::models::sprite::MaybeImage>
+        {
+            void operator()(Button & b) const { b.bgNormal() = _value; }
+        };
+
+        struct BgHovered : public Base<minire::models::sprite::MaybeImage>
+        {
+            void operator()(Button & b) const { b.bgHovered() = _value; }
+        };
+
+        struct BgPressed : public Base<minire::models::sprite::MaybeImage>
+        {
+            void operator()(Button & b) const { b.bgPressed() = _value; }
+        };
+
+        struct FontFace : public Base<content::Id>
+        {
+            void operator()(Button & b) const { b.fontFace() = _value; }
+        };
+
+        struct Icon : public Base<minire::models::sprite::MaybeImage>
+        {
+            void operator()(Button & b) const { b.icon() = _value; }
+        };
+
+        struct IconLocation : public Base<Theme::Location>
+        {
+            void operator()(Button & b) const { b.iconLocation() = _value; }
+        };
+
+        struct IconSpacing : public Base<float>
+        {
+            void operator()(Button & b) const { b.iconSpacing() = _value; }
+        };
+
+        struct PressOffset : public Base<glm::vec2>
+        {
+            void operator()(Button & b) const { b.pressOffset() = _value; }
+        };
+
+        struct ContentPadding : public Base<utils::Rect>
+        {
+            void operator()(Button & b) const { b.contentPadding() = _value; }
+        };
+
+        struct Horizontal : public Base<Arranger>
+        {
+            void operator()(Button & b) const { b.horizontal() = _value; }
+        };
+
+        struct Vertical : public Base<Arranger>
+        {
+            void operator()(Button & b) const { b.vertical() = _value; }
+        };
+
+        struct Checkable : public Base<bool>
+        {
+            void operator()(Button & b) const { b.setCheckable(_value); }
+        };
+
+        struct ExclusiveGroup : public Base<gui::models::Checkable::ExclusiveGroupSptr>
+        {
+            void operator()(Button & b) const { b.setExclusiveGroup(_value); }
+        };
+    }
 }

@@ -1,11 +1,12 @@
 #include <rasterizer.hpp>
 
 #include <minire/content/manager.hpp>
+#include <minire/logging.hpp>
 #include <minire/models/pbr-material.hpp>
 
 #include <opengl.hpp>
 #include <rasterizer/materials/pbr.hpp>
-#include <scene.hpp>
+#include <scene-impl.hpp>
 #include <utils/frustum.hpp>
 
 #include <glm/gtx/transform.hpp>
@@ -26,7 +27,7 @@ namespace minire
         , _vertexBuffers(_resources)
         , _meshes(_ubo, _materials, _vertexBuffers, _contentManager, _resources)
         , _fonts(_contentManager, fontsPreload)
-        , _labels(_fonts)
+        , _labels(_fonts, _contentManager)
         , _sprites(_textures)
         , _billboards(_contentManager, _fonts, _textures)
         , _directionalLightsShadowMaps(rasterizer::Ubo::maxDirectionalLights(), nullptr)
@@ -54,7 +55,7 @@ namespace minire
     }
 
     rasterizer::CulledDirectionalLights
-    Rasterizer::cullDirectionalLights(Scene const & scene)
+    Rasterizer::cullDirectionalLights(SceneImpl const & scene)
     {
         rasterizer::CulledDirectionalLights result;
         result.reserve(rasterizer::Ubo::maxDirectionalLights());
@@ -108,7 +109,7 @@ namespace minire
     }
 
     rasterizer::CulledPointLights
-    Rasterizer::cullPointLights(Scene const & scene)
+    Rasterizer::cullPointLights(SceneImpl const & scene)
     {
         rasterizer::CulledPointLights result;
         result.reserve(rasterizer::Ubo::maxPointLights());
@@ -162,7 +163,7 @@ namespace minire
     }
 
     rasterizer::CulledPrimitives
-    Rasterizer::cullPrimitives(Scene const & scene)
+    Rasterizer::cullPrimitives(SceneImpl const & scene)
     {
         rasterizer::CulledPrimitives result;
         // TODO: result.reserve
@@ -187,7 +188,7 @@ namespace minire
         return result;
     }
 
-    void Rasterizer::draw(Scene const & scene)
+    void Rasterizer::draw(SceneImpl const & scene)
     {
         auto directionalLights = cullDirectionalLights(scene);
         auto pointLights = cullPointLights(scene);
@@ -197,7 +198,7 @@ namespace minire
         draw2d();
     }
 
-    void Rasterizer::shadowPass(Scene const & scene,
+    void Rasterizer::shadowPass(SceneImpl const & scene,
                                 rasterizer::CulledPrimitives const & culledPrimitives,
                                 rasterizer::CulledDirectionalLights & culledDirectionalLights,
                                 rasterizer::CulledPointLights & culledPointLights)
@@ -235,7 +236,7 @@ namespace minire
         }
     }
 
-    void Rasterizer::colorPass(Scene const & scene,
+    void Rasterizer::colorPass(SceneImpl const & scene,
                                rasterizer::CulledDirectionalLights const & culledDirectionalLights,
                                rasterizer::CulledPointLights const & culledPointLights)
     {
@@ -293,7 +294,7 @@ namespace minire
         }
     }
 
-    void Rasterizer::draw3d(Scene const & scene,
+    void Rasterizer::draw3d(SceneImpl const & scene,
                             material::TextureRefs const & directionalLightsShadowMaps,
                             material::TextureRefs const & pointLightsShadowMaps)
     {
@@ -352,10 +353,10 @@ namespace minire
             {
                 assert(a);
                 assert(b);
-                return a->zOrder() < b->zOrder();
+                return a->effectiveZOrder() < b->effectiveZOrder();
             });
 
-        for(rasterizer::Drawable const * drawable : _drawables)
+        for(rasterizer::Drawable * drawable : _drawables)
         {
             assert(drawable);
             drawable->draw(_2dProjection);

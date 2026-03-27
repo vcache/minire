@@ -15,7 +15,7 @@
 namespace minire::grips
 {
     // TODO: screen resoution to sensitivity
-    // TODO: helpers for events::application::* processing and active camera
+    // TODO: helpers for events::* processing and active camera
     class Orbiting
     {
         constexpr float static kEpsilon = std::numeric_limits<float>::epsilon();
@@ -70,11 +70,13 @@ namespace minire::grips
 
         float distance() const { return _distance; }
 
+        Orbiting & operator=(Orbiting const &) = default;
+
     private:
-        glm::vec3       _target;
-        float           _distance;
-        float           _thetha;
-        float           _phi;
-        glm::vec2 const _phiMinMax;
+        glm::vec3 _target;
+        float     _distance;
+        float     _thetha;
+        float     _phi;
+        glm::vec2 _phiMinMax;
     };
 }

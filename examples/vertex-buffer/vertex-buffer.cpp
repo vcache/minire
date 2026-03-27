@@ -11,7 +11,7 @@
 namespace
 {
     class VertexBufferExample
-        : public minire::examples::TestbedController
+        : public minire::examples::TestbedApplication
     {
         static size_t constexpr kSphereRes = 50;
 
@@ -208,64 +208,67 @@ namespace
         }
 
     public:
-        using TestbedController::TestbedController;
+        using TestbedApplication::TestbedApplication;
 
-        void start() override
+        void onStart() override
         {
             using namespace minire::content;
-            using namespace minire::events::controller;
             using namespace minire::models;
 
-            TestbedController::start();
+            TestbedApplication::onStart();
 
-            enqueue<CreateVertexBuffer>("quads-example", makeQuadVertexBuffer(), false);
-            enqueue<CreateVertexBuffer>("sphere-example",
-                                        makeUvSphere(kSphereRes, kSphereRes,
-                                                     _sphereAnimationPhase,
-                                                     _sphereAnimationSeed),
-                                        false);
+            // Build customized vertex buffers
+            createVertexBuffer("quads-example", makeQuadVertexBuffer(), false);
+            createVertexBuffer("sphere-example", makeUvSphere(kSphereRes, kSphereRes,
+                                                              _sphereAnimationPhase,
+                                                              _sphereAnimationSeed),
+                               false);
 
+            // Build a material
             auto material = makeMaterial();
 
-            enqueue<SceneNewNode>("quad-node", ScenePath(), Transform(glm::vec3(0, -1, 0)), true);
-            enqueue<SceneNewMesh>("quad", ScenePath{"quad-node"},
+            // Attach them to a scene
+            auto quadNode = scene().root().make(Node{Transform(glm::vec3(0, -1, 0)), true});
+            quadNode->make("quad",
                 Mesh
                 {
                     ._source = mkPath(path::Special::kVertexBuffers, "quads-example"),
                     ._defaultMaterial = material,
-                },
-                true);
+                    ._skin = std::nullopt,
+                    ._visible = true,
+                });
 
-            enqueue<SceneNewNode>("sphere-node", ScenePath(), Transform(), true);
-            enqueue<SceneNewMesh>("sphere", ScenePath{"sphere-node"},
+            auto sphereNode = scene().root().make(Node{Transform(), true});
+            sphereNode->make("sphere",
                 Mesh
                 {
                     ._source = mkPath(path::Special::kVertexBuffers, "sphere-example"),
                     ._defaultMaterial = material,
-                },
-                true);
+                    ._skin = std::nullopt,
+                    ._visible = true,
+                });
         }
 
-        void step() override
+        bool onStep() override
         {
-            using namespace minire::events::controller;
-
             _sphereAnimationPhase += frameTime();
             auto const phase = std::sin(_sphereAnimationPhase);
-            enqueue<CreateVertexBuffer>("sphere-example",
-                                        makeUvSphere(kSphereRes, kSphereRes,
-                                                     phase, _sphereAnimationSeed),
-                                        true);
+            createVertexBuffer("sphere-example",
+                               makeUvSphere(kSphereRes, kSphereRes,
+                                            phase, _sphereAnimationSeed),
+                               true);
             if (_sphereAnimationPhase >= 2 * M_PI)
             {
                 _sphereAnimationSeed++;
                 _sphereAnimationPhase -= 2 * M_PI;
             }
+
+            return true;
         }
 
     private:
-        float                              _sphereAnimationPhase = 0;
-        size_t                             _sphereAnimationSeed = 0;
+        float  _sphereAnimationPhase = 0;
+        size_t _sphereAnimationSeed = 0;
     };
 }
 

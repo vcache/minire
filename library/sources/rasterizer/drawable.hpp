@@ -3,6 +3,7 @@
 #include <glm/mat4x4.hpp>
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 namespace minire::rasterizer
@@ -10,23 +11,21 @@ namespace minire::rasterizer
     class Drawable
     {
     public:
-        using PtrsList = std::vector<Drawable const *>;
+        // Assuming these pointers won't be stored anywhere,
+        // and nothing but draw() will be called.
+        using PtrsList = std::vector<Drawable *>;
 
     public:
-        explicit Drawable(size_t zOrder)
-            : _zOrder(zOrder)
-        {}
-
         virtual ~Drawable() = default;
 
-        virtual void draw(glm::mat4 const & projection) const = 0;
+        virtual void draw(glm::mat4 const & projection) = 0;
 
     public:
-        size_t zOrder() const { return _zOrder; }
+        size_t effectiveZOrder() const { return _effectiveZOrder; }
 
-        void setZOrder(size_t z) { _zOrder = z; }
+        void setEffectiveZOrder(size_t z) { _effectiveZOrder = z; }
 
     private:
-        size_t _zOrder;
+        size_t _effectiveZOrder = 0;
     };
 }
