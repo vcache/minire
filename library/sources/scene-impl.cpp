@@ -32,32 +32,7 @@ namespace minire
     template<typename Derived, typename ObjectType>
     void SceneImpl::Leaf<Derived, ObjectType>::setParent(scene::Node::Sptr const & newParentIface)
     {
-        // find a leaf's iterator
-        auto oldParent = _parent.lock();
-        MINIRE_INVARIANT(oldParent, "an un-parented scene leaf cannot be re-parented: \"{}\"", name());
-        auto oldIterator = oldParent->_children.find(name());
-        assert(oldIterator != oldParent->_children.cend());
-
-        // find a new parent and insert element to a new parent's children
-        SceneImpl::Node::Sptr newParent = std::static_pointer_cast<SceneImpl::Node>(newParentIface);
-        if (newParent)
-        {
-            auto [_, inserted] = newParent->_children.emplace(oldIterator->first,
-                                                              oldIterator->second);
-            MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into a new parent node (\"{}\")",
-                             name(), newParent->name());
-        }
-
-        // reset _parent for the element
-        _parent = newParent;
-
-        // erase the element from an old parent
-        oldParent->_children.erase(oldIterator);
-
-        if (newParent)
-        {
-            ObjectType::propagate();
-        }
+        SceneImpl::setParent(*this, newParentIface);
     }
 
     template<typename Derived, typename ObjectType>
@@ -100,7 +75,6 @@ namespace minire
         Object::revalidate(mask);
     }
 
-    // TODO: re-actualize active camera when its visibility changed?
     void SceneImpl::PerspectiveCameraLeaf::revalidate(Mask mask)
     {
         if (invalidatedAny(mask & (kYFov /*| kZNear | kZFar | kAspectRatio*/)))
@@ -117,7 +91,6 @@ namespace minire
         _scene.setActiveCamera(*this);
     }
 
-    // TODO: re-actualize active camera when its visibility changed?
     void SceneImpl::OrthographicCameraLeaf::revalidate(Mask mask)
     {
         if (invalidatedAny(mask & (kXMag | kYMag /* | kZNear | kZFar*/)))
@@ -319,36 +292,11 @@ namespace minire
         invalidate(kAnimation);
     }
 
-    // TODO: code duplicated w/ Left::setParent
-    // TODO: when parent is changed, some animation may steel refer to moved nodes,
+    // TODO: when parent is changed, some animation may stil refer to moved nodes,
     //       it will work, but ill-logic.
     void SceneImpl::Node::setParent(scene::Node::Sptr const & newParentIface)
     {
-        // Find a leaf's iterator
-        auto oldParent = _parent.lock();
-        MINIRE_INVARIANT(oldParent, "an un-parented scene leaf cannot be re-parented: \"{}\"", name());
-        auto oldIterator = oldParent->_children.find(name());
-
-        // Find a new parent and insert element to a new parent's children
-        SceneImpl::Node::Sptr newParent = std::static_pointer_cast<SceneImpl::Node>(newParentIface);
-        if (newParent)
-        {
-            auto [_, inserted] = newParent->_children.emplace(oldIterator->first,
-                                                              oldIterator->second);
-            MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into a new parent node (\"{}\")",
-                             name(), newParent->name());
-        }
-
-        // Reset _parent for the element
-        _parent = newParent;
-
-        // Erase the element from an old parent
-        oldParent->_children.erase(oldIterator);
-
-        if (newParent)
-        {
-            Object::propagate();
-        }
+        SceneImpl::setParent(*this, newParentIface);
     }
 
     void SceneImpl::Node::erase(models::ScenePath const & path)
@@ -1011,5 +959,39 @@ namespace minire
         }
 
         return result;
+    }
+
+    template<typename ItemType>
+    void SceneImpl::setParent(ItemType & item,
+                              scene::Node::Sptr const & newParentIface)
+    {
+        // find a leaf's iterator
+        auto oldParent = item._parent.lock();
+        MINIRE_INVARIANT(oldParent, "an un-parented scene leaf cannot be re-parented: \"{}\"",
+                         item.name());
+        auto oldIterator = oldParent->_children.find(item.name());
+        assert(oldIterator != oldParent->_children.cend());
+
+        // find a new parent and insert element to a new parent's children
+        SceneImpl::Node::Sptr newParent = std::static_pointer_cast<SceneImpl::Node>(newParentIface);
+        if (newParent)
+        {
+            auto [_, inserted] = newParent->_children.emplace(oldIterator->first,
+                                                              oldIterator->second);
+            MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into a new parent node (\"{}\")",
+                             item.name(), newParent->name());
+        }
+
+        // reset _parent for the element
+        item._parent = newParent;
+
+        // erase the element from an old parent
+        oldParent->_children.erase(oldIterator);
+
+        if (newParent)
+        {
+            item.propagate();
+        }
+
     }
 }

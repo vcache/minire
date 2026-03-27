@@ -214,6 +214,8 @@ namespace minire
             void setParent(scene::Node::Sptr const & newParent) override;
 
         private:
+            using ObjectType::propagate;
+
             void propagate(ObjectType::Mask) override;
             void invalidateParent(ObjectType::Mask);
 
@@ -434,6 +436,8 @@ namespace minire
                 return !invalidatedAny(kGlobalTransformDirty | kGlobalTransformGray);
             }
 
+            using scene::Node::propagate;
+
             void revalidate(Mask = kAllFlags) override;
             void propagate(Object::Mask) override;
             void invalidateParent(Mask);
@@ -530,6 +534,9 @@ namespace minire
         void revalidate(Node *, Node::Mask);
         void actualizeViewpoint();
         material::SkinningVector makeSkinningVector(MeshLeaf const &) const;
+
+        template<typename ItemType>
+        static void setParent(ItemType &, scene::Node::Sptr const &);
 
         // TODO: lerpable _ambientLight
 
