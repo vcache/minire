@@ -115,7 +115,7 @@ namespace minire
         Node::Sptr node = std::make_shared<Node>(name, std::move(model), weak_from_this(), _scene);
         auto [_, inserted] = _children.emplace(name, node);
         MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
-        node->invalidate(kGlobalTransformDirty);
+        node->invalidate(kLocalTransformDirty);
         return node;
     }
 
@@ -297,6 +297,7 @@ namespace minire
     void SceneImpl::Node::setParent(scene::Node::Sptr const & newParentIface)
     {
         SceneImpl::setParent(*this, newParentIface);
+        invalidate(kParentTransformChanged);
     }
 
     void SceneImpl::Node::erase(models::ScenePath const & path)
@@ -459,7 +460,7 @@ namespace minire
                 {
                     // NOTE: don't perform actual lerp for animable targets
                     targetNode->_localTransform.setCurrent(_scene._epochNumber, current);
-                    targetNode->invalidate(kGlobalTransformDirty);
+                    targetNode->invalidate(kLocalTransformDirty);
                 }
             }
         }
@@ -522,7 +523,7 @@ namespace minire
         {
             if (lerp(_scene._lerpWeight, _scene._epochNumber))
             {
-                newMask |= (kHasActivateChildren | kGlobalTransformDirty);
+                newMask |= (kHasActivateChildren | kLocalTransformDirty);
             }
             else
             {
@@ -532,22 +533,27 @@ namespace minire
 
         // Global transform
 
-        if (invalidatedAny(mask & kGlobalTransformDirty))
+        if (invalidatedAny(mask & (kLocalTransformDirty | kParentTransformChanged)))
         {
             static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
             static const glm::vec4 kGlobalOrigin(0, 0, 0, 1);
 
-            models::Transform const & localTransform = _localTransform.current();
+            if (invalidatedAny(mask & kLocalTransformDirty))
+            {
+                // NOTE: localTransform.matrix() is pretty expensive!
+                models::Transform const & localTransform = _localTransform.current();
+                _localTransformMatrix = localTransform.matrix();
+                dropMask |= kLocalTransformDirty;
+            }
 
-            glm::mat4 localTransformMatrix = localTransform.matrix();
             assert(!parent || parent->hasGlobalTransform());
             glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransform
                                                              : kIdentityMatrix;
-            _globalTransform = parentGlobalTransform * localTransformMatrix;
+            _globalTransform = parentGlobalTransform * _localTransformMatrix;
             _globalPosition = _globalTransform * kGlobalOrigin; // will drop "w"
 
-            dropMask |= kGlobalTransformDirty;
-            invalidateChildren(kGlobalTransformDirty);
+            dropMask |= kParentTransformChanged;
+            invalidateChildren(kParentTransformChanged);
         }
 
         if (invalidatedAny(mask & kGlobalTransformGray))
@@ -595,10 +601,10 @@ namespace minire
             newParentMask |= kChildVisibilityInvalidated;
         }
 
-        if (mask & kGlobalTransformDirty)
+        if (mask & (kLocalTransformDirty | kParentTransformChanged))
         {
             newParentMask |= kGlobalTransformGray;
-            newParentMask &= ~kGlobalTransformDirty;
+            newParentMask &= ~(kLocalTransformDirty | kParentTransformChanged);
         }
 
         // propagate flags upwards (own flags and by-pass ones)
@@ -898,7 +904,8 @@ namespace minire
                                 Node::kParentVisibilityInvalidated |
                                 Node::kChildVisibilityInvalidated);
 
-        revalidate(_root.get(), Node::kGlobalTransformDirty |
+        revalidate(_root.get(), Node::kLocalTransformDirty |
+                                Node::kParentTransformChanged |
                                 Node::kGlobalTransformGray);
 
         actualizeViewpoint();

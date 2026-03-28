@@ -433,7 +433,9 @@ namespace minire
 
             bool hasGlobalTransform() const
             {
-                return !invalidatedAny(kGlobalTransformDirty | kGlobalTransformGray);
+                return !invalidatedAny(kLocalTransformDirty |
+                                       kGlobalTransformGray |
+                                       kParentTransformChanged);
             }
 
             using scene::Node::propagate;
@@ -473,18 +475,22 @@ namespace minire
             static constexpr Mask kChildVisibilityInvalidated  = mkMask(kFlagsCount + 3);
 
             // own transform is outdated
-            static constexpr Mask kGlobalTransformDirty        = mkMask(kFlagsCount + 4);
+            static constexpr Mask kLocalTransformDirty         = mkMask(kFlagsCount + 4);
+
+            // own transform is outdated
+            static constexpr Mask kParentTransformChanged      = mkMask(kFlagsCount + 5);
 
             // own transform is clean, but some children are outdated
-            static constexpr Mask kGlobalTransformGray         = mkMask(kFlagsCount + 5);
+            static constexpr Mask kGlobalTransformGray         = mkMask(kFlagsCount + 6);
 
             // node itself or some of its children (maybe nested) has an active animation
-            static constexpr Mask kAnimation                   = mkMask(kFlagsCount + 6);
+            static constexpr Mask kAnimation                   = mkMask(kFlagsCount + 7);
 
             SceneImpl           & _scene;
             LerpableTransform     _localTransform;
             glm::vec3             _globalPosition;
             glm::mat4             _globalTransform;
+            glm::mat4             _localTransformMatrix;
             Wptr                  _parent;
             ChildrenMap           _children;
             AnimationSet          _animationSet;
