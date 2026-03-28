@@ -459,6 +459,7 @@ namespace minire
                 {
                     // NOTE: don't perform actual lerp for animable targets
                     targetNode->_localTransform.update(_scene._epochNumber, current);
+                    targetNode->lerp(1, _scene._epochNumber);
                     targetNode->invalidate(kGlobalTransformDirty);
                 }
             }
