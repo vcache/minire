@@ -57,6 +57,12 @@ namespace minire::utils
             }
         }
 
+        void setCurrent(size_t epochNumber, T const & newValue)
+        {
+            _epochNumber = epochNumber;
+            _current = _items[0] = _items[1] = newValue;
+        }
+
         T const & current() const { return _current; }
 
         using ElementType = T;
