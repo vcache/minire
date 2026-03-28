@@ -625,15 +625,16 @@ namespace minire
         }
     }
 
-    // TODO: make it non-recursive
     void SceneImpl::Node::invalidateParent(Mask mask)
     {
+        assert(0 == (mask & (kBaseMask | kLocalTransformDirty | kParentTransformChanged)));
         if (mask)
         {
-            if(auto parent = _parent.lock();
-                parent && !parent->invalidatedAll(mask))
+            for(auto parent = _parent.lock();
+                parent && !parent->invalidatedAll(mask);
+                parent = parent->_parent.lock())
             {
-                parent->invalidate(mask);
+                parent->invalidate(mask, false);
             }
         }
     }
