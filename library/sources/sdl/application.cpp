@@ -5,8 +5,8 @@
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 
-#include <SDL2/SDL.h>
 #include <fmt/format.h>
+#include <SDL2/SDL.h>
 
 namespace minire::sdl
 {
@@ -42,6 +42,69 @@ namespace minire::sdl
             MINIRE_THROW("unexpected SystemCursor value: {}",
                          static_cast<int>(systemCursor));
         }
+    }
+
+    Application::ColorCursor::ColorCursor(models::Image::Sptr const & image,
+                                          int hotX, int hotY)
+        : _hotX(hotX)
+        , _hotY(hotY)
+        , _image(image)
+    {
+        // check preconditions
+
+        MINIRE_INVARIANT(image, "no image provided for a cursor");
+        MINIRE_INVARIANT(image->_width > 0 && image->_height > 0,
+                         "bad image size: {}x{}", image->_width, image->_height);
+        MINIRE_INVARIANT(image->_data, "no pixel data");
+        MINIRE_INVARIANT(!image->_signed, "signed components aren't supported");
+        MINIRE_INVARIANT(image->_depth == models::Image::Depth::k8,
+                         "unsupported image component depth: {}",
+                         static_cast<int>(image->_depth));
+
+        // build a Surface
+
+        switch(image->_format)
+        {
+            using enum models::Image::Format;
+
+            case kRGB:
+                _surface.reset(::SDL_CreateRGBSurfaceFrom(image->_data, image->_width, image->_height,
+                                                          8 * image->bytesInPixel(), image->bytesInLine(),
+                                                          0x0000'00FF,  // R
+                                                          0x0000'FF00,  // G
+                                                          0x00FF'0000,  // B
+                                                          0x0000'0000));// A
+                break;
+
+            case kRGBA:
+                _surface.reset(::SDL_CreateRGBSurfaceFrom(image->_data, image->_width, image->_height,
+                                                          8 * image->bytesInPixel(), image->bytesInLine(),
+                                                          0x0000'00FF,  // R
+                                                          0x0000'FF00,  // G
+                                                          0x00FF'0000,  // B
+                                                          0xFF00'0000));// A
+                break;
+
+            default:
+                MINIRE_THROW("unsupported image format: {}",
+                             static_cast<int>(image->_format));
+        }
+
+        MINIRE_INVARIANT(_surface, "failed to create SDL Surface: {}",
+                         ::SDL_GetError());
+
+        // Build a cursor
+
+        _cursor.reset(::SDL_CreateColorCursor(_surface.get(), _hotX, _hotY));
+        MINIRE_INVARIANT(_cursor, "failed to create SDL Color Cursor: {}",
+                         ::SDL_GetError());
+    }
+
+    Application::ColorCursor::~ColorCursor()
+    {
+        _cursor.reset();
+        _surface.reset();
+        _image.reset();
     }
 
     Application::Application(int width, int height,
@@ -154,6 +217,14 @@ namespace minire::sdl
         else
         {
             MINIRE_WARNING("failed to create system cursor: {}", ::SDL_GetError());
+        }
+    }
+
+    void Application::setColorCursor(ColorCursor::Sptr const & colorCursor)
+    {
+        if (colorCursor && colorCursor->_cursor)
+        {
+            ::SDL_SetCursor(colorCursor->_cursor.get());
         }
     }
 
