@@ -82,7 +82,7 @@ namespace minire::scene
     }
 
     // TODO: calculate it lazily
-    utils::FrustumVertices Viewpoint::frustumVertices() const
+    utils::ViewFrustum Viewpoint::viewFrustum() const
     {
         revalidate();
 
@@ -96,19 +96,23 @@ namespace minire::scene
                              worldVertex.z / worldVertex.w);
         };
 
-        return utils::FrustumVertices
+        return utils::ViewFrustum
         {
-            // Near
-            invProject(glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-left
-            invProject(glm::vec4(-1.0f,  1.0f, -1.0f, 1.0f)),   // top-left
-            invProject(glm::vec4( 1.0f,  1.0f, -1.0f, 1.0f)),   // top-right
-            invProject(glm::vec4( 1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-right
+            ._vertices = {
+                // Near
+                invProject(glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-left
+                invProject(glm::vec4(-1.0f,  1.0f, -1.0f, 1.0f)),   // top-left
+                invProject(glm::vec4( 1.0f,  1.0f, -1.0f, 1.0f)),   // top-right
+                invProject(glm::vec4( 1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-right
 
-            // Far
-            invProject(glm::vec4(-1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-left
-            invProject(glm::vec4(-1.0f,  1.0f,  1.0f, 1.0f)),   // top-left
-            invProject(glm::vec4( 1.0f,  1.0f,  1.0f, 1.0f)),   // top-right
-            invProject(glm::vec4( 1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-right
+                // Far
+                invProject(glm::vec4(-1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-left
+                invProject(glm::vec4(-1.0f,  1.0f,  1.0f, 1.0f)),   // top-left
+                invProject(glm::vec4( 1.0f,  1.0f,  1.0f, 1.0f)),   // top-right
+                invProject(glm::vec4( 1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-right
+            },
+            ._nearPlane = inversed * glm::vec4(0.0f, 0.0f, -1.0f, 1.0f),
+            ._farPlane  = inversed * glm::vec4(0.0f, 0.0f,  1.0f, 1.0F),
         };
     }
 

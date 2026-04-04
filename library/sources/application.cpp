@@ -44,7 +44,6 @@ namespace minire
     {
         setVsync(true); // TODO: into parameters
 
-        MINIRE_GL(glClearColor, 0.0f, 0.2f, 0.2f, 1.0f); // TODO: into parameters
         MINIRE_GL(glDepthRangef, kNear, kFar);
 
         onResize(width, height);

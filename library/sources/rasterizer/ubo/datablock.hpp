@@ -41,11 +41,30 @@ namespace minire::rasterizer::ubo
         // light-space transform matrix
         alignas(4 * kStd140N) glm::mat4 _viewProjection = glm::mat4(1.0f);
 
-        // has shadows
-        alignas(1 * kStd140N) bool _hasShadows = false;
+        // which method to use:
+        // 0 - no shadows,  1 - std; 2 - std w/ pcf; 3 - ESM; 4 - LogESM
+        alignas(1 * kStd140N) uint32_t _method = 0;
 
-        // apply PCF for a shadow (ignored if !_hasShadows)
-        alignas(1 * kStd140N) bool _shadowUsePCF = false;
+        // optional argument of a method
+        alignas(1 * kStd140N) float _methodArg = 0;
+
+        // which bias to be used for normals:
+        // 0 - constant (_normalBiasBase only)
+        // 1 - slope-scaled (_normalBiasBase + _normalBiasMax)
+        alignas(1 * kStd140N) uint32_t _normalBiasMode = 0;
+        alignas(1 * kStd140N) float    _normalBiasBase = 0;
+        alignas(1 * kStd140N) float    _normalBiasMax = 0;
+
+        // which bias to be used for depth:
+        // 0 - constant (_depthBiasBase only)
+        // 1 - slope-scaled (_depthBiasBase + _depthBiasMax)
+        alignas(1 * kStd140N) uint32_t _depthBiasMode = 0;
+        alignas(1 * kStd140N) float    _depthBiasBase = 0;
+        alignas(1 * kStd140N) float    _depthBiasMax = 0;
+
+        // edges for a "smoothstep" of a shadow (to prevent light bleeding)
+        alignas(1 * kStd140N) float    _smoothStepLeft = 0;
+        alignas(1 * kStd140N) float    _smoothStepRight = 0;
     };
 
     struct PointLight
@@ -97,11 +116,19 @@ namespace minire::rasterizer::ubo
         return R"(
         struct BznkDirectionalLight
         {
-            vec3 _direction;
-            vec3 _color;
-            mat4 _viewProjection;
-            bool _hasShadows;
-            bool _shadowUsePCF;
+            vec3  _direction;
+            vec3  _color;
+            mat4  _viewProjection;
+            uint  _method;
+            float _methodArg;
+            uint  _normalBiasMode;
+            float _normalBiasBase;
+            float _normalBiasMax;
+            uint  _depthBiasMode;
+            float _depthBiasBase;
+            float _depthBiasMax;
+            float _smoothStepLeft;
+            float _smoothStepRight;
         };
         )";
     }

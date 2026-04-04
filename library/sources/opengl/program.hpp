@@ -72,6 +72,12 @@ namespace minire::opengl
         bool isUsing() const { return _id == _used; }
 
     public:
+        void setUniform(GLint location, bool value) const
+        {
+            assert(isUsing());
+            MINIRE_GL(glUniform1i, location, value ? 1 : 0);
+        }
+
         void setUniform(GLint location, GLint value) const
         {
             assert(isUsing());

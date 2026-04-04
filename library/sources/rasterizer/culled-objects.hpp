@@ -22,7 +22,6 @@ namespace minire::rasterizer
         glm::vec3         _color;
         FlatShadowMapSptr _shadowMap;
         glm::mat4         _viewProjection;
-        bool              _shadowUsePCF;
     };
 
     // TODO: can be a static array

@@ -5,10 +5,15 @@
 #include <rasterizer/culled-objects.hpp>
 #include <utils/frustum.hpp>
 
+#include <minire/models/shadow-params.hpp>
+
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
+#include <cassert>
 #include <memory>
+
+namespace minire::rasterizer::filters { class GaussianBlur; }
 
 namespace minire::rasterizer
 {
@@ -23,31 +28,38 @@ namespace minire::rasterizer
     public:
         using Sptr = std::shared_ptr<FlatShadowMap>;
 
-        explicit FlatShadowMap(size_t size = 4096);
+        explicit FlatShadowMap(models::ShadowParams const &);
         ~FlatShadowMap();
 
         // Returns light-space VP-matrix
         glm::mat4 perform(CulledPrimitives const &,
                           glm::vec3 const & lightPosition,
                           glm::vec3 const & lightDirection,
-                          utils::FrustumVertices const &);
+                          utils::ViewFrustum const &);
 
-        opengl::Texture const & texture() const { return _texture; }
+        opengl::Texture const & texture() const
+        {
+            assert(_shadowTexture || _depthTexture);
+            return _shadowTexture ? *_shadowTexture : *_depthTexture;
+        }
 
-        size_t size() const { return _size; }
+        models::ShadowParams const & shadowParams() const { return _shadowParams; }
 
     private:
         glm::mat4 buildVP(glm::vec3 const & lightPosition,
                           glm::vec3 const & lightDirection,
-                          utils::FrustumVertices const &) const;
+                          utils::ViewFrustum const &) const;
 
     private:
         class Factory;
         using FactoryUptr = std::unique_ptr<Factory>;
+        using GaussianBlurUptr = std::unique_ptr<filters::GaussianBlur>;
 
-        size_t const    _size;
-        FactoryUptr     _factory;
-        opengl::Texture _texture;
-        opengl::FBO     _fbo;
+        models::ShadowParams const _shadowParams;
+        FactoryUptr                _factory;
+        opengl::Texture::Uptr      _depthTexture;
+        opengl::Texture::Uptr      _shadowTexture;
+        opengl::FBO                _fbo;
+        GaussianBlurUptr           _gaussianBlur;
     };
 }

@@ -29,7 +29,7 @@ namespace minire::rasterizer
         // Return far plane value
         float perform(CulledPrimitives const &,
                       glm::vec3 const & lightPosition,
-                      utils::FrustumVertices const &);
+                      utils::ViewFrustum const &);
 
         opengl::Texture const & texture() const { return _texture; }
 

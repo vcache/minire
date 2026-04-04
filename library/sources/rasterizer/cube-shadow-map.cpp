@@ -169,13 +169,13 @@ namespace minire::rasterizer
 
 
         std::pair<float, float>
-        calcNearFar(utils::FrustumVertices const & frustumVertices)
+        calcNearFar(utils::ViewFrustum const & viewFrustum)
         {
             static float const kNear = 1.0f;
 
-            glm::vec3 min = frustumVertices[0];
-            glm::vec3 max = frustumVertices[0];
-            for (glm::vec3 const & vertex : frustumVertices)
+            glm::vec3 min = viewFrustum[0];
+            glm::vec3 max = viewFrustum[0];
+            for (glm::vec3 const & vertex : viewFrustum)
             {
                 min = glm::min(min, vertex);
                 max = glm::max(max, vertex);
@@ -188,7 +188,7 @@ namespace minire::rasterizer
 
     float CubeShadowMap::perform(CulledPrimitives const & primitives,
                                  glm::vec3 const & lightPosition,
-                                 utils::FrustumVertices const & frustumVertices)
+                                 utils::ViewFrustum const & viewFrustum)
     {
         // setup GL mode flags
         MINIRE_GL(glEnable, GL_DEPTH_TEST);
@@ -205,7 +205,7 @@ namespace minire::rasterizer
         MINIRE_GL(glClear, GL_DEPTH_BUFFER_BIT);
 
         // calculate planes and light VP
-        auto const [near, far] = calcNearFar(frustumVertices);
+        auto const [near, far] = calcNearFar(viewFrustum);
         CubeVPs const lightVPs = buildVPs(lightPosition, near, far);
 
         // collect programs

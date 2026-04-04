@@ -96,9 +96,9 @@ namespace minire::rasterizer
             return (kD * albedo / PI + specular) * radiance * NdotL;
         }
 
-        float shadowFactorDirect(const vec4 lightSpaceFragPos,
-                                 const sampler2D shadowMap,
-                                 const float bias)
+        float shadowFactorDirect_Std(const vec4 lightSpaceFragPos,
+                                     const sampler2D shadowMap,
+                                     const float bias)
         {
             vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
             if (projCoords.z > 1.0)
@@ -106,14 +106,14 @@ namespace minire::rasterizer
                 return 0.0;
             }
             projCoords = projCoords * 0.5 + 0.5;
-            float currentDepth = projCoords.z;
+            float currentDepth = projCoords.z - bias;
             float closestDepth = texture(shadowMap, projCoords.xy).r;
-            return currentDepth - bias > closestDepth  ? 1.0 : 0.0;
+            return currentDepth > closestDepth  ? 1.0 : 0.0;
         }
 
-        float shadowFactorDirectPCF(const vec4 lightSpaceFragPos,
-                                    const sampler2D shadowMap,
-                                    const float bias)
+        float shadowFactorDirect_Std_PCF(const vec4 lightSpaceFragPos,
+                                         const sampler2D shadowMap,
+                                         const float bias)
         {
             vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
             if (projCoords.z > 1.0)
@@ -122,7 +122,7 @@ namespace minire::rasterizer
             }
 
             projCoords = projCoords * 0.5 + 0.5;
-            float currentDepth = projCoords.z;
+            float currentDepth = projCoords.z - bias;
 
             float shadow = 0.0;
             vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
@@ -131,12 +131,46 @@ namespace minire::rasterizer
                 for(int y = -1; y <= 1; ++y)
                 {
                     float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-                    shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+                    shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
                 }
             }
             shadow /= 9.0;
 
             return shadow;
+        }
+
+        float shadowFactorDirect_ESM(const vec4 lightSpaceFragPos,
+                                     const sampler2D shadowMap,
+                                     const float bias,
+                                     const float kFactor)
+        {
+            vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
+            if (projCoords.z > 1.0)
+            {
+                return 0.0;
+            }
+            projCoords = projCoords * 0.5 + 0.5;
+            float currentDepth = projCoords.z - bias;
+            float occluder = texture(shadowMap, projCoords.xy).r;
+            float shadow = occluder * exp(-kFactor * currentDepth);
+            return clamp(shadow, 0.0, 1.0);
+        }
+
+        float shadowFactorDirect_LogESM(const vec4 lightSpaceFragPos,
+                                        const sampler2D shadowMap,
+                                        const float bias,
+                                        const float kFactor)
+        {
+            vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
+            if (projCoords.z > 1.0)
+            {
+                return 0.0;
+            }
+            projCoords = projCoords * 0.5 + 0.5;
+            float occluder = texture(shadowMap, projCoords.xy).r;
+            float currentDepth = projCoords.z - bias;
+            float shadow = exp(occluder - (kFactor * currentDepth));
+            return clamp(shadow, 0.0, 1.0);
         }
 
         float shadowFactorPoint(const vec4 fragmentPos,
@@ -149,7 +183,7 @@ namespace minire::rasterizer
             float closestDepth = texture(shadowMap, fragToLight).r;
             closestDepth *= shadowMapFarPlane;
             float currentDepth = length(fragToLight);
-            return currentDepth -  bias > closestDepth ? 1.0 : 0.0;
+            return currentDepth - bias > closestDepth ? 1.0 : 0.0;
         }
 
         float shadowFactorPointPCF(const vec4 fragmentPos,
@@ -214,27 +248,78 @@ namespace minire::rasterizer
             // ... for directional lights
             for(uint i = 0U; i < _directionalLightsCount; ++i)
             {
-                vec3 L = -_directionalLights[i]._direction;
+                vec3 L = -normalize(_directionalLights[i]._direction);
                 vec3 H = normalize(V + L);
                 vec3 radiance = _directionalLights[i]._color;
 
-                float shadow = 1.0;
-                if (_directionalLights[i]._hasShadows)
+                float shadow = 1.0; // "inverted shadow" actually: 0.0 - shadow, 1.0 - light
+
+                if (0u != _directionalLights[i]._method)
                 {
-                    //float bias = 0.001 * (1.0 - dot(normal, _directionalLights[i]._direction));
-                    if (_directionalLights[i]._shadowUsePCF)
+                    // normal bias (TODO: move it into a vertex shader)
+
+                    float offsetScale = 0;
+                    if (0u == _directionalLights[i]._normalBiasMode)
                     {
-                        shadow = 1.0 - shadowFactorDirectPCF(bznkDirectionalLightPos[i],
-                                                             bznkDirectionalLightsShadowMaps[i],
-                                                             0.005);
+                        offsetScale = _directionalLights[i]._normalBiasBase;
                     }
-                    else
+                    else if (1u == _directionalLights[i]._normalBiasMode)
                     {
-                        shadow = 1.0 - shadowFactorDirect(bznkDirectionalLightPos[i],
-                                                          bznkDirectionalLightsShadowMaps[i],
-                                                          0.005);
+                        offsetScale = max(_directionalLights[i]._normalBiasBase * (1.0 - dot(N, -L)),
+                                          _directionalLights[i]._normalBiasMax);
+                    }
+                    vec3 offsetPos = bznkWorldPos.xyz + N * offsetScale;
+                    vec4 lightSpaceFragPos = _directionalLights[i]._viewProjection * vec4(offsetPos, 1.0);
+
+                    // depth bias (TODO: consider using opengl's polygon offset)
+
+                    float depthBias = 0;
+                    if (0u == _directionalLights[i]._depthBiasMode)
+                    {
+                        depthBias = _directionalLights[i]._depthBiasBase;
+                    }
+                    else if (1u == _directionalLights[i]._depthBiasMode)
+                    {
+                        depthBias = max(_directionalLights[i]._depthBiasBase * (1.0 - dot(N, -L)),
+                                        _directionalLights[i]._depthBiasMax);
+                    }
+
+                    // shadow calculation
+
+                    if (1u == _directionalLights[i]._method)
+                    {
+                        shadow = 1.0 - shadowFactorDirect_Std(lightSpaceFragPos,
+                                                              bznkDirectionalLightsShadowMaps[i],
+                                                              depthBias);
+                    }
+                    else if (2u == _directionalLights[i]._method)
+                    {
+                        // TODO: consider using opengl's builtin PCF
+                        //       (GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE)
+                        shadow = 1.0 - shadowFactorDirect_Std_PCF(lightSpaceFragPos,
+                                                                  bznkDirectionalLightsShadowMaps[i],
+                                                                  depthBias);
+                    }
+                    else if (3u == _directionalLights[i]._method)
+                    {
+                        shadow = shadowFactorDirect_ESM(lightSpaceFragPos,
+                                                        bznkDirectionalLightsShadowMaps[i],
+                                                        depthBias,
+                                                        _directionalLights[i]._methodArg);
+                    }
+                    else if (4u == _directionalLights[i]._method)
+                    {
+                        shadow = shadowFactorDirect_LogESM(lightSpaceFragPos,
+                                                           bznkDirectionalLightsShadowMaps[i],
+                                                           depthBias,
+                                                           _directionalLights[i]._methodArg);
                     }
                 }
+
+                shadow = smoothstep(_directionalLights[i]._smoothStepLeft,
+                                    _directionalLights[i]._smoothStepRight,
+                                    shadow);
+
                 Lo += shadow * calcLo(N, V, L, H, F0, radiance, albedo, roughness, metallic);
             }
 
@@ -343,7 +428,6 @@ namespace minire::rasterizer
         {% include "shaders/model-skinning-kit.incl" %}
 
         out vec4 bznkWorldPos;
-        out vec4 bznkDirectionalLightPos[{{ kMaxDirectionalLights }}];
 
         {{ kUboDatablock }}
 
@@ -367,12 +451,6 @@ namespace minire::rasterizer
             vec3 B = cross(N, T);
             bznkTbn = mat3(T, B, N);
             {% endif %}
-
-            for(uint i = 0U; i < _directionalLightsCount; ++i)
-            {
-                bznkDirectionalLightPos[i] =
-                    _directionalLights[i]._viewProjection * bznkWorldPos;
-            }
         }
     )";
 
@@ -396,7 +474,6 @@ namespace minire::rasterizer
         {% endif %}
 
         in vec4 bznkWorldPos;
-        in vec4 bznkDirectionalLightPos[{{ kMaxDirectionalLights }}];
 
         // uniforms //
 

@@ -50,7 +50,7 @@ namespace minire::scene
 
         size_t revision() const { revalidate(); return _revision; }
 
-        utils::FrustumVertices frustumVertices() const;
+        utils::ViewFrustum viewFrustum() const;
 
     private:
         bool isSame(models::PerspectiveCamera const &) const;

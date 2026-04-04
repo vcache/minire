@@ -1,13 +1,17 @@
 #include <rasterizer/ubo.hpp>
 
+#include <minire/models/shadow-params.hpp>
+
 #include <opengl.hpp>
 #include <opengl/program.hpp>
+#include <rasterizer/flat-shadow-map.hpp>
+#include <utils/overloaded.hpp>
 
 #include <cassert>
 
 namespace minire::rasterizer
 {
-    static const GLuint kUboBindingPoint = 10; // TODO: why the fuck not 0?
+    static const GLuint kUboBindingPoint = 0;
 
     Ubo::Ubo()
     {
@@ -76,8 +80,87 @@ namespace minire::rasterizer
                 dst._direction = light._direction;
                 dst._color = light._color;
                 dst._viewProjection = light._viewProjection;
-                dst._hasShadows = light._shadowMap.operator bool();
-                dst._shadowUsePCF = light._shadowUsePCF;
+
+                if (light._shadowMap.operator bool())
+                {
+                    using namespace ::minire::models::shadow_params;
+
+                    assert(light._shadowMap);
+                    models::ShadowParams const & shadowParams = light._shadowMap->shadowParams();
+
+                    // setup shadow method
+                    dst._method = std::visit(utils::Overloaded
+                    {
+                        [&shadowParams](method::Standard const &)
+                        {
+                            assert(std::holds_alternative<std::monostate>(shadowParams._filter) ||
+                                   std::holds_alternative<filter::PCF>(shadowParams._filter));
+                            bool const pcf = std::holds_alternative<filter::PCF>(shadowParams._filter);
+                            return pcf ? 2 : 1;
+                        },
+                        [&dst](method::ESM const & esm)
+                        {
+                            dst._methodArg = esm._factor;
+                            return 3;
+                        },
+                        [&dst](method::LogESM const & logEsm)
+                        {
+                            dst._methodArg = logEsm._factor;
+                            return 4;
+                        },
+                    }, shadowParams._method);
+
+                    // setup normal bias
+                    std::visit(utils::Overloaded
+                    {
+                        [&dst](bias::Constant const & bias)
+                        {
+                            dst._normalBiasMode = 0;
+                            dst._normalBiasBase = bias._biasBase;
+                            dst._normalBiasMax = bias._biasBase;
+                        },
+                        [&dst](bias::SlopScaled const & bias)
+                        {
+                            dst._normalBiasMode = 1;
+                            dst._normalBiasBase = bias._biasBase;
+                            dst._normalBiasMax = bias._maxBias;
+                        },
+                    }, shadowParams._normalBias);
+
+                    // setup depth bias
+                    std::visit(utils::Overloaded
+                    {
+                        [&dst](bias::Constant const & bias)
+                        {
+                            dst._depthBiasMode = 0;
+                            dst._depthBiasBase = bias._biasBase;
+                            dst._depthBiasMax = bias._biasBase;
+                        },
+                        [&dst](bias::SlopScaled const & bias)
+                        {
+                            dst._depthBiasMode = 1;
+                            dst._depthBiasBase = bias._biasBase;
+                            dst._depthBiasMax = bias._maxBias;
+                        },
+                    }, shadowParams._depthBias);
+
+                    // setup smoothing parameters
+                    dst._smoothStepLeft = shadowParams._smoothStep.first;
+                    dst._smoothStepRight = shadowParams._smoothStep.second;
+                }
+                else
+                {
+                    dst._method = 0;
+                    dst._normalBiasMode = 0;
+                    dst._normalBiasBase = 0;
+                    dst._normalBiasMax = 0;
+                    dst._depthBiasMode = 0;
+                    dst._depthBiasBase = 0;
+                    dst._depthBiasMax = 0;
+                    dst._smoothStepLeft = 0;
+                    dst._smoothStepRight = 0;
+                }
+
                 _datablock._directionalLightsCount++;
             }
         }

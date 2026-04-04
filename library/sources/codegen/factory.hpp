@@ -16,6 +16,8 @@
 
 namespace minire::codegen
 {
+    // TODO: make Traits optional
+    // TODO: make Traits a template parameter
     template<typename... Plugins>
     class Factory
         : public Plugins...

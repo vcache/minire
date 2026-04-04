@@ -10,6 +10,8 @@ namespace minire::opengl
     class Texture
     {
     public:
+        using Uptr = std::unique_ptr<Texture>;
+
         explicit Texture(GLenum target)
             : _id(0)
             , _target(target)
@@ -55,6 +57,10 @@ namespace minire::opengl
             bind();
             MINIRE_GL(glTexParameteri, _target, pname, param);
         }
+
+        std::pair<size_t, size_t> size(GLint miplevel = 0) const;
+
+        GLint internalFormat() const;
 
     private:
         GLuint _id;

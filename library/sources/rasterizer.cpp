@@ -3,6 +3,7 @@
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/pbr-material.hpp>
+#include <minire/models/shadow-params.hpp>
 
 #include <opengl.hpp>
 #include <rasterizer/materials/pbr.hpp>
@@ -69,28 +70,27 @@ namespace minire
                                              models::MaybeShadowParams const & shadowParams)
             {
                 rasterizer::FlatShadowMap::Sptr shadowMap;
-                bool usePCF = false;
 
                 if (shadowParams)
                 {
                     if (shadowMapIndex >= _flatShadowMaps.size())
                     {
                         _flatShadowMaps.push_back(
-                            std::make_shared<rasterizer::FlatShadowMap>(shadowParams->_mapSize));
+                            std::make_shared<rasterizer::FlatShadowMap>(*shadowParams));
                     }
 
                     assert(_flatShadowMaps[shadowMapIndex]);
-                    if (_flatShadowMaps[shadowMapIndex]->size() != shadowParams->_mapSize)
+                    if (_flatShadowMaps[shadowMapIndex]->shadowParams() != *shadowParams)
                     {
-                        // TODO: should try to lookup for an existing map with a given size
-                        MINIRE_WARNING("flat shadow map have to be rebuild, due to size change from {} to {}",
-                                       _flatShadowMaps[shadowMapIndex]->size(), shadowParams->_mapSize);
+                        // TODO: should try to lookup for an existing map with a compatible parameters
+                        // TODO: maybe "hard-attach" maps to lights so that very customized shaders
+                        //       can be generated (i.e. shaders without branching)
+                        MINIRE_WARNING("flat shadow map have to be rebuild");
                         _flatShadowMaps[shadowMapIndex] =
-                            std::make_shared<rasterizer::FlatShadowMap>(shadowParams->_mapSize);
+                            std::make_shared<rasterizer::FlatShadowMap>(*shadowParams);
                     }
 
                     shadowMap = _flatShadowMaps[shadowMapIndex];
-                    usePCF = shadowParams->_usePCF;
 
                     shadowMapIndex++;
                 }
@@ -102,7 +102,6 @@ namespace minire
                     ._color = color,
                     ._shadowMap = shadowMap,
                     ._viewProjection = glm::identity<glm::mat4>(),
-                    ._shadowUsePCF = usePCF,
                 });
             });
         return result;
@@ -144,7 +143,8 @@ namespace minire
                     }
 
                     shadowMap = _cubeShadowMaps[shadowMapIndex];
-                    usePCF = shadowParams->_usePCF;
+                    usePCF = std::holds_alternative<models::shadow_params::filter::PCF>(
+                        shadowParams->_filter);
 
                     shadowMapIndex++;
                 }
@@ -204,7 +204,7 @@ namespace minire
                                 rasterizer::CulledPointLights & culledPointLights)
     {
         // TODO: maybe do min/max w/ scene AABB?
-        utils::FrustumVertices const & frustumVertices = scene.viewpoint().frustumVertices();
+        utils::ViewFrustum const & viewFrustum = scene.viewpoint().viewFrustum();
 
         // build shadow maps for directional lights (if any)
         for(rasterizer::CulledDirectionalLight & light : culledDirectionalLights)
@@ -213,7 +213,7 @@ namespace minire
             {
                 light._viewProjection = light._shadowMap->perform(
                     culledPrimitives, light._position, light._direction,
-                    frustumVertices);
+                    viewFrustum);
             }
             else
             {
@@ -227,7 +227,7 @@ namespace minire
             if (light._shadowMap)
             {
                 light._shadowMapFarPlane = light._shadowMap->perform(
-                    culledPrimitives, light._position, frustumVertices);
+                    culledPrimitives, light._position, viewFrustum);
             }
             else
             {
@@ -245,6 +245,7 @@ namespace minire
         assert(_screenHeight != 0);
         MINIRE_GL(glBindFramebuffer, GL_FRAMEBUFFER, 0);
         MINIRE_GL(glViewport, 0, 0, _screenWidth, _screenHeight);
+        MINIRE_GL(glClearColor, 0.0f, 0.2f, 0.2f, 1.0f); // TODO: into parameters
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // actualize shadow maps vector for directional lights
