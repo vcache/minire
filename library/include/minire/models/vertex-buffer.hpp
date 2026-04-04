@@ -134,5 +134,6 @@ namespace minire::models
         Buffer        _tangents;
         Buffer        _uvs;
         utils::Aabb   _aabb;    // TODO: make it optional
+        bool          _isDoubleSided;
     };
 }

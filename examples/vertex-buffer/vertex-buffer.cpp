@@ -53,6 +53,7 @@ namespace
                 ._uvs = std::monostate(),
                 ._aabb = Aabb(-1.0f, 0.0f, -1.0f,
                                1.0f, 0.0f, 1.0f),
+                ._isDoubleSided = false,
             };
         }
 
@@ -194,6 +195,7 @@ namespace
                 ._tangents = std::monostate(),
                 ._uvs = std::monostate(),
                 ._aabb = aabb,
+                ._isDoubleSided = false,
             };
         }
 

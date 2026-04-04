@@ -100,9 +100,12 @@ namespace minire
                     {
                         auto parent = billboard->_parent.lock();
                         MINIRE_INVARIANT(parent, "a billboard doesn't have a parent");
-                        assert(parent->hasGlobalTransform());
-                        assert(billboard->_billboard);
-                        callable(*billboard->_billboard, parent->_globalTransform);
+                        if (parent->_effectiveVisible)
+                        {
+                            assert(parent->hasGlobalTransform());
+                            assert(billboard->_billboard);
+                            callable(*billboard->_billboard, parent->_globalTransform);
+                        }
                     }
 
                     ++it;
@@ -130,16 +133,19 @@ namespace minire
                     {
                         auto parent = directionalLight->_parent.lock();
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
-                        assert(parent->hasGlobalTransform());
-                        // NOTE: 3-rd column of transform matrix is a z-axis direction
-                        glm::vec3 const direction = glm::vec3(parent->_globalTransform[2]);
-                        auto const & current = directionalLight->current();
-                        callable(index,
-                                 parent->_globalPosition, // TODO: it could be taken from _globalTransform
-                                 glm::normalize(direction),
-                                 current._color,
-                                 current._shadowParams);
-                        ++index;
+                        if (parent->_effectiveVisible)
+                        {
+                            assert(parent->hasGlobalTransform());
+                            // NOTE: 3-rd column of transform matrix is a z-axis direction
+                            glm::vec3 const direction = glm::vec3(parent->_globalTransform[2]);
+                            auto const & current = directionalLight->current();
+                            callable(index,
+                                     parent->_globalPosition, // TODO: it could be taken from _globalTransform
+                                     glm::normalize(direction),
+                                     current._color,
+                                     current._shadowParams);
+                            ++index;
+                        }
                     }
                     ++it;
                 }
@@ -167,14 +173,17 @@ namespace minire
                     {
                         auto parent = pointLight->_parent.lock();
                         MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
-                        assert(parent->hasGlobalTransform());
-                        auto const & current = pointLight->current();
-                        callable(index,
-                                 parent->_globalPosition, // TODO: it could be taken from _globalTransform
-                                 current._color,
-                                 current._attenuation,
-                                 current._shadowParams);
-                        ++index;
+                        if (parent->_effectiveVisible)
+                        {
+                            assert(parent->hasGlobalTransform());
+                            auto const & current = pointLight->current();
+                            callable(index,
+                                     parent->_globalPosition, // TODO: it could be taken from _globalTransform
+                                     current._color,
+                                     current._attenuation,
+                                     current._shadowParams);
+                            ++index;
+                        }
                     }
                     ++it;
                 }

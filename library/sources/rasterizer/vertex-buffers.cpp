@@ -125,13 +125,15 @@ namespace minire::rasterizer
 
     models::MeshFeatures VertexBuffers::meshFeatures(content::Id const & id) const
     {
-        return find(id, _resources)->_meshFeatures;
+        auto tmp = find(id, _resources); 
+        return tmp->_meshFeatures;
     }
 
     std::shared_ptr<opengl::VertexBuffer>
     VertexBuffers::build(content::Id const & id,
                          material::Program::Locations const & locations) const
     {
-        return find(id, _resources)->build(locations);
+        auto tmp = find(id, _resources);
+        return tmp->build(locations);
     }
 }

@@ -185,6 +185,7 @@ namespace minire::utils
         loadVertexBuffer(vertexBuffer._uvs, locations.uvAttribute(), "uvs");
 
         result->_aabb = vertexBuffer._aabb;
+        result->_doubleSided = vertexBuffer._isDoubleSided;
 
         return result;
     }

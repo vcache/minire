@@ -25,6 +25,7 @@ namespace minire::opengl
         GLenum            _elementsType = 0;
         utils::Aabb       _aabb;
         GLenum            _drawMode = GL_TRIANGLES;
+        bool              _doubleSided = false;
 
     public:
         VertexBuffer()
@@ -58,6 +59,15 @@ namespace minire::opengl
         void drawElements() const
         {
             bindVao();
+            // TODO: sort VertexBuffers via doubleSided to avoid frequent context switches
+            if (_doubleSided)
+            {
+                glDisable(GL_CULL_FACE);
+            }
+            else
+            {
+                glEnable(GL_CULL_FACE);
+            }
             MINIRE_GL(glDrawElements, _drawMode, _elementsCount, _elementsType, 0);
         }
 
