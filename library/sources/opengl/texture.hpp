@@ -17,7 +17,8 @@ namespace minire::opengl
             , _target(target)
         {
             MINIRE_GL(glGenTextures, 1, &_id);
-            bind();
+            bind(); // NOTE: Don't remove! Some code depends
+                    //       on bind() in a ctor.
         }
 
         ~Texture()

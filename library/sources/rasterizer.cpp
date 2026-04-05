@@ -122,29 +122,27 @@ namespace minire
                                              models::MaybeShadowParams const & shadowParams)
             {
                 rasterizer::CubeShadowMap::Sptr shadowMap;
-                bool usePCF = false;
 
                 if (shadowParams)
                 {
                     if (shadowMapIndex >= _cubeShadowMaps.size())
                     {
                         _cubeShadowMaps.push_back(
-                            std::make_shared<rasterizer::CubeShadowMap>(shadowParams->_mapSize));
+                            std::make_shared<rasterizer::CubeShadowMap>(*shadowParams));
                     }
 
                     assert(_cubeShadowMaps[shadowMapIndex]);
-                    if (_cubeShadowMaps[shadowMapIndex]->size() != shadowParams->_mapSize)
+                    if (_cubeShadowMaps[shadowMapIndex]->shadowParams() != *shadowParams)
                     {
-                        // TODO: should try to lookup for an existing map with a given size
-                        MINIRE_WARNING("cube shadow map have to be rebuild, due to size change from {} to {}",
-                                       _cubeShadowMaps[shadowMapIndex]->size(), shadowParams->_mapSize);
+                        // TODO: should try to lookup for an existing map with a compatible parameters
+                        // TODO: maybe "hard-attach" maps to lights so that very customized shaders
+                        //       can be generated (i.e. shaders without branching)
+                        MINIRE_WARNING("cube shadow map have to be rebuild");
                         _cubeShadowMaps[shadowMapIndex] =
-                            std::make_shared<rasterizer::CubeShadowMap>(shadowParams->_mapSize);
+                            std::make_shared<rasterizer::CubeShadowMap>(*shadowParams);
                     }
 
                     shadowMap = _cubeShadowMaps[shadowMapIndex];
-                    usePCF = std::holds_alternative<models::shadow_params::filter::PCF>(
-                        shadowParams->_filter);
 
                     shadowMapIndex++;
                 }
@@ -156,7 +154,6 @@ namespace minire
                     ._attenuation = attenuation,
                     ._shadowMap = shadowMap,
                     ._shadowMapFarPlane = 0,
-                    ._shadowUsePCF = usePCF,
                 });
             });
         return result;

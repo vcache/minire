@@ -80,6 +80,7 @@ namespace minire::models
         using Filter = std::variant<std::monostate,
                                     filter::PCF,
                                     filter::GaussianBlur>;
+
         namespace margin
         {
             struct Absolute

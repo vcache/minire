@@ -37,7 +37,6 @@ namespace minire::rasterizer
         glm::vec4         _attenuation;
         CubeShadowMapSptr _shadowMap;
         float             _shadowMapFarPlane;
-        bool              _shadowUsePCF;
     };
 
     // TODO: can be a static array

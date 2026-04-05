@@ -1,3 +1,3 @@
 include(examples-kit)
 
-CreateMinireExample(shadows-example)
+CreateMinireExample(shadows-sandbox)

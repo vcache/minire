@@ -85,7 +85,7 @@ namespace minire::rasterizer
         }
 
     public:
-        Factory(models::shadow_params::Method const & method)
+        explicit Factory(models::shadow_params::Method const & method)
             : CachedFactory(
             {
                 {GL_VERTEX_SHADER, kVertShader},
@@ -95,6 +95,7 @@ namespace minire::rasterizer
             , _kFactor(getOrMakeUniformCode("kFactor"))
         {
             assert(_lightMatrixCode != -1);
+            // NOTE: _kFactor might be -1
         }
 
         GLint const _lightMatrixCode = -1;
@@ -111,8 +112,6 @@ namespace minire::rasterizer
         , _fbo()
     {
         using namespace models::shadow_params;
-
-        // _fbo will be attached
 
         MINIRE_INVARIANT(_shadowParams._mapSize <= std::numeric_limits<GLsizei>::max(),
                          "too huge size: {}", _shadowParams._mapSize);
@@ -341,7 +340,7 @@ namespace minire::rasterizer
         assert(_factory);
         for(auto const & [traits, primitives] : drawQueue)
         {
-            // fetch a program for the traits
+            // fetch a program for given traits
             auto const & program = _factory->getUsingProgram(traits);
 
             // setup unifroms
@@ -361,7 +360,7 @@ namespace minire::rasterizer
                 },
             }, _shadowParams._method);
 
-            // perform draing operations
+            // perform drawing operations
             for(CulledPrimitive const * primitive : primitives)
             {
                 assert(primitive);

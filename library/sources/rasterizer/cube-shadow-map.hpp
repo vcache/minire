@@ -5,8 +5,11 @@
 #include <rasterizer/culled-objects.hpp>
 #include <utils/frustum.hpp>
 
+#include <minire/models/shadow-params.hpp>
+
 #include <glm/vec3.hpp>
 
+#include <cassert>
 #include <memory>
 
 namespace minire::rasterizer
@@ -22,8 +25,7 @@ namespace minire::rasterizer
     public:
         using Sptr = std::shared_ptr<CubeShadowMap>;
 
-        explicit CubeShadowMap(size_t size = 1024);
-
+        explicit CubeShadowMap(models::ShadowParams const &);
         ~CubeShadowMap();
 
         // Return far plane value
@@ -31,21 +33,22 @@ namespace minire::rasterizer
                       glm::vec3 const & lightPosition,
                       utils::ViewFrustum const &);
 
-        opengl::Texture const & texture() const { return _texture; }
+        opengl::Texture const & texture() const
+        {
+            assert(_shadowTexture || _depthTexture);
+            return _shadowTexture ? *_shadowTexture : *_depthTexture;
+        }
 
-        size_t size() const { return _size; }
+        models::ShadowParams const & shadowParams() const { return _shadowParams; }
 
     private:
         class Factory;
         using FactoryUptr = std::unique_ptr<Factory>;
 
-        size_t const    _size;
-        FactoryUptr     _factory;
-        opengl::Texture _texture;
-        opengl::FBO     _fbo;
-        GLint           _bznkModelMatrix = 0;
-        GLint           _bznkShadowMatrices = 0;
-        GLint           _bznkLightPos = 0;
-        GLint           _bznkFarPlane = 0;
+        models::ShadowParams const _shadowParams;
+        FactoryUptr                _factory;
+        opengl::Texture::Uptr      _depthTexture;
+        opengl::Texture::Uptr      _shadowTexture;
+        opengl::FBO                _fbo;
     };
 }

@@ -102,6 +102,8 @@ namespace minire
         std::unique_ptr<utils::TextLayout> layout(text::FormattedString const &,
                                                   content::Id const &) const override;
 
+        gui::Theme const & theme() const { assert(_theme); return *_theme; }
+
     private:
         struct Overlay
         {

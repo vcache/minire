@@ -24,6 +24,7 @@ namespace minire::examples
     class BasicTestbedApplication
         : public BaseApplication
     {
+    protected:
         glm::quat lookAt(glm::vec3 lookFrom, glm::vec3 lookTo,
                          glm::vec3 worldUp =  glm::vec3(0.0f, 1.0f, 0.0f))
         {
@@ -38,7 +39,8 @@ namespace minire::examples
 
         explicit BasicTestbedApplication(int width, int height,
                                          std::string const & title,
-                                         content::Manager & contentManager)
+                                         content::Manager & contentManager,
+                                         bool const defaultLights = true)
             : BaseApplication(width, height, title, contentManager)
             , _target(0.0f, 0.0f, 0.0f)
             , _orbiting(_target, 10)
@@ -46,6 +48,7 @@ namespace minire::examples
             , _isPointLightEnabled(true)
             , _isFloorPlaneEnabled(true)
             , _isPerspective(true)
+            , _defaultLights(defaultLights)
         {}
 
         void onStart() override
@@ -100,25 +103,35 @@ namespace minire::examples
                     ._visible = _isFloorPlaneEnabled,
                 });
 
-            auto directlightNode = root.make("directlight-node",
-                Node{Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))), true});
-            ShadowParams directlightShadowParams;
-            directlightShadowParams._depthBias = shadow_params::bias::Constant{0.005f};
-            directlightShadowParams._center = shadow_params::center::CameraYPlaneHitPoint{};
-            directlightShadowParams._radiusMargin = shadow_params::margin::Absolute{10.0f};
-            directlightShadowParams._nearMargin = shadow_params::margin::Absolute{-100.0f};
-            directlightShadowParams._farMargin = shadow_params::margin::Absolute{100.0f};
-            directlightNode->make("sun", DirectionalLight(
-                glm::vec3(0, 10, 0), directlightShadowParams, _isDirectLightEnabled));
+            if (_defaultLights)
+            {
+                auto directlightNode = root.make("directlight-node",
+                    Node{Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))), true});
+                ShadowParams directlightShadowParams;
+                directlightShadowParams._depthBias = shadow_params::bias::Constant{0.005f};
+                directlightShadowParams._center = shadow_params::center::CameraYPlaneHitPoint{};
+                directlightShadowParams._radiusMargin = shadow_params::margin::Absolute{10.0f};
+                directlightShadowParams._nearMargin = shadow_params::margin::Absolute{-100.0f};
+                directlightShadowParams._farMargin = shadow_params::margin::Absolute{100.0f};
+                directlightNode->make("sun", DirectionalLight(
+                    glm::vec3(0, 10, 0), directlightShadowParams, _isDirectLightEnabled));
+            }
 
-            auto pointlightNode = root.make("pointlight-node",
-                Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
-            pointlightNode->make("bulb",
-                PointLight(glm::vec4(1, 1, 1, 500), 2, ShadowParams{}, _isPointLightEnabled));
+            if (_defaultLights)
+            {
+                auto pointlightNode = root.make("pointlight-node",
+                    Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
+                ShadowParams pointlightShadowParams;
+                pointlightShadowParams._depthBias = shadow_params::bias::Constant{0.05f};
+                pointlightNode->make("bulb",
+                    PointLight(glm::vec4(1, 1, 1, 500), 2, pointlightShadowParams, _isPointLightEnabled));
+            }
         }
 
         bool onStep() override
         {
+            BaseApplication::onStep();
+
             // Update scene 5 times slower to show how
             // interpolation compensates a gap between
             // a render and a controller timings.
@@ -128,6 +141,9 @@ namespace minire::examples
 
         bool handle(application::OnMouseMove const & e) override
         {
+            if (BaseApplication::handle(e))
+                return true;
+
             bool updated = false;
             if (e._left)
             {
@@ -169,6 +185,9 @@ namespace minire::examples
 
         bool handle(application::OnMouseDown const & e) override
         {
+            if (BaseApplication::handle(e))
+                return true;
+
             if (models::MouseButton::kRight == e._mouseButton)
             {
                 _panning.start(e._x, e._y);
@@ -177,8 +196,11 @@ namespace minire::examples
             return true;
         }
 
-        bool handle(application::OnMouseUp const &) override
+        bool handle(application::OnMouseUp const & e) override
         {
+            if (BaseApplication::handle(e))
+                return true;
+
             if (_panning)
             {
                 _panning.finish(_target);
@@ -188,6 +210,9 @@ namespace minire::examples
 
         bool handle(application::OnMouseWheel const & e) override
         {
+            if (BaseApplication::handle(e))
+                return true;
+
             _orbiting.updateDistance(-0.5f * e._dy);
             _orbiting.evaluate(_cameraTransform);
 
@@ -206,11 +231,15 @@ namespace minire::examples
         {
             _windowSize.x = static_cast<float>(e._width);
             _windowSize.y = static_cast<float>(e._height);
-            return true;
+
+            return BaseApplication::handle(e);
         }
 
         bool handle(application::OnKeyDown const & e) override
         {
+            if (BaseApplication::handle(e))
+                return true;
+
             switch(e._key)
             {
                 case SDLK_c:
@@ -220,15 +249,21 @@ namespace minire::examples
                     break;
 
                 case SDLK_d:
-                    _isDirectLightEnabled = !_isDirectLightEnabled;
-                    MINIRE_INFO("Toggle direct light: {}", _isDirectLightEnabled);
-                    scene().root().template at<scene::DirectionalLight>("directlight-node", "sun").setVisible(_isDirectLightEnabled);
+                    if (_defaultLights)
+                    {
+                        _isDirectLightEnabled = !_isDirectLightEnabled;
+                        MINIRE_INFO("Toggle direct light: {}", _isDirectLightEnabled);
+                        scene().root().template at<scene::DirectionalLight>("directlight-node", "sun").setVisible(_isDirectLightEnabled);
+                    }
                     break;
 
                 case SDLK_p:
-                    _isPointLightEnabled = !_isPointLightEnabled;
-                    MINIRE_INFO("Toggle point light: {}", _isPointLightEnabled);
-                    scene().root().template at<scene::PointLight>("pointlight-node", "bulb").setVisible(_isPointLightEnabled);
+                    if (_defaultLights)
+                    {
+                        _isPointLightEnabled = !_isPointLightEnabled;
+                        MINIRE_INFO("Toggle point light: {}", _isPointLightEnabled);
+                        scene().root().template at<scene::PointLight>("pointlight-node", "bulb").setVisible(_isPointLightEnabled);
+                    }
                     break;
 
                 case SDLK_f:
@@ -253,6 +288,7 @@ namespace minire::examples
         bool                            _isPointLightEnabled;
         bool                            _isFloorPlaneEnabled;
         bool                            _isPerspective;
+        bool const                      _defaultLights;
     };
 
     class TestbedApplication
