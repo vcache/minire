@@ -8,6 +8,7 @@
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_scancode.h>
+#include <SDL2/SDL_scancode.h>
 #include <SDL2/SDL_surface.h>
 
 #include <cassert>
@@ -109,6 +110,8 @@ namespace minire::sdl
     protected:
         void startTextInput() const;
         void stopTextInput() const;
+
+        bool isPressed(::SDL_Scancode) const;
 
     protected:
         uint32_t ticks() const { return _frameTicks; } // milliseconds, msec

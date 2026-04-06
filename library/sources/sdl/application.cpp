@@ -292,6 +292,18 @@ namespace minire::sdl
         ::SDL_StopTextInput();
     }
 
+    bool Application::isPressed(::SDL_Scancode scancode) const
+    {
+        int numkeys = 0;
+        Uint8 const * keyboardState = ::SDL_GetKeyboardState(&numkeys);
+
+        int const code = static_cast<size_t>(scancode);
+        MINIRE_INVARIANT(code >= 0 && code < numkeys,
+                         "bad scancode ({}), numkeys = {}",
+                         code, numkeys);
+        return keyboardState[code];
+    }
+
     void Application::handleResize(int w, int h)
     {
         MINIRE_INVARIANT(w > 0 && h > 0,
