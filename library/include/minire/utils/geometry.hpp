@@ -18,6 +18,15 @@ namespace minire::utils
         glm::vec3 _direction = glm::vec3(0, 0, 0);
     };
 
+    struct InvRay : public Ray
+    {
+        InvRay(Ray const & ray)
+        {
+            _origin = ray._origin;
+            _direction = 1.0f / ray._direction;
+        }
+    };
+
     bool isIntersects(Aabb const &, Aabb const &);
     bool isIntersectsXZ(Aabb const &, Aabb const &);
 
@@ -25,6 +34,9 @@ namespace minire::utils
                         scene::Viewpoint const &);
 
     std::optional<glm::vec3> intersectXZ(Ray const &);
+
+    std::optional<float> intersection(Aabb const & aabb, Ray const &);
+    std::optional<float> intersection(Aabb const & aabb, InvRay const &);
 
 #if 0
     struct GroundHit

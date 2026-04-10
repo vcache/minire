@@ -77,6 +77,41 @@ namespace minire::utils
         return std::nullopt;
     }
 
+    std::optional<float> intersection(Aabb const & aabb, Ray const & ray)
+    {
+        return intersection(aabb, InvRay(ray));
+    }
+
+    std::optional<float> intersection(Aabb const & aabb, InvRay const & invRay)
+    {
+        glm::vec3 const & rayOrigin = invRay._origin;
+        glm::vec3 const & rayInvDir = invRay._direction; // it is inversed
+
+        glm::vec3 const & lb = aabb.min();
+        glm::vec3 const & rt = aabb.max();
+
+        float t1 = (lb.x - rayOrigin.x) * rayInvDir.x;
+        float t2 = (rt.x - rayOrigin.x) * rayInvDir.x;
+        float t3 = (lb.y - rayOrigin.y) * rayInvDir.y;
+        float t4 = (rt.y - rayOrigin.y) * rayInvDir.y;
+        float t5 = (lb.z - rayOrigin.z) * rayInvDir.z;
+        float t6 = (rt.z - rayOrigin.z) * rayInvDir.z;
+
+        using namespace std;
+        float tmin = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
+        float tmax = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
+
+        // if tmax < 0, ray (line) is intersecting AABB,
+        // but the whole AABB is behind us
+        if (tmax < 0) return std::nullopt;
+
+        // if tmin > tmax, ray doesn't intersect AABB
+        if (tmin > tmax) return std::nullopt;
+
+        return tmin;
+    }
+
+
 #if 0
     void GroundHit::extend(glm::vec2 const & point)
     {
