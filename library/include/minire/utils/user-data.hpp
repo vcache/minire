@@ -40,6 +40,9 @@ namespace minire::utils
         template<typename T>
         T const & userDataAs() const { return std::any_cast<T>(_userData); }
 
+        template<typename T>
+        T const * tryUserDataAs() const { return std::any_cast<T>(&_userData); }
+
     private:
         std::any _userData;
     };
