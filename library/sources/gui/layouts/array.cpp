@@ -3,8 +3,7 @@
 #include <minire/errors.hpp>
 #include <minire/gui/component.hpp>
 #include <minire/logging.hpp>
-
-#include <utils/overloaded.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <cassert>
 

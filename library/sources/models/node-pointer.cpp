@@ -1,7 +1,6 @@
 #include <minire/models/node-pointer.hpp>
 
-#include <utils/overloaded.hpp>
-
+#include <minire/utils/overloaded.hpp>
 #include <minire/scene.hpp> // for scene::Node
 
 #include <fmt/format.h>

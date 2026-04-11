@@ -4,6 +4,7 @@
 #include <minire/errors.hpp>
 #include <minire/models/billboard.hpp>
 #include <minire/models/font-face.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <opengl.hpp>
 #include <opengl/program.hpp>
@@ -14,7 +15,6 @@
 #include <rasterizer/sprites/vertex-buffer.hpp>
 #include <rasterizer/textures.hpp>
 #include <scene-impl.hpp>
-#include <utils/overloaded.hpp>
 
 #include <glm/mat4x4.hpp>
 #include <glm/gtc/type_ptr.hpp> // for gln::value_ptr
@@ -33,7 +33,8 @@ namespace minire::rasterizer
         virtual ~Program() = default;
         virtual void use(glm::mat4 const & transform,
                          scene::Viewpoint const &,
-                         glm::mat4 const & viewProj) const = 0;
+                         glm::mat4 const & viewProj,
+                         SceneImpl::OpbId const opbId) const = 0;
     };
 
     namespace
@@ -85,8 +86,10 @@ namespace minire::rasterizer
                 flat in vec2 bznkFragDims;
 
                 uniform sampler2D bznkTexture;
+                uniform uint bznkMeshId = 0u; // TODO: make it optional
 
-                out vec4 bznkOutCol;
+                layout(location = 0) out vec4 bznkOutColor;
+                layout(location = 1) out uint bznkOutMeshId;
 
                 vec2 sawtooth(vec2 t)
                 {
@@ -96,7 +99,8 @@ namespace minire::rasterizer
                 void main()
                 {
                     vec2 offset = bznkFragRep + bznkFragDims * sawtooth(bznkFragUv);
-                    bznkOutCol = texture(bznkTexture, offset);
+                    bznkOutColor = texture(bznkTexture, offset);
+                    bznkOutMeshId = bznkMeshId;
                 }
             )";
 
@@ -108,13 +112,15 @@ namespace minire::rasterizer
                 , _bznkView(_program.getUniformLocation("bznkView"))
                 , _bznkProjection(_program.getUniformLocation("bznkProjection"))
                 , _bznkTexture(_program.getUniformLocation("bznkTexture"))
+                , _bznkMeshId(_program.getUniformLocation("bznkMeshId"))
             {
                 // TOOD: _program.use(); ??
             }
 
             void use(glm::mat4 const & transform,
                      scene::Viewpoint const & viewpoint,
-                     glm::mat4 const &) const override
+                     glm::mat4 const &,
+                     SceneImpl::OpbId const opbId) const override
             {
                 _program.use();
 
@@ -123,14 +129,16 @@ namespace minire::rasterizer
                 _program.setUniform(_bznkView, viewpoint.view());
                 _program.setUniform(_bznkProjection, viewpoint.projection());
                 _program.setUniform(_bznkTexture, 0);
+                _program.setUniform(_bznkMeshId, opbId);
             }
 
         private:
             opengl::Program _program;
-            GLint           _bznkCenter = 0;
-            GLint           _bznkView = 0;
-            GLint           _bznkProjection = 0;
-            GLint           _bznkTexture = 0;
+            GLint const     _bznkCenter = 0;
+            GLint const     _bznkView = 0;
+            GLint const     _bznkProjection = 0;
+            GLint const     _bznkTexture = 0;
+            GLint const     _bznkMeshId = 0;
         };
 
         class ScreenPlacedSprite
@@ -174,8 +182,10 @@ namespace minire::rasterizer
                 flat in vec2 bznkFragDims;
 
                 uniform sampler2D bznkTexture;
+                uniform uint bznkMeshId = 0u; // TODO: make it optional
 
-                out vec4 bznkOutCol;
+                layout(location = 0) out vec4 bznkOutColor;
+                layout(location = 1) out uint bznkOutMeshId;
 
                 vec2 sawtooth(vec2 t)
                 {
@@ -185,7 +195,8 @@ namespace minire::rasterizer
                 void main()
                 {
                     ivec2 offset = ivec2(floor(bznkFragRep + bznkFragDims * sawtooth(bznkFragUv)));
-                    bznkOutCol = texelFetch(bznkTexture, offset, 0);
+                    bznkOutColor = texelFetch(bznkTexture, offset, 0);
+                    bznkOutMeshId = bznkMeshId;
                 }
             )";
 
@@ -197,11 +208,13 @@ namespace minire::rasterizer
                 , _bznkCenter(_program.getUniformLocation("bznkCenter"))
                 , _bznkViewProj(_program.getUniformLocation("bznkViewProj"))
                 , _bznkTexture(_program.getUniformLocation("bznkTexture"))
+                , _bznkMeshId(_program.getUniformLocation("bznkMeshId"))
             {}
 
             void use(glm::mat4 const & transform,
                      scene::Viewpoint const & viewpoint,
-                     glm::mat4 const & viewProj) const override
+                     glm::mat4 const & viewProj,
+                     SceneImpl::OpbId const opbId) const override
             {
                 _program.use();
 
@@ -213,14 +226,16 @@ namespace minire::rasterizer
                 _program.setUniform(_bznkCenter, translate);
                 _program.setUniform(_bznkViewProj, viewProj);
                 _program.setUniform(_bznkTexture, 0);
+                _program.setUniform(_bznkMeshId, opbId);
             }
 
         private:
             opengl::Program _program;
-            GLint           _bznkScreenFactor = 0;
-            GLint           _bznkCenter = 0;
-            GLint           _bznkViewProj = 0;
-            GLint           _bznkTexture = 0;
+            GLint const     _bznkScreenFactor = 0;
+            GLint const     _bznkCenter = 0;
+            GLint const     _bznkViewProj = 0;
+            GLint const     _bznkTexture = 0;
+            GLint const     _bznkMeshId = 0;
         };
 
         class WorldPlacedLabel
@@ -276,8 +291,10 @@ namespace minire::rasterizer
                 flat in uint bznkFragFont;
 
                 uniform sampler2D bznkFonts[3];
+                uniform uint bznkMeshId = 0u; // TODO: make it optional
 
-                out vec4 bznkOutColor;
+                layout(location = 0) out vec4 bznkOutColor;
+                layout(location = 1) out uint bznkOutMeshId;
 
                 void main()
                 {
@@ -289,6 +306,7 @@ namespace minire::rasterizer
                     float bgFactor = 1.0 - fgFactor;
                     bznkOutColor = bznkFragBgColor * bgFactor
                                  + bznkFragFgColor * fgFactor;
+                    bznkOutMeshId = bznkMeshId;
                 }
             )";
 
@@ -300,11 +318,13 @@ namespace minire::rasterizer
                 , _bznkView(_program.getUniformLocation("bznkView"))
                 , _bznkProjection(_program.getUniformLocation("bznkProjection"))
                 , _bznkFonts(_program.getUniformLocation("bznkFonts"))
+                , _bznkMeshId(_program.getUniformLocation("bznkMeshId"))
             {}
 
             void use(glm::mat4 const & transform,
                      scene::Viewpoint const & viewpoint,
-                     glm::mat4 const &) const override
+                     glm::mat4 const &,
+                     SceneImpl::OpbId const opbId) const override
             {
                 static const std::array<GLint, 3> kTextureUnits{0, 1, 2};
 
@@ -315,14 +335,16 @@ namespace minire::rasterizer
                 _program.setUniform(_bznkView, viewpoint.view());
                 _program.setUniform(_bznkProjection, viewpoint.projection());
                 _program.setUniform(_bznkFonts, kTextureUnits);
+                _program.setUniform(_bznkMeshId, opbId);
             }
 
         private:
             opengl::Program _program;
-            GLint           _bznkCenter = 0;
-            GLint           _bznkView = 0;
-            GLint           _bznkProjection = 0;
-            GLint           _bznkFonts = 0;
+            GLint const     _bznkCenter = 0;
+            GLint const     _bznkView = 0;
+            GLint const     _bznkProjection = 0;
+            GLint const     _bznkFonts = 0;
+            GLint const     _bznkMeshId = 0;
         };
 
         class ScreenPlacedLabel
@@ -373,8 +395,10 @@ namespace minire::rasterizer
                 flat in uint bznkFragFont;
 
                 uniform sampler2D bznkFonts[3];
+                uniform uint bznkMeshId = 0u; // TODO: make it optional
 
-                out vec4 bznkOutColor;
+                layout(location = 0) out vec4 bznkOutColor;
+                layout(location = 1) out uint bznkOutMeshId;
 
                 void main()
                 {
@@ -385,6 +409,7 @@ namespace minire::rasterizer
                     float bgFactor = 1.0 - fgFactor;
                     bznkOutColor = bznkFragBgColor * bgFactor
                                  + bznkFragFgColor * fgFactor;
+                    bznkOutMeshId = bznkMeshId;
                 }
             )";
 
@@ -396,11 +421,13 @@ namespace minire::rasterizer
                 , _bznkCenter(_program.getUniformLocation("bznkCenter"))
                 , _bznkViewProj(_program.getUniformLocation("bznkViewProj"))
                 , _bznkFonts(_program.getUniformLocation("bznkFonts"))
+                , _bznkMeshId(_program.getUniformLocation("bznkMeshId"))
             {}
 
             void use(glm::mat4 const & transform,
                      scene::Viewpoint const & viewpoint,
-                     glm::mat4 const & viewProj) const override
+                     glm::mat4 const & viewProj,
+                     SceneImpl::OpbId const opbId) const override
             {
 
                 static const std::array<GLint, 3> kTextureUnits{0, 1, 2};
@@ -415,14 +442,16 @@ namespace minire::rasterizer
                 _program.setUniform(_bznkCenter, translate);
                 _program.setUniform(_bznkViewProj, viewProj);
                 _program.setUniform(_bznkFonts, kTextureUnits);
+                _program.setUniform(_bznkMeshId, opbId);
             }
 
         private:
             opengl::Program _program;
-            GLint           _bznkScreenFactor = 0;
-            GLint           _bznkCenter = 0;
-            GLint           _bznkViewProj = 0;
-            GLint           _bznkFonts = 0;
+            GLint const     _bznkScreenFactor = 0;
+            GLint const     _bznkCenter = 0;
+            GLint const     _bznkViewProj = 0;
+            GLint const     _bznkFonts = 0;
+            GLint const     _bznkMeshId = 0;
         };
     }
 
@@ -434,7 +463,8 @@ namespace minire::rasterizer
         virtual ~Billboard() = default;
         virtual void draw(glm::mat4 const & transform,
                           scene::Viewpoint const & viewpoint,
-                          glm::mat4 const & viewProj) const = 0;
+                          glm::mat4 const & viewProj,
+                          SceneImpl::OpbId const &) const = 0;
     };
 
     namespace
@@ -455,10 +485,11 @@ namespace minire::rasterizer
 
             void draw(glm::mat4 const & transform,
                       scene::Viewpoint const & viewpoint,
-                      glm::mat4 const & viewProj) const override
+                      glm::mat4 const & viewProj,
+                      SceneImpl::OpbId const & opbId) const override
             {
                 assert(_program);
-                _program->use(transform, viewpoint, viewProj);
+                _program->use(transform, viewpoint, viewProj, opbId);
 
                 MINIRE_GL(glActiveTexture, GL_TEXTURE0);
                 assert(_texture);
@@ -493,11 +524,12 @@ namespace minire::rasterizer
 
             void draw(glm::mat4 const & transform,
                       scene::Viewpoint const & viewpoint,
-                      glm::mat4 const & viewProj) const override
+                      glm::mat4 const & viewProj,
+                      SceneImpl::OpbId const & opbId) const override
             {
 
                 assert(_program);
-                _program->use(transform, viewpoint, viewProj);
+                _program->use(transform, viewpoint, viewProj, opbId);
 
                 MINIRE_GL(glActiveTexture, GL_TEXTURE0);
                 assert(_fontRegular);
@@ -719,9 +751,10 @@ namespace minire::rasterizer
         //       (i.e. has correct relative order)
         scene.cullBillboards(
             [&viewpoint, &viewProj](rasterizer::Billboard const & billboard,
-                                    glm::mat4 const & transform)
+                                    glm::mat4 const & transform,
+                                    SceneImpl::OpbId const opbId)
             {
-                billboard.draw(transform, viewpoint, viewProj);
+                billboard.draw(transform, viewpoint, viewProj, opbId);
             });
     }
 }

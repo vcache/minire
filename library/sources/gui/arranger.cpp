@@ -1,7 +1,7 @@
 #include <minire/gui/arranger.hpp>
 
 #include <minire/errors.hpp>
-#include <utils/overloaded.hpp>
+#include <minire/utils/overloaded.hpp>
 
 namespace minire::gui
 {

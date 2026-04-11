@@ -40,7 +40,8 @@ namespace minire::rasterizer
                   glm::vec3 const & emissiveFactor,
                   material::TextureRefs const & directionalLightsShadowMaps,
                   material::TextureRefs const & pointLightsShadowMaps,
-                  material::SkinningVector const & skinningVector) const;
+                  material::SkinningVector const & skinningVector,
+                  uint32_t const meshId) const;
 
         // Position attrib is guaranteed to be at index 0.
         void drawBare() const;

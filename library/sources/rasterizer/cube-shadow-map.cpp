@@ -5,9 +5,9 @@
 #include <codegen/plugins/vertex-position.hpp>
 #include <rasterizer/mesh.hpp>
 #include <scene-impl.hpp>
-#include <utils/overloaded.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <glm/gtx/transform.hpp>
 #include <glm/mat4x4.hpp>

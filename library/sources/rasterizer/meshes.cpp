@@ -59,12 +59,13 @@ namespace minire::rasterizer
             [&ambientLight = scene.ambientLight(),
              &directionalLightsShadowMaps, &pointLightsShadowMaps]
             (Mesh const & mesh, glm::vec3 const & emissiveFactor,
-             glm::mat4 const & transform, material::SkinningVector const & skinningVector)
+             glm::mat4 const & transform, material::SkinningVector const & skinningVector,
+             SceneImpl::OpbId const obpId)
             {
                 mesh.draw(transform, ambientLight, emissiveFactor,
                           directionalLightsShadowMaps,
                           pointLightsShadowMaps,
-                          skinningVector);
+                          skinningVector, obpId);
             }
         );
     }

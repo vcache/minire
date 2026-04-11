@@ -11,6 +11,7 @@
 #include <minire/models/pbr-material.hpp>
 #include <minire/models/point-light.hpp>
 #include <minire/models/transform.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <glm/gtc/quaternion.hpp> // for quatLookAt
 
@@ -33,6 +34,42 @@ namespace minire::examples
             return glm::quatLookAt(direction, worldUp);
         }
 
+        void printSceneItem(std::string const & prefix,
+                            minire::scene::SceneItem const & sceneItem) const
+        {
+            if (!_printOpbData)
+                return;
+
+            std::visit(utils::Overloaded
+            {
+                [](std::monostate const &) {},
+                [&prefix](minire::scene::Mesh::Sptr const & mesh)
+                {
+                    if (mesh)
+                    {
+                        MINIRE_INFO("{} mesh: {} / {}",
+                                    prefix, mesh->name(),
+                                    mesh->absPath());
+                    }
+                },
+                [&prefix](minire::scene::Billboard::Sptr const & billboard)
+                {
+                    if (billboard)
+                    {
+                        MINIRE_INFO("{} billboard: {} / {}",
+                                    prefix, billboard->name(),
+                                    billboard->absPath());
+                    }
+                },
+                [](auto const & object)
+                {
+                    using T = std::decay_t<decltype(object)>;
+                    MINIRE_THROW("unexpected scene object: \"{}\", {}",
+                                  object->name(), minire::utils::demangle<T>());
+                },
+            }, sceneItem);
+        }
+
     public:
         using BaseApplication::scene;
         using BaseApplication::frame;
@@ -41,7 +78,8 @@ namespace minire::examples
                                          std::string const & title,
                                          content::Manager & contentManager,
                                          bool const defaultLights = true)
-            : BaseApplication(width, height, title, contentManager)
+            : BaseApplication(width, height, title,
+                              contentManager)
             , _target(0.0f, 0.0f, 0.0f)
             , _orbiting(_target, 10)
             , _isDirectLightEnabled(false)
@@ -49,6 +87,7 @@ namespace minire::examples
             , _isFloorPlaneEnabled(true)
             , _isPerspective(true)
             , _defaultLights(defaultLights)
+            , _printOpbData(false)
         {}
 
         void onStart() override
@@ -136,6 +175,8 @@ namespace minire::examples
             // interpolation compensates a gap between
             // a render and a controller timings.
 
+            printSceneItem("Hot", scene().fetchHotSceneItem());
+
             return 0 == (frame() % 5);
         }
 
@@ -179,6 +220,8 @@ namespace minire::examples
                 assert(_cameraNode);
                 _cameraNode->setOrigin(_cameraTransform);
             }
+
+            printSceneItem("Arbitrary", scene().fetchSceneItem(e._absX, e._absY));
 
             return true;
         }
@@ -271,6 +314,11 @@ namespace minire::examples
                     MINIRE_INFO("Toggle floor plane: {}", _isFloorPlaneEnabled);
                     scene().root().template at<scene::Mesh>(models::ScenePath{"floor-node", "floor-plane"}).setVisible(_isFloorPlaneEnabled);
                     break;
+
+                case SDLK_b:
+                    _printOpbData = !_printOpbData;
+                    MINIRE_INFO("Toggle OBP buffer output: {}", _printOpbData);
+                    break;
             }
             return false;
         }
@@ -289,6 +337,7 @@ namespace minire::examples
         bool                            _isFloorPlaneEnabled;
         bool                            _isPerspective;
         bool const                      _defaultLights;
+        bool                            _printOpbData;
     };
 
     class TestbedApplication

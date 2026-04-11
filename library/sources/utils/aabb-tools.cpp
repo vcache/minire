@@ -5,10 +5,10 @@
 #include <minire/formats/gltf.hpp>
 #include <minire/formats/obj.hpp>
 #include <minire/utils/demangle.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <utils/gltf-element-fetch.hpp>
 #include <utils/gltf-node-transform.hpp>
-#include <utils/overloaded.hpp>
 
 #include <fmt/ranges.h>
 
@@ -121,10 +121,10 @@ namespace minire::utils
             size_t const sceneIndex = utils::getElementIndex(sceneId, model.scenes, "scene");
             ::tinygltf::Scene const & gltfScene = model.scenes[sceneIndex];
 
+            std::unordered_set<size_t> visited;
             for(int nodeIndex : gltfScene.nodes)
             {
                 MINIRE_INVARIANT(nodeIndex >= 0, "bad node index: {}", nodeIndex);
-                std::unordered_set<size_t> visited;
                 Aabb nodeAabb = buildNodeAabb(model, static_cast<size_t>(nodeIndex), visited);
                 result.extend(nodeAabb);
             }

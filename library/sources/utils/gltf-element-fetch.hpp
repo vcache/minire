@@ -3,7 +3,7 @@
 #include <minire/content/path.hpp>
 #include <minire/errors.hpp>
 #include <minire/utils/demangle.hpp>
-#include <utils/overloaded.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <type_traits>
 #include <vector>

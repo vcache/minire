@@ -1,5 +1,12 @@
 #pragma once
 
+#include <opengl/fbo.hpp>
+#include <opengl/pbo.hpp>
+#include <opengl/program.hpp>
+#include <opengl/rbo.hpp>
+#include <opengl/texture.hpp>
+#include <opengl/vao.hpp>
+#include <opengl/vbo.hpp>
 #include <rasterizer/billboards.hpp>
 #include <rasterizer/coordinates.hpp>
 #include <rasterizer/cube-shadow-map.hpp>
@@ -31,12 +38,20 @@ namespace minire
     {
     public:
         explicit Rasterizer(content::Manager &,
+                            int width, int height,
                             content::Ids const & fontsPreload = {});
 
         void draw(SceneImpl const &);
 
         void setScreenSize(size_t const width,
                            size_t const height);
+
+        // NOTE: might have some latency (reads from pixel buffer)
+        uint32_t fetchMeshId(size_t const x, size_t const y) const;
+
+        // NOTE: Shouldn't have any latencies
+        uint32_t fetchHotMeshId() const;
+        void setHotFragment(size_t const x, size_t const y);
 
     public:
         rasterizer::Labels & labels() { return _labels; }
@@ -50,6 +65,7 @@ namespace minire
         void newResourceLayer(rasterizer::Resources::LayerId const & layerId) { _resources.newLayer(layerId); }
         void disposeResourceLayer(rasterizer::Resources::LayerId const & layerId) { _resources.disposeLayer(layerId); }
         rasterizer::Resources::LayerId const & currentResourceLayer() const { return _resources.current(); }
+
 
     private:
         rasterizer::CulledDirectionalLights cullDirectionalLights(SceneImpl const &);
@@ -75,6 +91,19 @@ namespace minire
 
     private:
         content::Manager             & _contentManager;
+
+        // Object required fo Multi-Render Target (MRT)
+        opengl::FBO                    _primaryFbo;
+        opengl::Texture::Uptr          _colorBuffer;
+        opengl::Texture::Uptr          _idBuffer;
+        opengl::RBO::Uptr              _depthRbo;
+        opengl::VAO::Sptr              _screenQuadVao;
+        opengl::VBO::Sptr              _screenQuadVbo;
+        opengl::Program                _screenQuadProgram;
+        GLint const                    _screenTextureUniform;
+        opengl::PBO::Uptr              _hotFragmentPbo; // PBO for ID under the cursor (a hot fragment)
+        size_t                         _hotFragmentX = 0;
+        size_t                         _hotFragmentY = 0;
 
         // NOTE: the order of these is ridiculously vital (see ctor)
         rasterizer::Ubo                _ubo;

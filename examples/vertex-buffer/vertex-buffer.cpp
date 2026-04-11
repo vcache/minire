@@ -253,6 +253,8 @@ namespace
 
         bool onStep() override
         {
+            TestbedApplication::onStep(); // intentionally ignore the result
+
             _sphereAnimationPhase += frameTime();
             auto const phase = std::sin(_sphereAnimationPhase);
             createVertexBuffer("sphere-example",

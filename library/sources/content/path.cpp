@@ -1,8 +1,7 @@
 #include <minire/content/path.hpp>
 
 #include <minire/errors.hpp>
-
-#include <utils/overloaded.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <boost/container_hash/hash.hpp> // for hash_combine
 #include <fmt/format.h>

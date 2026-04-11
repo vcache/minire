@@ -3,12 +3,12 @@
 #include <rasterizer.hpp>
 #include <rasterizer/constants.hpp>
 #include <scene-impl/gltf-instantiator.hpp>
-#include <utils/overloaded.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 #include <minire/utils/demangle.hpp>
 #include <minire/utils/geometry.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <fmt/ranges.h>
 
@@ -25,7 +25,32 @@ namespace minire
      *  - think culling index abstraction
      * */
 
-    // TODO: store/calculate absolute path for nodes/leaves (and use them for logging)
+    // OpbIdHolder //
+
+    class SceneImpl::OpbIdHolder
+    {
+        OpbIdHolder(OpbIdHolder const &) = delete;
+        OpbIdHolder& operator=(OpbIdHolder const &) = delete;
+        OpbIdHolder(OpbIdHolder &&) = delete;
+        OpbIdHolder& operator=(OpbIdHolder &&) = delete;
+
+    public:
+        explicit OpbIdHolder(SceneImpl & scene)
+            : _scene(scene)
+            , _id(_scene.allocateOpdId())
+        {}
+
+        ~OpbIdHolder()
+        {
+            _scene.releaseOpdId(_id);
+        }
+
+        SceneImpl::OpbId id() const { return _id; }
+
+    private:
+        SceneImpl            & _scene;
+        SceneImpl::OpbId const _id;
+    };
 
     // SceneImpl::Leaf //
 
@@ -51,7 +76,37 @@ namespace minire
         }
     }
 
+    template<typename Derived, typename ObjectType>
+    models::ScenePath SceneImpl::Leaf<Derived, ObjectType>::absPath() const
+    {
+        models::ScenePath result;
+
+        if (auto parent = _parent.lock(); parent)
+        {
+            result = parent->absPath();
+        }
+
+        result.push_back(name());
+        return result;
+    }
+
     // SceneImpl::*Leaf //
+
+    SceneImpl::MeshLeaf::MeshLeaf(std::string name,
+                                  models::Mesh const & model,
+                                  std::weak_ptr<Node> parent,
+                                  std::shared_ptr<rasterizer::Mesh> const & mesh,
+                                  SceneImpl & scene)
+        : Leaf(std::move(name), model, parent, scene)
+        , _mesh(mesh)
+        , _opbId(scene._enableOpb ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
+                                  : std::unique_ptr<SceneImpl::OpbIdHolder>())
+    {}
+
+    SceneImpl::OpbId SceneImpl::MeshLeaf::opbId() const
+    {
+        return _scene._enableOpb && _opbId ? _opbId->id() : 0;
+    }
 
     void SceneImpl::DirectionalLightLeaf::revalidate(Mask mask)
     {
@@ -107,6 +162,22 @@ namespace minire
         _scene.setActiveCamera(*this);
     }
 
+    SceneImpl::BillboardLeaf::BillboardLeaf(std::string name,
+                                            models::Billboard model,
+                                            std::weak_ptr<Node> parent,
+                                            std::shared_ptr<rasterizer::Billboard> const & billboard,
+                                            SceneImpl & scene)
+        : Leaf(std::move(name), std::move(model), parent, scene)
+        , _billboard(billboard)
+        , _opbId(scene._enableOpb ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
+                                  : std::unique_ptr<SceneImpl::OpbIdHolder>())
+    {}
+
+    SceneImpl::OpbId SceneImpl::BillboardLeaf::opbId() const
+    {
+        return _scene._enableOpb && _opbId ? _opbId->id() : 0;
+    }
+
     // SceneImpl::Node //
 
     scene::Node::Sptr SceneImpl::Node::make(std::string const & name, models::Node model)
@@ -127,9 +198,21 @@ namespace minire
         assert(mesh);
 
         auto meshLeaf = std::make_shared<MeshLeaf>(name, model, weak_from_this(), mesh, _scene);
-        auto [_, inserted] = _children.emplace(name, meshLeaf);
-        MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
+
+        {
+            auto [_, inserted] = _children.emplace(name, meshLeaf);
+            MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
+        }
+
+        // TODO: probably can be replaced to _opbIdToSceneItem
         _scene._meshLeaves.push_back(meshLeaf);
+
+        if (meshLeaf->_opbId)
+        {
+            OpbId const opbId = meshLeaf->_opbId->id();
+            auto [_, inserted] = _scene._opbIdToSceneItem.emplace(opbId, meshLeaf);
+            MINIRE_INVARIANT(inserted, "failed to store OPB ID ({}) of \"{}\"", opbId, name);
+        }
 
         if (model._skin)
         {
@@ -211,11 +294,20 @@ namespace minire
         auto [_, inserted] = _children.emplace(name, billboardLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
 
+        // TODO: can be replaced by _opbIdToSceneItem
         _scene._billboardsLeaves.emplace_back(model._zOrder, billboardLeaf);
         _scene._billboardsLeaves.sort([](auto const & a, auto const & b)
             {
                 return a.first < b.first;
             });
+
+        if (billboardLeaf->_opbId)
+        {
+            OpbId const opbId = billboardLeaf->_opbId->id();
+            auto [_, inserted] = _scene._opbIdToSceneItem.emplace(opbId, billboardLeaf);
+            MINIRE_INVARIANT(inserted, "failed to store OPB ID ({}) of \"{}\"", opbId, name);
+        }
+
         return billboardLeaf;
     }
 
@@ -300,6 +392,18 @@ namespace minire
         invalidate(kParentTransformChanged);
     }
 
+    models::ScenePath SceneImpl::Node::absPath() const
+    {
+        models::ScenePath result;
+        result.reserve(10); // hmmm
+        for (auto node = shared_from_this(); node; node = node->_parent.lock())
+        {
+            result.push_back(node->name());
+        }
+        std::ranges::reverse(result);
+        return result;
+    }
+
     void SceneImpl::Node::erase(models::ScenePath const & path)
     {
         if (auto it = findIterator(path); !it.empty())
@@ -313,13 +417,13 @@ namespace minire
         _children.clear();
     }
 
-    SceneImpl::Node::SceneItem
+    scene::SceneItem
     SceneImpl::Node::find(models::ScenePath const & path) const
     {
         if (auto it = findIterator(path); !it.empty())
         {
             return std::visit(
-                [](auto const & child) -> SceneItem { return child; },
+                [](auto const & child) -> scene::SceneItem { return child; },
                 it.item());
         }
         return std::monostate();
@@ -694,8 +798,32 @@ namespace minire
 
     // Scene //
 
+    SceneImpl::OpbId SceneImpl::allocateOpdId()
+    {
+        if (_vacantOpbIds.empty())
+        {
+            MINIRE_INVARIANT(_maxOpbId != std::numeric_limits<OpbId>::max(),
+                             "too many object on a scene to select: {}", _maxOpbId);
+            return _maxOpbId++;
+        }
+
+        auto it = _vacantOpbIds.begin();
+        OpbId result = *it;
+        _vacantOpbIds.erase(it);
+
+        return result;
+    }
+
+    void SceneImpl::releaseOpdId(OpbId opbId)
+    {
+        _opbIdToSceneItem.erase(opbId);
+        _vacantOpbIds.insert(opbId);
+    }
+
     SceneImpl::SceneImpl(Rasterizer & rasterizer)
         : _rasterizer(rasterizer)
+        , _enableOpb(true)  // TODO: make OPB optional (as an attachable unit for The NextGenPipeline (NGP))
+                            // TODO: MASS should be disable when OPB is used
     {
         reset();
     }
@@ -759,6 +887,42 @@ namespace minire
         _root = std::make_shared<Node>("(the root)",
             models::Node{models::Transform{}, true},
             Node::Wptr(), *this);
+    }
+
+    scene::SceneItem SceneImpl::fetchSceneItem(size_t const x, size_t const y) const
+    {
+        if (!_enableOpb)
+            return std::monostate();
+
+        return fetchSceneItem(_rasterizer.fetchMeshId(x, y));
+    }
+
+    scene::SceneItem SceneImpl::fetchHotSceneItem() const
+    {
+        if (!_enableOpb)
+            return std::monostate();
+
+        return fetchSceneItem(_rasterizer.fetchHotMeshId());
+    }
+
+    scene::SceneItem SceneImpl::fetchSceneItem(OpbId const opbId) const
+    {
+        if (!_enableOpb)
+            return std::monostate();
+
+        if (0 == opbId)
+            return std::monostate();
+
+        auto it = _opbIdToSceneItem.find(opbId);
+        if (it == _opbIdToSceneItem.cend())
+            return std::monostate();
+
+        return std::visit(utils::Overloaded
+        {
+            [](std::monostate const &) -> scene::SceneItem { return std::monostate(); },
+            [](MeshLeaf::Wptr const & item) -> scene::SceneItem { return item.lock(); },
+            [](BillboardLeaf::Wptr const & item) -> scene::SceneItem { return item.lock(); },
+        }, it->second);
     }
 
     void SceneImpl::setViewport(size_t weight, size_t height)

@@ -6,10 +6,10 @@
 #include <rasterizer/filters/gaussian-blur.hpp>
 #include <rasterizer/mesh.hpp>
 #include <utils/frustum.hpp>
-#include <utils/overloaded.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <glm/gtx/transform.hpp>
 #include <glm/mat4x4.hpp>

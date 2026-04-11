@@ -6,6 +6,7 @@
 #include <minire/logging.hpp>
 #include <minire/utils/aabb-tools.hpp>
 #include <minire/utils/geometry.hpp>
+#include <minire/utils/overloaded.hpp>
 #include <minire/utils/ray-caster.hpp>
 #include <minire/utils/unow.hpp>
 
@@ -15,7 +16,6 @@
 #include <scene-impl/gltf-instantiator.hpp>
 #include <scene-impl/viewpoint.hpp>
 #include <text/measurer.hpp>
-#include <utils/overloaded.hpp>
 
 #include <fmt/format.h>
 
@@ -39,7 +39,7 @@ namespace minire
                              models::MsaaParams const & msaaParams)
         : sdl::GlApplication(width, height, title, msaaParams)
         , _contentManager(contentManager)
-        , _rasterizer(std::make_unique<Rasterizer>(contentManager))
+        , _rasterizer(std::make_unique<Rasterizer>(contentManager, width, height))
         , _scene(std::make_unique<SceneImpl>(*_rasterizer))
     {
         setVsync(true); // TODO: into parameters
@@ -283,6 +283,12 @@ namespace minire
                                   bool x1, bool x2)
     {
         GlApplication::onMouseMove(absX, absY, relX, relY, left, middle, right, x1, x2);
+
+        if (absX >= 0 && absY >= 0)
+        {
+            _rasterizer->setHotFragment(absX, absY);
+        }
+
         handle(application::OnMouseMove
         {
             ._absX = absX,

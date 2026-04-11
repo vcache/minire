@@ -64,7 +64,8 @@ namespace minire::rasterizer::materials
                             glm::vec3 const & emissiveFactor,
                             material::TextureRefs const & directionalLightsShadowMaps,
                             material::TextureRefs const & pointLightsShadowMaps,
-                            material::SkinningVector const & skinningVector) const override;
+                            material::SkinningVector const & skinningVector,
+                            uint32_t const meshId) const override;
 
         opengl::Program const & glProgram() const override { return _program; }
 
@@ -109,6 +110,8 @@ namespace minire::rasterizer::materials
         GLint _ambientLightUniformLocation = -1;
 
         GLint _bonesLocation = -1;
+
+        GLint _meshId = -1;
 
         // Attributes
 

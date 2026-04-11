@@ -76,7 +76,8 @@ namespace minire::material
                                     glm::vec3 const & emissiveFactor,
                                     TextureRefs const & directionalLightsShadowMaps,
                                     TextureRefs const & pointLightsShadowMaps,
-                                    SkinningVector const & skinningVector) const = 0;
+                                    SkinningVector const & skinningVector,
+                                    uint32_t const meshId) const = 0;
 
         virtual opengl::Program const & glProgram() const = 0;
 

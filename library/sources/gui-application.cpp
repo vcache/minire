@@ -4,11 +4,11 @@
 #include <minire/errors.hpp>
 #include <minire/gui/events.hpp>
 #include <minire/logging.hpp>
+#include <minire/utils/overloaded.hpp>
+#include <minire/utils/rect.hpp>
 
 #include <gui-application/builtin-theme.hpp>
-#include <minire/utils/rect.hpp>
 #include <text/measurer.hpp>
-#include <utils/overloaded.hpp>
 
 #include <cassert>
 

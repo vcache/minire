@@ -51,6 +51,7 @@ namespace minire::rasterizer
         glm::vec3                _emissiveFactor;
         glm::mat4                _transform;
         material::SkinningVector _skinningVector;
+        size_t const             _obpId;
     };
 
     using CulledPrimitives = std::vector<CulledPrimitive>;

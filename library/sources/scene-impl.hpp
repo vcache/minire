@@ -39,6 +39,10 @@ namespace minire
 
         void reset() override;
 
+        scene::SceneItem fetchSceneItem(size_t const x, size_t const y) const override;
+
+        scene::SceneItem fetchHotSceneItem() const override;
+
     public:
         void setViewport(size_t width, size_t height);
 
@@ -51,6 +55,8 @@ namespace minire
                      double const frameTime);        // seconds duration of a (previous) frame
 
     public:
+        using OpbId = uint32_t; // NOTE: "0" is a special case (not an object or not used)
+
         template<typename Callable>
         void cullModels(Callable callable) const
         {
@@ -75,7 +81,8 @@ namespace minire
                             assert(mesh->_mesh);
                             callable(*mesh->_mesh, mesh->emissiveFactor(),
                                      parent->_globalTransform,
-                                     makeSkinningVector(*mesh));
+                                     makeSkinningVector(*mesh),
+                                     mesh->opbId());
                         }
                     }
 
@@ -104,7 +111,8 @@ namespace minire
                         {
                             assert(parent->hasGlobalTransform());
                             assert(billboard->_billboard);
-                            callable(*billboard->_billboard, parent->_globalTransform);
+                            callable(*billboard->_billboard, parent->_globalTransform,
+                                     billboard->opbId());
                         }
                     }
 
@@ -197,6 +205,7 @@ namespace minire
 
     private:
         class Node;
+        class OpbIdHolder;
 
         template<typename Derived,
                  typename ObjectType>
@@ -221,6 +230,7 @@ namespace minire
 
             scene::Node::Wptr parent() const override { return _parent; }
             void setParent(scene::Node::Sptr const & newParent) override;
+            models::ScenePath absPath() const override;
 
         private:
             using ObjectType::propagate;
@@ -244,14 +254,13 @@ namespace minire
                               models::Mesh const & model,
                               std::weak_ptr<Node> parent,
                               std::shared_ptr<rasterizer::Mesh> const & mesh,
-                              SceneImpl & scene)
-                : Leaf(std::move(name), model, parent, scene)
-                , _mesh(mesh)
-            {}
+                              SceneImpl & scene);
 
             bool lerp(float, size_t) { return false; } // just for compatibility
 
             bool isLerpable(size_t) const { return false; }
+
+            SceneImpl::OpbId opbId() const;
 
             // TODO: lerpable _emissiveFactor
 
@@ -266,6 +275,7 @@ namespace minire
             std::shared_ptr<rasterizer::Mesh> _mesh;
             SkinBones                         _skinBones;
             std::weak_ptr<Node>               _skinOrigin;
+            std::unique_ptr<OpbIdHolder>      _opbId;
 
             friend class SceneImpl;
         };
@@ -339,19 +349,19 @@ namespace minire
                                    models::Billboard model,
                                    std::weak_ptr<Node> parent,
                                    std::shared_ptr<rasterizer::Billboard> const & billboard,
-                                   SceneImpl & scene)
-                : Leaf(std::move(name), std::move(model), parent, scene)
-                , _billboard(billboard)
-            {}
+                                   SceneImpl & scene);
 
             bool lerp(float, size_t) { return false; } // just for compatibility
 
             bool isLerpable(size_t) const { return false; }
 
+            SceneImpl::OpbId opbId() const;
+
             auto const & billboard() const { return _billboard; }
 
         private:
             std::shared_ptr<rasterizer::Billboard> _billboard;
+            std::unique_ptr<OpbIdHolder>           _opbId;
 
             friend class SceneImpl;
         };
@@ -430,12 +440,13 @@ namespace minire
 
             scene::Node::Wptr parent() const override { return _parent; }
             void setParent(scene::Node::Sptr const & newParent) override;
+            models::ScenePath absPath() const override;
 
             void erase(models::ScenePath const &) override;
             void clear() override;
 
         private:
-            SceneItem find(models::ScenePath const &) const override;
+            scene::SceneItem find(models::ScenePath const &) const override;
 
         private:
             bool lerp(float weight, size_t epochNumber);
@@ -545,6 +556,14 @@ namespace minire
         using DirectionalLightLeaves = std::list<DirectionalLightLeaf::Wptr>;
         using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
 
+        using WeakSceneItem = std::variant<std::monostate,
+                                           MeshLeaf::Wptr,
+                                           BillboardLeaf::Wptr>;
+
+        // Object Picking Buffer
+        using VacantOpbIds = std::unordered_set<OpbId>; // TODO: consider std::hive
+        using OpbIdToSceneItem = std::unordered_map<OpbId, WeakSceneItem>;
+
     private:
         void revalidate(Node *, Node::Mask);
         void actualizeViewpoint();
@@ -552,6 +571,11 @@ namespace minire
 
         template<typename ItemType>
         static void setParent(ItemType &, scene::Node::Sptr const &);
+
+        OpbId allocateOpdId();
+        void releaseOpdId(OpbId);
+
+        scene::SceneItem fetchSceneItem(OpbId const) const;
 
         // TODO: lerpable _ambientLight
 
@@ -565,11 +589,18 @@ namespace minire
         double                         _frameTime = 0;
         size_t                         _nodesEstimate = 1;
 
+        bool const                     _enableOpb;
+        VacantOpbIds                   _vacantOpbIds;
+        OpbIdToSceneItem               _opbIdToSceneItem;
+        OpbId                          _maxOpbId = 1;
+
         mutable MeshLeaves             _meshLeaves;
         mutable BillboardsLeaves       _billboardsLeaves;
         mutable DirectionalLightLeaves _directionalLightLeaves;
         mutable PointLightLeaves       _pointLightLeaves;
 
         friend class Node;
+        friend class MeshLeaf;
+        friend class OpbIdHolder;
     };
 }

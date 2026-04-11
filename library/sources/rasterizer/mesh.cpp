@@ -4,13 +4,13 @@
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
+#include <minire/utils/overloaded.hpp>
 #include <minire/utils/std-pair-hash.hpp>
 
 #include <rasterizer/materials.hpp>
 #include <rasterizer/vertex-buffers.hpp>
 #include <utils/gltf-interpreters.hpp>
 #include <utils/obj-interpreters.hpp>
-#include <utils/overloaded.hpp>
 
 #include <cassert>
 #include <variant>
@@ -224,7 +224,8 @@ namespace minire::rasterizer
                     glm::vec3 const & emissiveFactor,
                     material::TextureRefs const & directionalLightsShadowMaps,
                     material::TextureRefs const & pointLightsShadowMaps,
-                    material::SkinningVector const & skinningVector) const
+                    material::SkinningVector const & skinningVector,
+                    uint32_t const meshId) const
     {
         for(Material const & material : _materials)
         {
@@ -236,7 +237,8 @@ namespace minire::rasterizer
                                                  emissiveFactor,
                                                  directionalLightsShadowMaps,
                                                  pointLightsShadowMaps,
-                                                 skinningVector);
+                                                 skinningVector,
+                                                 meshId);
             for(size_t const primIndex : material._primitives)
             {
                 assert(primIndex < _primitives.size());

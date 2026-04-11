@@ -538,7 +538,8 @@ namespace minire::rasterizer
 
         // output //
 
-        out vec3 bznkOutColor;
+        layout(location = 0) out vec3 bznkOutColor;
+        layout(location = 1) out uint bznkOutMeshId;
 
         // input //
 
@@ -594,6 +595,9 @@ namespace minire::rasterizer
 
         uniform vec3 bznkAmbientLight = vec3(0.03);
 
+        // TODO: make it optional
+        uniform uint bznkMeshId = 0u;
+
         // routines //
 
         {% include "shaders/pbr-kit.incl" %}
@@ -645,6 +649,8 @@ namespace minire::rasterizer
                                         ao,
                                         bznkAmbientLight);
             bznkOutColor += emissiveFactor;
+
+            bznkOutMeshId = bznkMeshId;
         }
     )";
 }

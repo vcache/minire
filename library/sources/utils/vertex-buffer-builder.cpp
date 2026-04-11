@@ -3,9 +3,9 @@
 #include <minire/errors.hpp>
 #include <minire/models/vertex-buffer.hpp>
 #include <minire/utils/always-false.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <opengl/vertex-buffer.hpp>
-#include <utils/overloaded.hpp>
 
 #include <cassert>
 

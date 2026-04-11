@@ -2,8 +2,7 @@
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
-
-#include <utils/overloaded.hpp>
+#include <minire/utils/overloaded.hpp>
 
 #include <cassert>
 #include <cmath>

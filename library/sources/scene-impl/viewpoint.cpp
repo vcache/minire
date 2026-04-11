@@ -1,8 +1,7 @@
 #include <scene-impl/viewpoint.hpp>
 
 #include <minire/errors.hpp>
-
-#include <utils/overloaded.hpp>
+#include <minire/utils/overloaded.hpp>
 
 // NOTE MVPmatrix = projection * view * model;
 // i.e. in shader: gl_Position = viewpoint.transform() * model.transform() * inPos;

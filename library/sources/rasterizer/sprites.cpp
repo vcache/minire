@@ -1,6 +1,7 @@
 #include <rasterizer/sprites.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/utils/overloaded.hpp>
 #include <minire/utils/rect.hpp>
 
 #include <opengl.hpp>
@@ -8,7 +9,6 @@
 #include <opengl/shader.hpp>
 #include <rasterizer/sprites/vertex-buffer.hpp>
 #include <rasterizer/textures.hpp>
-#include <utils/overloaded.hpp>
 
 #include <glm/gtc/type_ptr.hpp> // for glm::value_ptr
 #include <glm/mat4x4.hpp>

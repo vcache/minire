@@ -6,6 +6,7 @@
 #include <minire/models/shadow-params.hpp>
 
 #include <opengl.hpp>
+#include <opengl/shader.hpp>
 #include <rasterizer/materials/pbr.hpp>
 #include <scene-impl.hpp>
 #include <utils/frustum.hpp>
@@ -17,9 +18,57 @@
 
 namespace minire
 {
+    namespace
+    {
+        static float const kScreenQuad[] =
+        {
+            // xy           // uv
+            -1.0f,  1.0f,   0.0f, 1.0f,
+            -1.0f, -1.0f,   0.0f, 0.0f,
+             1.0f, -1.0f,   1.0f, 0.0f,
+
+            -1.0f,  1.0f,   0.0f, 1.0f,
+             1.0f, -1.0f,   1.0f, 0.0f,
+             1.0f,  1.0f,   1.0f, 1.0f
+        };
+
+        static GLsizei const kScreenQuadStride = sizeof(float) * (2 + 2);
+
+        static char const * kVertShader =
+        R"(
+            #version 330 core
+            layout (location = 0) in vec2 aPos;
+            layout (location = 1) in vec2 aTexCoords;
+            out vec2 TexCoords;
+            void main()
+            {
+                TexCoords = aTexCoords;
+                gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0);
+            }
+        )";
+
+        static char const * kFragShader =
+        R"(
+            #version 330 core
+            in vec2 TexCoords;
+            out vec4 FragColor;
+            uniform sampler2D screenTexture;
+            void main()
+            {
+                FragColor = texture(screenTexture, TexCoords);
+            }
+        )";
+    }
+
     Rasterizer::Rasterizer(content::Manager & contentManager,
+                           int width, int height,
                            content::Ids const & fontsPreload)
         : _contentManager(contentManager)
+        , _screenQuadProgram({
+            std::make_shared<opengl::Shader>(GL_VERTEX_SHADER, kVertShader),
+            std::make_shared<opengl::Shader>(GL_FRAGMENT_SHADER, kFragShader),
+        })
+        , _screenTextureUniform(_screenQuadProgram.getUniformLocation("screenTexture"))
         , _ubo()
         , _coordinates(_ubo)
         , _lines(_ubo)
@@ -34,13 +83,84 @@ namespace minire
         , _directionalLightsShadowMaps(rasterizer::Ubo::maxDirectionalLights(), nullptr)
         , _pointLightsShadowMaps(rasterizer::Ubo::maxPointLights(), nullptr)
         , _2dProjection(1.0)
-        , _screenWidth(0)
-        , _screenHeight(0)
+        , _screenWidth(static_cast<size_t>(width))
+        , _screenHeight(static_cast<size_t>(height))
     {
         // TODO: preload textures for sprites
 
+        MINIRE_INVARIANT(width >= 0 && height >= 0, "bad window size: {}x{}", width, height);
+
         _materials.add(models::PbrMaterial::kMaterialKind,
                        std::make_unique<rasterizer::materials::PbrFactory>(_textures));
+
+        // Build main FBO
+
+        _primaryFbo.bind();
+
+        {
+            _colorBuffer = std::make_unique<opengl::Texture>(GL_TEXTURE_2D);
+            MINIRE_GL(glTexImage2D, GL_TEXTURE_2D, 0, GL_RGBA8, width, height,
+                      0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+            // drop mipmap filter
+            _colorBuffer->parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            _colorBuffer->parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            _colorBuffer->parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            _colorBuffer->parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+            _primaryFbo.attach2D(*_colorBuffer, GL_COLOR_ATTACHMENT0);
+        }
+
+        {
+            _idBuffer = std::make_unique<opengl::Texture>(GL_TEXTURE_2D);
+            MINIRE_GL(glTexImage2D, GL_TEXTURE_2D, 0, GL_R32UI, width, height,
+                      0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+            _primaryFbo.attach2D(*_idBuffer, GL_COLOR_ATTACHMENT1);
+
+            _colorBuffer->parameteri(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            _colorBuffer->parameteri(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            _colorBuffer->parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            _colorBuffer->parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        }
+
+        GLenum const drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        MINIRE_GL(glDrawBuffers, 2, drawBuffers);
+
+        {
+            _depthRbo = std::make_unique<opengl::RBO>();
+            _depthRbo->storage(width, height, GL_DEPTH_COMPONENT24);
+            _primaryFbo.attach(*_depthRbo, GL_DEPTH_ATTACHMENT);
+        }
+
+        MINIRE_INVARIANT(::glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE,
+                         "primary FBO isn't complete");
+
+        _primaryFbo.unbind();
+
+        // Build PBO
+
+        {
+            _hotFragmentPbo = std::make_unique<opengl::PBO>();
+            _hotFragmentPbo->bufferData(sizeof(uint32_t), NULL, GL_STREAM_READ);
+            _hotFragmentPbo->unbind();
+        }
+
+        // Build screen quad
+
+        _screenQuadVao = std::make_shared<opengl::VAO>();
+
+        _screenQuadVbo = std::make_shared<opengl::VBO>(_screenQuadVao, GL_ARRAY_BUFFER);
+        _screenQuadVbo->bufferData(sizeof(kScreenQuad), kScreenQuad, GL_STATIC_DRAW);
+
+        _screenQuadVao->enableAttrib(0);
+        _screenQuadVao->attribPointer(0, 2, GL_FLOAT, GL_FALSE, kScreenQuadStride, 0);
+
+        _screenQuadVao->enableAttrib(1);
+        _screenQuadVao->attribPointer(1, 2, GL_FLOAT, GL_FALSE, kScreenQuadStride, 2 * sizeof(float));
+
+        // Initial call
+
+        setScreenSize(_screenWidth, _screenHeight);
     }
 
     void Rasterizer::setScreenSize(size_t const width,
@@ -51,8 +171,70 @@ namespace minire
                                    static_cast<float>(width),
                                    static_cast<float>(height),
                                    0.0f);
+
+        bool const changed = width != _screenWidth || height != _screenHeight;
+        if (changed)
+        {
+            // Color buffer
+            assert(_colorBuffer);
+            _colorBuffer->bind();
+            MINIRE_GL(glTexImage2D, GL_TEXTURE_2D, 0, GL_RGBA8, width, height,
+                      0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+            // ID buffer
+            assert(_idBuffer);
+            _idBuffer->bind();
+            MINIRE_GL(glTexImage2D, GL_TEXTURE_2D, 0, GL_R32UI, width, height,
+                      0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+
+            // Depth buffer
+            assert(_depthRbo);
+            _depthRbo->storage(width, height, GL_DEPTH_COMPONENT24);
+        }
+
         _screenWidth = width;
         _screenHeight = height;
+    }
+
+    void Rasterizer::setHotFragment(size_t const x, size_t const y)
+    {
+        _hotFragmentX = x;
+        _hotFragmentY = y;
+    }
+
+    uint32_t Rasterizer::fetchMeshId(size_t const x, size_t const y) const
+    {
+        if (x >= _screenWidth || y >= _screenHeight)
+            return 0;
+
+        // make sure it not conflicts w/ _hotFragmentPbo
+        assert(_hotFragmentPbo);
+        _hotFragmentPbo->unbind();
+
+        _primaryFbo.bind(GL_READ_FRAMEBUFFER);
+        MINIRE_GL(glReadBuffer, GL_COLOR_ATTACHMENT1);
+
+        uint32_t pixelData = 0;
+        glReadPixels(x, _screenHeight - 1 - y, 1, 1, GL_RED_INTEGER, GL_UNSIGNED_INT, &pixelData);
+
+        _primaryFbo.unbind();    // will bind to 0
+
+        return pixelData;
+    }
+
+    uint32_t Rasterizer::fetchHotMeshId() const
+    {
+        uint32_t id = 0;
+
+        assert(_hotFragmentPbo);
+        if (opengl::PBO::Mapping mapping = _hotFragmentPbo->mapBuffer();
+            mapping)
+        {
+            id = *mapping.dataAs<uint32_t>();
+        }
+
+        _hotFragmentPbo->unbind();
+        return id;
     }
 
     rasterizer::CulledDirectionalLights
@@ -168,7 +350,8 @@ namespace minire
             [&result] (rasterizer::Mesh const & mesh,
                        glm::vec3 const & emissiveFactor,
                        glm::mat4 const & transform,
-                       material::SkinningVector && skinningVector)
+                       material::SkinningVector && skinningVector,
+                       size_t const obpId)
             {
                 for(size_t i = 0; i < mesh.primitives(); ++i)
                 {
@@ -179,6 +362,7 @@ namespace minire
                         ._emissiveFactor = emissiveFactor,
                         ._transform = transform,
                         ._skinningVector = std::move(skinningVector),
+                        ._obpId = obpId,
                     });
                 }
             });
@@ -191,6 +375,7 @@ namespace minire
         auto pointLights = cullPointLights(scene);
         auto primitives = cullPrimitives(scene);
         shadowPass(scene, primitives, directionalLights, pointLights);
+        // TODO: color pass should also use "primitives"
         colorPass(scene, directionalLights, pointLights);
         draw2d();
     }
@@ -237,13 +422,19 @@ namespace minire
                                rasterizer::CulledDirectionalLights const & culledDirectionalLights,
                                rasterizer::CulledPointLights const & culledPointLights)
     {
+        // setup Primary FBO
+        _primaryFbo.bind();
+
         // initial setup
         assert(_screenWidth != 0);
         assert(_screenHeight != 0);
-        MINIRE_GL(glBindFramebuffer, GL_FRAMEBUFFER, 0);
         MINIRE_GL(glViewport, 0, 0, _screenWidth, _screenHeight);
         MINIRE_GL(glClearColor, 0.0f, 0.2f, 0.2f, 1.0f); // TODO: into parameters
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // clean up ID buffer
+        GLuint clearId = 0;
+        MINIRE_GL(glClearBufferuiv, GL_COLOR, 1, &clearId);
 
         // actualize shadow maps vector for directional lights
         _directionalLightsShadowMaps.resize(culledDirectionalLights.size());
@@ -290,6 +481,34 @@ namespace minire
             draw3d(scene, _directionalLightsShadowMaps,
                    _pointLightsShadowMaps);
         }
+
+        // Queue PBO for a hot pixel
+        assert(_hotFragmentPbo);
+        _primaryFbo.bind(GL_READ_FRAMEBUFFER);
+        MINIRE_GL(glReadBuffer, GL_COLOR_ATTACHMENT1);
+        _hotFragmentPbo->bind();
+        MINIRE_GL(glReadPixels, _hotFragmentX, _screenHeight - 1 - _hotFragmentY, 1, 1,
+                  GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+        _hotFragmentPbo->unbind();
+        MINIRE_GL(glBindFramebuffer, GL_READ_FRAMEBUFFER, 0);
+
+        // Fullscreen pass
+        _primaryFbo.unbind();   // will bind to 0
+        MINIRE_GL(glViewport, 0, 0, _screenWidth, _screenHeight);
+        MINIRE_GL(glDisable, GL_DEPTH_TEST);
+        MINIRE_GL(glDisable, GL_CULL_FACE);
+        MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT);
+
+        _screenQuadProgram.use();
+
+        assert(_colorBuffer);
+        MINIRE_GL(glActiveTexture, GL_TEXTURE0);
+        _screenQuadProgram.setUniform(_screenTextureUniform, GLint(0));
+        _colorBuffer->bind();
+
+        assert(_screenQuadVao);
+        _screenQuadVao->bind();
+        MINIRE_GL(glDrawArrays, GL_TRIANGLES, 0, 6);
     }
 
     void Rasterizer::draw3d(SceneImpl const & scene,

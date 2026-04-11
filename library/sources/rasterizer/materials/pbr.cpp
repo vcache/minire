@@ -123,7 +123,8 @@ namespace minire::rasterizer::materials
                                     glm::vec3 const & emissiveFactor,
                                     material::TextureRefs const & directionalLightsShadowMaps,
                                     material::TextureRefs const & pointLightsShadowMaps,
-                                    material::SkinningVector const & skinningVector) const
+                                    material::SkinningVector const & skinningVector,
+                                    uint32_t const meshId) const
     {
         _program.use();
 
@@ -233,6 +234,12 @@ namespace minire::rasterizer::materials
         else
         {
             assert(_modelUniformLocation != -1);
+        }
+
+        // object picking buffer
+        if (_meshId != -1)
+        {
+            _program.setUniform(_meshId, meshId);
         }
 
         // sanity check
@@ -356,6 +363,8 @@ namespace minire::rasterizer::materials
 
         result->_bonesLocation = features.hasSkin() ? result->_program.getUniformLocation("bznkBones") : -1;
         assert(!features.hasSkin() || result->_bonesLocation != -1);
+
+        result->_meshId = result->_program.getUniformLocation("bznkMeshId");
 
         result->_positionAttribute = result->_program.getAttribLocation("bznkVertex");
         assert(result->_positionAttribute != -1);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <opengl.hpp>
+#include <opengl/rbo.hpp>
 #include <opengl/texture.hpp>
 
 #include <cassert>
@@ -44,11 +45,11 @@ namespace minire::opengl
         }
 
     public:
-        void bind() const
+        void bind(GLuint framebuffer = GL_FRAMEBUFFER) const
         {
             if (_id != _used)
             {
-                MINIRE_GL(glBindFramebuffer, GL_FRAMEBUFFER, _id);
+                MINIRE_GL(glBindFramebuffer, framebuffer, _id);
                 _used = _id;
             }
         }
@@ -67,6 +68,13 @@ namespace minire::opengl
             bind();
             MINIRE_GL(glFramebufferTexture2D, GL_FRAMEBUFFER, attachment,
                       depthTexture.target(), depthTexture.id(), 0);
+        }
+
+        void attach(RBO const & rbo, GLenum attachment)
+        {
+            bind();
+            MINIRE_GL(glFramebufferRenderbuffer, GL_FRAMEBUFFER,
+                      attachment, GL_RENDERBUFFER, rbo.id());
         }
 
         static void unbind()

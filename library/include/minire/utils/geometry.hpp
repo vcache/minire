@@ -35,6 +35,7 @@ namespace minire::utils
 
     std::optional<glm::vec3> intersectXZ(Ray const &);
 
+    // Slab method
     std::optional<float> intersection(Aabb const & aabb, Ray const &);
     std::optional<float> intersection(Aabb const & aabb, InvRay const &);
 

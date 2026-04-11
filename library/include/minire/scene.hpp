@@ -41,7 +41,22 @@ namespace minire
 
     namespace scene
     {
+        class Mesh;
+        class DirectionalLight;
+        class PointLight;
+        class PerspectiveCamera;
+        class OrthographicCamera;
+        class Billboard;
         class Node;
+
+        using SceneItem = std::variant<std::monostate,
+                                       std::shared_ptr<Mesh>,
+                                       std::shared_ptr<DirectionalLight>,
+                                       std::shared_ptr<PointLight>,
+                                       std::shared_ptr<PerspectiveCamera>,
+                                       std::shared_ptr<OrthographicCamera>,
+                                       std::shared_ptr<Billboard>,
+                                       std::shared_ptr<Node>>;
 
         class Mesh
             : public utils::Object<Mesh, models::Mesh, true /* immutable model */>
@@ -81,6 +96,7 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+            virtual models::ScenePath absPath() const = 0;
 
             void detach() { setParent({}); }
 
@@ -126,6 +142,7 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+            virtual models::ScenePath absPath() const = 0;
 
             void detach() { setParent({}); }
         };
@@ -179,6 +196,7 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+            virtual models::ScenePath absPath() const = 0;
 
             void detach() { setParent({}); }
         };
@@ -250,6 +268,7 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+            virtual models::ScenePath absPath() const = 0;
 
             void detach() { setParent({}); }
         };
@@ -321,6 +340,7 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+            virtual models::ScenePath absPath() const = 0;
 
             void detach() { setParent({}); }
         };
@@ -357,6 +377,7 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+            virtual models::ScenePath absPath() const = 0;
 
             void detach() { setParent({}); }
         };
@@ -373,14 +394,6 @@ namespace minire
 
             static constexpr size_t kFlagsCount = 2; // an offset for descendants
 
-            using SceneItem = std::variant<std::monostate,
-                                           std::shared_ptr<Mesh>,
-                                           std::shared_ptr<DirectionalLight>,
-                                           std::shared_ptr<PointLight>,
-                                           std::shared_ptr<PerspectiveCamera>,
-                                           std::shared_ptr<OrthographicCamera>,
-                                           std::shared_ptr<Billboard>,
-                                           std::shared_ptr<Node>>;
             virtual SceneItem find(models::ScenePath const &) const = 0;
 
         public:
@@ -504,6 +517,7 @@ namespace minire
 
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
+            virtual models::ScenePath absPath() const = 0;
 
             virtual void erase(models::ScenePath const &) = 0;
             virtual void clear() = 0;
@@ -535,6 +549,16 @@ namespace minire
         }
 
         virtual void reset() = 0;
+
+        // "x" and "y" are screen-space coordinates
+        // (same as in OnMouseMove._absX and OnMouseMove._absY)
+        // NOTE: it might have significant latency
+        // Returns only visible and renderable Scene leaves (Mesh or Billboard).
+        virtual scene::SceneItem fetchSceneItem(size_t const x, size_t const y) const = 0;
+
+        // A faster method to fetch a Mesh under the mouse cursor.
+        // Returns only visible and renderable Scene leaves (Mesh or Billboard).
+        virtual scene::SceneItem fetchHotSceneItem() const = 0;
 
     public:
         glm::vec3 const & ambientLight() const { return _ambientLight; }

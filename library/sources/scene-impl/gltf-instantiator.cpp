@@ -17,7 +17,6 @@
 #include <utils/gltf-buffer-reader.hpp>
 #include <utils/gltf-element-fetch.hpp>
 #include <utils/gltf-node-transform.hpp>
-#include <utils/overloaded.hpp>
 
 #include <fmt/ranges.h>
 #include <glm/gtc/type_ptr.hpp>
