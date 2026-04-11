@@ -37,12 +37,12 @@ namespace minire
     public:
         explicit OpbIdHolder(SceneImpl & scene)
             : _scene(scene)
-            , _id(_scene.allocateOpdId())
+            , _id(_scene.allocateOpbId())
         {}
 
         ~OpbIdHolder()
         {
-            _scene.releaseOpdId(_id);
+            _scene.releaseOpbId(_id);
         }
 
         SceneImpl::OpbId id() const { return _id; }
@@ -798,7 +798,7 @@ namespace minire
 
     // Scene //
 
-    SceneImpl::OpbId SceneImpl::allocateOpdId()
+    SceneImpl::OpbId SceneImpl::allocateOpbId()
     {
         if (_vacantOpbIds.empty())
         {
@@ -814,7 +814,7 @@ namespace minire
         return result;
     }
 
-    void SceneImpl::releaseOpdId(OpbId opbId)
+    void SceneImpl::releaseOpbId(OpbId opbId)
     {
         _opbIdToSceneItem.erase(opbId);
         _vacantOpbIds.insert(opbId);

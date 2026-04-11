@@ -572,8 +572,8 @@ namespace minire
         template<typename ItemType>
         static void setParent(ItemType &, scene::Node::Sptr const &);
 
-        OpbId allocateOpdId();
-        void releaseOpdId(OpbId);
+        OpbId allocateOpbId();
+        void releaseOpbId(OpbId);
 
         scene::SceneItem fetchSceneItem(OpbId const) const;
 
@@ -581,6 +581,16 @@ namespace minire
 
     private:
         Rasterizer                   & _rasterizer;
+
+        // NOTE: while destructing, Leaves will release OpbId's,
+        //       thereofe _vacantOpbIds and _opbIdToSceneItem must
+        //       be destroyed last.
+        //       So the order of members declaration is vital here.
+        bool const                     _enableOpb;
+        VacantOpbIds                   _vacantOpbIds;
+        OpbIdToSceneItem               _opbIdToSceneItem;
+        OpbId                          _maxOpbId = 1;
+
         Node::Sptr                     _root;
         ActiveCamera                   _activeCamera;
         scene::Viewpoint               _viewpoint;
@@ -588,11 +598,6 @@ namespace minire
         double                         _lerpWeight = 0;
         double                         _frameTime = 0;
         size_t                         _nodesEstimate = 1;
-
-        bool const                     _enableOpb;
-        VacantOpbIds                   _vacantOpbIds;
-        OpbIdToSceneItem               _opbIdToSceneItem;
-        OpbId                          _maxOpbId = 1;
 
         mutable MeshLeaves             _meshLeaves;
         mutable BillboardsLeaves       _billboardsLeaves;
