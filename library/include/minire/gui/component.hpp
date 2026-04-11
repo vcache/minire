@@ -9,6 +9,7 @@
 #include <minire/gui/theme.hpp>
 #include <minire/models/system-cursor.hpp>
 #include <minire/utils/rect.hpp>
+#include <minire/utils/user-data.hpp>
 
 #include <glm/vec2.hpp>
 
@@ -40,6 +41,7 @@ namespace minire::gui
     class Component
         : public CommonCallbacks<Component>
         , public std::enable_shared_from_this<Component>
+        , public utils::UserData
     {
     public:
         using Sptr = std::shared_ptr<Component>;
@@ -86,29 +88,6 @@ namespace minire::gui
             layout() = result;
             return result;
         }
-
-        // User's opaque data
-        template<typename T>
-        void setUserData(T && userData)
-        {
-            _userData = std::forward<T>(userData);
-        }
-
-        template<typename T, typename ... Args>
-        void emplaceUserData(Args && ... args)
-        {
-            _userData.emplace<T>(std::forward<Args>(args)...);
-        }
-
-        template<typename T, typename U, typename ... Args>
-        void emplaceUserData(std::initializer_list<U> il,
-                             Args && ... args)
-        {
-            _userData.emplace<T>(il, std::forward<Args>(args)...);
-        }
-
-        std::any const & userData() const { return _userData; }
-        std::any & userData() { return _userData; }
 
         // Component tree navigation (read-only)
         Children const & children() const { return _children; }
@@ -246,8 +225,6 @@ namespace minire::gui
         Property<size_t>          _zOrder;
         Property<Layout::Sptr>    _layout;
         models::SystemCursor      _systemCursor;
-
-        std::any                  _userData;
 
         Wptr                      _parent;
         Children                  _children;

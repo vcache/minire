@@ -14,6 +14,7 @@
 #include <minire/models/transform.hpp>
 #include <minire/utils/demangle.hpp>
 #include <minire/utils/object.hpp>
+#include <minire/utils/user-data.hpp>
 #include <minire/utils/uuid.hpp>
 
 #include <glm/vec3.hpp>
@@ -60,6 +61,7 @@ namespace minire
 
         class Mesh
             : public utils::Object<Mesh, models::Mesh, true /* immutable model */>
+            , public utils::UserData
         {
         protected:
             static constexpr Mask kEmmisiveFactor = mkMask(0);
@@ -106,6 +108,7 @@ namespace minire
 
         class DirectionalLight
             : public utils::Object<DirectionalLight, models::DirectionalLight>
+            , public utils::UserData
         {
         protected:
             static constexpr Mask kColor        = mkMask(0);
@@ -149,6 +152,7 @@ namespace minire
 
         class PointLight
             : public utils::Object<PointLight, models::PointLight>
+            , public utils::UserData
         {
         protected:
             static constexpr Mask kColor        = mkMask(0);
@@ -203,6 +207,7 @@ namespace minire
 
         class PerspectiveCamera
             : public utils::Object<PerspectiveCamera, models::PerspectiveCamera>
+            , public utils::UserData
         {
         protected:
             static constexpr Mask kYFov        = mkMask(0);
@@ -275,6 +280,7 @@ namespace minire
 
         class OrthographicCamera
             : public utils::Object<OrthographicCamera, models::OrthographicCamera>
+            , public utils::UserData
         {
         protected:
             static constexpr Mask kXMag    = mkMask(0);
@@ -347,6 +353,7 @@ namespace minire
 
         class Billboard
             : public utils::Object<Billboard, models::Billboard>
+            , public utils::UserData
         {
         protected:
             static constexpr Mask kVisible = mkMask(0);
@@ -384,6 +391,7 @@ namespace minire
 
         class Node
             : public utils::Object<Node, models::Node>
+            , public utils::UserData
         {
         protected:
             static constexpr Mask kOrigin  = mkMask(0);
