@@ -3,6 +3,7 @@
 #include <minire/content/path.hpp>
 #include <minire/material.hpp>
 #include <minire/models/node-pointer.hpp>
+#include <minire/models/outline.hpp>
 #include <minire/models/scene-path.hpp>
 
 #include <glm/mat4x4.hpp>
@@ -33,8 +34,10 @@ namespace minire::models
 
         // TODO: should it be a default (i.e. fallback) material or
         //       an override-material?
-        material::Model::Sptr _defaultMaterial;
-        std::optional<Skin>   _skin;
-        bool                  _visible;
+        material::Model::Sptr _defaultMaterial = material::Model::Sptr{};
+        std::optional<Skin>   _skin = std::nullopt;
+        bool                  _visible = true;
+        Outline               _outline = std::monostate();
+        glm::vec3             _emissiveFactor = glm::vec3(0);
     };
 }

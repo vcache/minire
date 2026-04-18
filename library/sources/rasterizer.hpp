@@ -41,6 +41,8 @@ namespace minire
                             int width, int height,
                             content::Ids const & fontsPreload = {});
 
+        ~Rasterizer();
+
         void draw(SceneImpl const &);
 
         void setScreenSize(size_t const width,
@@ -89,6 +91,8 @@ namespace minire
         using FlatShadowMaps = std::vector<rasterizer::FlatShadowMap::Sptr>;
         using CubeShadowMaps = std::vector<rasterizer::CubeShadowMap::Sptr>;
 
+        class ScreenPassUbo;
+
     private:
         content::Manager             & _contentManager;
 
@@ -101,9 +105,13 @@ namespace minire
         opengl::VBO::Sptr              _screenQuadVbo;
         opengl::Program                _screenQuadProgram;
         GLint const                    _screenTextureUniform;
+        GLint const                    _idTextureUniform;
+        GLint const                    _outlineIdsUniform;
+        GLint const                    _outlineIdsCountUniform;
         opengl::PBO::Uptr              _hotFragmentPbo; // PBO for ID under the cursor (a hot fragment)
         size_t                         _hotFragmentX = 0;
         size_t                         _hotFragmentY = 0;
+        std::unique_ptr<ScreenPassUbo> _screenPassUbo;
 
         // NOTE: the order of these is ridiculously vital (see ctor)
         rasterizer::Ubo                _ubo;

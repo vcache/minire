@@ -64,28 +64,20 @@ namespace minire
             , public utils::UserData
         {
         protected:
-            static constexpr Mask kEmmisiveFactor = mkMask(0);
-            static constexpr Mask kVisible        = mkMask(1);
+            static constexpr Mask kVisible        = mkMask(0);
+            static constexpr Mask kOutline        = mkMask(1);
+            static constexpr Mask kEmmisiveFactor = mkMask(2);
 
-            static constexpr Mask kBaseMask = kEmmisiveFactor
-                                            | kVisible;
+            static constexpr Mask kBaseMask = kVisible
+                                            | kOutline
+                                            | kEmmisiveFactor;
 
-            static constexpr size_t kFlagsCount = 2; // an offset for descendants
+            static constexpr size_t kFlagsCount = 3; // an offset for descendants
 
         public:
             using Object::Object;
 
             // TODO: maybe allow mutation of _source/_defaultMaterial?
-
-            glm::vec3 const & emissiveFactor() const { return _emissiveFactor; }
-            void setEmissiveFactor(glm::vec3 const & emissiveFactor)
-            {
-                if (this->emissiveFactor() != emissiveFactor)
-                {
-                    _emissiveFactor = emissiveFactor;
-                    invalidate(kEmmisiveFactor);
-                }
-            }
 
             bool visible() const { return model()._visible; }
             void setVisible(bool visible)
@@ -96,14 +88,29 @@ namespace minire
                 }
             }
 
+            models::Outline const & outline() const { return model()._outline; }
+            void setOutline(models::Outline const & outline)
+            {
+                if (this->outline() != outline)
+                {
+                    model(kOutline)._outline = outline;
+                }
+            }
+
+            glm::vec3 const & emissiveFactor() const { return model()._emissiveFactor; }
+            void setEmissiveFactor(glm::vec3 const & emissiveFactor)
+            {
+                if (this->emissiveFactor() != emissiveFactor)
+                {
+                    model(kEmmisiveFactor)._emissiveFactor = emissiveFactor;
+                }
+            }
+
             virtual std::weak_ptr<Node> parent() const = 0;
             virtual void setParent(std::shared_ptr<Node> const & newParent) = 0;
             virtual models::ScenePath absPath() const = 0;
 
             void detach() { setParent({}); }
-
-        private:
-            glm::vec3 _emissiveFactor = glm::vec3(0);
         };
 
         class DirectionalLight
@@ -351,16 +358,19 @@ namespace minire
             void detach() { setParent({}); }
         };
 
+        // TODO: add emissive factor (as in Mesh)
         class Billboard
             : public utils::Object<Billboard, models::Billboard>
             , public utils::UserData
         {
         protected:
-            static constexpr Mask kVisible = mkMask(0);
+            static constexpr Mask kOutline = mkMask(0);
+            static constexpr Mask kVisible = mkMask(1);
 
-            static constexpr Mask kBaseMask = kVisible;
+            static constexpr Mask kBaseMask = kOutline
+                                            | kVisible;
 
-            static constexpr size_t kFlagsCount = 1; // an offset for descendants
+            static constexpr size_t kFlagsCount = 2; // an offset for descendants
 
         public:
             using Object::Object;
@@ -372,6 +382,15 @@ namespace minire
 
             // TODO: zOrder isnt't model data, they are more like instance data (as Node/Leaf in Scene) (like Visible)
             size_t zOrder() const { return model()._zOrder; }
+
+            models::Outline const & outline() const { return model()._outline; }
+            void setOutline(models::Outline const & outline)
+            {
+                if (this->outline() != outline)
+                {
+                    model(kOutline)._outline = outline;
+                }
+            }
 
             bool visible() const { return model()._visible; }
             void setVisible(bool visible)
@@ -389,6 +408,7 @@ namespace minire
             void detach() { setParent({}); }
         };
 
+        // TODO: outline of a node as a whole (i.e. a group of outlines)
         class Node
             : public utils::Object<Node, models::Node>
             , public utils::UserData

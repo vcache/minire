@@ -5,6 +5,7 @@
 
 #include <opengl.hpp>
 #include <opengl/program.hpp>
+#include <rasterizer/binding-points.hpp>
 #include <rasterizer/cube-shadow-map.hpp>
 #include <rasterizer/flat-shadow-map.hpp>
 
@@ -12,11 +13,9 @@
 
 namespace minire::rasterizer
 {
-    static const GLuint kUboBindingPoint = 0;
-
     Ubo::Ubo()
     {
-        _glUbo.bindBufferBase(kUboBindingPoint);
+        _glUbo.bindBufferBase(kModelsBindingPoint);
     }
 
     void Ubo::bind()
@@ -35,12 +34,11 @@ namespace minire::rasterizer
     void Ubo::bindBufferRange(opengl::Program const & program) const
     {
         // TODO: harcoded "BznkDatablock"
-        // TODO: "10" binding harcoded
         GLuint blockIndex = program.getUniformBlockIndex("BznkDatablock");
         MINIRE_GL(glUniformBlockBinding,
                   program.id(),
                   blockIndex,
-                  kUboBindingPoint);
+                  kModelsBindingPoint);
     }
 
     std::string Ubo::interfaceBlock()

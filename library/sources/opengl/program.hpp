@@ -64,6 +64,7 @@ namespace minire::opengl
         {
             GLuint result = ::glGetUniformBlockIndex(_id, uniformBlockName);
             MINIRE_MAYBE_THROW_GL(glGetUniformBlockIndex);
+            assert(GL_INVALID_INDEX != result);
             return result;
         }
 
@@ -144,6 +145,14 @@ namespace minire::opengl
             static_assert(kItems > 0, "number of items must be non-zero");
             assert(isUsing());
             MINIRE_GL(glUniform1iv, location, value.size(), value.data());
+        }
+
+        template<size_t kItems>
+        void setUniform(GLint location, std::array<GLuint, kItems> const & value) const
+        {
+            static_assert(kItems > 0, "number of items must be non-zero");
+            assert(isUsing());
+            MINIRE_GL(glUniform1uiv, location, value.size(), value.data());
         }
 
     private:

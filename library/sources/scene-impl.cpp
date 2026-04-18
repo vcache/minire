@@ -101,11 +101,36 @@ namespace minire
         , _mesh(mesh)
         , _opbId(scene._enableOpb ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
                                   : std::unique_ptr<SceneImpl::OpbIdHolder>())
-    {}
+    {
+        // calling at the end, to avoid unwanted calls to virtual methods
+        Object::propagate(); // must be called before "setAllowPropagation" !
+        setAllowPropagation(true);
+    }
 
     SceneImpl::OpbId SceneImpl::MeshLeaf::opbId() const
     {
         return _scene._enableOpb && _opbId ? _opbId->id() : 0;
+    }
+
+    void SceneImpl::MeshLeaf::revalidate(Mask mask)
+    {
+        if (OpbId const id = opbId();
+            invalidatedAny(mask & kOutline) && id != 0)
+        {
+            std::visit(utils::Overloaded
+            {
+                [this, id](std::monostate const &)
+                {
+                    _scene._pixelEdgeOutlines.erase(id);
+                },
+                [this, id](models::outline::PixelEdge const & pixelEdge)
+                {
+                    _scene._pixelEdgeOutlines.emplace(id, pixelEdge);
+                },
+            }, outline());
+        }
+
+        Object::revalidate(mask);
     }
 
     void SceneImpl::DirectionalLightLeaf::revalidate(Mask mask)
@@ -171,11 +196,36 @@ namespace minire
         , _billboard(billboard)
         , _opbId(scene._enableOpb ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
                                   : std::unique_ptr<SceneImpl::OpbIdHolder>())
-    {}
+    {
+        // calling at the end, to avoid unwanted calls to virtual methods
+        Object::propagate(); // must be called before "setAllowPropagation" !
+        setAllowPropagation(true);
+    }
 
     SceneImpl::OpbId SceneImpl::BillboardLeaf::opbId() const
     {
         return _scene._enableOpb && _opbId ? _opbId->id() : 0;
+    }
+
+    void SceneImpl::BillboardLeaf::revalidate(Mask mask)
+    {
+        if (OpbId const id = opbId();
+            invalidatedAny(mask & kOutline) && id != 0)
+        {
+            std::visit(utils::Overloaded
+            {
+                [this, id](std::monostate const &)
+                {
+                    _scene._pixelEdgeOutlines.erase(id);
+                },
+                [this, id](models::outline::PixelEdge const & pixelEdge)
+                {
+                    _scene._pixelEdgeOutlines.emplace(id, pixelEdge);
+                },
+            }, outline());
+        }
+
+        Object::revalidate(mask);
     }
 
     // SceneImpl::Node //
@@ -811,12 +861,15 @@ namespace minire
         OpbId result = *it;
         _vacantOpbIds.erase(it);
 
+        assert(!_pixelEdgeOutlines.contains(result));
+
         return result;
     }
 
     void SceneImpl::releaseOpbId(OpbId opbId)
     {
         _opbIdToSceneItem.erase(opbId);
+        _pixelEdgeOutlines.erase(opbId);
         _vacantOpbIds.insert(opbId);
     }
 
@@ -995,11 +1048,12 @@ namespace minire
                     },
                     [this, mask, &setHasActivateLeaf](auto & leaf)
                     {
+                        using Leaf = std::decay_t<decltype(leaf)>;
                         assert(leaf);
                         if ((Node::kHasPendedActivation & mask) &&
                             leaf->invalidated())
                         {
-                            leaf->revalidate(mask);
+                            leaf->revalidate(mask | Leaf::element_type::kBaseMask);
                         }
 
                         if (Node::kHasActivateChildren & mask)

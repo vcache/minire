@@ -57,6 +57,8 @@ namespace minire
     public:
         using OpbId = uint32_t; // NOTE: "0" is a special case (not an object or not used)
 
+        auto const & pixelEdgeOutlines() const { return _pixelEdgeOutlines; }
+
         template<typename Callable>
         void cullModels(Callable callable) const
         {
@@ -264,6 +266,8 @@ namespace minire
 
             // TODO: lerpable _emissiveFactor
 
+            void revalidate(Mask = kAllFlags) override;
+
         private:
             struct SkinBone
             {
@@ -292,7 +296,11 @@ namespace minire
                                   SceneImpl & scene)
                 : Leaf<Derived, SceneType>(std::move(name), model, parent, scene)
                 , utils::Lerpable<ModelType>(model)
-            {}
+            {
+                // calling at the end, to avoid unwanted calls to virtual methods
+                SceneType::propagate(); // must be called before "setAllowPropagation" !
+                SceneType::setAllowPropagation(true);
+            }
         };
 
         class DirectionalLightLeaf final
@@ -358,6 +366,8 @@ namespace minire
             SceneImpl::OpbId opbId() const;
 
             auto const & billboard() const { return _billboard; }
+
+            void revalidate(Mask = kAllFlags) override;
 
         private:
             std::shared_ptr<rasterizer::Billboard> _billboard;
@@ -561,8 +571,10 @@ namespace minire
                                            BillboardLeaf::Wptr>;
 
         // Object Picking Buffer
-        using VacantOpbIds = std::unordered_set<OpbId>; // TODO: consider std::hive
+        using OpbIdsSet = std::unordered_set<OpbId>; // TODO: consider std::hive
         using OpbIdToSceneItem = std::unordered_map<OpbId, WeakSceneItem>;
+
+        using PixelEdgeOutlines = std::unordered_map<OpbId, models::outline::PixelEdge>;
 
     private:
         void revalidate(Node *, Node::Mask);
@@ -587,7 +599,7 @@ namespace minire
         //       be destroyed last.
         //       So the order of members declaration is vital here.
         bool const                     _enableOpb;
-        VacantOpbIds                   _vacantOpbIds;
+        OpbIdsSet                      _vacantOpbIds;
         OpbIdToSceneItem               _opbIdToSceneItem;
         OpbId                          _maxOpbId = 1;
 
@@ -599,6 +611,7 @@ namespace minire
         double                         _frameTime = 0;
         size_t                         _nodesEstimate = 1;
 
+        mutable PixelEdgeOutlines      _pixelEdgeOutlines;
         mutable MeshLeaves             _meshLeaves;
         mutable BillboardsLeaves       _billboardsLeaves;
         mutable DirectionalLightLeaves _directionalLightLeaves;

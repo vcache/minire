@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minire/content/id.hpp>
+#include <minire/models/outline.hpp>
 #include <minire/text/formatted-string.hpp>
 #include <minire/utils/rect.hpp>
 
@@ -47,7 +48,8 @@ namespace minire::models
 
         Content   _content;
         Placement _placement;
-        size_t    _zOrder;
-        bool      _visible;
+        size_t    _zOrder = 0;
+        Outline   _outline = std::monostate();
+        bool      _visible = true;
     };
 }

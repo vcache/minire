@@ -38,7 +38,8 @@ namespace minire::utils
         template<typename T>
         void setModel(T && model)
         {
-            static_assert(!kImmutable, "cannot setModel for an immutable Object");
+            static_assert(!kImmutable, "cannot setModel for an immutable Object "
+                                       "(but particular fields can be altered)");
             _model = std::forward<T>(model);
             invalidate();
         }

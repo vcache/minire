@@ -88,6 +88,7 @@ namespace minire::examples
             , _isPerspective(true)
             , _defaultLights(defaultLights)
             , _printOpbData(false)
+            , _outlineHotObj(true)
         {}
 
         void onStart() override
@@ -175,7 +176,39 @@ namespace minire::examples
             // interpolation compensates a gap between
             // a render and a controller timings.
 
-            printSceneItem("Hot", scene().fetchHotSceneItem());
+            scene::SceneItem const hotSceneItem = scene().fetchHotSceneItem();
+
+            printSceneItem("Hot", hotSceneItem);
+
+            if (_outlineHotObj)
+            {
+                scene::Mesh::Sptr outlinedObj = [&hotSceneItem]
+                {
+                    if (std::holds_alternative<scene::Mesh::Sptr>(hotSceneItem))
+                    {
+                        return std::get<scene::Mesh::Sptr>(hotSceneItem);
+                    }
+                    return scene::Mesh::Sptr();
+                }();
+
+                if (_outlinedObj != outlinedObj)
+                {
+                    if (_outlinedObj)
+                    {
+                        _outlinedObj->setOutline(std::monostate());
+                    }
+
+                    _outlinedObj = outlinedObj;
+
+                    if (_outlinedObj)
+                    {
+                        _outlinedObj->setOutline(models::outline::PixelEdge
+                            {
+                                ._color = glm::vec4(0.0, 1.0, 0.0, .5),
+                            });
+                    }
+                }
+            }
 
             return 0 == (frame() % 5);
         }
@@ -319,6 +352,16 @@ namespace minire::examples
                     _printOpbData = !_printOpbData;
                     MINIRE_INFO("Toggle OBP buffer output: {}", _printOpbData);
                     break;
+
+                case SDLK_h:
+                    _outlineHotObj = !_outlineHotObj;
+                    MINIRE_INFO("Toggle highlight object: {}", _outlineHotObj);
+                    if (!_outlineHotObj && _outlinedObj)
+                    {
+                        _outlinedObj->setOutline(std::monostate());
+                        _outlinedObj.reset();
+                    }
+                    break;
             }
             return false;
         }
@@ -338,6 +381,8 @@ namespace minire::examples
         bool                            _isPerspective;
         bool const                      _defaultLights;
         bool                            _printOpbData;
+        bool                            _outlineHotObj;
+        scene::Mesh::Sptr               _outlinedObj;
     };
 
     class TestbedApplication

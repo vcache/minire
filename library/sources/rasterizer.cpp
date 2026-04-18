@@ -7,6 +7,8 @@
 
 #include <opengl.hpp>
 #include <opengl/shader.hpp>
+#include <opengl/ubo.hpp>
+#include <rasterizer/binding-points.hpp>
 #include <rasterizer/materials/pbr.hpp>
 #include <scene-impl.hpp>
 #include <utils/frustum.hpp>
@@ -32,7 +34,21 @@ namespace minire
              1.0f,  1.0f,   1.0f, 1.0f
         };
 
-        static GLsizei const kScreenQuadStride = sizeof(float) * (2 + 2);
+        static constexpr GLsizei kScreenQuadStride = sizeof(float) * (2 + 2);
+        static constexpr size_t kMaxPixelOutlines = 32; // NOTE: see kFragShader
+        static constexpr size_t kStd140N = 4;
+
+        struct alignas(1 * kStd140N) PixelOutline
+        {
+            alignas(4 * kStd140N) glm::vec4 _color = glm::vec4(0);
+            alignas(1 * kStd140N) uint32_t  _id = 0;
+        };
+
+        struct alignas(1 * kStd140N) ScreenPassDatablock
+        {
+            alignas(4 * kStd140N) PixelOutline _pixelOutlines[kMaxPixelOutlines];
+            alignas(1 * kStd140N) uint32_t     _pixelOutlineCount = 0;
+        };
 
         static char const * kVertShader =
         R"(
@@ -50,15 +66,113 @@ namespace minire
         static char const * kFragShader =
         R"(
             #version 330 core
+
+            struct PixelOutline
+            {
+                vec4 _color;
+                uint _id;
+            };
+
+            layout(std140) uniform kScreenPassDatablock
+            {
+                PixelOutline _pixelOutlines[32];  // NOTE: see kMaxPixelOutlines
+                uint         _pixelOutlineCount;
+            };
+
             in vec2 TexCoords;
             out vec4 FragColor;
+
             uniform sampler2D screenTexture;
+            uniform usampler2D idTexture;
+
+            bool isSelected(uint id, out uint outlineIndex)
+            {
+                for(uint i = uint(0); i < _pixelOutlineCount; i++)
+                {
+                    if (_pixelOutlines[i]._id == id)
+                    {
+                        outlineIndex = i;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            bool edgeTest(out vec4 color)
+            {
+                uint currentId = texture(idTexture, TexCoords).r;
+                uint outlineIndex;
+                if (!isSelected(currentId, outlineIndex))
+                {
+                    for(int x = -1; x <= 1; x++)
+                    {
+                        for(int y = -1; y <= 1; y++)
+                        {
+                            uint offsetObjId = textureOffset(idTexture, TexCoords, ivec2(x, y)).r;
+                            if(isSelected(offsetObjId, outlineIndex))
+                            {
+                                color = _pixelOutlines[outlineIndex]._color;
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
             void main()
             {
+                // base color
                 FragColor = texture(screenTexture, TexCoords);
+
+                // optional outline
+                if (_pixelOutlineCount != uint(0))
+                {
+                    vec4 outlineColor;
+                    if (edgeTest(outlineColor))
+                    {
+                        FragColor.rgb = mix(FragColor.rgb, outlineColor.rgb, outlineColor.a);
+                    }
+                }
             }
         )";
     }
+
+    // Rasterizer::ScreenPassUbo //
+
+    class Rasterizer::ScreenPassUbo
+    {
+        ScreenPassUbo(ScreenPassUbo const &) = delete;
+        ScreenPassUbo & operator=(ScreenPassUbo const &) = delete;
+        ScreenPassUbo(ScreenPassUbo &&) = delete;
+        ScreenPassUbo & operator=(ScreenPassUbo &&) = delete;
+
+    public:
+        explicit ScreenPassUbo(opengl::Program & program)
+        {
+            // Bind a uniform to a binding point
+            GLuint const datablockIndex = program.getUniformBlockIndex("kScreenPassDatablock");
+            assert(GL_INVALID_INDEX != datablockIndex);
+            MINIRE_GL(glUniformBlockBinding, program.id(), datablockIndex,
+                      rasterizer::kScreenPassBindingPoint);
+
+            // Bind a UBO buffer to the same binding point
+            _ubo.bindBufferBase(rasterizer::kScreenPassBindingPoint);
+        }
+
+        ScreenPassDatablock & datablock() { return _datablock; }
+
+        void update()
+        {
+            _ubo.update(_datablock);
+        }
+
+    private:
+        ScreenPassDatablock              _datablock;
+        opengl::UBO<ScreenPassDatablock> _ubo;
+    };
+
+    // Rasterizer //
 
     Rasterizer::Rasterizer(content::Manager & contentManager,
                            int width, int height,
@@ -69,6 +183,10 @@ namespace minire
             std::make_shared<opengl::Shader>(GL_FRAGMENT_SHADER, kFragShader),
         })
         , _screenTextureUniform(_screenQuadProgram.getUniformLocation("screenTexture"))
+        , _idTextureUniform(_screenQuadProgram.getUniformLocation("idTexture"))
+        , _outlineIdsUniform(_screenQuadProgram.getUniformLocation("outlineIds"))
+        , _outlineIdsCountUniform(_screenQuadProgram.getUniformLocation("outlineIdsCount"))
+        , _screenPassUbo(std::make_unique<ScreenPassUbo>(_screenQuadProgram))
         , _ubo()
         , _coordinates(_ubo)
         , _lines(_ubo)
@@ -117,10 +235,10 @@ namespace minire
                       0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
             _primaryFbo.attach2D(*_idBuffer, GL_COLOR_ATTACHMENT1);
 
-            _colorBuffer->parameteri(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            _colorBuffer->parameteri(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            _colorBuffer->parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            _colorBuffer->parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            _idBuffer->parameteri(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            _idBuffer->parameteri(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            _idBuffer->parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            _idBuffer->parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         }
 
         GLenum const drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
@@ -162,6 +280,8 @@ namespace minire
 
         setScreenSize(_screenWidth, _screenHeight);
     }
+
+    Rasterizer::~Rasterizer() = default;
 
     void Rasterizer::setScreenSize(size_t const width,
                                    size_t const height)
@@ -492,20 +612,50 @@ namespace minire
         _hotFragmentPbo->unbind();
         MINIRE_GL(glBindFramebuffer, GL_READ_FRAMEBUFFER, 0);
 
-        // Fullscreen pass
+        // Prepare the fullscreen pass
         _primaryFbo.unbind();   // will bind to 0
         MINIRE_GL(glViewport, 0, 0, _screenWidth, _screenHeight);
         MINIRE_GL(glDisable, GL_DEPTH_TEST);
         MINIRE_GL(glDisable, GL_CULL_FACE);
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT);
 
+        // activate a progrma
         _screenQuadProgram.use();
 
+        // setup textures and uniform
         assert(_colorBuffer);
         MINIRE_GL(glActiveTexture, GL_TEXTURE0);
         _screenQuadProgram.setUniform(_screenTextureUniform, GLint(0));
         _colorBuffer->bind();
 
+        assert(_idBuffer);
+        MINIRE_GL(glActiveTexture, GL_TEXTURE1);
+        _screenQuadProgram.setUniform(_idTextureUniform, GLint(1));
+        _idBuffer->bind();
+
+        // setup screen-pass UBO
+        MINIRE_INVARIANT(scene.pixelEdgeOutlines().size() <= kMaxPixelOutlines,
+                         "too many pixel-outline objects ({}), while limit is {}",
+                         scene.pixelEdgeOutlines().size(), kMaxPixelOutlines);
+        assert(_screenPassUbo);
+        ScreenPassDatablock & datablock = _screenPassUbo->datablock();
+        datablock._pixelOutlineCount = 0;
+        for(auto const & [opbId, pixelEdge] : scene.pixelEdgeOutlines())
+        {
+            assert(datablock._pixelOutlineCount < kMaxPixelOutlines);
+            PixelOutline & pixelOutline = datablock._pixelOutlines[datablock._pixelOutlineCount];
+
+            assert(opbId > 0);
+            assert(opbId <= std::numeric_limits<uint32_t>::max());
+
+            pixelOutline._id = static_cast<uint32_t>(opbId);
+            pixelOutline._color = pixelEdge._color;
+
+            datablock._pixelOutlineCount++;
+        }
+        _screenPassUbo->update();
+
+        // run the pass
         assert(_screenQuadVao);
         _screenQuadVao->bind();
         MINIRE_GL(glDrawArrays, GL_TRIANGLES, 0, 6);

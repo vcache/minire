@@ -25,7 +25,7 @@ namespace minire::opengl
                       GL_UNIFORM_BUFFER,
                       sizeof(Struct),
                       nullptr,
-                      GL_STATIC_DRAW);
+                      GL_DYNAMIC_DRAW);
         }
 
         UBO(UBO && other)
@@ -50,6 +50,11 @@ namespace minire::opengl
         void bind() const
         {
             MINIRE_GL(glBindBuffer, GL_UNIFORM_BUFFER, _buffer);
+        }
+
+        void unbind() const
+        {
+            MINIRE_GL(glBindBuffer, GL_UNIFORM_BUFFER, 0);
         }
 
         void update(Struct const & data) const
