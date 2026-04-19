@@ -58,6 +58,7 @@ namespace minire
     void SceneImpl::Leaf<Derived, ObjectType>::setParent(scene::Node::Sptr const & newParentIface)
     {
         SceneImpl::setParent(*this, newParentIface);
+        ObjectType::invalidate();
     }
 
     template<typename Derived, typename ObjectType>
@@ -307,6 +308,9 @@ namespace minire
             meshLeaf->_skinOrigin = model._skin->_origin ? nodeFromPointer(*model._skin->_origin)
                                                          : Node::Wptr();
         }
+
+        meshLeaf->invalidate();
+
         return meshLeaf;
     }
 
@@ -376,6 +380,8 @@ namespace minire
             auto [_, inserted] = _scene._opbIdToSceneItem.emplace(opbId, billboardLeaf);
             MINIRE_INVARIANT(inserted, "failed to store OPB ID ({}) of \"{}\"", opbId, name);
         }
+
+        billboardLeaf->invalidate();
 
         return billboardLeaf;
     }
