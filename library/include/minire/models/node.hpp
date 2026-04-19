@@ -1,5 +1,6 @@
 #pragma once
 
+#include <minire/models/outline.hpp>
 #include <minire/models/transform.hpp>
 
 namespace minire::models
@@ -7,6 +8,7 @@ namespace minire::models
     struct Node
     {
         models::Transform _origin;
-        bool              _visible;
+        Outline           _outline = std::monostate();
+        bool              _visible = true;
     };
 }

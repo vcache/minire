@@ -408,19 +408,21 @@ namespace minire
             void detach() { setParent({}); }
         };
 
-        // TODO: outline of a node as a whole (i.e. a group of outlines)
+        // TODO: add en Emmissive Factor (as in Mesh)
         class Node
             : public utils::Object<Node, models::Node>
             , public utils::UserData
         {
         protected:
             static constexpr Mask kOrigin  = mkMask(0);
-            static constexpr Mask kVisible = mkMask(1);
+            static constexpr Mask kOutline = mkMask(1);
+            static constexpr Mask kVisible = mkMask(2);
 
             static constexpr Mask kBaseMask = kOrigin
+                                            | kOutline
                                             | kVisible;
 
-            static constexpr size_t kFlagsCount = 2; // an offset for descendants
+            static constexpr size_t kFlagsCount = 3; // an offset for descendants
 
             virtual SceneItem find(models::ScenePath const &) const = 0;
 
@@ -435,6 +437,15 @@ namespace minire
                 if (this->origin() != origin)
                 {
                     model(kOrigin)._origin = std::move(origin);
+                }
+            }
+
+            models::Outline const & outline() const { return model()._outline; }
+            void setOutline(models::Outline const & outline)
+            {
+                if (this->outline() != outline)
+                {
+                    model(kOutline)._outline = outline;
                 }
             }
 

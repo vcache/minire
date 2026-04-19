@@ -150,7 +150,7 @@ namespace
             Transform initialCameraTransform;
             _orbiting.evaluate(initialCameraTransform);
 
-            _cameraNode = scene().root().make(Node{initialCameraTransform, true});
+            _cameraNode = scene().root().make(Node{initialCameraTransform});
             _camera = _cameraNode->make(
                 minire::models::PerspectiveCamera
                 {
@@ -162,10 +162,10 @@ namespace
                 });
             _camera->activate();
 
-            auto lightNode = scene().root().make(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
+            auto lightNode = scene().root().make(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f))});
             lightNode->make(PointLight(glm::vec4(1, 1, 1, 500), 2, std::nullopt, true));
 
-            auto targetNode = scene().root().make("target", Node{minire::models::Transform(), true});
+            auto targetNode = scene().root().make("target", Node{minire::models::Transform()});
             if (_arguments._scene != kNoIndex)
             {
                 targetNode->makeFromSource(mkPath(_arguments._filename,

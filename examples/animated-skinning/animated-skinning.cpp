@@ -20,7 +20,7 @@ namespace
             {
                 float const fi = static_cast<float>(i);
                 scene::Node::Sptr base = scene().root().make(
-                    models::Node{models::Transform(glm::vec3(0, 0, 4.0f - fi)), true});
+                    models::Node{models::Transform(glm::vec3(0, 0, 4.0f - fi))});
 
                 base->makeFromSource(mkPath("SimpleSkin2.gltf", path::Special::kScenes, path::Index(0)),
                                      contentManager(), true);

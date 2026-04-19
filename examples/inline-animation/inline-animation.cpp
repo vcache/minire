@@ -18,7 +18,7 @@ namespace
 
             TestbedApplication::onStart();
 
-            auto cubeNode = scene().root().make(models::Node{models::Transform(), true});
+            auto cubeNode = scene().root().make(models::Node{models::Transform()});
             cubeNode->make(
                 models::Mesh
                 {

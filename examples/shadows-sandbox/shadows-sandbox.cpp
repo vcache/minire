@@ -157,7 +157,7 @@ namespace
             switch(lightType)
             {
                 case LightType::kPoint:
-                    _lightNode = scene().root().make("test-light", Node{Transform(glm::vec3(5.0f)), true});
+                    _lightNode = scene().root().make("test-light", Node{Transform(glm::vec3(5.0f))});
                     _lightNode->make("bulb", PointLight(glm::vec4(1, 1, 1, 500), 2, shadowParams, true));
                     break;
 
@@ -165,7 +165,7 @@ namespace
                     shadowParams._center = shadow_params::center::CameraYPlaneHitPoint{};
                     shadowParams._radiusMargin = shadow_params::margin::Absolute{10.0f};
                     _lightNode = scene().root().make("test-light",
-                        Node{Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))), true});
+                        Node{Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0)))});
                     _lightNode->make("sun", DirectionalLight(glm::vec3(1, 1, 1), shadowParams, true));
                     break;
             }

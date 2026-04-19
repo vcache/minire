@@ -88,7 +88,7 @@ namespace minire::examples
             , _isPerspective(true)
             , _defaultLights(defaultLights)
             , _printOpbData(false)
-            , _outlineHotObj(true)
+            , _outlineHotObj(false)
         {}
 
         void onStart() override
@@ -102,7 +102,7 @@ namespace minire::examples
 
             _orbiting.evaluate(_cameraTransform);
 
-            _cameraNode = root.make("cam-node", Node{_cameraTransform, true});
+            _cameraNode = root.make("cam-node", Node{_cameraTransform});
             {
                 _perspectiveCamera = _cameraNode->make("persp-cam",
                     PerspectiveCamera
@@ -126,7 +126,7 @@ namespace minire::examples
                 _perspectiveCamera->activate();
             }
 
-            auto floorNode = root.make("floor-node", Node{Transform(glm::vec3(0, -.5, 0)), true});
+            auto floorNode = root.make("floor-node", Node{Transform(glm::vec3(0, -.5, 0))});
             floorNode->make("floor-plane",
                 Mesh
                 {
@@ -146,7 +146,7 @@ namespace minire::examples
             if (_defaultLights)
             {
                 auto directlightNode = root.make("directlight-node",
-                    Node{Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0))), true});
+                    Node{Transform(glm::vec3(0), lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0)))});
                 ShadowParams directlightShadowParams;
                 directlightShadowParams._depthBias = shadow_params::bias::Constant{0.005f};
                 directlightShadowParams._center = shadow_params::center::CameraYPlaneHitPoint{};
@@ -160,7 +160,7 @@ namespace minire::examples
             if (_defaultLights)
             {
                 auto pointlightNode = root.make("pointlight-node",
-                    Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f)), true});
+                    Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f))});
                 ShadowParams pointlightShadowParams;
                 pointlightShadowParams._depthBias = shadow_params::bias::Constant{0.05f};
                 pointlightNode->make("bulb",

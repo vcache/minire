@@ -473,7 +473,10 @@ namespace minire
             void revalidate(Mask = kAllFlags) override;
             void propagate(Object::Mask) override;
             void invalidateParent(Mask);
+
+            template<typename T>
             void invalidateChildren(Mask);
+
             bool advanceAnimation();
 
             AnimationTracksSptr
@@ -516,6 +519,13 @@ namespace minire
             // node itself or some of its children (maybe nested) has an active animation
             static constexpr Mask kAnimation                   = mkMask(kFlagsCount + 7);
 
+            // recalc outline of some of nested nodes
+            static constexpr Mask kChildOutlineInvalidated     = mkMask(kFlagsCount + 8);
+
+            // effective outline of a node should be re-evaluated
+            // due to change of some of parent's effective outline
+            static constexpr Mask kParentOutlineInvalidated    = mkMask(kFlagsCount + 9);
+
             SceneImpl           & _scene;
             LerpableTransform     _localTransform;
             glm::vec3             _globalPosition;
@@ -525,6 +535,7 @@ namespace minire
             ChildrenMap           _children;
             AnimationSet          _animationSet;
             ActiveAnimation::Uptr _activeAnimation;
+            models::Outline       _effectiveOutline = std::monostate();
             bool                  _effectiveVisible = true;
 
         private:

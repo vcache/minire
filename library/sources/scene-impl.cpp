@@ -63,8 +63,11 @@ namespace minire
     template<typename Derived, typename ObjectType>
     void SceneImpl::Leaf<Derived, ObjectType>::propagate(ObjectType::Mask mask)
     {
-        assert(!mask || (mask & ObjectType::kBaseMask)); (void)mask;
-        invalidateParent(Node::kHasPendedActivation);
+        if (mask)
+        {
+            assert(mask & ObjectType::kBaseMask);
+            invalidateParent(Node::kHasPendedActivation);
+        }
     }
 
     template<typename Derived, typename ObjectType>
@@ -117,9 +120,17 @@ namespace minire
         if (OpbId const id = opbId();
             invalidatedAny(mask & kOutline) && id != 0)
         {
+            auto p = _parent.lock();
+            models::Outline const & effectiveOutline =
+                p && std::holds_alternative<std::monostate>(outline()) ? p->_effectiveOutline
+                                                                       : outline();
             std::visit(utils::Overloaded
             {
                 [this, id](std::monostate const &)
+                {
+                    _scene._pixelEdgeOutlines.erase(id);
+                },
+                [this, id](models::outline::NoOutline const &)
                 {
                     _scene._pixelEdgeOutlines.erase(id);
                 },
@@ -127,7 +138,7 @@ namespace minire
                 {
                     _scene._pixelEdgeOutlines.emplace(id, pixelEdge);
                 },
-            }, outline());
+            }, effectiveOutline);
         }
 
         Object::revalidate(mask);
@@ -212,9 +223,17 @@ namespace minire
         if (OpbId const id = opbId();
             invalidatedAny(mask & kOutline) && id != 0)
         {
+            auto p = _parent.lock();
+            models::Outline const & effectiveOutline =
+                p && std::holds_alternative<std::monostate>(outline()) ? p->_effectiveOutline
+                                                                       : outline();
             std::visit(utils::Overloaded
             {
                 [this, id](std::monostate const &)
+                {
+                    _scene._pixelEdgeOutlines.erase(id);
+                },
+                [this, id](models::outline::NoOutline const &)
                 {
                     _scene._pixelEdgeOutlines.erase(id);
                 },
@@ -222,7 +241,7 @@ namespace minire
                 {
                     _scene._pixelEdgeOutlines.emplace(id, pixelEdge);
                 },
-            }, outline());
+            }, effectiveOutline);
         }
 
         Object::revalidate(mask);
@@ -707,7 +726,7 @@ namespace minire
             _globalPosition = _globalTransform * kGlobalOrigin; // will drop "w"
 
             dropMask |= kParentTransformChanged;
-            invalidateChildren(kParentTransformChanged);
+            invalidateChildren<Node::Sptr>(kParentTransformChanged);
         }
 
         if (invalidatedAny(mask & kGlobalTransformGray))
@@ -729,9 +748,32 @@ namespace minire
             _effectiveVisible = visible() && (parent ? parent->_effectiveVisible : true);
             if (oldEffectiveVisible != _effectiveVisible)
             {
-                invalidateChildren(kParentVisibilityInvalidated);
+                invalidateChildren<Node::Sptr>(kParentVisibilityInvalidated);
             }
             dropMask |= (kParentVisibilityInvalidated | kVisible);
+        }
+
+        // Outline
+
+        if (invalidatedAny(mask & kChildOutlineInvalidated))
+        {
+            dropMask |= kChildOutlineInvalidated;
+        }
+
+        if (invalidatedAny(mask & (kOutline | kParentOutlineInvalidated)))
+        {
+            models::Outline const & newOutline =
+                std::holds_alternative<std::monostate>(outline()) && parent
+                    ? parent->_effectiveOutline // the node has no explicitly-set outline and the Node has a parent, inherit it from a parent
+                    : outline();                // the node has no parent or it's outline is explicitly set
+            if (_effectiveOutline != newOutline)
+            {
+                _effectiveOutline = newOutline;
+                invalidateChildren<Node::Sptr>(kParentOutlineInvalidated);
+                invalidateChildren<MeshLeaf::Sptr>(kOutline);
+                invalidateChildren<BillboardLeaf::Sptr>(kOutline);
+            }
+            dropMask |= (kParentOutlineInvalidated | kOutline);
         }
 
         Object::revalidate(dropMask);
@@ -750,6 +792,11 @@ namespace minire
             newParentMask |= kHasPendedActivation;
         }
 
+        if (mask & kOutline)
+        {
+            newParentMask |= kChildOutlineInvalidated;
+        }
+
         if (mask & kVisible)
         {
             newParentMask |= kChildVisibilityInvalidated;
@@ -766,15 +813,16 @@ namespace minire
     }
 
     // NOTE: won't propagate upwards, only updates flags of given children
+    // NOTE: won't propagate recursively, only the direct children will be affected
+    template<typename T>
     void SceneImpl::Node::invalidateChildren(Mask mask)
     {
         for(auto const & [_, child] : _children)
         {
-            if (Node::Sptr const * node = std::get_if<Node::Sptr>(&child);
-                node)
+            if (T const * item = std::get_if<T>(&child); item)
             {
-                assert(*node);
-                (*node)->invalidate(mask, false);
+                assert(*item);
+                (*item)->invalidate(mask, false);
             }
         }
     }
@@ -938,7 +986,7 @@ namespace minire
     void SceneImpl::reset()
     {
         _root = std::make_shared<Node>("(the root)",
-            models::Node{models::Transform{}, true},
+            models::Node{models::Transform{}},
             Node::Wptr(), *this);
     }
 
@@ -1050,10 +1098,13 @@ namespace minire
                     {
                         using Leaf = std::decay_t<decltype(leaf)>;
                         assert(leaf);
-                        if ((Node::kHasPendedActivation & mask) &&
-                            leaf->invalidated())
+
+                        bool const leafRevalidation =
+                            mask & (Node::kHasPendedActivation | Node::kParentOutlineInvalidated);
+
+                        if (leafRevalidation && leaf->invalidated())
                         {
-                            leaf->revalidate(mask | Leaf::element_type::kBaseMask);
+                            leaf->revalidate(Leaf::element_type::kBaseMask);
                         }
 
                         if (Node::kHasActivateChildren & mask)
@@ -1122,6 +1173,10 @@ namespace minire
         revalidate(_root.get(), Node::kVisible |
                                 Node::kParentVisibilityInvalidated |
                                 Node::kChildVisibilityInvalidated);
+
+        revalidate(_root.get(), Node::kOutline |
+                                Node::kParentOutlineInvalidated |
+                                Node::kChildOutlineInvalidated);
 
         revalidate(_root.get(), Node::kLocalTransformDirty |
                                 Node::kParentTransformChanged |

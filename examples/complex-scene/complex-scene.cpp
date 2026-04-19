@@ -31,7 +31,7 @@ namespace
             TestbedApplication::onStart();
 
             _joint0 = scene().root().make("joint-0",
-                minire::models::Node{minire::models::Transform{}, true});
+                minire::models::Node{minire::models::Transform{}});
             attachCube(*_joint0);
             _joint0->inlineAnimation(
                 minire::models::AnimationTracks
@@ -57,7 +57,7 @@ namespace
                 1.0f);
 
             _joint1 = _joint0->make("joint-1",
-                minire::models::Node{minire::models::Transform{glm::vec3{0, 1.5, 0}}, true});
+                minire::models::Node{minire::models::Transform{glm::vec3{0, 1.5, 0}}});
             attachCube(*_joint1);
             _joint1->inlineAnimation(
                 minire::models::AnimationTracks
@@ -83,7 +83,7 @@ namespace
                 1.0f);
 
             _joint2 = _joint1->make("joint-2",
-                minire::models::Node{minire::models::Transform{glm::vec3{0, 1.5, 0}}, true});
+                minire::models::Node{minire::models::Transform{glm::vec3{0, 1.5, 0}}});
             attachCube(*_joint2);
             glm::vec3 const rotationAxis = glm::normalize(glm::vec3(.5, .5, .5));
             _joint2->inlineAnimation(
@@ -108,6 +108,9 @@ namespace
                 },
                 minire::scene::Node::kInfinitely,
                 1.0f);
+
+            // a propagation of outlining example
+            _joint1->setOutline(minire::models::outline::PixelEdge{glm::vec4(1, 1, 0, 1)});
         }
 
         bool onStep() override

@@ -49,7 +49,7 @@ namespace
 
             TestbedApplication::onStart();
 
-            _cubeNode = scene().root().make(Node{_cubeTransform, true});
+            _cubeNode = scene().root().make(Node{_cubeTransform});
             _cubeMesh = _cubeNode->make(
                 Mesh
                 {

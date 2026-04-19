@@ -230,7 +230,7 @@ namespace
             auto material = makeMaterial();
 
             // Attach them to a scene
-            auto quadNode = scene().root().make(Node{Transform(glm::vec3(0, -1, 0)), true});
+            auto quadNode = scene().root().make(Node{Transform(glm::vec3(0, -1, 0))});
             quadNode->make("quad",
                 Mesh
                 {
@@ -240,7 +240,7 @@ namespace
                     ._visible = true,
                 });
 
-            auto sphereNode = scene().root().make(Node{Transform(), true});
+            auto sphereNode = scene().root().make(Node{Transform()});
             sphereNode->make("sphere",
                 Mesh
                 {

@@ -36,7 +36,7 @@ namespace
                                 glm::vec3 billboardNodeOrigin,
                                 std::vector<Billboard> billboards)
             {
-                minire::scene::Node::Sptr base = scene().root().make(Node{Transform(origin), true});
+                minire::scene::Node::Sptr base = scene().root().make(Node{Transform(origin)});
                 base->make(Mesh
                     {
                         ._source = mkPath("Box.glb", path::Special::kMeshes, path::Index(0)),
@@ -45,7 +45,7 @@ namespace
                         ._visible = true,
                     });
 
-                minire::scene::Node::Sptr billboardNode = base->make(Node{Transform(billboardNodeOrigin), true});
+                minire::scene::Node::Sptr billboardNode = base->make(Node{Transform(billboardNodeOrigin)});
                 for(Billboard const & billboard : billboards)
                 {
                     billboardNode->make(billboard);

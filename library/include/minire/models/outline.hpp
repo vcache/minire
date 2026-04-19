@@ -8,6 +8,11 @@ namespace minire::models
 {
     namespace outline
     {
+        struct NoOutline
+        {
+            bool operator==(NoOutline const &) const = default;
+        };
+
         struct PixelEdge
         {
             glm::vec4 _color;
@@ -16,6 +21,7 @@ namespace minire::models
         };
     }
 
-    using Outline = std::variant<std::monostate,
+    using Outline = std::variant<std::monostate,        // automatic outline (inherited from parent)
+                                 outline::NoOutline,    // explicit absence of an outline
                                  outline::PixelEdge>;
 }
