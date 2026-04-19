@@ -136,7 +136,7 @@ namespace minire
                 },
                 [this, id](models::outline::PixelEdge const & pixelEdge)
                 {
-                    _scene._pixelEdgeOutlines.emplace(id, pixelEdge);
+                    _scene._pixelEdgeOutlines[id] = pixelEdge;
                 },
             }, effectiveOutline);
         }
@@ -239,7 +239,7 @@ namespace minire
                 },
                 [this, id](models::outline::PixelEdge const & pixelEdge)
                 {
-                    _scene._pixelEdgeOutlines.emplace(id, pixelEdge);
+                    _scene._pixelEdgeOutlines[id] = pixelEdge;
                 },
             }, effectiveOutline);
         }
