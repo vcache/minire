@@ -95,7 +95,7 @@ namespace minire::gui::components
         Property<float> & lineHeight() { return _lineHeight; }
 
         void select(Selected);
-        Selected const & selected() const;
+        Selected selected() const;
         std::any const * current() const;
 
         template<typename Callback>
@@ -132,6 +132,8 @@ namespace minire::gui::components
                                  bool const effectiveVisible,
                                  Area const & contentArea,
                                  Area const & clippingWindow) override;
+
+        Selected actualSelected() const;
 
     private:
         class ListViewLayout;

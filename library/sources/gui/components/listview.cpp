@@ -266,6 +266,15 @@ namespace minire::gui::components
         }
     }
 
+    ListView::Selected ListView::actualSelected() const
+    {
+        if (_selected && *_selected >= _contents.get().size())
+        {
+            return std::nullopt;
+        }
+        return _selected;
+    }
+
     size_t ListView::revalidateContent(size_t zOffset,
                                        bool const effectiveVisible,
                                        Area const & contentArea,
@@ -274,10 +283,11 @@ namespace minire::gui::components
         zOffset = Image::revalidateContent(zOffset, effectiveVisible,
                                            contentArea, clippingWindow);
 
-        if (_selected && *_selected >= _contents.get().size())
+        Selected selected = actualSelected();
+        if (_selected != _selected)
         {
             auto previous = _selected;
-            _selected = std::nullopt;
+            _selected = selected;
             handle(listview::OnSelectionChanged{previous, _selected});
         }
 
@@ -389,19 +399,19 @@ namespace minire::gui::components
             }
         }
 
+        // TODO: it should be called from revalidate()
         handle(listview::OnSelectionChanged{previous, _selected});
     }
 
-    ListView::Selected const & ListView::selected() const
+    ListView::Selected ListView::selected() const
     {
-        return _selected;
+        return actualSelected();
     }
 
     std::any const * ListView::current() const
     {
-        if (!_selected || _contents.get().empty())
-            return nullptr;
-        return &(_contents.get().at(*_selected));
+        Selected selected = actualSelected();
+        return selected ? &(_contents.get().at(*selected)) : nullptr;
     }
 
     void ListView::scroll(int deltaY)
