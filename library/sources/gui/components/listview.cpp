@@ -399,7 +399,9 @@ namespace minire::gui::components
 
     std::any const * ListView::current() const
     {
-        return _selected ? &(_contents.get().at(*_selected)) : nullptr;
+        if (!_selected || _contents.get().empty())
+            return nullptr;
+        return &(_contents.get().at(*_selected));
     }
 
     void ListView::scroll(int deltaY)
