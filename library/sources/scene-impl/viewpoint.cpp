@@ -157,4 +157,9 @@ namespace minire::scene
             }
         }, _camera);
     }
+
+    glm::vec3 Viewpoint::forwardVector() const
+    {
+        return glm::normalize(glm::vec3(-_view[0][2], -_view[1][2], -_view[2][2]));
+    }
 }

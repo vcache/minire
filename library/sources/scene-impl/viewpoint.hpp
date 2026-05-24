@@ -52,6 +52,8 @@ namespace minire::scene
 
         utils::ViewFrustum viewFrustum() const;
 
+        glm::vec3 forwardVector() const;
+
     private:
         bool isSame(models::PerspectiveCamera const &) const;
         bool isSame(models::OrthographicCamera const &) const;

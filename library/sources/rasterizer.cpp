@@ -658,6 +658,7 @@ namespace minire
         // run the pass
         assert(_screenQuadVao);
         _screenQuadVao->bind();
+        MINIRE_GL(glDisable, GL_BLEND);
         MINIRE_GL(glDrawArrays, GL_TRIANGLES, 0, 6);
     }
 
@@ -688,9 +689,8 @@ namespace minire
         // draw billboards
         MINIRE_GL(glDisable, GL_CULL_FACE);
         MINIRE_GL(glDepthFunc, GL_LEQUAL);
-        // TODO: fix alpha blending for billboards
-        //MINIRE_GL(glEnable, GL_BLEND);
-        //MINIRE_GL(glBlendFunc, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        MINIRE_GL(glEnable, GL_BLEND);
+        MINIRE_GL(glBlendFunc, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         _billboards.draw(scene);
     }
 

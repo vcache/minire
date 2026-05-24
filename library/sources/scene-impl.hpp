@@ -29,6 +29,9 @@ namespace minire
     class SceneImpl
         : public Scene
     {
+        class Node;
+        class BillboardLeaf;
+
     public:
         explicit SceneImpl(Rasterizer &);
 
@@ -100,8 +103,17 @@ namespace minire
         template<typename Callable>
         void cullBillboards(Callable callable) const
         {
-            auto it = _billboardsLeaves.begin();
-            while(it != _billboardsLeaves.end())
+            // perform culling
+            using Element = std::tuple<float /* dist */,
+                                       size_t /* zOrder */,
+                                       std::shared_ptr<Node>, /* locked parent */
+                                       std::shared_ptr<BillboardLeaf> /* locked billboard */ >;
+            std::vector<Element> culled;
+            culled.reserve(_billboardsLeaves.size());
+            glm::vec3 const forwardVector = _viewpoint.forwardVector();
+
+            for(auto it = _billboardsLeaves.begin();
+                it != _billboardsLeaves.end();)
             {
                 if (auto const & billboard = it->second.lock(); billboard)
                 {
@@ -113,17 +125,38 @@ namespace minire
                         {
                             assert(parent->hasGlobalTransform());
                             assert(billboard->_billboard);
-                            callable(*billboard->_billboard, parent->_globalTransform,
-                                     billboard->opbId());
+
+                            float const distToCam = glm::dot(parent->_globalPosition - _viewpoint.position(),
+                                                             forwardVector);
+
+                            culled.emplace_back(distToCam, it->first, parent, billboard);
                         }
                     }
-
                     ++it;
                 }
                 else
                 {
                     it = _billboardsLeaves.erase(it);
                 }
+            }
+
+            // sort by distance to a camera
+            std::ranges::sort(culled,
+                [](Element const & lhs, Element const & rhs)
+                {
+                    return std::tie(std::get<0>(rhs), std::get<1>(lhs))
+                         < std::tie(std::get<0>(lhs), std::get<1>(rhs));
+                });
+
+            // issue callbacks
+            for(Element const & element : culled)
+            {
+                auto const & parent = std::get<2>(element);
+                auto const & billboard = std::get<3>(element);
+                assert(parent);
+                assert(billboard);
+                callable(*billboard->_billboard, parent->_globalTransform,
+                         billboard->opbId());
             }
         }
 
@@ -206,7 +239,6 @@ namespace minire
         }
 
     private:
-        class Node;
         class OpbIdHolder;
 
         template<typename Derived,
