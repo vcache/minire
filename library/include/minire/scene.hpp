@@ -67,12 +67,14 @@ namespace minire
             static constexpr Mask kVisible        = mkMask(0);
             static constexpr Mask kOutline        = mkMask(1);
             static constexpr Mask kEmmisiveFactor = mkMask(2);
+            static constexpr Mask kEnableOpb      = mkMask(3);
 
             static constexpr Mask kBaseMask = kVisible
                                             | kOutline
-                                            | kEmmisiveFactor;
+                                            | kEmmisiveFactor
+                                            | kEnableOpb;
 
-            static constexpr size_t kFlagsCount = 3; // an offset for descendants
+            static constexpr size_t kFlagsCount = 4; // an offset for descendants
 
         public:
             using Object::Object;
@@ -103,6 +105,15 @@ namespace minire
                 if (this->emissiveFactor() != emissiveFactor)
                 {
                     model(kEmmisiveFactor)._emissiveFactor = emissiveFactor;
+                }
+            }
+
+            bool enableOpb() const { return model()._enableOpb; }
+            void setEnableOpb(bool enableOpb)
+            {
+                if (this->enableOpb() != enableOpb)
+                {
+                    model(kEnableOpb)._enableOpb = enableOpb;
                 }
             }
 
@@ -364,13 +375,15 @@ namespace minire
             , public utils::UserData
         {
         protected:
-            static constexpr Mask kOutline = mkMask(0);
-            static constexpr Mask kVisible = mkMask(1);
+            static constexpr Mask kOutline   = mkMask(0);
+            static constexpr Mask kEnableOpb = mkMask(1);
+            static constexpr Mask kVisible   = mkMask(2);
 
             static constexpr Mask kBaseMask = kOutline
+                                            | kEnableOpb
                                             | kVisible;
 
-            static constexpr size_t kFlagsCount = 2; // an offset for descendants
+            static constexpr size_t kFlagsCount = 3; // an offset for descendants
 
         public:
             using Object::Object;
@@ -389,6 +402,15 @@ namespace minire
                 if (this->outline() != outline)
                 {
                     model(kOutline)._outline = outline;
+                }
+            }
+
+            bool enableOpb() const { return model()._enableOpb; }
+            void setEnableOpb(bool enableOpb)
+            {
+                if (this->enableOpb() != enableOpb)
+                {
+                    model(kEnableOpb)._enableOpb = enableOpb;
                 }
             }
 

@@ -50,6 +50,7 @@ namespace minire::models
         Placement _placement;
         size_t    _zOrder = 0;
         Outline   _outline = std::monostate();
+        bool      _enableOpb = true; // use mesh in Object Pick Buffer (see Scene::fetch*SceneItem)
         bool      _visible = true;
     };
 }

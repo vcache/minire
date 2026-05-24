@@ -36,8 +36,9 @@ namespace minire::models
         //       an override-material?
         material::Model::Sptr _defaultMaterial = material::Model::Sptr{};
         std::optional<Skin>   _skin = std::nullopt;
-        bool                  _visible = true;
         Outline               _outline = std::monostate();
         glm::vec3             _emissiveFactor = glm::vec3(0);
+        bool                  _enableOpb = true; // use mesh in Object Pick Buffer (see Scene::fetch*SceneItem)
+        bool                  _visible = true;
     };
 }

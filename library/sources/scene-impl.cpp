@@ -103,8 +103,9 @@ namespace minire
                                   SceneImpl & scene)
         : Leaf(std::move(name), model, parent, scene)
         , _mesh(mesh)
-        , _opbId(scene._enableOpb ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
-                                  : std::unique_ptr<SceneImpl::OpbIdHolder>())
+        , _opbId(scene._enableOpb // OpbId is always allocated (even if disabled in a model)
+                    ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
+                    : std::unique_ptr<SceneImpl::OpbIdHolder>())
     {
         // calling at the end, to avoid unwanted calls to virtual methods
         Object::propagate(); // must be called before "setAllowPropagation" !
@@ -113,7 +114,7 @@ namespace minire
 
     SceneImpl::OpbId SceneImpl::MeshLeaf::opbId() const
     {
-        return _scene._enableOpb && _opbId ? _opbId->id() : 0;
+        return _scene._enableOpb && enableOpb() && _opbId ? _opbId->id() : 0;
     }
 
     void SceneImpl::MeshLeaf::revalidate(Mask mask)
@@ -141,6 +142,8 @@ namespace minire
                 },
             }, effectiveOutline);
         }
+
+        // don't need anything for kEnableOpb (every frame is simply reread)
 
         Object::revalidate(mask);
     }
@@ -206,8 +209,9 @@ namespace minire
                                             SceneImpl & scene)
         : Leaf(std::move(name), std::move(model), parent, scene)
         , _billboard(billboard)
-        , _opbId(scene._enableOpb ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
-                                  : std::unique_ptr<SceneImpl::OpbIdHolder>())
+        , _opbId(scene._enableOpb // OpbId is always allocated (even if disabled in a model)
+                    ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
+                    : std::unique_ptr<SceneImpl::OpbIdHolder>())
     {
         // calling at the end, to avoid unwanted calls to virtual methods
         Object::propagate(); // must be called before "setAllowPropagation" !
@@ -216,7 +220,7 @@ namespace minire
 
     SceneImpl::OpbId SceneImpl::BillboardLeaf::opbId() const
     {
-        return _scene._enableOpb && _opbId ? _opbId->id() : 0;
+        return _scene._enableOpb && enableOpb() && _opbId ? _opbId->id() : 0;
     }
 
     void SceneImpl::BillboardLeaf::revalidate(Mask mask)
@@ -244,6 +248,8 @@ namespace minire
                 },
             }, effectiveOutline);
         }
+
+        // don't need anything for kEnableOpb (every frame is simply reread)
 
         Object::revalidate(mask);
     }
