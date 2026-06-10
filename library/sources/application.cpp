@@ -46,7 +46,6 @@ namespace minire
 
         MINIRE_GL(glDepthRangef, kNear, kFar);
 
-        onResize(width, height);
         setGlDebug(true);   // TODO: disable for release
                             // TODO: into parameters
 
@@ -357,6 +356,11 @@ namespace minire
         // starting an actual epoch (just before onRender)
         startEpoch();
         _epochDuration = 0;     // initial epoch has no duration,
+
+        int w = 0, h = 0;
+        ::SDL_GetWindowSize(window(), &w, &h);
+        MINIRE_INVARIANT(w >= 0 && h >= 0, "bad window size: {} x {}", w, h);
+        onResize(w, h);
     }
 
     void Application::onRender()
