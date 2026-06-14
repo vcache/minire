@@ -487,6 +487,8 @@ namespace minire
             void erase(models::ScenePath const &) override;
             void clear() override;
 
+            std::vector<scene::SceneItem> children() const override;
+
         private:
             scene::SceneItem find(models::ScenePath const &) const override;
 

@@ -583,6 +583,8 @@ namespace minire
             virtual void erase(models::ScenePath const &) = 0;
             virtual void clear() = 0;
 
+            virtual std::vector<SceneItem> children() const = 0;
+
             template<typename... Path>
             void erase(Path && ... path) requires kNotScenePath<Path...>
             {

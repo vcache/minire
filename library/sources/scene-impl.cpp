@@ -498,6 +498,18 @@ namespace minire
         _children.clear();
     }
 
+    std::vector<scene::SceneItem> SceneImpl::Node::children() const
+    {
+        std::vector<scene::SceneItem> result;
+        result.reserve(_children.size());
+        for (auto const & [_, child] : _children)
+        {
+            result.emplace_back(
+                std::visit([](auto const & child) -> scene::SceneItem { return child; }, child));
+        }
+        return result;
+    }
+
     scene::SceneItem
     SceneImpl::Node::find(models::ScenePath const & path) const
     {
