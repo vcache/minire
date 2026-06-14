@@ -33,7 +33,7 @@ namespace
             _joint0 = scene().root().make("joint-0",
                 minire::models::Node{minire::models::Transform{}});
             attachCube(*_joint0);
-            _joint0->inlineAnimation(
+            _joint0->playbackStack().push(
                 minire::models::AnimationTracks
                 {
                     {
@@ -59,7 +59,7 @@ namespace
             _joint1 = _joint0->make("joint-1",
                 minire::models::Node{minire::models::Transform{glm::vec3{0, 1.5, 0}}});
             attachCube(*_joint1);
-            _joint1->inlineAnimation(
+            _joint1->playbackStack().push(
                 minire::models::AnimationTracks
                 {
                     {
@@ -86,7 +86,7 @@ namespace
                 minire::models::Node{minire::models::Transform{glm::vec3{0, 1.5, 0}}});
             attachCube(*_joint2);
             glm::vec3 const rotationAxis = glm::normalize(glm::vec3(.5, .5, .5));
-            _joint2->inlineAnimation(
+            _joint2->playbackStack().push(
                 minire::models::AnimationTracks
                 {
                     {

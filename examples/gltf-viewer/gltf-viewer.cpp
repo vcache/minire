@@ -214,9 +214,9 @@ namespace
                 minire::models::ScenePath containerNode;
                 boost::split(containerNode, _arguments._animationSceneNode, boost::is_any_of("/"));
                 scene().root().at<minire::scene::Node>(containerNode)
-                              .playAnimation(_arguments._animationName,
-                                             _arguments._animationRepeats,
-                                             _arguments._animationScale);
+                              .playbackStack().push(_arguments._animationName,
+                                                    _arguments._animationRepeats,
+                                                    _arguments._animationScale);
             }
         }
 

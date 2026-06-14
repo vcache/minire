@@ -29,7 +29,7 @@ namespace
                     ._visible = true,
                 });
 
-            cubeNode->inlineAnimation(
+            cubeNode->playbackStack().push(
                 models::AnimationTracks
                 {
                     {

@@ -25,7 +25,7 @@ namespace
                 base->makeFromSource(mkPath("SimpleSkin2.gltf", path::Special::kScenes, path::Index(0)),
                                      contentManager(), true);
 
-                base->at<scene::Node>("Armature").playAnimation(
+                base->at<scene::Node>("Armature").playbackStack().push(
                     "Anim_0", scene::Node::kInfinitely, 1.0f * fi);
             }
         }

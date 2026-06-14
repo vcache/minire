@@ -420,10 +420,7 @@ namespace minire
     void SceneImpl::Node::makeAnimationSet(models::AnimationSet animationSet) // TODO: const ref?
     {
         // drop any current active animation
-        if (_activeAnimation)
-        {
-            _activeAnimation.reset();
-        }
+        _playbackStack.clear();
 
         // transform animation set from abstract (model) into a concrete one
         AnimationSet newAnimationSet;
@@ -434,35 +431,6 @@ namespace minire
                                     instantiateTracks(animationTracks));
         }
         _animationSet = std::move(newAnimationSet);
-    }
-
-    void SceneImpl::Node::playAnimation(models::AnimationId const & animationId,
-                                        size_t repeats, float speedScale)
-    {
-        auto it = _animationSet.find(animationId);
-        MINIRE_INVARIANT(it != _animationSet.cend(),
-                         "no such animation: {}", animationId);
-
-        assert(it->second);
-        _activeAnimation = std::make_unique<ActiveAnimation>(
-            it->second, repeats, speedScale);
-        invalidate(kAnimation);
-    }
-
-    void SceneImpl::Node::stopAnimation()
-    {
-        if (_activeAnimation)
-        {
-            _activeAnimation.reset();
-        }
-    }
-
-    void SceneImpl::Node::inlineAnimation(models::AnimationTracks animationTracks,
-                                          size_t repeats, float speedScale)
-    {
-        _activeAnimation = std::make_unique<ActiveAnimation>(
-            instantiateTracks(animationTracks), repeats, speedScale);
-        invalidate(kAnimation);
     }
 
     // TODO: when parent is changed, some animation may stil refer to moved nodes,
@@ -530,6 +498,7 @@ namespace minire
         , _scene(scene)
         , _localTransform(origin())
         , _parent(parent)
+        , _playbackStack(*this)
     {
         // calling at the end, to avoid unwanted calls to virtual methods
         Object::propagate(); // must be called before "setAllowPropagation" !
@@ -601,13 +570,13 @@ namespace minire
 
     bool SceneImpl::Node::advanceAnimation()
     {
-        if (!_activeAnimation)
-            return false;
+        SceneImpl::ActiveAnimation * activeAnimation = _playbackStack.activeAnimation();
+        if (!activeAnimation) return false;
 
-        ActiveAnimation & activeAnimation = *_activeAnimation;
+        if (activeAnimation->_paused) return true;
 
         // advance all sequencers (that aren't done)
-        for(auto sequencer : activeAnimation._uniqueSequencers)
+        for(auto sequencer : activeAnimation->_uniqueSequencers)
         {
             assert(sequencer);
             if (!sequencer->isDone())
@@ -617,12 +586,12 @@ namespace minire
         }
 
         // update transformation
-        assert(activeAnimation._animationTracks);
-        assert(activeAnimation._animationSequencers.size() == activeAnimation._animationTracks->size());
-        for(size_t i = 0; i < activeAnimation._animationTracks->size(); ++i)
+        assert(activeAnimation->_animationTracks);
+        assert(activeAnimation->_animationSequencers.size() == activeAnimation->_animationTracks->size());
+        for(size_t i = 0; i < activeAnimation->_animationTracks->size(); ++i)
         {
-            AnimationTrack & animationTrack = (*activeAnimation._animationTracks)[i];
-            ActiveAnimation::SequencerSet const & sequencerSet = activeAnimation._animationSequencers[i];
+            AnimationTrack & animationTrack = (*activeAnimation->_animationTracks)[i];
+            ActiveAnimation::SequencerSet const & sequencerSet = activeAnimation->_animationSequencers[i];
 
             if (Node::Sptr const & targetNode = animationTrack._target.lock();
                 targetNode)
@@ -662,21 +631,16 @@ namespace minire
             }
         }
 
-        // test if all sequencers are done
-        bool hasNonDoneSequencer = std::ranges::any_of(
-            activeAnimation._uniqueSequencers,
-            [](ActiveAnimation::Sequencer::Sptr const & sequencer)
-            {
-                assert(sequencer);
-                return !sequencer->isDone();
-            });
-
-        if (!hasNonDoneSequencer)
+        // clean up finished playbacks
+        // TODO: finished animations may overlap with a next one,
+        //       so the next one should be advanced in before
+        while (0 != _playbackStack.size() &&
+               _playbackStack.top()->status() == scene::Node::PlaybackController::Status::kFinished)
         {
-            _activeAnimation.reset();
+            _playbackStack.pop();
         }
 
-        return hasNonDoneSequencer;
+        return 0 != _playbackStack.size();
     }
 
     void SceneImpl::Node::revalidate(Mask mask)
@@ -916,6 +880,80 @@ namespace minire
         }
 
         assert(_animationTracks->size() == _animationSequencers.size());
+    }
+
+    // PlaybackController //
+
+    scene::Node::PlaybackController::Status SceneImpl::ActiveAnimation::status() const
+    {
+        if (_paused) return scene::Node::PlaybackController::Status::kPaused;
+
+        bool hasNonDoneSequencer = std::ranges::any_of(
+            _uniqueSequencers,
+            [](ActiveAnimation::Sequencer::Sptr const & sequencer)
+            {
+                assert(sequencer);
+                return !sequencer->isDone();
+            });
+
+        return hasNonDoneSequencer ? scene::Node::PlaybackController::Status::kActive
+                                   : scene::Node::PlaybackController::Status::kFinished;
+    }
+
+    void SceneImpl::ActiveAnimation::pause()
+    {
+        _paused = true;
+    }
+
+    void SceneImpl::ActiveAnimation::resume()
+    {
+        _paused = false;
+    }
+
+    // PlaybackStackImpl //
+
+    SceneImpl::PlaybackStackImpl::PlaybackStackImpl(Node & node)
+        : _node(node)
+    {
+        _activeAnimations.reserve(16);
+    }
+
+    void SceneImpl::PlaybackStackImpl::push(models::AnimationId const & animationId,
+                                            size_t repeats,
+                                            float speedScale)
+    {
+        auto it = _node._animationSet.find(animationId);
+        MINIRE_INVARIANT(it != _node._animationSet.cend(),
+                         "no such animation: {} in {}", animationId, _node.name());
+
+        assert(it->second);
+        auto newAnimation = std::make_unique<SceneImpl::ActiveAnimation>(
+            it->second, repeats, speedScale);
+        _activeAnimations.emplace_back(std::move(newAnimation));
+        _node.invalidate(SceneImpl::Node::kAnimation);
+    }
+
+    void SceneImpl::PlaybackStackImpl::push(models::AnimationTracks animationTracks,
+                                            size_t repeats,
+                                            float speedScale)
+    {
+        auto newAnimation = std::make_unique<SceneImpl::ActiveAnimation>(
+            _node.instantiateTracks(animationTracks), repeats, speedScale);
+        _activeAnimations.emplace_back(std::move(newAnimation));
+        _node.invalidate(SceneImpl::Node::kAnimation);
+    }
+
+    void SceneImpl::PlaybackStackImpl::pop()
+    {
+        if (!_activeAnimations.empty())
+        {
+            _activeAnimations.pop_back();
+        }
+    }
+
+    SceneImpl::ActiveAnimation * SceneImpl::PlaybackStackImpl::activeAnimation() const
+    {
+        return !_activeAnimations.empty() ? _activeAnimations.back().get() : nullptr;
     }
 
     // Scene //

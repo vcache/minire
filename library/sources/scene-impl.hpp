@@ -424,11 +424,23 @@ namespace minire
 
         using AnimationSet = std::unordered_map<models::AnimationId,
                                                 AnimationTracksSptr>;
-        struct ActiveAnimation
+        class ActiveAnimation
+            : public scene::Node::PlaybackController
         {
+        public:
             using Uptr = std::unique_ptr<ActiveAnimation>;
             using Sequencer = utils::Sequencer<float>;
 
+            ActiveAnimation(AnimationTracksSptr const &,
+                            size_t const repeats,
+                            float const speedScale);
+
+        public:
+            Status status() const override;
+            void pause() override;
+            void resume() override;
+
+        private:
             struct SequencerSet
             {
                 Sequencer::CSptr _translation;
@@ -439,10 +451,36 @@ namespace minire
             AnimationTracksSptr          _animationTracks;
             std::vector<SequencerSet>    _animationSequencers;
             std::vector<Sequencer::Sptr> _uniqueSequencers;
+            bool                         _paused = false;
 
-            ActiveAnimation(AnimationTracksSptr const &,
-                            size_t const repeats,
-                            float const speedScale);
+            friend class Node;
+        };
+
+        class PlaybackStackImpl
+            : public scene::Node::PlaybackStack
+        {
+        public:
+            explicit PlaybackStackImpl(Node & node);
+
+            void push(models::AnimationId const &,
+                      size_t repeats = 1,
+                      float speedScale = 1.0f) override;
+
+            void push(models::AnimationTracks animationTracks,
+                      size_t repeats = 1,
+                      float speedScale = 1.0f) override;
+
+            void pop() override;
+            void clear() override { _activeAnimations.clear(); }
+
+            scene::Node::PlaybackController * top() const override { return activeAnimation(); }
+            size_t size() const override { return _activeAnimations.size(); }
+
+            ActiveAnimation * activeAnimation() const;
+
+        private:
+            Node                             & _node;
+            std::vector<ActiveAnimation::Uptr> _activeAnimations;
         };
 
         class Node final
@@ -471,10 +509,9 @@ namespace minire
 
         public:
             void makeAnimationSet(models::AnimationSet animationSet) override;
-            void playAnimation(models::AnimationId const &, size_t repeats, float speedScale) override;
-            void stopAnimation() override;
-            void inlineAnimation(models::AnimationTracks animationTracks,
-                                 size_t repeats, float speedScale) override;
+
+            PlaybackStack & playbackStack() override { return _playbackStack; }
+            PlaybackStack const & playbackStack() const override { return _playbackStack; }
 
         public:
             size_t size() const override { return _children.size(); }
@@ -568,7 +605,7 @@ namespace minire
             Wptr                  _parent;
             ChildrenMap           _children;
             AnimationSet          _animationSet;
-            ActiveAnimation::Uptr _activeAnimation;
+            PlaybackStackImpl     _playbackStack;
             models::Outline       _effectiveOutline = std::monostate();
             bool                  _effectiveVisible = true;
 
@@ -597,6 +634,7 @@ namespace minire
             Node::Sptr nodeFromPointer(models::NodePointer const &) const;
 
             friend class SceneImpl;
+            friend class PlaybackStackImpl;
         };
 
     private:

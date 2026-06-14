@@ -505,23 +505,61 @@ namespace minire
             //       this command has "assign" semantics.
             virtual void makeAnimationSet(models::AnimationSet animationSet) = 0;
 
-            /**
-             * \param repeats kInfinitely or a specific value,
-             *                for example, 1 for a single repeat
-             * \param speedScale 1.0 for a normal speed,
-             *                   less than one = slowdown
-             *                   more than one = speedup
-             * */
-            virtual void playAnimation(models::AnimationId const &,
-                                       size_t repeats = 1,
-                                       float speedScale = 1.0f) = 0;
+            // Animations are stored as a LIFO-queue (a stack).
 
-            virtual void stopAnimation() = 0;
+            class PlaybackController
+                : public utils::UserData
+            {
+            public:
+                using Uptr = std::unique_ptr<PlaybackController>;
 
-            // Params semantics as in makeAnimationSet and playAnimation
-            virtual void inlineAnimation(models::AnimationTracks animationTracks,
-                                         size_t repeats = 1, // or kInfinitely
-                                         float speedScale = 1.0f) = 0;
+                PlaybackController() = default;
+                virtual ~PlaybackController() = default;
+
+                enum class Status { kActive, kPaused, kFinished, };
+
+                virtual Status status() const = 0;
+
+                virtual void pause() = 0;
+                virtual void resume() = 0;
+            };
+
+            class PlaybackStack
+            {
+            public:
+                PlaybackStack() = default;
+                virtual ~PlaybackStack() = default;
+
+            public:
+                /**
+                 * \param repeats kInfinitely or a specific value,
+                 *                for example, 1 for a single repeat
+                 * \param speedScale 1.0 for a normal speed,
+                 *                   less than one = slowdown
+                 *                   more than one = speedup
+                 * */
+                virtual void push(models::AnimationId const &,
+                                  size_t repeats = 1,
+                                  float speedScale = 1.0f) = 0;
+
+                // Params semantics as in makeAnimationSet and playAnimation
+                virtual void push(models::AnimationTracks animationTracks,
+                                  size_t repeats = 1, // or kInfinitely
+                                  float speedScale = 1.0f) = 0;
+
+                // does nothing when empty
+                virtual void pop() = 0;
+                virtual void clear() = 0;
+
+                // resturns nullptr whenm emptry,
+                // the cakller  MUST NOT  store the pointer for a long time,
+                // must not outlive the playback time!
+                virtual PlaybackController * top() const = 0;
+                virtual size_t size() const = 0;
+            };
+
+            virtual PlaybackStack & playbackStack() = 0;
+            virtual PlaybackStack const & playbackStack() const = 0;
 
         public:
             template<typename T>
