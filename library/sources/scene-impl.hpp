@@ -437,8 +437,7 @@ namespace minire
 
         public:
             Status status() const override;
-            void pause() override;
-            void resume() override;
+            void setPaused(bool) override;
 
         private:
             struct SequencerSet

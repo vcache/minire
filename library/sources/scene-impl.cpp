@@ -900,14 +900,9 @@ namespace minire
                                    : scene::Node::PlaybackController::Status::kFinished;
     }
 
-    void SceneImpl::ActiveAnimation::pause()
+    void SceneImpl::ActiveAnimation::setPaused(bool paused)
     {
-        _paused = true;
-    }
-
-    void SceneImpl::ActiveAnimation::resume()
-    {
-        _paused = false;
+        _paused = paused;
     }
 
     // PlaybackStackImpl //

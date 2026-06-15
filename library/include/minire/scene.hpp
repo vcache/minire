@@ -519,9 +519,7 @@ namespace minire
                 enum class Status { kActive, kPaused, kFinished, };
 
                 virtual Status status() const = 0;
-
-                virtual void pause() = 0;
-                virtual void resume() = 0;
+                virtual void setPaused(bool) = 0;
             };
 
             class PlaybackStack
