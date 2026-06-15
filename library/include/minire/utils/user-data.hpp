@@ -37,8 +37,11 @@ namespace minire::utils
         std::any const & userData() const { return _userData; }
         std::any & userData() { return _userData; }
 
+        // NOTE: these reference and pointer are valid until *this isn't destroyed.
+        //       Avoid to store them to prevent possible dangling ref/pointer.
+
         template<typename T>
-        T const & userDataAs() const { return std::any_cast<T>(_userData); }
+        T const & userDataAs() const { return std::any_cast<T const &>(_userData); }
 
         template<typename T>
         T const * tryUserDataAs() const { return std::any_cast<T>(&_userData); }
