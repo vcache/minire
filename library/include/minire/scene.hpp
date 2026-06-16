@@ -553,6 +553,8 @@ namespace minire
                 // the cakller  MUST NOT  store the pointer for a long time,
                 // must not outlive the playback time!
                 virtual PlaybackController * top() const = 0;
+                virtual PlaybackController * bottom() const = 0;
+
                 virtual size_t size() const = 0;
             };
 

@@ -946,6 +946,16 @@ namespace minire
         }
     }
 
+    scene::Node::PlaybackController * SceneImpl::PlaybackStackImpl::top() const
+    {
+        return activeAnimation();
+    }
+
+    scene::Node::PlaybackController * SceneImpl::PlaybackStackImpl::bottom() const
+    {
+        return !_activeAnimations.empty() ? _activeAnimations.front().get() : nullptr;
+    }
+
     SceneImpl::ActiveAnimation * SceneImpl::PlaybackStackImpl::activeAnimation() const
     {
         return !_activeAnimations.empty() ? _activeAnimations.back().get() : nullptr;

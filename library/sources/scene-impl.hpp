@@ -472,7 +472,9 @@ namespace minire
             void pop() override;
             void clear() override { _activeAnimations.clear(); }
 
-            scene::Node::PlaybackController * top() const override { return activeAnimation(); }
+            scene::Node::PlaybackController * top() const override;
+            scene::Node::PlaybackController * bottom() const override;
+
             size_t size() const override { return _activeAnimations.size(); }
 
             ActiveAnimation * activeAnimation() const;
