@@ -9,6 +9,7 @@
 #include <utility> // for std::forward
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 namespace minire
 {

@@ -27,6 +27,15 @@ namespace minire
             guiPush("__base__");
         }
 
+        template<typename ... ApplicationArgs>
+        GuiApplication(std::unique_ptr<gui::Theme> && theme,
+                       ApplicationArgs &&... applicationArgs)
+            : Application(std::forward<ApplicationArgs>(applicationArgs)...)
+            , _theme(std::move(theme))
+        {
+            guiPush("__base__");
+        }
+
         ~GuiApplication() override;
 
         void setFocus(gui::Component::Sptr const & = {});
