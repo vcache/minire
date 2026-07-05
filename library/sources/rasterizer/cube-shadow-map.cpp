@@ -198,7 +198,7 @@ namespace minire::rasterizer
             };
         }
 
-        bool updateUserUniforms(material::UserUniforms & userUniforms) const override
+        void updateUserUniforms(material::UserUniforms & userUniforms) const override
         {
             Uniforms * uniforms = userUniforms.getOrMakeUserData<Uniforms>(userUniforms);
             assert(uniforms);
@@ -207,8 +207,6 @@ namespace minire::rasterizer
             if (_factor) uniforms->_factor.set(*_factor);
             uniforms->_lightPos.set(_lightPos);
             uniforms->_shadowMatrices.set(_shadowMatrices);
-
-            return true;
         }
 
         std::string slugImpl() const override

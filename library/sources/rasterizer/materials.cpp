@@ -283,7 +283,7 @@ namespace minire::rasterizer
                 }
                 else
                 {
-                    MINIRE_GL(glBindTexture, GL_TEXTURE_2D, 0);
+                    MINIRE_GL(glBindTexture, GL_TEXTURE_CUBE_MAP, 0);
                 }
             }
             _program.setUniform(_pointLightsShadowMapsUniform, pointLightsSamplers);
@@ -311,29 +311,31 @@ namespace minire::rasterizer
     void Materials::Brush::setupCustomUniforms(TextureUnitHelper & textureUnitHelper) const
     {
         assert(_material);
-        if (!_material->updateUserUniforms(_userUniforms))
-            return;
+        _material->updateUserUniforms(_userUniforms);
 
         assert(_userUniformMeta.size() == _userUniforms.size());
         for(size_t i = 0; i < _userUniforms.size(); ++i)
         {
             material::UserUniform & userUniform = _userUniforms[i];
-            if (!userUniform.updated()) continue;
+            bool const updated = userUniform.updated();
 
             UserUniformMeta & userUniformMeta = _userUniformMeta[i];
             GLint const location = userUniformMeta._location;
 
             std::visit(utils::Overloaded
             {
-                [location, this](bool v)                { _program.setUniform(location, v); },
-                [location, this](int32_t v)             { _program.setUniform(location, v); },
-                [location, this](uint32_t v)            { _program.setUniform(location, v); },
-                [location, this](float v)               { _program.setUniform(location, v); },
-                [location, this](glm::vec2 const & v)   { _program.setUniform(location, v); },
-                [location, this](glm::vec3 const & v)   { _program.setUniform(location, v); },
-                [location, this](glm::vec4 const & v)   { _program.setUniform(location, v); },
-                [location, this](glm::mat4 const & v)   { _program.setUniform(location, v); },
+                [location, updated, this](bool v)                { if (updated) _program.setUniform(location, v); },
+                [location, updated, this](int32_t v)             { if (updated) _program.setUniform(location, v); },
+                [location, updated, this](uint32_t v)            { if (updated) _program.setUniform(location, v); },
+                [location, updated, this](float v)               { if (updated) _program.setUniform(location, v); },
+                [location, updated, this](glm::vec2 const & v)   { if (updated) _program.setUniform(location, v); },
+                [location, updated, this](glm::vec3 const & v)   { if (updated) _program.setUniform(location, v); },
+                [location, updated, this](glm::vec4 const & v)   { if (updated) _program.setUniform(location, v); },
+                [location, updated, this](glm::mat4 const & v)   { if (updated) _program.setUniform(location, v); },
 
+                // NOTE: texture binding code is irrespective to "updated" because:
+                //          - textures must be bound to texture units (since they are global states of OpenGL)
+                //          - textureUnitHelper must be advanced to provide deterministic textures indexing
                 [location, this, i, &textureUnitHelper, &userUniformMeta]
                 (material::TextureUniform const & textureUniformSource)
                 {
@@ -356,9 +358,9 @@ namespace minire::rasterizer
                     textureUnitHelper.setTextureUniform(location, *userUniformMeta._texture);
                 },
 
-                [location, this](std::array<glm::mat4, 6> const & v)
+                [location, updated, this](std::array<glm::mat4, 6> const & v)
                 {
-                    _program.setUniform(location, v);
+                    if (updated) _program.setUniform(location, v);
                 },
 
                 // TODO: support all types, maybe just implement setUniform(material::Value const &)

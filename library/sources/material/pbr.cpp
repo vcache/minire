@@ -683,6 +683,8 @@ namespace minire::material
             TrackerTexture<kAoTextureName>        _aoTexture;
             TrackerTexture<kEmissiveTextureName>  _emissiveTexture;
 
+            size_t                                _revision;
+
             explicit PbrUniforms(material::UserUniforms & userUniforms)
                 : _albedoFactor(userUniforms)
                 , _albedoTexture(userUniforms)
@@ -695,13 +697,18 @@ namespace minire::material
                 , _aoStrength(userUniforms)
                 , _aoTexture(userUniforms)
                 , _emissiveTexture(userUniforms)
+                , _revision(0)
             {}
         };
     }
 
+    // NOTE 1: any changes in _model must increase _revision!
+    // NOTE 2: value of *TextureComponent are immuable,
+    //         because they require shaders re-compilation.
+
     Pbr::Pbr(models::PbrMaterial const & model)
         : _model(model)
-        , _invalidated(true)
+        , _revision(1)  // starts from 1 for an initial update
     {}
 
     material::Program Pbr::render() const
@@ -733,16 +740,17 @@ namespace minire::material
         };
     }
 
-    bool Pbr::updateUserUniforms(material::UserUniforms & userUniforms) const
+    void Pbr::updateUserUniforms(material::UserUniforms & userUniforms) const
     {
         using TextureUniform = material::TextureUniform;
-
-        // skip if not changed
-        if (!_invalidated) return false;
 
         // fetch specified PBR uniforms
         PbrUniforms * pbrUniforms = userUniforms.getOrMakeUserData<PbrUniforms>(userUniforms);
         assert(pbrUniforms);
+
+        // skip if not changed
+        assert(pbrUniforms->_revision <= _revision);
+        if (pbrUniforms->_revision == _revision) return;
 
         // setup values
         pbrUniforms->_albedoFactor.set(_model._albedoFactor);
@@ -786,9 +794,8 @@ namespace minire::material
                 TextureUniform{*_model._emissiveTexture, _model._emissiveSampler});
         }
 
-        // done
-        _invalidated = false;
-        return true;
+        // advance brush's revision
+        pbrUniforms->_revision = _revision;
     }
 
     std::string Pbr::slugImpl() const

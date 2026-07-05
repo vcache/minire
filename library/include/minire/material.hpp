@@ -221,7 +221,7 @@ namespace minire
         // indeces inside this vector (but ONLY for the same "brushId").
         // The list of uniforms is auto-collected by minire_register_user_uniform.
         // Returns true, if at least one uniform has been updated.
-        virtual bool updateUserUniforms(material::UserUniforms &) const = 0;
+        virtual void updateUserUniforms(material::UserUniforms &) const = 0;
 
         // Can contain anything, only for debug purposes, non-identiying
         virtual std::string humanReadableName() const

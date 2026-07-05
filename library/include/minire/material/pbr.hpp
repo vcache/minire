@@ -17,13 +17,13 @@ namespace minire::material
         explicit Pbr(models::PbrMaterial const &);
 
         material::Program render() const override;
-        bool updateUserUniforms(material::UserUniforms &) const override;
+        void updateUserUniforms(material::UserUniforms &) const override;
 
     protected:
         std::string slugImpl() const override;
 
     protected:
         models::PbrMaterial const _model;
-        mutable bool              _invalidated;
+        mutable size_t            _revision;
     };
 }
