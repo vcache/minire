@@ -51,9 +51,14 @@ namespace
             _windowSize.x = e._width;
             _windowSize.y = e._height;
 
-            _centeral._label->setPosition((_windowSize - _centeral._size) / 2.0f);
-            _rightBottom._label->setPosition(_windowSize - _rightBottom._size - glm::vec2(1));
-            _clipping._label->setPosition(glm::vec2{(_windowSize.x - _clipping._size.x) / 2.0f, 0.0f});
+            if (_centeral._label)
+                _centeral._label->setPosition((_windowSize - _centeral._size) / 2.0f);
+
+            if (_rightBottom._label)
+                _rightBottom._label->setPosition(_windowSize - _rightBottom._size - glm::vec2(1));
+
+            if (_clipping._label)
+                _clipping._label->setPosition(glm::vec2{(_windowSize.x - _clipping._size.x) / 2.0f, 0.0f});
 
             return true;
         }

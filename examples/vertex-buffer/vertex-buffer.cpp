@@ -1,6 +1,6 @@
 #include "../common/testbed.hpp"
 
-#include <minire/models/pbr-material.hpp>
+#include <minire/material/pbr.hpp>
 
 #include <cassert>
 #include <cstdlib> // for EXIT_SUCCESS
@@ -201,12 +201,13 @@ namespace
 
         auto makeMaterial() const
         {
-            using namespace minire::models;
-            auto result = std::make_shared<PbrMaterial>();
-            result->_albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f);
-            result->_metallicFactor = 0.5f;
-            result->_roughnessFactor = 0.6f;
-            return result;
+            return std::make_shared<minire::material::Pbr>(
+                minire::models::PbrMaterial
+                {
+                    ._albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f),
+                    ._metallicFactor = 0.5f,
+                    ._roughnessFactor = 0.6f,
+                });
         }
 
     public:

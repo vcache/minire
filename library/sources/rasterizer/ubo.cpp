@@ -31,10 +31,10 @@ namespace minire::rasterizer
         }
     }
 
-    void Ubo::bindBufferRange(opengl::Program const & program) const
+    void Ubo::bindBufferRange(opengl::Program const & program,
+                              std::string const & uniformName) const
     {
-        // TODO: harcoded "BznkDatablock"
-        GLuint blockIndex = program.getUniformBlockIndex("BznkDatablock");
+        GLuint blockIndex = program.getUniformBlockIndex(uniformName.c_str());
         MINIRE_GL(glUniformBlockBinding,
                   program.id(),
                   blockIndex,

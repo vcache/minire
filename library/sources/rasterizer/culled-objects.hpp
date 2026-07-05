@@ -3,6 +3,8 @@
 #include <minire/material.hpp>
 #include <minire/models/mesh-features.hpp>
 
+#include <material/types.hpp>
+
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>

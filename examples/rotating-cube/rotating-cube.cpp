@@ -2,6 +2,7 @@
 
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
+#include <minire/material/pbr.hpp>
 #include <minire/models/camera.hpp>
 #include <minire/models/mesh.hpp>
 #include <minire/models/pbr-material.hpp>
@@ -135,18 +136,18 @@ namespace
                                                    : mkPath("cube.obj"),
                     ._defaultMaterial = [this]
                     {
-                        auto result = std::make_shared<PbrMaterial>();
+                        minire::models::PbrMaterial pbrModel;
                         if (_arguments._useTexture)
                         {
-                            result->_albedoTexture =  "uv-color.png";
+                            pbrModel._albedoTexture =  "uv-color.png";
                         }
                         else
                         {
-                            result->_albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f);
+                            pbrModel._albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f);
                         }
-                        result->_metallicFactor = 0.5f;
-                        result->_roughnessFactor = 0.6f;
-                        return result;
+                        pbrModel._metallicFactor = 0.5f;
+                        pbrModel._roughnessFactor = 0.6f;
+                        return std::make_shared<minire::material::Pbr>(pbrModel);
                     }(),
                     ._skin = std::nullopt,
                     ._visible = true,

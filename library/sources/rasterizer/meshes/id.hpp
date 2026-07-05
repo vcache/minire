@@ -11,8 +11,8 @@ namespace minire::rasterizer::meshes
 {
     struct Id
     {
-        content::Path         _contentPath;
-        material::Model::Sptr _defaultMaterial;
+        content::Path  _contentPath;
+        Material::Sptr _defaultMaterial;
 
         bool operator==(Id const & o) const
         {
@@ -31,7 +31,7 @@ namespace std
         {
             size_t result = 0;
             boost::hash_combine(result, std::hash<minire::content::Path>{}(v._contentPath));
-            boost::hash_combine(result, std::hash<minire::material::Model::Sptr>{}(v._defaultMaterial));
+            boost::hash_combine(result, std::hash<minire::Material::Sptr>{}(v._defaultMaterial));
             return result;
         }
     };

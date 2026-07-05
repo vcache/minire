@@ -14,14 +14,12 @@ namespace minire::rasterizer
 {
     // TODO: bucket drawing call to minimize program switch
 
-    Meshes::Meshes(Ubo const & ubo,
-                   Materials const & materials,
+    Meshes::Meshes(Materials const & materials,
                    VertexBuffers const & vertexBuffers,
                    content::Manager & contentManager,
                    Resources & resources)
         : _contentManager(contentManager)
         , _resources(resources)
-        , _ubo(ubo)
         , _materials(materials)
         , _vertexBuffers(vertexBuffers)
     {}
@@ -43,10 +41,9 @@ namespace minire::rasterizer
     }
 
     std::shared_ptr<Mesh> Meshes::load(content::Path const & source,
-                                       material::Model::Sptr const & defaultMaterial)
+                                       Material::Sptr const & defaultMaterial)
     {
-        return std::make_shared<Mesh>(source, defaultMaterial,
-                                      _contentManager, _materials, _ubo,
+        return std::make_shared<Mesh>(source, defaultMaterial, _contentManager, _materials,
                                       _vertexBuffers);
     }
 

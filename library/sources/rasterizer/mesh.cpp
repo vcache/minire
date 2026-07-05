@@ -13,15 +13,15 @@
 #include <utils/obj-interpreters.hpp>
 
 #include <cassert>
+#include <limits>
 #include <variant>
 
 namespace minire::rasterizer
 {
     void Mesh::loadPrimitives(content::Path const & source,
-                              material::Model::Sptr const & defaultMaterial,
+                              Material::Sptr const & defaultMaterial,
                               content::Manager & contentManager,
                               Materials const & materials,
-                              Ubo const & ubo,
                               VertexBuffers const & vertexBuffers)
     {
         MINIRE_INVARIANT(!source.empty(), "source path is empty");
@@ -41,13 +41,13 @@ namespace minire::rasterizer
 
             // Build material instance and fetch a program
             models::MeshFeatures const & meshFeatures = vertexBuffers.meshFeatures(vertexBufferId);
-            auto matProgram = materials.build(*defaultMaterial, meshFeatures, ubo);
-            auto matInstance = materials.instantiate(*defaultMaterial, meshFeatures);
-            MINIRE_INVARIANT(matProgram, "no material program for {}", source);
-            MINIRE_INVARIANT(matInstance, "no material instance for {}", source);
+
+            MINIRE_INVARIANT(defaultMaterial, "no default material found (required for OBJ): {}", source);
+            auto brush = materials.getBrush(meshFeatures, defaultMaterial);
+            assert(brush);
 
             // Create or make opengl::VertexBuffer for a given Locations
-            material::Program::Locations const & locations = matProgram->locations();
+            material::Locations const & locations = brush->locations();
             auto openglVertexBuffer = vertexBuffers.build(vertexBufferId, locations);
             assert(openglVertexBuffer);
 
@@ -57,7 +57,7 @@ namespace minire::rasterizer
             // setup _primitives and _materials
 
             _primitives.emplace_back(std::move(openglVertexBuffer), meshFeatures, locations);
-            _materials.emplace_back(Material{std::move(matProgram), std::move(matInstance), {0}});
+            _materials.emplace_back(MaterialData{brush, {0}});
 
             return;
         }
@@ -74,21 +74,17 @@ namespace minire::rasterizer
 
         return lease->visit(utils::Overloaded
         {
-            [this, &source, &defaultMaterial, &materials, &ubo]
+            [this, &source, &defaultMaterial, &materials]
             (formats::Obj const & obj)
             {
                 MINIRE_INVARIANT(defaultMaterial, "no default material found (required for OBJ): {}", source);
                 MINIRE_INVARIANT(source.size() == 1, "too many path component for OBJ: {}", source.size());
 
                 models::MeshFeatures meshFeatures = utils::getMeshFeatures(obj);
+                auto brush = materials.getBrush(meshFeatures, defaultMaterial);
+                assert(brush);
 
-                auto matProgram = materials.build(*defaultMaterial, meshFeatures, ubo);
-                auto matInstance = materials.instantiate(*defaultMaterial, meshFeatures);
-
-                MINIRE_INVARIANT(matProgram, "no material program for {}", source);
-                MINIRE_INVARIANT(matInstance, "no material instance for {}", source);
-
-                material::Program::Locations const & locations = matProgram->locations();
+                material::Locations const & locations = brush->locations();
                 MINIRE_INVARIANT(locations.tangentAttribute() == -1, "OBJ doesn't support tangents");
                 MINIRE_INVARIANT(locations.jointsAttribute() == -1, "OBJ doesn't support skining");
                 MINIRE_INVARIANT(locations.weightsAttribute() == -1, "OBJ doesn't support skining");
@@ -102,10 +98,10 @@ namespace minire::rasterizer
 
                 _primitives.emplace_back(std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)),
                                          meshFeatures, locations);
-                _materials.emplace_back(Material{std::move(matProgram), std::move(matInstance), {0}});
+                _materials.emplace_back(MaterialData{brush, {0}});
             },
 
-            [this, &source, &defaultMaterial, &materials, &ubo, &contentManager]
+            [this, &source, &defaultMaterial, &materials, &contentManager]
             (formats::GltfModelSptr const & gltf)
             {
                 // Check preconditions
@@ -138,10 +134,10 @@ namespace minire::rasterizer
                 auto prefetched = utils::prefetchGltfFeatures(gltf, meshIndex, contentManager);
 
                 using MatComboKey = std::pair<models::MeshFeatures, size_t>;
-                using MatMap = std::unordered_map<MatComboKey, Material>;
+                using MatMap = std::unordered_map<MatComboKey, MaterialData>;
                 MatMap materialsMap;
                 materialsMap.reserve(prefetched._materialModels.size());
-                std::vector<material::Program::Locations> locationsForPrims;
+                std::vector<material::Locations> locationsForPrims;
                 locationsForPrims.reserve(prefetched._primitives.size());
 
                 for(size_t primIndex = 0; primIndex < prefetched._primitives.size(); ++primIndex)
@@ -159,26 +155,23 @@ namespace minire::rasterizer
                         MINIRE_INVARIANT(useDefault || prefetched._materialModels[primitive._materialModel],
                                          "no builtin material loaded, {}", source);
 
-                        material::Model const & effectiveMaterial =
-                            useDefault ? *defaultMaterial
-                                       : *prefetched._materialModels[primitive._materialModel];
+                        Material::Sptr const & effectiveMaterial =
+                            useDefault ? defaultMaterial
+                                       : prefetched._materialModels[primitive._materialModel];
 
-                        auto matProgram = materials.build(effectiveMaterial, primitive._meshFeatures, ubo);
-                        auto matInstance = materials.instantiate(effectiveMaterial, primitive._meshFeatures);
+                        assert(effectiveMaterial);
+                        auto brush = materials.getBrush(primitive._meshFeatures, effectiveMaterial);
+                        assert(brush);
 
-                        MINIRE_INVARIANT(matProgram, "no material program for {}", source);
-                        MINIRE_INVARIANT(matInstance, "no material instance for {}", source);
-
-                        Material newMaterial{std::move(matProgram), std::move(matInstance), {}};
-                        auto [newIt, inserted] = materialsMap.emplace(key, std::move(newMaterial));
+                        auto [newIt, inserted] = materialsMap.emplace(key, MaterialData{brush, {}});
                         MINIRE_INVARIANT(inserted, "failed to insert a new material+feature pair: {}", source);
                         it = newIt;
                     }
                     assert(it != materialsMap.cend());
                     it->second._primitives.emplace_back(primIndex);
-                    assert(it->second._matProgram);
 
-                    material::Program::Locations const & locations = it->second._matProgram->locations();
+                    assert(it->second._brush);
+                    material::Locations const & locations = it->second._brush->locations();
                     locationsForPrims.emplace_back(locations);
                 }
 
@@ -210,13 +203,12 @@ namespace minire::rasterizer
     }
 
     Mesh::Mesh(content::Path const & source,
-               material::Model::Sptr const & defaultMaterial,
+               Material::Sptr const & defaultMaterial,
                content::Manager & contentManager,
                Materials const & materials,
-               Ubo const & ubo,
                VertexBuffers const & vertexBuffers)
     {
-        loadPrimitives(source, defaultMaterial, contentManager, materials, ubo, vertexBuffers);
+        loadPrimitives(source, defaultMaterial, contentManager, materials, vertexBuffers);
     }
 
     void Mesh::draw(glm::mat4 const & modelTransform,
@@ -227,19 +219,17 @@ namespace minire::rasterizer
                     material::SkinningVector const & skinningVector,
                     uint32_t const meshId) const
     {
-        for(Material const & material : _materials)
+        for(MaterialData const & materialData : _materials)
         {
-            assert(material._matProgram);
-            assert(material._matInstance);
-            material._matProgram->prepareDrawing(*(material._matInstance),
-                                                 modelTransform,
-                                                 ambientLight,
-                                                 emissiveFactor,
-                                                 directionalLightsShadowMaps,
-                                                 pointLightsShadowMaps,
-                                                 skinningVector,
-                                                 meshId);
-            for(size_t const primIndex : material._primitives)
+            assert(materialData._brush);
+            materialData._brush->prepareDrawing(modelTransform,
+                                                ambientLight,
+                                                emissiveFactor,
+                                                directionalLightsShadowMaps,
+                                                pointLightsShadowMaps,
+                                                skinningVector,
+                                                meshId);
+            for(size_t const primIndex : materialData._primitives)
             {
                 assert(primIndex < _primitives.size());
                 assert(_primitives[primIndex]._buffer);
@@ -270,5 +260,13 @@ namespace minire::rasterizer
         assert(primitiveIndex < _primitives.size());
         assert(_primitives[primitiveIndex]._buffer);
         _primitives[primitiveIndex]._buffer->drawElements();
+    }
+
+    size_t Mesh::issueConsumerKey()
+    {
+        static size_t gNextConsumerKey = 0;
+        assert(gNextConsumerKey != std::numeric_limits<size_t>::max());
+        MINIRE_DEBUG("new mesh consumer key issued: {}", gNextConsumerKey);
+        return gNextConsumerKey++;
     }
 }

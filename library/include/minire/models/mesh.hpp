@@ -34,11 +34,11 @@ namespace minire::models
 
         // TODO: should it be a default (i.e. fallback) material or
         //       an override-material?
-        material::Model::Sptr _defaultMaterial = material::Model::Sptr{};
-        std::optional<Skin>   _skin = std::nullopt;
-        Outline               _outline = std::monostate();
-        glm::vec3             _emissiveFactor = glm::vec3(0);
-        bool                  _enableOpb = true; // use mesh in Object Pick Buffer (see Scene::fetch*SceneItem)
-        bool                  _visible = true;
+        Material::Sptr      _defaultMaterial = Material::Sptr{};
+        std::optional<Skin> _skin = std::nullopt;
+        Outline             _outline = std::monostate();
+        glm::vec3           _emissiveFactor = glm::vec3(0);
+        bool                _enableOpb = true; // use mesh in Object Pick Buffer (see Scene::fetch*SceneItem)
+        bool                _visible = true;
     };
 }

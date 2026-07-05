@@ -4,6 +4,7 @@
 
 #include <minire/content/manager.hpp>
 #include <minire/errors.hpp>
+#include <minire/material/pbr.hpp>
 #include <minire/models/image.hpp>
 #include <minire/models/pbr-material.hpp>
 #include <minire/models/sampler.hpp>
@@ -250,8 +251,8 @@ namespace minire::utils
         {
             using Leases = std::vector<std::unique_ptr<content::Lease>>;
 
-            material::Model::Uptr _materialModel;
-            Leases                _textureLeases;
+            Material::Sptr _material;
+            Leases         _textureLeases;
         };
 
         std::pair<content::Id, ::tinygltf::Texture const *>
@@ -390,7 +391,7 @@ namespace minire::utils
 
             return MaterialData
             {
-                std::make_unique<models::PbrMaterial>(std::move(result)),
+                std::make_shared<material::Pbr>(result),
                 std::move(leases),
             };
         }
@@ -540,7 +541,7 @@ namespace minire::utils
             {
                 ::tinygltf::Material const & material = model->materials[materialIndex];
                 MaterialData materialData = createMaterialModel(model, material, contentManager);
-                result._materialModels[materialIndex] = std::move(materialData._materialModel);
+                result._materialModels[materialIndex] = std::move(materialData._material);
                 std::move(materialData._textureLeases.begin(),
                           materialData._textureLeases.end(),
                           std::back_inserter(result._textureLeases));
@@ -553,7 +554,7 @@ namespace minire::utils
     std::vector<opengl::VertexBuffer>
     createVertexBuffers(::tinygltf::Model const & model,
                         size_t const meshIndex,
-                        std::vector<material::Program::Locations> const & locationsForPrims)
+                        std::vector<material::Locations> const & locationsForPrims)
     {
         // fetch the mesh
 
@@ -572,7 +573,7 @@ namespace minire::utils
         for(size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
         {
             ::tinygltf::Primitive const & primitive = mesh.primitives[primitiveIndex];
-            material::Program::Locations const & locations = locationsForPrims[primitiveIndex];
+            material::Locations const & locations = locationsForPrims[primitiveIndex];
             result.emplace_back(createVertexBuffer(model, mesh, primitive,
                                                    locations.vertexAttribute(),
                                                    locations.uvAttribute(),

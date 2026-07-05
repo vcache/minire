@@ -1,5 +1,6 @@
 #include "../common/testbed.hpp"
 
+#include <minire/material/pbr.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include <cmath>
@@ -56,11 +57,13 @@ namespace
                     ._source = mkPath("cube.gltf", path::Special::kMeshes, path::Index(0)),
                     ._defaultMaterial = [this]
                     {
-                        auto result = std::make_shared<PbrMaterial>();
-                        result->_albedoTexture =  "uv-color.png";
-                        result->_metallicFactor = 0.5f;
-                        result->_roughnessFactor = 0.6f;
-                        return result;
+                        return std::make_shared<minire::material::Pbr>(
+                            minire::models::PbrMaterial
+                            {
+                                ._albedoTexture =  "uv-color.png",
+                                ._metallicFactor = 0.5f,
+                                ._roughnessFactor = 0.6f,
+                            });
                     }(),
                     ._skin = std::nullopt,
                     ._visible = true,

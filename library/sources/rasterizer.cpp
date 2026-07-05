@@ -2,14 +2,12 @@
 
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
-#include <minire/models/pbr-material.hpp>
 #include <minire/models/shadow-params.hpp>
 
 #include <opengl.hpp>
 #include <opengl/shader.hpp>
 #include <opengl/ubo.hpp>
 #include <rasterizer/binding-points.hpp>
-#include <rasterizer/materials/pbr.hpp>
 #include <scene-impl.hpp>
 #include <utils/frustum.hpp>
 
@@ -191,9 +189,9 @@ namespace minire
         , _coordinates(_ubo)
         , _lines(_ubo)
         , _textures(_contentManager, _resources)
-        , _materials()
+        , _materials(_textures, _ubo)
         , _vertexBuffers(_resources)
-        , _meshes(_ubo, _materials, _vertexBuffers, _contentManager, _resources)
+        , _meshes(_materials, _vertexBuffers, _contentManager, _resources)
         , _fonts(_contentManager, fontsPreload)
         , _labels(_fonts, _contentManager)
         , _sprites(_textures)
@@ -207,9 +205,6 @@ namespace minire
         // TODO: preload textures for sprites
 
         MINIRE_INVARIANT(width >= 0 && height >= 0, "bad window size: {}x{}", width, height);
-
-        _materials.add(models::PbrMaterial::kMaterialKind,
-                       std::make_unique<rasterizer::materials::PbrFactory>(_textures));
 
         // Build main FBO
 
@@ -378,7 +373,7 @@ namespace minire
                     if (shadowMapIndex >= _flatShadowMaps.size())
                     {
                         _flatShadowMaps.push_back(
-                            std::make_shared<rasterizer::FlatShadowMap>(*shadowParams));
+                            std::make_shared<rasterizer::FlatShadowMap>(_materials, *shadowParams));
                     }
 
                     assert(_flatShadowMaps[shadowMapIndex]);
@@ -389,7 +384,7 @@ namespace minire
                         //       can be generated (i.e. shaders without branching)
                         MINIRE_WARNING("flat shadow map have to be rebuild");
                         _flatShadowMaps[shadowMapIndex] =
-                            std::make_shared<rasterizer::FlatShadowMap>(*shadowParams);
+                            std::make_shared<rasterizer::FlatShadowMap>(_materials, *shadowParams);
                     }
 
                     shadowMap = _flatShadowMaps[shadowMapIndex];
@@ -430,7 +425,7 @@ namespace minire
                     if (shadowMapIndex >= _cubeShadowMaps.size())
                     {
                         _cubeShadowMaps.push_back(
-                            std::make_shared<rasterizer::CubeShadowMap>(*shadowParams));
+                            std::make_shared<rasterizer::CubeShadowMap>(_materials, *shadowParams));
                     }
 
                     assert(_cubeShadowMaps[shadowMapIndex]);
@@ -441,7 +436,7 @@ namespace minire
                         //       can be generated (i.e. shaders without branching)
                         MINIRE_WARNING("cube shadow map have to be rebuild");
                         _cubeShadowMaps[shadowMapIndex] =
-                            std::make_shared<rasterizer::CubeShadowMap>(*shadowParams);
+                            std::make_shared<rasterizer::CubeShadowMap>(_materials, *shadowParams);
                     }
 
                     shadowMap = _cubeShadowMaps[shadowMapIndex];

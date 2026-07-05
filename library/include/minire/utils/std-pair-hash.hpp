@@ -12,7 +12,7 @@ namespace std
     {
         size_t operator()(pair<K, V> const & v) const
         {
-            size_t result = 0x5D239016BE5C2176ULL;
+            size_t result = 0;
             boost::hash_combine(result, std::hash<K>{}(v.first));
             boost::hash_combine(result, std::hash<V>{}(v.second));
             return result;

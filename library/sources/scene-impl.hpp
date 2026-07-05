@@ -8,6 +8,7 @@
 #include <minire/models/transform.hpp>
 #include <minire/scene.hpp>
 
+#include <material/types.hpp>
 #include <scene-impl/animations.hpp>
 #include <scene-impl/viewpoint.hpp>
 #include <utils/lerpable.hpp>

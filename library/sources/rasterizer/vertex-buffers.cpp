@@ -26,7 +26,7 @@ namespace minire::rasterizer
 
         struct VertexBufferData
         {
-            using GpuInstances = std::unordered_map<material::Program::Locations,
+            using GpuInstances = std::unordered_map<material::Locations,
                                                     std::shared_ptr<opengl::VertexBuffer>>;
 
             models::VertexBuffer _vertexBuffer;
@@ -57,7 +57,7 @@ namespace minire::rasterizer
             }
 
             std::shared_ptr<opengl::VertexBuffer>
-            build(material::Program::Locations const & locations)
+            build(material::Locations const & locations)
             {
                 auto it = _gpuInstances.find(locations);
                 if(it == _gpuInstances.end())
@@ -131,7 +131,7 @@ namespace minire::rasterizer
 
     std::shared_ptr<opengl::VertexBuffer>
     VertexBuffers::build(content::Id const & id,
-                         material::Program::Locations const & locations) const
+                         material::Locations const & locations) const
     {
         auto tmp = find(id, _resources);
         return tmp->build(locations);

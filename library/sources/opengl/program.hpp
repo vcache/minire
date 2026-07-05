@@ -10,6 +10,7 @@
 #include <array>
 #include <cassert>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -51,6 +52,16 @@ namespace minire::opengl
             auto res = ::glGetUniformLocation(_id, name);
             MINIRE_MAYBE_THROW_GL("glGetUniformLocation");
             return res;
+        }
+
+        GLint getUniformLocation(std::optional<std::string> const & name) const
+        {
+            return name ? getUniformLocation(name->c_str()) : -1;
+        }
+
+        GLint getAttribLocation(std::optional<std::string> const & name) const
+        {
+            return name ? getAttribLocation(name->c_str()) : -1;
         }
 
         GLint getAttribLocation(GLchar const * name) const

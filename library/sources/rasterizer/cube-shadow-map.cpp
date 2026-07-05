@@ -1,14 +1,13 @@
 #include <rasterizer/cube-shadow-map.hpp>
 
-#include <codegen/factory.hpp>
-#include <codegen/plugins/skinning.hpp>
-#include <codegen/plugins/vertex-position.hpp>
 #include <rasterizer/mesh.hpp>
 #include <scene-impl.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/material.hpp>
 #include <minire/utils/overloaded.hpp>
 
+#include <fmt/format.h>
 #include <glm/gtx/transform.hpp>
 #include <glm/mat4x4.hpp>
 #include <inja/inja.hpp>
@@ -21,33 +20,37 @@
 
 namespace minire::rasterizer
 {
-    class CubeShadowMap::Factory
-        : public codegen::CachedFactory<codegen::plugins::VertexPosition,
-                                        codegen::plugins::Skinning>
+    namespace
+    {
+        using CubeVPs = std::array<glm::mat4, 6>;
+    }
+
+    class CubeShadowMap::Material
+        : public ::minire::Material
     {
         static constexpr auto kVertShader =
         R"(
-            #version 330 core
+            {% include "minire/preamble.incl" %}
 
-            {% include "shaders/vertex-position.incl" %}
+            layout(location = {{ minire_vertex_attrib_location() }}) in vec3 minireVertex;
 
-            {% include "shaders/model-skinning-kit.incl" %}
+            {% include "minire/transform.incl" %}
 
             void main()
             {
-                mat4 effectiveModel = getEffectiveModelMatrix();
-                gl_Position = effectiveModel * vec4({{ bznkVertex }}, 1.0);
+                mat4 effectiveModel = minireModelMatrix();
+                gl_Position = effectiveModel * vec4(minireVertex, 1.0);
             }
         )";
 
         static constexpr auto kGeomShader =
         R"(
-            #version 330 core
+            {% include "minire/preamble.incl" %}
 
             layout (triangles) in;
             layout (triangle_strip, max_vertices=18) out;
 
-            uniform mat4 bznkShadowMatrices[6];
+            uniform mat4 bznkShadowMatrices[6]; {{ minire_register_user_uniform("bznkShadowMatrices") }}
 
             out vec4 FragPos; // FragPos from GS (output per emitvertex)
 
@@ -69,12 +72,12 @@ namespace minire::rasterizer
 
         static constexpr auto kFragShaderStd =
         R"(
-            #version 330 core
+            {% include "minire/preamble.incl" %}
 
             in vec4 FragPos;
 
-            uniform vec3 bznkLightPos;
-            uniform float bznkFarPlane;
+            uniform vec3 bznkLightPos; {{ minire_register_user_uniform("bznkLightPos") }}
+            uniform float bznkFarPlane; {{ minire_register_user_uniform("bznkFarPlane") }}
 
             void main()
             {
@@ -91,15 +94,15 @@ namespace minire::rasterizer
 
         static constexpr auto kFragShaderESM =
         R"(
-            #version 330 core
+            {% include "minire/preamble.incl" %}
 
             layout (location = 0) out float outputRed32;
 
             in vec4 FragPos;
 
-            uniform vec3 bznkLightPos;
-            uniform float bznkFarPlane;
-            uniform float kFactor;
+            uniform vec3 bznkLightPos; {{ minire_register_user_uniform("bznkLightPos") }}
+            uniform float bznkFarPlane; {{ minire_register_user_uniform("bznkFarPlane") }}
+            uniform float kFactor; {{ minire_register_user_uniform("kFactor") }}
 
             void main()
             {
@@ -116,15 +119,15 @@ namespace minire::rasterizer
 
         static constexpr auto kFragShaderLogESM =
         R"(
-            #version 330 core
+            {% include "minire/preamble.incl" %}
 
             layout (location = 0) out float outputRed32;
 
             in vec4 FragPos;
 
-            uniform vec3 bznkLightPos;
-            uniform float bznkFarPlane;
-            uniform float kFactor;
+            uniform vec3 bznkLightPos; {{ minire_register_user_uniform("bznkLightPos") }}
+            uniform float bznkFarPlane; {{ minire_register_user_uniform("bznkFarPlane") }}
+            uniform float kFactor; {{ minire_register_user_uniform("kFactor") }}
 
             void main()
             {
@@ -149,35 +152,101 @@ namespace minire::rasterizer
             }, method);
         }
 
-    public:
-        explicit Factory(models::shadow_params::Method const & method)
-            : CachedFactory({
-                {GL_VERTEX_SHADER, kVertShader},
-                {GL_FRAGMENT_SHADER, fetchFragShader(method)},
-                {GL_GEOMETRY_SHADER, kGeomShader},
-            })
-            , _shadowMatrices(getOrMakeUniformCode("bznkShadowMatrices"))
-            , _lightPos(getOrMakeUniformCode("bznkLightPos"))
-            , _farPlane(getOrMakeUniformCode("bznkFarPlane"))
-            , _kFactor(getOrMakeUniformCode("kFactor"))
+        static auto fetchSlug(models::shadow_params::Method const & method)
         {
-            assert(_shadowMatrices != -1);
-            assert(_lightPos != -1);
-            assert(_farPlane != -1);
-            // NOTE: _kFactor might be -1
+            return std::visit(utils::Overloaded
+            {
+                [](models::shadow_params::method::Standard const &) { return "std"; },
+                [](models::shadow_params::method::ESM const &)      { return "ESM"; },
+                [](models::shadow_params::method::LogESM const &)   { return "LogESM"; },
+            }, method);
         }
 
-        GLint const _shadowMatrices = -1;
-        GLint const _lightPos = -1;
-        GLint const _farPlane = -1;
-        GLint const _kFactor = -1;
+        struct Uniforms
+        {
+            static constexpr char kFarPlaneName[] = "bznkFarPlane";
+            static constexpr char kFactorName[] = "kFactor";
+            static constexpr char kLightPosName[] = "bznkLightPos";
+            static constexpr char kShadowMatricesName[] = "bznkShadowMatrices";
+
+            material::UserUniformTracker<float, kFarPlaneName>         _farPlane;
+            material::UserUniformTracker<float, kFactorName>           _factor;
+            material::UserUniformTracker<glm::vec3, kLightPosName>     _lightPos;
+            material::UserUniformTracker<CubeVPs, kShadowMatricesName> _shadowMatrices;
+
+            explicit Uniforms(material::UserUniforms & userUniforms)
+                : _farPlane(userUniforms)
+                , _factor(userUniforms)
+                , _lightPos(userUniforms)
+                , _shadowMatrices(userUniforms)
+            {}
+        };
+
+    public:
+        material::Program render() const override
+        {
+            material::Shaders shaders;
+            shaders[static_cast<int>(material::ShaderType::kVertex)] = kVertShader;
+            shaders[static_cast<int>(material::ShaderType::kFragment)] = fetchFragShader(_method);
+            shaders[static_cast<int>(material::ShaderType::kGeometry)] = kGeomShader;
+
+            return material::Program
+            {
+                ._shaders = std::move(shaders),
+                ._extra = {},
+                ._includes = {},
+            };
+        }
+
+        bool updateUserUniforms(material::UserUniforms & userUniforms) const override
+        {
+            Uniforms * uniforms = userUniforms.getOrMakeUserData<Uniforms>(userUniforms);
+            assert(uniforms);
+
+            uniforms->_farPlane.set(_farPlane);
+            if (_factor) uniforms->_factor.set(*_factor);
+            uniforms->_lightPos.set(_lightPos);
+            uniforms->_shadowMatrices.set(_shadowMatrices);
+
+            return true;
+        }
+
+        std::string slugImpl() const override
+        {
+            return fmt::format("m:{}", fetchSlug(_method), _instanceKey);
+        }
+
+    public:
+        explicit Material(models::shadow_params::Method const & method,
+                          size_t instanceKey)
+            : _method(method)
+            , _instanceKey(instanceKey)
+        {}
+
+        // TODO: instead copying, maybe just update by reference values that alredy allocated?
+        void setFarPlane(float value) { _farPlane = value; }
+        void setFactor(float value) { _factor = value; }
+        void unsetFactor() { _factor.reset(); }
+        void setLightPos(glm::vec3 const & value) { _lightPos = value; }
+        void setShadowMatrices(CubeVPs const & value) { _shadowMatrices = value; }
+
+    private:
+        models::shadow_params::Method const _method;
+        size_t const                        _instanceKey;
+        float                               _farPlane;
+        std::optional<float>                _factor;
+        glm::vec3                           _lightPos;
+        CubeVPs                             _shadowMatrices;
     };
 
     // CubeShadowMap //
 
-    CubeShadowMap::CubeShadowMap(models::ShadowParams const & shadowParams)
-        : _shadowParams(shadowParams)
-        , _factory(std::make_unique<Factory>(_shadowParams._method))
+    CubeShadowMap::CubeShadowMap(Materials const & materials,
+                                 models::ShadowParams const & shadowParams)
+        : _materials(materials)
+        , _shadowParams(shadowParams)
+        , _meshConsumerKey(Mesh::issueConsumerKey())
+        , _material(std::make_shared<Material>(_shadowParams._method, _meshConsumerKey))
         , _depthTexture()
         , _shadowTexture()
         , _fbo()
@@ -267,12 +336,11 @@ namespace minire::rasterizer
                          "point lights don't support GaussianBlur");
     }
 
+    // TODO: it should clean up cached brushes (see extraBrush())
     CubeShadowMap::~CubeShadowMap() = default;
 
     namespace
     {
-        using CubeVPs = std::array<glm::mat4, 6>;
-
         CubeVPs buildVPs(glm::vec3 const & lightPosition,
                          float const near,
                          float const far)
@@ -348,46 +416,52 @@ namespace minire::rasterizer
         CubeVPs const lightVPs = buildVPs(lightPosition, near, far);
 
         // collect programs
-        std::unordered_map<codegen::Traits, std::vector<CulledPrimitive const *>> drawQueue;
+        using DrawQueue = std::unordered_map<models::MeshFeatures,
+                                             std::vector<CulledPrimitive const *>>;
+        DrawQueue drawQueue;
         for(CulledPrimitive const & primitive : primitives)
         {
-            auto const & [_, attribLocations] =
+            auto const & [meshFeatures, _] =
                 primitive._mesh.primitiveTraits(primitive._primitiveIndex);
-            codegen::Traits traits{attribLocations};
-            drawQueue[traits].emplace_back(&primitive);
+            drawQueue[meshFeatures].emplace_back(&primitive);
         }
 
         // perform drawing commands
-        assert(_factory);
-        for(auto const & [traits, primitives] : drawQueue)
+        assert(_material);
+        for(auto const & [meshFeatures, primitives] : drawQueue)
         {
-            // fetch a program for given traits
-            auto const & program = _factory->getUsingProgram(traits);
-
             // setup uniforms
-            program.setUniformByCode(_factory->_shadowMatrices, lightVPs);
-            program.setUniformByCode(_factory->_lightPos, lightPosition);
-            program.setUniformByCode(_factory->_farPlane, far);
+            _material->setShadowMatrices(lightVPs);
+            _material->setLightPos(lightPosition);
+            _material->setFarPlane(far);
             std::visit(utils::Overloaded
             {
-                [](models::shadow_params::method::Standard const &) {},
-                [&program, this](models::shadow_params::method::ESM const & esm)
-                {
-                    assert(_factory->_kFactor != -1);
-                    program.setUniformByCode(_factory->_kFactor, esm._factor);
-                },
-                [&program, this](models::shadow_params::method::LogESM const & logEsm)
-                {
-                    assert(_factory->_kFactor != -1);
-                    program.setUniformByCode(_factory->_kFactor, logEsm._factor);
-                },
+                [this](models::shadow_params::method::Standard const &) { _material->unsetFactor(); },
+                [this](models::shadow_params::method::ESM const & v)    { _material->setFactor(v._factor); },
+                [this](models::shadow_params::method::LogESM const & v) { _material->setFactor(v._factor); },
             }, _shadowParams._method);
 
             // perform drawing operations
             for(CulledPrimitive const * primitive : primitives)
             {
                 assert(primitive);
-                program.setSkinningUniforms(primitive->_transform, primitive->_skinningVector);
+
+                // fetch or create a brush for given primitives
+                Materials::Brush::Sptr & brush = primitive->_mesh.extraBrush(_meshConsumerKey);
+                if (!brush)
+                {
+                    brush = _materials.getBrush(meshFeatures, _material);
+                }
+                assert(brush);
+
+                // TODO: some parameters can be optional!
+                brush->prepareDrawing(primitive->_transform,
+                                      glm::vec3() /* ambientLight */,
+                                      glm::vec3() /* emissiveFactor */,
+                                      {} /* directionalLightsShadowMaps */,
+                                      {} /* pointLightsShadowMaps */,
+                                      primitive->_skinningVector,
+                                      0 /* meshId */);
                 primitive->_mesh.drawBare(primitive->_primitiveIndex);
             }
         }

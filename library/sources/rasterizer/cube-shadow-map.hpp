@@ -14,6 +14,8 @@
 
 namespace minire::rasterizer
 {
+    class Materials;
+
     // Can be used for Point and Spot lights.
     class CubeShadowMap
     {
@@ -25,7 +27,8 @@ namespace minire::rasterizer
     public:
         using Sptr = std::shared_ptr<CubeShadowMap>;
 
-        explicit CubeShadowMap(models::ShadowParams const &);
+        explicit CubeShadowMap(Materials const & materials,
+                               models::ShadowParams const &);
         ~CubeShadowMap();
 
         // Return far plane value
@@ -42,11 +45,12 @@ namespace minire::rasterizer
         models::ShadowParams const & shadowParams() const { return _shadowParams; }
 
     private:
-        class Factory;
-        using FactoryUptr = std::unique_ptr<Factory>;
+        class Material;
 
+        Materials const           & _materials;
         models::ShadowParams const _shadowParams;
-        FactoryUptr                _factory;
+        size_t const               _meshConsumerKey;
+        std::shared_ptr<Material>  _material;
         opengl::Texture::Uptr      _depthTexture;
         opengl::Texture::Uptr      _shadowTexture;
         opengl::FBO                _fbo;

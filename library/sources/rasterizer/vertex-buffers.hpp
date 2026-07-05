@@ -1,8 +1,9 @@
 #pragma once
 
 #include <minire/content/id.hpp>
-#include <minire/material.hpp> // TODO: included only for Program::Locations
 #include <minire/models/mesh-features.hpp>
+
+#include <material/types.hpp>
 
 #include <memory>
 
@@ -28,7 +29,7 @@ namespace minire::rasterizer
         models::MeshFeatures meshFeatures(content::Id const &) const;
 
         std::shared_ptr<opengl::VertexBuffer> build(content::Id const &,
-                                                    material::Program::Locations const &) const;
+                                                    material::Locations const &) const;
 
     private:
         Resources & _resources;

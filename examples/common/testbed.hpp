@@ -6,6 +6,7 @@
 #include <minire/grips/panning.hpp>
 #include <minire/gui-application.hpp>
 #include <minire/logging.hpp>
+#include <minire/material/pbr.hpp>
 #include <minire/models/camera.hpp>
 #include <minire/models/font-face.hpp>
 #include <minire/models/pbr-material.hpp>
@@ -133,11 +134,13 @@ namespace minire::examples
                     ._source = mkPath("../common/floor-plane.glb", path::Special::kMeshes, path::Index(0)),
                     ._defaultMaterial = [this]
                     {
-                        auto result = std::make_shared<PbrMaterial>();
-                        result->_albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f);
-                        result->_metallicFactor = 0.0f;
-                        result->_roughnessFactor = 1.0f;
-                        return result;
+                        return std::make_shared<material::Pbr>(
+                            models::PbrMaterial
+                            {
+                                ._albedoFactor = glm::vec3(1.0f, 0.0f, 0.0f),
+                                ._metallicFactor = 0.0f,
+                                ._roughnessFactor = 1.0f,
+                            });
                     }(),
                     ._skin = {},
                     ._visible = _isFloorPlaneEnabled,

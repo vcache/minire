@@ -16,7 +16,8 @@ namespace minire::rasterizer
 
         void bind();
 
-        void bindBufferRange(opengl::Program const &) const;
+        void bindBufferRange(opengl::Program const &,
+                             std::string const & uniformName = "BznkDatablock") const;
 
         static std::string interfaceBlock();
 

@@ -3,6 +3,8 @@
 #include <minire/formats/gltf.hpp> // TODO: use forward declaration
 #include <minire/material.hpp>
 #include <minire/models/mesh-features.hpp>
+
+#include <material/types.hpp>
 #include <opengl/vertex-buffer.hpp>
 
 #include <limits>
@@ -26,7 +28,7 @@ namespace minire::utils
         };
 
         using Primitives = std::vector<Primitive>;
-        using MaterialModels = std::vector<material::Model::Uptr>;
+        using MaterialModels = std::vector<Material::Sptr>;
         using Leases = std::vector<std::unique_ptr<content::Lease>>;
 
         MaterialModels _materialModels;
@@ -40,5 +42,5 @@ namespace minire::utils
     std::vector<opengl::VertexBuffer>
     createVertexBuffers(::tinygltf::Model const &,
                         size_t const meshIndex,
-                        std::vector<material::Program::Locations> const & locationsForPrims);
+                        std::vector<material::Locations> const & locationsForPrims);
 }

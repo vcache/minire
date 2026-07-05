@@ -5,6 +5,7 @@
 #include <minire/utils/always-false.hpp>
 #include <minire/utils/overloaded.hpp>
 
+#include <material/types.hpp>
 #include <opengl/vertex-buffer.hpp>
 
 #include <cassert>
@@ -96,7 +97,7 @@ namespace minire::utils
 
     std::shared_ptr<opengl::VertexBuffer>
     createVertexBuffer(models::VertexBuffer const & vertexBuffer,
-                       material::Program::Locations const & locations)
+                       material::Locations const & locations)
     {
         auto result = std::make_shared<opengl::VertexBuffer>();
 
