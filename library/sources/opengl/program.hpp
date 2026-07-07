@@ -59,16 +59,16 @@ namespace minire::opengl
             return name ? getUniformLocation(name->c_str()) : -1;
         }
 
-        GLint getAttribLocation(std::optional<std::string> const & name) const
-        {
-            return name ? getAttribLocation(name->c_str()) : -1;
-        }
-
         GLint getAttribLocation(GLchar const * name) const
         {
             auto res = ::glGetAttribLocation(_id, name);
             MINIRE_MAYBE_THROW_GL("glGetAttribLocation");
             return res;
+        }
+
+        GLint getAttribLocation(std::optional<std::string> const & name) const
+        {
+            return name ? getAttribLocation(name->c_str()) : -1;
         }
 
         GLuint getUniformBlockIndex(GLchar const * uniformBlockName) const

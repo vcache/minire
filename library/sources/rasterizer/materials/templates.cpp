@@ -23,23 +23,23 @@ namespace minire::rasterizer::materials
         R"(
             {{ minire_assert(minire_shader_type == "vertex", "attributes not in a vertex shader") }}
 
-            layout(location = {{ minire_vertex_attrib_location() }}) in vec3 minireVertex;
+            in vec3 minireVertex; {{ minire_set_vertex_attrib_name("minireVertex") }}
 
             {% if minire_mesh_traits.has_uv %}
-            layout(location = {{ minire_uv_attrib_location() }}) in vec2 minireUv;
+            in vec2 minireUv; {{ minire_set_uv_attrib_name("minireUv") }}
             {% endif %}
 
             {% if minire_mesh_traits.has_normal %}
-            layout(location = {{ minire_normal_attrib_location() }}) in vec3 minireNormal;
+            in vec3 minireNormal; {{ minire_set_normal_attrib_name("minireNormal") }}
             {% endif %}
 
             {% if minire_mesh_traits.has_tangent %}
-            layout(location = {{ minire_tangent_attrib_location() }}) in vec3 minireTangent;
+            in vec3 minireTangent; {{ minire_set_tangent_attrib_name("minireTangent") }}
             {% endif %}
 
             {% if minire_mesh_traits.has_skin and not minire_is_guard_set("skinning-attribs") %}
-            layout(location = {{ minire_joints_attrib_location() }})  in uvec4 minireJoints;
-            layout(location = {{ minire_weights_attrib_location() }}) in vec4  minireWeights;
+            in uvec4 minireJoints; {{ minire_set_joints_attrib_name("minireJoints") }}
+            in vec4 minireWeights; {{ minire_set_weights_attrib_name("minireWeights") }}
             {{ minire_set_guard("skinning-attribs") }}
             {% endif %}
         )";
@@ -55,8 +55,8 @@ namespace minire::rasterizer::materials
             {% if minire_mesh_traits.has_skin %}
 
             {% if not minire_is_guard_set("skinning-attribs") %}
-            layout(location = {{ minire_joints_attrib_location() }})  in uvec4 minireJoints;
-            layout(location = {{ minire_weights_attrib_location() }}) in vec4  minireWeights;
+            in uvec4 minireJoints; {{ minire_set_joints_attrib_name("minireJoints") }}
+            in vec4 minireWeights; {{ minire_set_weights_attrib_name("minireWeights") }}
             {{ minire_set_guard("skinning-attribs") }}
             {% endif %}
 

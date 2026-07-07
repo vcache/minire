@@ -37,18 +37,15 @@ namespace minire::rasterizer
             std::optional<std::string> _meshId;
         };
 
-        struct AttribLocations
+        struct AttribNames
         {
-            int _vertex  = -1;
-            int _uv      = -1;
-            int _normal  = -1;
-            int _tangent = -1;
-            int _joints  = -1;
-            int _weights = -1;
+            std::optional<std::string>  _vertex;
+            std::optional<std::string>  _uv;
+            std::optional<std::string>  _normal;
+            std::optional<std::string>  _tangent;
+            std::optional<std::string>  _joints;
+            std::optional<std::string>  _weights;
         };
-
-        static material::Locations const kAttributeLocations(0, 1, 2, 3, 4, 5);
-        static int const kUserAttribBaseLocation = 6;
 
         GLenum toGlEnum(material::ShaderType shaderType)
         {
@@ -153,7 +150,7 @@ namespace minire::rasterizer
 
     struct Materials::TemplateRenderingOutput
     {
-        AttribLocations                 _attribLocations;
+        AttribNames                     _attribNames;
         std::optional<std::string>      _uboName;
         BuiltinUniformNames             _builtinUniforms;
         std::unordered_set<std::string> _userUniforms;
@@ -173,14 +170,14 @@ namespace minire::rasterizer
         , _sources(std::move(sources))
         , _templateParams(std::move(templateParams))
         , _meshFeatures(meshFeatures)
-        , _attribLocations(tro._attribLocations._vertex,
-                           tro._attribLocations._uv,
-                           tro._attribLocations._normal,
-                           tro._attribLocations._tangent,
-                           tro._attribLocations._joints,
-                           tro._attribLocations._weights)
         , _material(material)
         , _program(makeShaders(_sources, *_templateParams))
+        , _attribLocations(_program.getAttribLocation(tro._attribNames._vertex),
+                           _program.getAttribLocation(tro._attribNames._uv),
+                           _program.getAttribLocation(tro._attribNames._normal),
+                           _program.getAttribLocation(tro._attribNames._tangent),
+                           _program.getAttribLocation(tro._attribNames._joints),
+                           _program.getAttribLocation(tro._attribNames._weights))
         , _modelUniform(_program.getUniformLocation(tro._builtinUniforms._model))
         , _bonesUniform(_program.getUniformLocation(tro._builtinUniforms._bones))
         , _directionalLightsShadowMapsUniform(_program.getUniformLocation(tro._builtinUniforms._directionalLightsShadowMaps))
@@ -405,12 +402,8 @@ namespace minire::rasterizer
                                        std::string const & slug,
                                        std::string const & name) const
     {
-        assert(kUserAttribBaseLocation == 6);
         return std::make_unique<nlohmann::json>(nlohmann::json::object(
         {
-            // vertex attributes
-            {"minire_user_attrib_base_location",    kUserAttribBaseLocation},
-
             // fragment output locations
             {"minire_color_output_location",    0},    // vec3, +1
             {"minire_mesh_id_output_location",  1},    // uint, +1
@@ -491,35 +484,23 @@ namespace minire::rasterizer
 
         // Vertex attributes
 
-        env.add_callback("minire_vertex_attrib_location", 0, [&outputs](inja::Arguments const &)
-            {   // vec3, +1
-                return outputs._attribLocations._vertex = kAttributeLocations.vertexAttribute();
-            });
+        env.add_void_callback("minire_set_vertex_attrib_name", 1, [&outputs](inja::Arguments const & args)
+                              { setSetOnce(args, outputs._attribNames._vertex); });
 
-        env.add_callback("minire_uv_attrib_location", 0, [&outputs](inja::Arguments const &)
-            {   // vec2,  +1
-                return outputs._attribLocations._uv = kAttributeLocations.uvAttribute();
-            });
+        env.add_void_callback("minire_set_uv_attrib_name", 1, [&outputs](inja::Arguments const & args)
+                              { setSetOnce(args, outputs._attribNames._uv); });
 
-        env.add_callback("minire_normal_attrib_location", 0, [&outputs](inja::Arguments const &)
-            {   // vec3,  +1
-                return outputs._attribLocations._normal = kAttributeLocations.normalAttribute();
-            });
+        env.add_void_callback("minire_set_normal_attrib_name", 1, [&outputs](inja::Arguments const & args)
+                              { setSetOnce(args, outputs._attribNames._normal); });
 
-        env.add_callback("minire_tangent_attrib_location", 0, [&outputs](inja::Arguments const &)
-            {   // vec3,  +1
-                return outputs._attribLocations._tangent = kAttributeLocations.tangentAttribute();
-            });
+        env.add_void_callback("minire_set_tangent_attrib_name", 1, [&outputs](inja::Arguments const & args)
+                              { setSetOnce(args, outputs._attribNames._tangent); });
 
-        env.add_callback("minire_joints_attrib_location", 0, [&outputs](inja::Arguments const &)
-            {   // vec3,  +1
-                return outputs._attribLocations._joints = kAttributeLocations.jointsAttribute();
-            });
+        env.add_void_callback("minire_set_joints_attrib_name", 1, [&outputs](inja::Arguments const & args)
+                              { setSetOnce(args, outputs._attribNames._joints); });
 
-        env.add_callback("minire_weights_attrib_location", 0, [&outputs](inja::Arguments const &)
-            {   // uvec4,  +1
-                return outputs._attribLocations._weights = kAttributeLocations.weightsAttribute();
-            });
+        env.add_void_callback("minire_set_weights_attrib_name", 1, [&outputs](inja::Arguments const & args)
+                              { setSetOnce(args, outputs._attribNames._weights); });
 
         // UBO
 

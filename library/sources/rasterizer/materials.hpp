@@ -76,9 +76,12 @@ namespace minire::rasterizer
             material::Shaders const         _sources;
             std::unique_ptr<nlohmann::json> _templateParams;
             models::MeshFeatures const      _meshFeatures;
-            material::Locations const       _attribLocations;
             Material::Sptr                  _material;
             opengl::Program                 _program;
+
+            // Vertex Attributes locations
+
+            material::Locations const       _attribLocations;
 
             // Builtin Uniform prescence
 

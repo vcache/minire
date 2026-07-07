@@ -32,7 +32,7 @@ namespace minire::rasterizer
         R"(
             {% include "minire/preamble.incl" %}
 
-            layout(location = {{ minire_vertex_attrib_location() }}) in vec3 minireVertex;
+            in vec3 minireVertex; {{ minire_set_vertex_attrib_name("minireVertex") }}
 
             {% include "minire/transform.incl" %}
 
