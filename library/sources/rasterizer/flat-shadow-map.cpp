@@ -25,9 +25,7 @@ namespace minire::rasterizer
         static constexpr auto kVertShader =
         R"(
             {% include "minire/preamble.incl" %}
-
-            in vec3 minireVertex; {{ minire_set_vertex_attrib_name("minireVertex") }}
-
+            {% include "minire/attributes.incl" %}
             {% include "minire/transform.incl" %}
 
             uniform mat4 bznkLightMatrix; {{ minire_register_user_uniform("bznkLightMatrix") }}
@@ -384,53 +382,33 @@ namespace minire::rasterizer
                                           glm::normalize(lightDirection),
                                           viewFrustum);
 
-        // collect programs
-        using DrawQueue = std::unordered_map<models::MeshFeatures,
-                                             std::vector<CulledPrimitive const *>>;
-        DrawQueue drawQueue;
-        for(CulledPrimitive const & primitive : primitives)
-        {
-            auto const & [meshFeatures, _] =
-                primitive._mesh.primitiveTraits(primitive._primitiveIndex);
-            drawQueue[meshFeatures].emplace_back(&primitive);
-        }
-
-        // perform drawing commands
+        // setup material-specific unifroms
         assert(_material);
-        for(auto const & [meshFeatures, primitives] : drawQueue)
+        _material->setLightMatrix(lightVP);
+        std::visit(utils::Overloaded
         {
-            // setup unifroms
-            _material->setLightMatrix(lightVP);
-            std::visit(utils::Overloaded
+            [this](models::shadow_params::method::Standard const &) { _material->unsetFactor(); },
+            [this](models::shadow_params::method::ESM const & v)    { _material->setFactor(v._factor); },
+            [this](models::shadow_params::method::LogESM const & v) { _material->setFactor(v._factor); },
+        }, _shadowParams._method);
+
+        // perform the drawing
+        for(auto const & [uniquePrimitive, primitiveInstances] : primitives)
+        {
+            Materials::Brush::Sptr & brush = uniquePrimitive._mesh.extraBrush(
+                uniquePrimitive._primitiveIndex, _meshConsumerKey);
+            if (!brush)
             {
-                [this](models::shadow_params::method::Standard const &) { _material->unsetFactor(); },
-                [this](models::shadow_params::method::ESM const & v)    { _material->setFactor(v._factor); },
-                [this](models::shadow_params::method::LogESM const & v) { _material->setFactor(v._factor); },
-            }, _shadowParams._method);
-
-            // perform drawing operations
-            for(CulledPrimitive const * primitive : primitives)
-            {
-                assert(primitive);
-
-                // fetch or create a brush for given primitives
-                Materials::Brush::Sptr & brush = primitive->_mesh.extraBrush(_meshConsumerKey);
-                if (!brush)
-                {
-                    brush = _materials.getBrush(meshFeatures, _material);
-                }
-                assert(brush);
-
-                // TODO: some parameters can be optional!
-                brush->prepareDrawing(primitive->_transform,
-                                      glm::vec3() /* ambientLight */,
-                                      glm::vec3() /* emissiveFactor */,
-                                      {} /* directionalLightsShadowMaps */,
-                                      {} /* pointLightsShadowMaps */,
-                                      primitive->_skinningVector,
-                                      0 /* meshId */);
-                primitive->_mesh.drawBare(primitive->_primitiveIndex);
+                models::MeshFeatures const & meshFeatures =
+                    uniquePrimitive._mesh.meshFeatures(uniquePrimitive._primitiveIndex);
+                brush = _materials.getBrush(meshFeatures, _material);
             }
+
+            assert(brush);
+            brush->draw(uniquePrimitive, primitiveInstances,
+                        glm::vec3() /* ambientLight */,
+                        {} /* directionalLightsShadowMaps */,
+                        {} /* pointLightsShadowMaps */);
         }
 
         // tidy up

@@ -19,25 +19,29 @@ namespace minire::opengl
     {
         using VboMap = std::unordered_map<size_t, opengl::VBO>;
 
-        opengl::VAO::Sptr _vao; // TODO: why not unique_ptr?
-        VboMap            _vboMap;
-        size_t            _elementsCount = 0;
-        GLenum            _elementsType = 0;
-        utils::Aabb       _aabb;
-        GLenum            _drawMode = GL_TRIANGLES;
-        bool              _doubleSided = false;
+        opengl::VAO _vao;
+        VboMap      _vboMap;
+        size_t      _elementsCount = 0;
+        GLenum      _elementsType = 0;
+        utils::Aabb _aabb;
+        GLenum      _drawMode = GL_TRIANGLES;
+        bool        _doubleSided = false;
 
     public:
-        VertexBuffer()
-            : _vao(std::make_shared<opengl::VAO>())
-        {}
+        VertexBuffer() = default;
 
     public:
         VertexBuffer(VertexBuffer &&) = default;
 
         opengl::VBO & createVbo(size_t index, GLenum target)
         {
-            auto [it, inserted] = _vboMap.emplace(index, opengl::VBO(_vao, target));
+            if (GL_ELEMENT_ARRAY_BUFFER == target)
+            {
+                // NOTE: EBO belongs to VAO, so that, target's VAO must be bound
+                _vao.bind();
+            }
+
+            auto [it, inserted] = _vboMap.emplace(index, opengl::VBO(target));
             if (!inserted && it->second.target() != target)
             {
                 MINIRE_THROW("VBO re-created w/ different target: {} != {}",
@@ -52,7 +56,7 @@ namespace minire::opengl
             return it != _vboMap.end() ? &it->second : nullptr;
         }
 
-        void bindVao() const { assert(_vao); _vao->bind(); }
+        void bindVao() const { _vao.bind(); }
 
         utils::Aabb const & aabb() const { return _aabb; }
 
@@ -62,13 +66,28 @@ namespace minire::opengl
             // TODO: sort VertexBuffers via doubleSided to avoid frequent context switches
             if (_doubleSided)
             {
-                glDisable(GL_CULL_FACE);
+                MINIRE_GL(glDisable, GL_CULL_FACE);
             }
             else
             {
-                glEnable(GL_CULL_FACE);
+                MINIRE_GL(glEnable, GL_CULL_FACE);
             }
             MINIRE_GL(glDrawElements, _drawMode, _elementsCount, _elementsType, 0);
+        }
+
+        void drawElementsInstanced(size_t const instancesCount) const
+        {
+            bindVao();
+            // TODO: sort VertexBuffers via doubleSided to avoid frequent context switches
+            if (_doubleSided)
+            {
+                MINIRE_GL(glDisable, GL_CULL_FACE);
+            }
+            else
+            {
+                MINIRE_GL(glEnable, GL_CULL_FACE);
+            }
+            MINIRE_GL(glDrawElementsInstanced, _drawMode, _elementsCount, _elementsType, 0, instancesCount);
         }
 
         VertexBuffer& operator=(VertexBuffer && other)

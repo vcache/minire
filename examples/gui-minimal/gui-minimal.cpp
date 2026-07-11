@@ -108,12 +108,13 @@ namespace
             if (GuiApplication::handle(e))
                 return true;
 
-            assert(_bottomRight);
-
-            _bottomRight->horizontal()->_position =
-                minire::gui::position::Constant{static_cast<float>(e._width - 50)};
-            _bottomRight->vertical()->_position =
-                minire::gui::position::Constant{static_cast<float>(e._height - 50)};
+            if (_bottomRight)
+            {
+                _bottomRight->horizontal()->_position =
+                    minire::gui::position::Constant{static_cast<float>(e._width - 50)};
+                _bottomRight->vertical()->_position =
+                    minire::gui::position::Constant{static_cast<float>(e._height - 50)};
+            }
 
             return true;
         }

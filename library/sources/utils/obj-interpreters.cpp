@@ -122,16 +122,16 @@ namespace minire::utils
         size_t const bstride = stride * sizeof(float);
 
         // setup VAO
-        result._vao->enableAttrib(vtxAttribIndex);
-        result._vao->attribPointer(vtxAttribIndex, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
+        result._vao.enableAttrib(vtxAttribIndex);
+        result._vao.attribPointer(vtxAttribIndex, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
         pointer += (3 * sizeof(float));
 
         if (mesh.haveUvs())
         {
             if (uvAttribIndx != -1)
             {
-                result._vao->enableAttrib(uvAttribIndx);
-                result._vao->attribPointer(uvAttribIndx, 2, GL_FLOAT, GL_FALSE, bstride, pointer);
+                result._vao.enableAttrib(uvAttribIndx);
+                result._vao.attribPointer(uvAttribIndx, 2, GL_FLOAT, GL_FALSE, bstride, pointer);
             }
             pointer += (2 * sizeof(float));
         }
@@ -140,8 +140,8 @@ namespace minire::utils
         {
             if (normAttrib != -1)
             {
-                result._vao->enableAttrib(normAttrib);
-                result._vao->attribPointer(normAttrib, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
+                result._vao.enableAttrib(normAttrib);
+                result._vao.attribPointer(normAttrib, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
             }
             pointer += (3 * sizeof(float)); // TODO: useless
         }

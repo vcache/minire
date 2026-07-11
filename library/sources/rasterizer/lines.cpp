@@ -56,6 +56,9 @@ namespace minire::rasterizer
             : _program({
                 std::make_shared<opengl::Shader>(GL_VERTEX_SHADER, VertShader()),
                 std::make_shared<opengl::Shader>(GL_FRAGMENT_SHADER, kFragShader)})
+            , _vao()
+            , _vbo(GL_ARRAY_BUFFER)
+            , _vboCount(0)
         {
             _program.use();
             ubo.bindBufferRange(_program);
@@ -63,13 +66,10 @@ namespace minire::rasterizer
 
         void draw() const
         {
-            if (_vbo && _vao)
+            if (_vboCount != 0)
             {
                 _program.use();
-
-                _vao->bind();
-                _vbo->bind();
-
+                _vao.bind();
                 MINIRE_GL(glDrawArrays, GL_LINES, 0, _vboCount);
             }
         }
@@ -79,25 +79,14 @@ namespace minire::rasterizer
             size_t const bytes = buffer.size() * sizeof(float);
             assert(std::numeric_limits<GLsizeiptr>::max() > bytes);
 
-            if (!_vao)
+            if (_vbo.size() < static_cast<GLsizeiptr>(bytes))
             {
-                _vao = std::make_shared<opengl::VAO>();
-                _vbo = std::make_shared<opengl::VBO>(_vao, GL_ARRAY_BUFFER);
-                _vbo->bufferData(bytes, buffer.data(), GL_DYNAMIC_DRAW);
-                reSetVaoPointers();
-            }
-            else if (_vbo->size() < static_cast<GLsizeiptr>(bytes))
-            {
-                assert(_vao);
-                _vbo = std::make_shared<opengl::VBO>(_vao, GL_ARRAY_BUFFER);
-                _vbo->bufferData(bytes, buffer.data(), GL_DYNAMIC_DRAW);
+                _vbo.bufferData(bytes, buffer.data(), GL_DYNAMIC_DRAW);
                 reSetVaoPointers();
             }
             else
             {
-                assert(_vao);
-                assert(_vbo);
-                _vbo->bufferSubData(0, bytes, buffer.data());
+                _vbo.bufferSubData(0, bytes, buffer.data());
             }
             _vboCount = buffer.size() / 6;
         }
@@ -106,23 +95,22 @@ namespace minire::rasterizer
         void reSetVaoPointers()
         {
             constexpr size_t kStride = sizeof(float) * (3 + 3);
-            assert(_vao);
 
             // position
-            _vao->attribPointer(0, 3, GL_FLOAT, GL_FALSE, kStride, 0);
-            _vao->enableAttrib(0);
+            _vao.attribPointer(0, 3, GL_FLOAT, GL_FALSE, kStride, 0);
+            _vao.enableAttrib(0);
 
             // color
-            _vao->attribPointer(1, 3, GL_FLOAT, GL_FALSE, kStride,
-                                3 * sizeof(float));
-            _vao->enableAttrib(1);
+            _vao.attribPointer(1, 3, GL_FLOAT, GL_FALSE, kStride,
+                               3 * sizeof(float));
+            _vao.enableAttrib(1);
         }
 
     private:
-        opengl::Program   _program;
-        opengl::VAO::Sptr _vao;
-        opengl::VBO::Sptr _vbo;
-        size_t            _vboCount;
+        opengl::Program _program;
+        opengl::VAO     _vao;
+        opengl::VBO     _vbo;
+        size_t          _vboCount;
     };
 
     Lines::Lines(Ubo const & ubo)

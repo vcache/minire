@@ -176,6 +176,7 @@ namespace minire
                            int width, int height,
                            content::Ids const & fontsPreload)
         : _contentManager(contentManager)
+        , _screenQuadVbo(GL_ARRAY_BUFFER)
         , _screenQuadProgram({
             std::make_shared<opengl::Shader>(GL_VERTEX_SHADER, kVertShader),
             std::make_shared<opengl::Shader>(GL_FRAGMENT_SHADER, kFragShader),
@@ -186,10 +187,11 @@ namespace minire
         , _outlineIdsCountUniform(_screenQuadProgram.getUniformLocation("outlineIdsCount"))
         , _screenPassUbo(std::make_unique<ScreenPassUbo>(_screenQuadProgram))
         , _ubo()
+        , _instancedBuffersPool()
         , _coordinates(_ubo)
         , _lines(_ubo)
         , _textures(_contentManager, _resources)
-        , _materials(_textures, _ubo)
+        , _materials(_textures, _ubo, _instancedBuffersPool)
         , _vertexBuffers(_resources)
         , _meshes(_materials, _vertexBuffers, _contentManager, _resources)
         , _fonts(_contentManager, fontsPreload)
@@ -260,16 +262,16 @@ namespace minire
 
         // Build screen quad
 
-        _screenQuadVao = std::make_shared<opengl::VAO>();
+        _screenQuadVao.bind();
+        _screenQuadVbo.bind();
 
-        _screenQuadVbo = std::make_shared<opengl::VBO>(_screenQuadVao, GL_ARRAY_BUFFER);
-        _screenQuadVbo->bufferData(sizeof(kScreenQuad), kScreenQuad, GL_STATIC_DRAW);
+        _screenQuadVbo.bufferData(sizeof(kScreenQuad), kScreenQuad, GL_STATIC_DRAW);
 
-        _screenQuadVao->enableAttrib(0);
-        _screenQuadVao->attribPointer(0, 2, GL_FLOAT, GL_FALSE, kScreenQuadStride, 0);
+        _screenQuadVao.enableAttrib(0);
+        _screenQuadVao.attribPointer(0, 2, GL_FLOAT, GL_FALSE, kScreenQuadStride, 0);
 
-        _screenQuadVao->enableAttrib(1);
-        _screenQuadVao->attribPointer(1, 2, GL_FLOAT, GL_FALSE, kScreenQuadStride, 2 * sizeof(float));
+        _screenQuadVao.enableAttrib(1);
+        _screenQuadVao.attribPointer(1, 2, GL_FLOAT, GL_FALSE, kScreenQuadStride, 2 * sizeof(float));
 
         // Initial call
 
@@ -465,20 +467,25 @@ namespace minire
             [&result] (rasterizer::Mesh const & mesh,
                        glm::vec3 const & emissiveFactor,
                        glm::mat4 const & transform,
-                       material::SkinningVector && skinningVector,
-                       size_t const obpId)
+                       material::SkinningVectorSptr const & skinningVectorSptr,
+                       size_t const opbId)
             {
+                MINIRE_INVARIANT(opbId <= std::numeric_limits<uint32_t>::max(),
+                                 "too large opbId: {}", opbId);
+
                 for(size_t i = 0; i < mesh.primitives(); ++i)
                 {
-                    result.emplace_back(rasterizer::CulledPrimitive
-                    {
-                        ._mesh = mesh,
-                        ._primitiveIndex = i,
-                        ._emissiveFactor = emissiveFactor,
-                        ._transform = transform,
-                        ._skinningVector = std::move(skinningVector),
-                        ._obpId = obpId,
-                    });
+                    rasterizer::UniquePrimitive uniquePrimitive{mesh, i};
+                    rasterizer::PrimitiveInstances & primitiveInstances = result[uniquePrimitive];
+
+                    primitiveInstances._attribs.emplace_back(
+                        rasterizer::PrimitiveInstances::Attribs
+                        {
+                            ._transform = transform,
+                            ._emissiveFactor = emissiveFactor,
+                            ._opbId = static_cast<uint32_t>(opbId)
+                        });
+                    primitiveInstances._skinningVectors.emplace_back(skinningVectorSptr);
                 }
             });
         return result;
@@ -490,8 +497,7 @@ namespace minire
         auto pointLights = cullPointLights(scene);
         auto primitives = cullPrimitives(scene);
         shadowPass(scene, primitives, directionalLights, pointLights);
-        // TODO: color pass should also use "primitives"
-        colorPass(scene, directionalLights, pointLights);
+        colorPass(scene, primitives, directionalLights, pointLights);
         draw2d();
     }
 
@@ -534,6 +540,7 @@ namespace minire
     }
 
     void Rasterizer::colorPass(SceneImpl const & scene,
+                               rasterizer::CulledPrimitives const & culledPrimitives,
                                rasterizer::CulledDirectionalLights const & culledDirectionalLights,
                                rasterizer::CulledPointLights const & culledPointLights)
     {
@@ -593,7 +600,7 @@ namespace minire
             _ubo.setViewPosition(glm::vec4(viewpoint.position(), 1.0f));
             _ubo.setLights(culledDirectionalLights, culledPointLights);
             _ubo.bind();
-            draw3d(scene, _directionalLightsShadowMaps,
+            draw3d(scene, culledPrimitives, _directionalLightsShadowMaps,
                    _pointLightsShadowMaps);
         }
 
@@ -614,7 +621,7 @@ namespace minire
         MINIRE_GL(glDisable, GL_CULL_FACE);
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT);
 
-        // activate a progrma
+        // activate a program
         _screenQuadProgram.use();
 
         // setup textures and uniform
@@ -651,13 +658,13 @@ namespace minire
         _screenPassUbo->update();
 
         // run the pass
-        assert(_screenQuadVao);
-        _screenQuadVao->bind();
+        _screenQuadVao.bind();
         MINIRE_GL(glDisable, GL_BLEND);
         MINIRE_GL(glDrawArrays, GL_TRIANGLES, 0, 6);
     }
 
     void Rasterizer::draw3d(SceneImpl const & scene,
+                            rasterizer::CulledPrimitives const & culledPrimitives,
                             material::TextureRefs const & directionalLightsShadowMaps,
                             material::TextureRefs const & pointLightsShadowMaps)
     {
@@ -678,7 +685,7 @@ namespace minire
         _lines.draw();
 
         // draw entries
-        _meshes.draw(scene, directionalLightsShadowMaps,
+        _meshes.draw(scene, culledPrimitives, directionalLightsShadowMaps,
                      pointLightsShadowMaps);
 
         // draw billboards

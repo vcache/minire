@@ -35,10 +35,7 @@ namespace minire::opengl
 
         ~RBO()
         {
-            if (_id == _used)
-            {
-                _used = 0;
-            }
+            if (_id == _used) _used = 0;
             ::glDeleteRenderbuffers(1, &_id);
         }
 

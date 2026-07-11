@@ -12,8 +12,6 @@
 
 namespace minire::rasterizer
 {
-    // TODO: bucket drawing call to minimize program switch
-
     Meshes::Meshes(Materials const & materials,
                    VertexBuffers const & vertexBuffers,
                    content::Manager & contentManager,
@@ -48,22 +46,19 @@ namespace minire::rasterizer
     }
 
     void Meshes::draw(SceneImpl const & scene,
+                      CulledPrimitives const & culledPrimitives,
                       material::TextureRefs const & directionalLightsShadowMaps,
                       material::TextureRefs const & pointLightsShadowMaps) const
     {
-        // TODO: group models by a material signature (to avoid frequent program switch)
-        scene.cullModels(
-            [&ambientLight = scene.ambientLight(),
-             &directionalLightsShadowMaps, &pointLightsShadowMaps]
-            (Mesh const & mesh, glm::vec3 const & emissiveFactor,
-             glm::mat4 const & transform, material::SkinningVector const & skinningVector,
-             SceneImpl::OpbId const obpId)
-            {
-                mesh.draw(transform, ambientLight, emissiveFactor,
-                          directionalLightsShadowMaps,
-                          pointLightsShadowMaps,
-                          skinningVector, obpId);
-            }
-        );
+        // TODO: group models by brush signatures (to avoid frequent program switch)
+        glm::vec3 const ambientLight = scene.ambientLight();
+        for(auto const & [uniquePrimitive, primitiveInstances] : culledPrimitives)
+        {
+            Materials::Brush const & brush =
+                uniquePrimitive._mesh.brush(uniquePrimitive._primitiveIndex);
+            brush.draw(uniquePrimitive, primitiveInstances, ambientLight,
+                       directionalLightsShadowMaps, pointLightsShadowMaps);
+
+        }
     }
 }

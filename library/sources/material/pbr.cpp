@@ -503,6 +503,9 @@ namespace minire::material
 
             out vec4 bznkWorldPos;
 
+            flat out uint bznkMeshId;
+            flat out vec3 bznkEmissiveFactor;
+
             {% include "minire/transform.incl" %}
             {% include "minire/ubo.incl" %}
 
@@ -526,6 +529,9 @@ namespace minire::material
                 vec3 B = cross(N, T);
                 bznkTbn = mat3(T, B, N);
                 {% endif %}
+
+                bznkMeshId = minireMeshId;
+                bznkEmissiveFactor = minireEmissiveFactor;
             }
         )";
 
@@ -552,6 +558,9 @@ namespace minire::material
             {% endif %}
 
             in vec4 bznkWorldPos;
+
+            flat in uint bznkMeshId;
+            flat in vec3 bznkEmissiveFactor;
 
             // uniforms //
 
@@ -628,7 +637,7 @@ namespace minire::material
                 float ao = bznkAoStrength;
                 {% endif %}
 
-                vec3 emissiveFactor = minireEmissiveFactor;
+                vec3 emissiveFactor = bznkEmissiveFactor;
                 {% if minire_extra.kHasEmissiveTexture %}
                 emissiveFactor *= texture(bznkEmissiveTexture, bznkFragUv).rgb;
                 {% endif %}
@@ -641,7 +650,7 @@ namespace minire::material
                                             minireAmbientLight);
                 bznkOutColor += emissiveFactor;
 
-                bznkOutMeshId = minireMeshId;
+                bznkOutMeshId = bznkMeshId;
             }
         )";
     }

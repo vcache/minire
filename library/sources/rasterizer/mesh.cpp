@@ -47,18 +47,16 @@ namespace minire::rasterizer
             assert(brush);
 
             // Create or make opengl::VertexBuffer for a given Locations
-            material::Locations const & locations = brush->locations();
-            auto openglVertexBuffer = vertexBuffers.build(vertexBufferId, locations);
+            auto openglVertexBuffer = vertexBuffers.build(vertexBufferId, materials.locations());
             assert(openglVertexBuffer);
 
             // extend aabb
             _aabb.extend(openglVertexBuffer->_aabb);
 
             // setup _primitives and _materials
+            _primitives.emplace_back(std::move(openglVertexBuffer), meshFeatures, brush);
 
-            _primitives.emplace_back(std::move(openglVertexBuffer), meshFeatures, locations);
-            _materials.emplace_back(MaterialData{brush, {0}});
-
+            // quit the function, since it is a special case
             return;
         }
 
@@ -84,10 +82,7 @@ namespace minire::rasterizer
                 auto brush = materials.getBrush(meshFeatures, defaultMaterial);
                 assert(brush);
 
-                material::Locations const & locations = brush->locations();
-                MINIRE_INVARIANT(locations.tangentAttribute() == -1, "OBJ doesn't support tangents");
-                MINIRE_INVARIANT(locations.jointsAttribute() == -1, "OBJ doesn't support skining");
-                MINIRE_INVARIANT(locations.weightsAttribute() == -1, "OBJ doesn't support skining");
+                material::Locations const & locations = materials.locations();
                 opengl::VertexBuffer vertexBuffer = utils::createVertexBuffer(
                     obj,
                     locations.vertexAttribute(),
@@ -97,8 +92,7 @@ namespace minire::rasterizer
                 _aabb.extend(vertexBuffer._aabb);
 
                 _primitives.emplace_back(std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)),
-                                         meshFeatures, locations);
-                _materials.emplace_back(MaterialData{brush, {0}});
+                                         meshFeatures, brush);
             },
 
             [this, &source, &defaultMaterial, &materials, &contentManager]
@@ -133,19 +127,23 @@ namespace minire::rasterizer
                 // get features
                 auto prefetched = utils::prefetchGltfFeatures(gltf, meshIndex, contentManager);
 
+                // brushes cache
                 using MatComboKey = std::pair<models::MeshFeatures, size_t>;
-                using MatMap = std::unordered_map<MatComboKey, MaterialData>;
-                MatMap materialsMap;
+                using BrushMap = std::unordered_map<MatComboKey, Materials::Brush::Sptr>;
+                BrushMap materialsMap;
                 materialsMap.reserve(prefetched._materialModels.size());
-                std::vector<material::Locations> locationsForPrims;
-                locationsForPrims.reserve(prefetched._primitives.size());
 
+                // brushes vector
+                std::vector<Materials::Brush::Sptr> brushesForPrims;
+                brushesForPrims.reserve(prefetched._primitives.size());
+
+                // iterate primitive to build helper structures
                 for(size_t primIndex = 0; primIndex < prefetched._primitives.size(); ++primIndex)
                 {
                     auto const & primitive = prefetched._primitives[primIndex];
-                    MatComboKey key(primitive._meshFeatures, primitive._materialModel);
-                    auto it = materialsMap.find(key);
-                    if (it == materialsMap.cend())
+                    MatComboKey const key(primitive._meshFeatures, primitive._materialModel);
+                    Materials::Brush::Sptr & brush = materialsMap[key];
+                    if (!brush)
                     {
                         // a new combination found, should build a new material
                         bool const useDefault = primitive._materialModel == utils::GltfMeshFeatures::kNoIndex;
@@ -160,38 +158,27 @@ namespace minire::rasterizer
                                        : prefetched._materialModels[primitive._materialModel];
 
                         assert(effectiveMaterial);
-                        auto brush = materials.getBrush(primitive._meshFeatures, effectiveMaterial);
-                        assert(brush);
-
-                        auto [newIt, inserted] = materialsMap.emplace(key, MaterialData{brush, {}});
-                        MINIRE_INVARIANT(inserted, "failed to insert a new material+feature pair: {}", source);
-                        it = newIt;
+                        brush = materials.getBrush(primitive._meshFeatures, effectiveMaterial);
                     }
-                    assert(it != materialsMap.cend());
-                    it->second._primitives.emplace_back(primIndex);
 
-                    assert(it->second._brush);
-                    material::Locations const & locations = it->second._brush->locations();
-                    locationsForPrims.emplace_back(locations);
+                    assert(brush);
+                    brushesForPrims.emplace_back(brush);
                 }
 
-                for(auto & [_, material] : materialsMap)
-                {
-                    _materials.emplace_back(std::move(material));
-                }
-
+                // fetch vertex buffers
                 std::vector<opengl::VertexBuffer> vertexBuffers = utils::createVertexBuffers(
-                    *gltf, meshIndex, locationsForPrims);
+                    *gltf, meshIndex, materials.locations());
+
+                // build Mesh::Primitive objects
                 assert(vertexBuffers.size() == prefetched._primitives.size());
-                assert(vertexBuffers.size() == locationsForPrims.size());
+                assert(vertexBuffers.size() == brushesForPrims.size());
                 _primitives.reserve(vertexBuffers.size());
                 for(size_t i = 0; i < vertexBuffers.size(); ++i)
                 {
                     opengl::VertexBuffer & vertexBuffer = vertexBuffers[i];
                     _aabb.extend(vertexBuffer._aabb);
                     _primitives.emplace_back(std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)),
-                                             prefetched._primitives[i]._meshFeatures,
-                                             locationsForPrims[i]);
+                                             prefetched._primitives[i]._meshFeatures, brushesForPrims[i]);
                 }
             },
 
@@ -209,57 +196,6 @@ namespace minire::rasterizer
                VertexBuffers const & vertexBuffers)
     {
         loadPrimitives(source, defaultMaterial, contentManager, materials, vertexBuffers);
-    }
-
-    void Mesh::draw(glm::mat4 const & modelTransform,
-                    glm::vec3 const & ambientLight,
-                    glm::vec3 const & emissiveFactor,
-                    material::TextureRefs const & directionalLightsShadowMaps,
-                    material::TextureRefs const & pointLightsShadowMaps,
-                    material::SkinningVector const & skinningVector,
-                    uint32_t const meshId) const
-    {
-        for(MaterialData const & materialData : _materials)
-        {
-            assert(materialData._brush);
-            materialData._brush->prepareDrawing(modelTransform,
-                                                ambientLight,
-                                                emissiveFactor,
-                                                directionalLightsShadowMaps,
-                                                pointLightsShadowMaps,
-                                                skinningVector,
-                                                meshId);
-            for(size_t const primIndex : materialData._primitives)
-            {
-                assert(primIndex < _primitives.size());
-                assert(_primitives[primIndex]._buffer);
-                _primitives[primIndex]._buffer->drawElements();
-            }
-        }
-    }
-
-    void Mesh::drawBare() const
-    {
-        for(Primitive const & primitive : _primitives)
-        {
-            assert(primitive._buffer);
-            primitive._buffer->drawElements();
-        }
-    }
-
-    Mesh::PrimitiveTraits Mesh::primitiveTraits(size_t const primitiveIndex) const
-    {
-        assert(primitiveIndex < _primitives.size());
-        Primitive const & primitive = _primitives[primitiveIndex];
-        return std::tie(primitive._meshFeatures,
-                        primitive._attribLocations);
-    }
-
-    void Mesh::drawBare(size_t const primitiveIndex) const
-    {
-        assert(primitiveIndex < _primitives.size());
-        assert(_primitives[primitiveIndex]._buffer);
-        _primitives[primitiveIndex]._buffer->drawElements();
     }
 
     size_t Mesh::issueConsumerKey()

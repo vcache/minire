@@ -12,6 +12,7 @@ namespace minire::material
 {
     using TextureRefs = std::vector<opengl::Texture const *>;
     using SkinningVector = std::vector<glm::mat4>;
+    using SkinningVectorSptr = std::shared_ptr<SkinningVector>;
 
     class Locations
     {

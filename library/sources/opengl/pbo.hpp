@@ -28,7 +28,8 @@ namespace minire::opengl
             }
             catch(...)
             {
-                glDeleteBuffers(1, &_id);
+                if (_id == _used) _used = 0;
+                ::glDeleteBuffers(1, &_id);
                 throw;
             }
         }
@@ -48,10 +49,7 @@ namespace minire::opengl
 
         ~PBO()
         {
-            if (_id == _used)
-            {
-                _used = 0;
-            }
+            if (_id == _used) _used = 0;
             ::glDeleteBuffers(1, &_id);
         }
 

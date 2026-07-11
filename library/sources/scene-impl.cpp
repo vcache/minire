@@ -1282,29 +1282,33 @@ namespace minire
     }
 
     // TODO: should be a static method?
-    material::SkinningVector
+    material::SkinningVectorSptr
     SceneImpl::makeSkinningVector(MeshLeaf const & mesh) const
     {
         static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
 
-        material::SkinningVector result;
-        result.reserve(mesh._skinBones.size());
+        if (mesh._skinBones.empty()) return {};
 
+        material::SkinningVectorSptr result =
+            std::make_shared<material::SkinningVector>(mesh._skinBones.size());
+
+        size_t offset = 0;
         for(MeshLeaf::SkinBone const & skinBone : mesh._skinBones)
         {
             if (auto const & node = skinBone._node.lock();
                 node && node->hasGlobalTransform())
             {
-                result.emplace_back(node->_globalTransform * skinBone._inverseBindMatrix);
+                (*result)[offset++] = glm::mat4(node->_globalTransform * skinBone._inverseBindMatrix);
             }
             else
             {
                 // TODO: add more debug info
-                result.emplace_back(kIdentityMatrix);
+                (*result)[offset++] = kIdentityMatrix;
                 MINIRE_WARNING("skinBone refers to a non-existing Node or "
                                "its's global transform isn't clear");
             }
         }
+        assert(offset == result->size());
 
         return result;
     }

@@ -4,6 +4,7 @@
 #include <minire/material.hpp>
 #include <minire/models/mesh-features.hpp>
 #include <minire/utils/aabb.hpp>
+#include <minire/utils/std-pair-hash.hpp>
 
 #include <material/types.hpp>
 #include <opengl/vertex-buffer.hpp>
@@ -35,70 +36,65 @@ namespace minire::rasterizer
                       Materials const &,
                       VertexBuffers const &);
 
-        void draw(glm::mat4 const & transform,
-                  glm::vec3 const & ambientLight,
-                  glm::vec3 const & emissiveFactor,
-                  material::TextureRefs const & directionalLightsShadowMaps,
-                  material::TextureRefs const & pointLightsShadowMaps,
-                  material::SkinningVector const & skinningVector,
-                  uint32_t const meshId) const;
-
-        // Position attrib is guaranteed to be at index 0.
-        void drawBare() const;
-
         utils::Aabb const & aabb() const { return _aabb; }
 
     public:
-        using PrimitiveTraits = std::tuple<models::MeshFeatures const &,
-                                           material::Locations const &>;
-
         size_t primitives() const { return _primitives.size(); }
 
-        PrimitiveTraits primitiveTraits(size_t const primitiveIndex) const;
+        models::MeshFeatures const & meshFeatures(size_t const primitiveIndex) const
+        {
+            assert(primitiveIndex < _primitives.size());
+            return _primitives[primitiveIndex]._meshFeatures;
+        }
 
-        void drawBare(size_t const primitiveIndex) const;
+        opengl::VertexBuffer const & vertexBuffer(size_t primitiveIndex) const
+        {
+            assert(primitiveIndex < _primitives.size());
+            assert(_primitives[primitiveIndex]._buffer);
+            return *_primitives[primitiveIndex]._buffer;
+        }
+
+        // Primary brushes are Mesh-specific brushes for color pass
+        Materials::Brush const & brush(size_t const primitiveIndex) const
+        {
+            assert(primitiveIndex < _primitives.size());
+            assert(_primitives[primitiveIndex]._brush);
+            return *_primitives[primitiveIndex]._brush;
+        }
 
         // The caller is resposible to prived the unique key!
         // Should be used carefully, because there is not way to clean up the store.
         // TODO: should be cleaned up somehow
-        Materials::Brush::Sptr & extraBrush(size_t consumerKey) const
+        Materials::Brush::Sptr & extraBrush(size_t primitiveIndex, size_t consumerKey) const
         {
-            return _extraBrushes[consumerKey];
+            return _extraBrushes[std::pair(primitiveIndex, consumerKey)];
         }
 
         static size_t issueConsumerKey();
 
     private:
-        struct MaterialData
-        {
-            Materials::Brush::Sptr _brush;
-            std::vector<size_t>    _primitives;
-        };
-
         struct Primitive
         {
             // Since the ownership of _buffer is shared, it is valid and sane
             // that some other owners may change the contents of a buffer.
             // For example, it might be used to implement dynamically changable meshes,
             //              or UV-based animations.
-            //
-            // (!) Despite that, other owners  MUST  guarantee, that mesh alternations
-            // will be done in a compatible with an initially given attrib locations way!
             std::shared_ptr<opengl::VertexBuffer> _buffer;
             models::MeshFeatures const            _meshFeatures;
-            material::Locations const             _attribLocations;
+            Materials::Brush::Sptr                _brush;
 
             explicit Primitive(std::shared_ptr<opengl::VertexBuffer> buffer,
                                models::MeshFeatures const & meshFeatures,
-                               material::Locations const & attribLocations)
+                               Materials::Brush::Sptr const & brush)
                 : _buffer(std::move(buffer))
                 , _meshFeatures(meshFeatures)
-                , _attribLocations(attribLocations)
+                , _brush(brush)
             {}
         };
 
         // Just a cache-like store for shadow map instances.
-        using ExtraBrushes = std::unordered_map<size_t, Materials::Brush::Sptr>;
+        using ExtraBrushId = std::pair<size_t, size_t>;
+        using ExtraBrushes = std::unordered_map<ExtraBrushId, Materials::Brush::Sptr>;
 
     private:
         void loadPrimitives(content::Path const & source,
@@ -108,10 +104,9 @@ namespace minire::rasterizer
                             VertexBuffers const &);
 
     private:
-        std::vector<MaterialData> _materials;
-        std::vector<Primitive>    _primitives;
-        utils::Aabb               _aabb;
-        mutable ExtraBrushes      _extraBrushes;
+        std::vector<Primitive> _primitives;
+        utils::Aabb            _aabb;
+        mutable ExtraBrushes   _extraBrushes;
 
         friend class Meshes;
     };

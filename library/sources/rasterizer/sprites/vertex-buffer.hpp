@@ -51,14 +51,13 @@ namespace minire::rasterizer::sprites
 
         void draw() const
         {
-            assert(_vao);
-            _vao->bind();
+            _vao.bind();
             MINIRE_GL(glDrawArrays, GL_TRIANGLES, 0, _vertices);
         }
 
     private:
-        opengl::VAO::Sptr _vao;
-        opengl::VBO       _vbo;
-        size_t const      _vertices;
+        opengl::VAO  _vao;
+        opengl::VBO  _vbo;
+        size_t const _vertices;
     };
 }

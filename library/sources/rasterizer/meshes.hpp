@@ -3,6 +3,7 @@
 #include <minire/material.hpp>
 #include <minire/utils/aabb.hpp>
 
+#include <rasterizer/culled-objects.hpp>
 #include <rasterizer/mesh.hpp>
 #include <rasterizer/meshes/id.hpp>
 
@@ -26,6 +27,7 @@ namespace minire::rasterizer
                         Resources &);
 
         void draw(SceneImpl const &,
+                  CulledPrimitives const &,
                   material::TextureRefs const & directionalLightsShadowMaps,
                   material::TextureRefs const & pointLightsShadowMaps) const;
 

@@ -42,5 +42,5 @@ namespace minire::utils
     std::vector<opengl::VertexBuffer>
     createVertexBuffers(::tinygltf::Model const &,
                         size_t const meshIndex,
-                        std::vector<material::Locations> const & locationsForPrims);
+                        material::Locations const &);
 }

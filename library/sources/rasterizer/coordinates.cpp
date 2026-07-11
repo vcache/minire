@@ -71,8 +71,8 @@ namespace minire::rasterizer
             : _program({
                 std::make_shared<opengl::Shader>(GL_VERTEX_SHADER, VertShader()),
                 std::make_shared<opengl::Shader>(GL_FRAGMENT_SHADER, kFragShader)})
-            , _vao(std::make_shared<opengl::VAO>())
-            , _vbo(_vao, GL_ARRAY_BUFFER)
+            , _vao()
+            , _vbo(GL_ARRAY_BUFFER)
             , _bznkLengthUniform(_program.getUniformLocation("bznkLength"))
         {
             _vbo.bufferData(sizeof(kVbo), kVbo, GL_STATIC_DRAW);
@@ -80,12 +80,12 @@ namespace minire::rasterizer
             constexpr size_t stride = sizeof(float) * (3 + 3);
 
             // position
-            _vao->attribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, 0);
-            _vao->enableAttrib(0);
+            _vao.attribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, 0);
+            _vao.enableAttrib(0);
 
             // color
-            _vao->attribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, 3 * sizeof(float));
-            _vao->enableAttrib(1);
+            _vao.attribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, 3 * sizeof(float));
+            _vao.enableAttrib(1);
 
             _program.use();
             setBznkLengthUniform(length);
@@ -96,11 +96,7 @@ namespace minire::rasterizer
         void draw() const
         {
             _program.use();
-
-            assert(_vao);
-            _vao->bind();
-            _vbo.bind();
-
+            _vao.bind();
             MINIRE_GL(glDrawArrays, GL_LINES, 0, 6);
         }
 
@@ -110,9 +106,9 @@ namespace minire::rasterizer
         }
 
     private:
-        opengl::Program   _program;
-        opengl::VAO::Sptr _vao;
-        opengl::VBO       _vbo;
+        opengl::Program _program;
+        opengl::VAO     _vao;
+        opengl::VBO     _vbo;
 
         GLint             _bznkLengthUniform;
     };

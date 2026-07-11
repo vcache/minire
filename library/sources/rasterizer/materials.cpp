@@ -7,8 +7,12 @@
 #include <minire/utils/overloaded.hpp>
 
 #include <opengl/program.hpp>
+#include <opengl/vao.hpp>
+#include <opengl/vertex-buffer.hpp>
+#include <rasterizer/binding-points.hpp>
 #include <rasterizer/constants.hpp>
 #include <rasterizer/materials/templates.hpp>
+#include <rasterizer/mesh.hpp>
 #include <rasterizer/ubo.hpp>
 
 #include <fmt/format.h>
@@ -32,19 +36,9 @@ namespace minire::rasterizer
             std::optional<std::string> _bones;
             std::optional<std::string> _directionalLightsShadowMaps;
             std::optional<std::string> _pointLightsShadowMaps;
-            std::optional<std::string> _emissiveFactor;
             std::optional<std::string> _ambientLight;
+            std::optional<std::string> _emissiveFactor;
             std::optional<std::string> _meshId;
-        };
-
-        struct AttribNames
-        {
-            std::optional<std::string>  _vertex;
-            std::optional<std::string>  _uv;
-            std::optional<std::string>  _normal;
-            std::optional<std::string>  _tangent;
-            std::optional<std::string>  _joints;
-            std::optional<std::string>  _weights;
         };
 
         GLenum toGlEnum(material::ShaderType shaderType)
@@ -99,6 +93,61 @@ namespace minire::rasterizer
                         "Shaders set sources:\n\n{}\n\nGeneric params:\n{}",
                          fmt::join(shaders, "\n=============================\n"), templateParams.dump(4));
         }
+
+        // Will return a flat vector of subchunks of "maxBones" elements,
+        // where each element a subchunk is 3 of glm::vec3 (0-th, 1-th,
+        // and 2-nd rows of transform matrix; 3-rd row should reconsructed into glm::vec4(0, 0, 0, 1))
+        std::vector<glm::vec4> flattenSkinningVectors
+        (PrimitiveInstances::InstancedSkinningVectors const & isv, size_t const maxBones)
+        {
+            static const std::vector<glm::vec4> kFillers
+            {
+                glm::vec4(1, 0, 0, 0),
+                glm::vec4(0, 1, 0, 0),
+                glm::vec4(0, 0, 1, 0),
+            };
+
+            // NOTE: 'isv' is just a std::vector<std::vector<glm::mat4>>,
+            //       inner vector's size must be no more than maxBones.
+            std::vector<glm::vec4> result(maxBones * 3 * isv.size());
+            size_t offset = 0;
+            for(material::SkinningVectorSptr const & skinningVector : isv)
+            {
+                if (skinningVector)
+                {
+                    MINIRE_INVARIANT(skinningVector->size() <= maxBones,
+                                     "too many bone: {} while the limit is {}",
+                                     skinningVector->size(), maxBones);
+
+                    // fill the matrices contents, glm::mat4 is column-major,
+                    // so indeces are: matrix[column][row]
+                    for(glm::mat4 const & matrix : *skinningVector)
+                    {
+                        glm::mat4 transposed = glm::transpose(matrix);
+                        result[offset++] = transposed[0];
+                        result[offset++] = transposed[1];
+                        result[offset++] = transposed[2];
+                        assert(transposed[3] == glm::vec4(0, 0, 0, 1));
+                    }
+                }
+                else
+                {
+                    MINIRE_WARNING("mesh has skins, but no skinningVector provided");
+                }
+
+                // fill the gap
+                size_t const residue = maxBones - (skinningVector ? skinningVector->size() : 0);
+                for(size_t i = 0; i < residue; ++i)
+                {
+                    result[offset++] = kFillers[0];
+                    result[offset++] = kFillers[1];
+                    result[offset++] = kFillers[2];
+                }
+            }
+
+            assert(offset == result.size());
+            return result;
+        }
     }
 
     // Materials::Brush::TextureUnitHelper //
@@ -150,7 +199,6 @@ namespace minire::rasterizer
 
     struct Materials::TemplateRenderingOutput
     {
-        AttribNames                     _attribNames;
         std::optional<std::string>      _uboName;
         BuiltinUniformNames             _builtinUniforms;
         std::unordered_set<std::string> _userUniforms;
@@ -159,32 +207,26 @@ namespace minire::rasterizer
 
     // Materials::Brush //
 
-    Materials::Brush::Brush(Textures const & textures,
+    Materials::Brush::Brush(Materials const & materials,
+                            Textures const & textures,
                             Ubo const & ubo,
+                            InstancedBuffersPool & instancedBuffersPool,
                             Materials::TemplateRenderingOutput const & tro,
                             material::Shaders && sources,
                             std::unique_ptr<nlohmann::json> && templateParams,
                             models::MeshFeatures const & meshFeatures,
                             Material::Sptr const & material)
-        : _textures(textures)
+        : _materials(materials)
+        , _textures(textures)
+        , _instancedBuffersPool(instancedBuffersPool)
         , _sources(std::move(sources))
         , _templateParams(std::move(templateParams))
         , _meshFeatures(meshFeatures)
         , _material(material)
         , _program(makeShaders(_sources, *_templateParams))
-        , _attribLocations(_program.getAttribLocation(tro._attribNames._vertex),
-                           _program.getAttribLocation(tro._attribNames._uv),
-                           _program.getAttribLocation(tro._attribNames._normal),
-                           _program.getAttribLocation(tro._attribNames._tangent),
-                           _program.getAttribLocation(tro._attribNames._joints),
-                           _program.getAttribLocation(tro._attribNames._weights))
-        , _modelUniform(_program.getUniformLocation(tro._builtinUniforms._model))
-        , _bonesUniform(_program.getUniformLocation(tro._builtinUniforms._bones))
         , _directionalLightsShadowMapsUniform(_program.getUniformLocation(tro._builtinUniforms._directionalLightsShadowMaps))
         , _pointLightsShadowMapsUniform(_program.getUniformLocation(tro._builtinUniforms._pointLightsShadowMaps))
-        , _emissiveFactorUniform(_program.getUniformLocation(tro._builtinUniforms._emissiveFactor))
         , _ambientLightUniform(_program.getUniformLocation(tro._builtinUniforms._ambientLight))
-        , _meshIdUniform(_program.getUniformLocation(tro._builtinUniforms._meshId))
         , _userUniforms(tro._userUniforms.cbegin(), tro._userUniforms.cend())
     {
         assert(_templateParams); // a bit late, but still
@@ -214,31 +256,11 @@ namespace minire::rasterizer
     }
 
     void Materials::Brush::setupBuiltinUniforms(TextureUnitHelper & textureUnitHelper,
-                                                glm::mat4 const & modelTransform,
                                                 glm::vec3 const & ambientLight,
-                                                glm::vec3 const & emissiveFactor,
                                                 material::TextureRefs const & directionalLightsShadowMaps,
-                                                material::TextureRefs const & pointLightsShadowMaps,
-                                                material::SkinningVector const & skinningVector,
-                                                uint32_t const meshId) const
+                                                material::TextureRefs const & pointLightsShadowMaps) const
     {
-        MINIRE_INVARIANT(skinningVector.empty() || (_bonesUniform >= 0 &&
-                                                    _attribLocations.jointsAttribute() >= 0),
-                         "mesh has skinningVector while mesh's program doesn't support skinning");
-
-        if (_modelUniform != -1)
-        {
-            assert(skinningVector.empty());
-            assert(_bonesUniform == -1);
-            _program.setUniform(_modelUniform, modelTransform);
-        }
-        else
-        {
-            assert(!skinningVector.empty());
-        }
-
         if (_ambientLightUniform != -1) _program.setUniform(_ambientLightUniform, ambientLight);
-        if (_emissiveFactorUniform != -1) _program.setUniform(_emissiveFactorUniform, emissiveFactor);
 
         // directional lights shadow maps
         if (_directionalLightsShadowMapsUniform != -1)
@@ -285,25 +307,7 @@ namespace minire::rasterizer
             }
             _program.setUniform(_pointLightsShadowMapsUniform, pointLightsSamplers);
         }
-
-        // data for skinning
-        if (!skinningVector.empty())
-        {
-            if (_bonesUniform != -1)
-            {
-                assert(skinningVector.size() <= rasterizer::Constants::kMaxBones);
-                assert(_modelUniform == -1);
-                _program.setUniform(_bonesUniform, skinningVector);
-            }
-        }
-        else
-        {
-            assert(_modelUniform != -1);
-        }
-
-        // object picking buffer
-        if (_meshIdUniform != -1) _program.setUniform(_meshIdUniform, meshId);
-   }
+    }
 
     void Materials::Brush::setupCustomUniforms(TextureUnitHelper & textureUnitHelper) const
     {
@@ -371,30 +375,126 @@ namespace minire::rasterizer
         }
     }
 
-    void Materials::Brush::prepareDrawing(glm::mat4 const & modelTransform,
-                                          glm::vec3 const & ambientLight,
-                                          glm::vec3 const & emissiveFactor,
-                                          material::TextureRefs const & directionalLightsShadowMaps,
-                                          material::TextureRefs const & pointLightsShadowMaps,
-                                          material::SkinningVector const & skinningVector,
-                                          uint32_t const meshId) const
+    void Materials::Brush::draw(UniquePrimitive const & uniquePrimitive,
+                                PrimitiveInstances const & primitiveInstances,
+                                glm::vec3 const & ambientLight,
+                                material::TextureRefs const & directionalLightsShadowMaps,
+                                material::TextureRefs const & pointLightsShadowMaps) const
     {
         _program.use();
 
         TextureUnitHelper textureUnitHelper(_program);
 
-        setupBuiltinUniforms(textureUnitHelper, modelTransform, ambientLight, emissiveFactor,
-                             directionalLightsShadowMaps, pointLightsShadowMaps, skinningVector, meshId);
- 
+        // setup common uniforms
+        setupBuiltinUniforms(textureUnitHelper, ambientLight, directionalLightsShadowMaps,
+                             pointLightsShadowMaps);
         setupCustomUniforms(textureUnitHelper);
+
+        // fetch VertexBuffer
+        opengl::VertexBuffer const & vertexBuffer =
+            uniquePrimitive._mesh.vertexBuffer(uniquePrimitive._primitiveIndex);
+
+        // perform drawing
+        // fetch VAO and additional VBO
+        opengl::VAO const & vao = vertexBuffer._vao;
+        vao.bind();
+
+        auto & fencedBuffers = _instancedBuffersPool.fetch();
+        opengl::VBO & vbo = fencedBuffers->_vbo;
+        opengl::SSBO & ssbo = fencedBuffers->_ssbo;
+
+        // upload VBO's contents
+        vbo.bind();
+        assert(primitiveInstances.size() == primitiveInstances._attribs.size());
+        if (GLsizeiptr const requiredSize = static_cast<GLsizeiptr>(
+                primitiveInstances.size() * sizeof(PrimitiveInstances::Attribs));
+            vbo.size() < requiredSize)
+        {
+            vbo.bufferData(requiredSize, primitiveInstances._attribs.data(), GL_DYNAMIC_DRAW);
+        }
+        else
+        {
+            vbo.bufferSubData(0, requiredSize, primitiveInstances._attribs.data());
+        }
+
+        // setup attributes in the VAO
+        GLsizei const stride = static_cast<GLsizei>(sizeof(PrimitiveInstances::Attribs));
+
+        if (_materials._modelAttrib != -1)
+        {
+           for (int i = 0; i < 4; ++i)
+           {
+                GLint const location = _materials._modelAttrib + i;
+                vao.enableAttrib(location);
+                size_t const offset = offsetof(PrimitiveInstances::Attribs, _transform) +
+                                      (i * sizeof(glm::vec4)); // NOTE: mat4 = 4 * vec4
+                vao.attribPointer(location, 4, GL_FLOAT, GL_FALSE, stride, offset);
+                vao.attribDivisor(location, 1);
+           }
+        }
+
+        if (_materials._emissiveFactorAttrib != -1)
+        {
+            vao.enableAttrib(_materials._emissiveFactorAttrib);
+            vao.attribPointer(_materials._emissiveFactorAttrib, 3, GL_FLOAT, GL_FALSE, stride,
+                              offsetof(PrimitiveInstances::Attribs, _emissiveFactor));
+            vao.attribDivisor(_materials._emissiveFactorAttrib, 1);
+        }
+
+        if (_materials._meshIdAttrib != -1)
+        {
+            vao.enableAttrib(_materials._meshIdAttrib);
+            vao.attribIPointer(_materials._meshIdAttrib, 1, GL_UNSIGNED_INT, stride,
+                               offsetof(PrimitiveInstances::Attribs, _opbId));
+            vao.attribDivisor(_materials._meshIdAttrib, 1);
+        }
+
+        // setup skinning vectors
+        if (_meshFeatures.hasSkin())
+        {
+            assert(primitiveInstances.size() == primitiveInstances._skinningVectors.size());
+            std::vector<glm::vec4> skinningVectors = flattenSkinningVectors(primitiveInstances._skinningVectors,
+                                                                            rasterizer::Constants::kMaxBones);
+            if (GLsizeiptr const requiredSize = static_cast<GLsizeiptr>(
+                    skinningVectors.size() * sizeof(glm::vec4));
+                ssbo.size() < requiredSize)
+            {
+                ssbo.bufferData(requiredSize, skinningVectors.data(), GL_DYNAMIC_DRAW);
+            }
+            else
+            {
+                ssbo.bufferSubData(0, requiredSize, skinningVectors.data());
+            }
+            ssbo.bindBufferBase(kSkinningVectrorBindingPoint);
+        }
+
+        // draw elements
+        vertexBuffer.drawElementsInstanced(primitiveInstances.size());
+
+        // create a fence
+        GLsync fence = ::glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        MINIRE_MAYBE_THROW_GL(glFenceSync);
+        fencedBuffers.setFence(fence);
     }
 
     // Materials //
 
     Materials::Materials(Textures const & textures,
-                         Ubo const & ubo)
+                         Ubo const & ubo,
+                         InstancedBuffersPool & instancedBuffersPool)
         : _textures(textures)
         , _ubo(ubo)
+        , _instancedBuffersPool(instancedBuffersPool)
+        , _locationsAllocator()
+        , _attribLocations(_locationsAllocator.allocate(1), // vertex, vec3
+                           _locationsAllocator.allocate(1), // uv, vec2
+                           _locationsAllocator.allocate(1), // normal, vec3
+                           _locationsAllocator.allocate(1), // tangent, vec3
+                           _locationsAllocator.allocate(1), // joints, uvec4
+                           _locationsAllocator.allocate(1)) // weights, vec4
+        , _modelAttrib(_locationsAllocator.allocate(4))             // mat4
+        , _emissiveFactorAttrib(_locationsAllocator.allocate(1))    // vec3
+        , _meshIdAttrib((_locationsAllocator.allocate(1)))          // uvec
     {}
 
     std::unique_ptr<nlohmann::json>
@@ -404,6 +504,20 @@ namespace minire::rasterizer
     {
         return std::make_unique<nlohmann::json>(nlohmann::json::object(
         {
+            // vertex attribute
+            {"minire_vertex_attrib_location", _attribLocations.vertexAttribute()},
+            {"minire_uv_attrib_location", _attribLocations.uvAttribute()},
+            {"minire_normal_attrib_location", _attribLocations.normalAttribute()},
+            {"minire_tangent_attrib_location", _attribLocations.tangentAttribute()},
+            {"minire_joints_attrib_location", _attribLocations.jointsAttribute()},
+            {"minire_weights_attrib_location", _attribLocations.weightsAttribute()},
+            {"minire_instanced_model_attrib_location", _modelAttrib},
+            {"minire_instanced_emissive_factor_attrib_location", _emissiveFactorAttrib},
+            {"minire_instanced_mesh_id_attrib_location", _meshIdAttrib},
+
+            // SSBOs
+            {"minire_skinning_ssbo_binding_point", kSkinningVectrorBindingPoint},
+
             // fragment output locations
             {"minire_color_output_location",    0},    // vec3, +1
             {"minire_mesh_id_output_location",  1},    // uint, +1
@@ -417,10 +531,10 @@ namespace minire::rasterizer
             {"minire_mesh_traits",
                 nlohmann::json::object(
                 {
-                    {"has_uv", meshFeatures.hasUv()},
-                    {"has_normal", meshFeatures.hasNormal()},
+                    {"has_uv",      meshFeatures.hasUv()},
+                    {"has_normal",  meshFeatures.hasNormal()},
                     {"has_tangent", meshFeatures.hasTangent()},
-                    {"has_skin", meshFeatures.hasSkin()},
+                    {"has_skin",    meshFeatures.hasSkin()},
                 })
             },
 
@@ -434,6 +548,9 @@ namespace minire::rasterizer
     //                 more specifically: matrixes, arrays, doubles (double, dvec).
     //                 Safe types are: float, int, uint, bool,
     //                                 (i/b/u)vec2, (i/b/u)vec3, (i/b/u)vec4 
+
+    // NOTE: since decision to enable instanced rendering is currently depends only on
+    //       meshFeatures, it is not required to add instancing flag into Materials::Key.
 
     Materials::Brush::Sptr Materials::getBrush(models::MeshFeatures const & meshFeatures,
                                                Material::Sptr const & material) const
@@ -482,61 +599,24 @@ namespace minire::rasterizer
                 }
             });
 
-        // Vertex attributes
-
-        env.add_void_callback("minire_set_vertex_attrib_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._attribNames._vertex); });
-
-        env.add_void_callback("minire_set_uv_attrib_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._attribNames._uv); });
-
-        env.add_void_callback("minire_set_normal_attrib_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._attribNames._normal); });
-
-        env.add_void_callback("minire_set_tangent_attrib_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._attribNames._tangent); });
-
-        env.add_void_callback("minire_set_joints_attrib_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._attribNames._joints); });
-
-        env.add_void_callback("minire_set_weights_attrib_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._attribNames._weights); });
-
         // UBO
 
         env.add_void_callback("minire_set_ubo_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._uboName); });
+            { setSetOnce(args, outputs._uboName); });
 
         // Uniforms
 
-        env.add_void_callback("minire_set_model_uniform_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._builtinUniforms._model); });
-
-        env.add_void_callback("minire_set_bones_uniform_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._builtinUniforms._bones); });
-
         env.add_void_callback("minire_set_directional_lights_shadow_maps_uniform_name", 1,
-                              [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._builtinUniforms._directionalLightsShadowMaps); });
+            [&outputs](inja::Arguments const & args)
+            { setSetOnce(args, outputs._builtinUniforms._directionalLightsShadowMaps); });
 
         env.add_void_callback("minire_set_point_lights_shadow_maps_uniform_name", 1,
-                              [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._builtinUniforms._pointLightsShadowMaps); });
-
-        env.add_void_callback("minire_set_emissive_factor_uniform_name", 1,
-                              [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._builtinUniforms._emissiveFactor); });
+            [&outputs](inja::Arguments const & args)
+            { setSetOnce(args, outputs._builtinUniforms._pointLightsShadowMaps); });
 
         env.add_void_callback("minire_set_ambient_light_uniform_name", 1,
-                              [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._builtinUniforms._ambientLight); });
-
-        env.add_void_callback("minire_set_mesh_id_uniform_name", 1,
-                              [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._builtinUniforms._meshId); });
-
-        env.add_void_callback("minire_set_ubo_name", 1, [&outputs](inja::Arguments const & args)
-                              { setSetOnce(args, outputs._uboName); });
+            [&outputs](inja::Arguments const & args)
+            { setSetOnce(args, outputs._builtinUniforms._ambientLight); });
 
         env.add_void_callback("minire_register_user_uniform", 1, [&outputs](inja::Arguments const & args)
         {
@@ -596,8 +676,8 @@ namespace minire::rasterizer
         }
 
         // build the brush and memoize it in cache
-        Brush::Sptr brush = std::make_shared<Brush>(_textures, _ubo, outputs,
-                                                    std::move(shadersSources),
+        Brush::Sptr brush = std::make_shared<Brush>(*this, _textures, _ubo, _instancedBuffersPool,
+                                                    outputs, std::move(shadersSources),
                                                     std::move(templateParams),
                                                     meshFeatures, material);
         MINIRE_DEBUG("a new brush issued (cache miss): material {}, slug: {}, h: {}",

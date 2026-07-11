@@ -5,43 +5,48 @@
 #include <opengl.hpp>
 
 #include <cassert>
-#include <memory>
 #include <stdexcept>
 
 namespace minire::opengl
 {
     class VAO
     {
-    public:
-        using Sptr = std::shared_ptr<VAO>;
-        using Uptr = std::unique_ptr<VAO>;
+        VAO(VAO const &) = delete;
+        VAO & operator=(VAO const &) = delete;
 
+    public:
         VAO()
             : _vaoId(0)
         {
-            MINIRE_GL(glGenVertexArrays, 1, &_vaoId);
-
-            bind();
-
-            MINIRE_INVARIANT(GL_TRUE == glIsVertexArray(_vaoId),
-                             "failed to generate VAO: {}", _vaoId);
+            try
+            {
+                MINIRE_GL(glGenVertexArrays, 1, &_vaoId);
+                bind();
+            }
+            catch(...)
+            {
+                if (_vaoId == _used) _used = 0;
+                ::glDeleteVertexArrays(1, &_vaoId);
+            }
         }
-
-        VAO(VAO const &) = delete;
-        VAO(VAO &&) = delete;
-        VAO & operator=(VAO const &) = delete;
-        VAO & operator=(VAO &&) = delete;
 
         ~VAO()
         {
-            if (glIsVertexArray(_vaoId))
-            {
-                if (_vaoId == _used)
-                {
-                    _used = 0;
-                }
-                glDeleteVertexArrays(1, &_vaoId);
-            }
+            if (_vaoId == _used) _used = 0;
+            ::glDeleteVertexArrays(1, &_vaoId);
+        }
+
+        VAO(VAO && other)
+            : _vaoId(other._vaoId)
+        {
+            other._vaoId = 0;
+        }
+
+        VAO & operator=(VAO && other)
+        {
+            VAO tmp(std::move(other));
+            std::swap(_vaoId, tmp._vaoId);
+            return *this;
         }
 
         // NOTE: Avoid direct call to glBindVertexArray,
@@ -90,6 +95,12 @@ namespace minire::opengl
             MINIRE_GL(glVertexAttribIPointer,
                       index, size, type, stride,
                       reinterpret_cast<const GLvoid*>(pointer));
+        }
+
+        void attribDivisor(GLuint index, GLuint divisor) const
+        {
+            bind();
+            MINIRE_GL(glVertexAttribDivisor, index, divisor);
         }
 
         static void unbind()

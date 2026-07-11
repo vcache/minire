@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <optional>
 #include <tuple>
 
 // TODO: set "LoadImageDataOption::preserve_channels" to avoid unnecessary components loading
@@ -123,13 +124,13 @@ namespace minire::utils
             }
         };
 
-        size_t requireAttr(::tinygltf::Mesh const & mesh,
-                           ::tinygltf::Primitive const & primitive,
-                           std::string const & name)
+        // If attribute exists, the index is guaranteed to be valid
+        std::optional<size_t> findAttr(::tinygltf::Mesh const & mesh,
+                                       ::tinygltf::Primitive const & primitive,
+                                       std::string const & name)
         {
             auto it = primitive.attributes.find(name);
-            MINIRE_INVARIANT(it != primitive.attributes.cend(),
-                             "no {} index attribute: {}", name, mesh.name);
+            if (it == primitive.attributes.cend()) return std::nullopt;
             MINIRE_INVARIANT(it->second >= 0, "bad {} index: {}, {}",
                                               name, it->second, mesh.name)
             return static_cast<size_t>(it->second);
@@ -399,7 +400,7 @@ namespace minire::utils
         // TODO: see glDrawArrays, glDrawRangeElements, glMultiDrawElements, or glMultiDrawArrays
         //       for cases w/o indeces and multiple primitives
         // TODO: Client implementations SHOULD support at least two texture coordinate sets, ...
-        // TODO: don't load texture automatically, since they might be controller via content::Manger
+        // TODO: don't load texture automatically, since they might be controller via content::Manager
         opengl::VertexBuffer createVertexBuffer(::tinygltf::Model const & model,
                                                 ::tinygltf::Mesh const & mesh,
                                                 ::tinygltf::Primitive const & primitive,
@@ -441,8 +442,11 @@ namespace minire::utils
             {
                 if (attribIndex == -1) continue;
 
-                size_t const accessorIndex = requireAttr(mesh, primitive, accessorName);
-                auto const & [accessor, bufferView] = createVbo(model, accessorIndex, GL_ARRAY_BUFFER, result, false);
+                std::optional<size_t> const accessorIndex = findAttr(mesh, primitive, accessorName);
+                if (!accessorIndex) continue;
+
+                auto const & [accessor, bufferView] = createVbo(model, *accessorIndex,
+                                                                GL_ARRAY_BUFFER, result, false);
 
                 MINIRE_INVARIANT(accessor.sparse.count == 0 && !accessor.sparse.isSparse,
                                  "sparse accessors aren't yet supported");
@@ -452,21 +456,21 @@ namespace minire::utils
                     result._aabb = calcAabb(accessor, mesh.name);
                 }
 
-                result._vao->enableAttrib(attribIndex);
+                result._vao.enableAttrib(attribIndex);
                 if (isIntegerType)
                 {
-                    result._vao->attribIPointer(attribIndex,
-                                                ::tinygltf::GetNumComponentsInType(accessor.type),
-                                                gltfComponentTypeToGlType(accessor.componentType),
-                                                bufferView.byteStride, accessor.byteOffset);
+                    result._vao.attribIPointer(attribIndex,
+                                               ::tinygltf::GetNumComponentsInType(accessor.type),
+                                               gltfComponentTypeToGlType(accessor.componentType),
+                                               bufferView.byteStride, accessor.byteOffset);
                 }
                 else
                 {
-                    result._vao->attribPointer(attribIndex,
-                                               ::tinygltf::GetNumComponentsInType(accessor.type),
-                                               gltfComponentTypeToGlType(accessor.componentType),
-                                               accessor.normalized ? GL_TRUE : GL_FALSE,
-                                               bufferView.byteStride, accessor.byteOffset);
+                    result._vao.attribPointer(attribIndex,
+                                              ::tinygltf::GetNumComponentsInType(accessor.type),
+                                              gltfComponentTypeToGlType(accessor.componentType),
+                                              accessor.normalized ? GL_TRUE : GL_FALSE,
+                                              bufferView.byteStride, accessor.byteOffset);
                 }
             }
 
@@ -554,7 +558,7 @@ namespace minire::utils
     std::vector<opengl::VertexBuffer>
     createVertexBuffers(::tinygltf::Model const & model,
                         size_t const meshIndex,
-                        std::vector<material::Locations> const & locationsForPrims)
+                        material::Locations const & locations)
     {
         // fetch the mesh
 
@@ -566,14 +570,12 @@ namespace minire::utils
 
         std::vector<opengl::VertexBuffer> result;
         result.reserve(mesh.primitives.size());
-        assert(locationsForPrims.size() == mesh.primitives.size());
 
         // iterate primitives
 
         for(size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
         {
             ::tinygltf::Primitive const & primitive = mesh.primitives[primitiveIndex];
-            material::Locations const & locations = locationsForPrims[primitiveIndex];
             result.emplace_back(createVertexBuffer(model, mesh, primitive,
                                                    locations.vertexAttribute(),
                                                    locations.uvAttribute(),

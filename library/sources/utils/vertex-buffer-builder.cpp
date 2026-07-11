@@ -149,12 +149,11 @@ namespace minire::utils
                         loadBufferData(b, vbo, convertUsage(usage)); // assuming it will bind the VBO
                     },
                     buffer._byteBuffer);
-                    assert(result->_vao);
-                    result->_vao->enableAttrib(attrIndex);
-                    result->_vao->attribPointer(attrIndex, buffer._components,
-                                                elementType(buffer),
-                                                buffer._normalized ? GL_TRUE : GL_FALSE,
-                                                0 /* stride */, buffer._offset);
+                    result->_vao.enableAttrib(attrIndex);
+                    result->_vao.attribPointer(attrIndex, buffer._components,
+                                               elementType(buffer),
+                                               buffer._normalized ? GL_TRUE : GL_FALSE,
+                                               0 /* stride */, buffer._offset);
                 },
 
                 [&result, &attrIndex](models::VertexBuffer::StridedBuffer const & buffer)
@@ -171,11 +170,11 @@ namespace minire::utils
                         newVbo.bufferData(buffer._byteBuffer->size(), buffer._byteBuffer->data(),
                                           convertUsage(buffer._usage)); // assuming it will bind the VBO
                     }
-                    result->_vao->enableAttrib(attrIndex);
-                    result->_vao->attribPointer(attrIndex, buffer._components,
-                                                bufferElementType(buffer._dataType),
-                                                buffer._normalized ? GL_TRUE : GL_FALSE,
-                                                buffer._stride, buffer._offset);
+                    result->_vao.enableAttrib(attrIndex);
+                    result->_vao.attribPointer(attrIndex, buffer._components,
+                                               bufferElementType(buffer._dataType),
+                                               buffer._normalized ? GL_TRUE : GL_FALSE,
+                                               buffer._stride, buffer._offset);
                 },
             }, buffer);
         };

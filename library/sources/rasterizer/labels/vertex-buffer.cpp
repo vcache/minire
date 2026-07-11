@@ -115,36 +115,36 @@ namespace minire::rasterizer::labels
     // VertexBuffer //
 
     VertexBuffer::VertexBuffer(std::vector<Vertex> const & vertices)
-        : _vao(std::make_shared<opengl::VAO>())
-        , _vbo(_vao, GL_ARRAY_BUFFER)
+        : _vao()
+        , _vbo(GL_ARRAY_BUFFER)
         , _vertices(vertices.size())
     {
         size_t constexpr stride = sizeof(Vertex);
         size_t pointer = 0;
 
         // layout(location = 0) in vec2 bznkPos;
-        _vao->enableAttrib(0);
-        _vao->attribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, pointer);
+        _vao.enableAttrib(0);
+        _vao.attribPointer(0, 2, GL_FLOAT, GL_FALSE, stride, pointer);
         pointer += sizeof(Vertex::_pos);
 
         // layout(location = 1) in vec2 bznkUv;
-        _vao->enableAttrib(1);
-        _vao->attribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, pointer);
+        _vao.enableAttrib(1);
+        _vao.attribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, pointer);
         pointer += sizeof(Vertex::_uv);
 
         // layout(location = 2) in vec4 bznkFgColor;
-        _vao->enableAttrib(2);
-        _vao->attribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, pointer);
+        _vao.enableAttrib(2);
+        _vao.attribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, pointer);
         pointer += sizeof(Vertex::_fgColor);
 
         // layout(location = 3) in vec4 bznkBgColor;
-        _vao->enableAttrib(3);
-        _vao->attribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, pointer);
+        _vao.enableAttrib(3);
+        _vao.attribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, pointer);
         pointer += sizeof(Vertex::_bgColor);
 
         // layout(location = 4) in uint bznkFont;
-        _vao->enableAttrib(4);
-        _vao->attribIPointer(4, 1, GL_UNSIGNED_INT, stride, pointer);
+        _vao.enableAttrib(4);
+        _vao.attribIPointer(4, 1, GL_UNSIGNED_INT, stride, pointer);
         pointer += sizeof(Vertex::_font);
 
         // upload vertices data

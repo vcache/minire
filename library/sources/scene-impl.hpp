@@ -664,7 +664,7 @@ namespace minire
     private:
         void revalidate(Node *, Node::Mask);
         void actualizeViewpoint();
-        material::SkinningVector makeSkinningVector(MeshLeaf const &) const;
+        material::SkinningVectorSptr makeSkinningVector(MeshLeaf const &) const;
 
         template<typename ItemType>
         static void setParent(ItemType &, scene::Node::Sptr const &);

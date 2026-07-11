@@ -2,6 +2,9 @@
 
 #include <material/types.hpp>
 #include <opengl/program.hpp>
+#include <rasterizer/culled-objects.hpp>
+#include <rasterizer/instanced-buffers.hpp>
+#include <rasterizer/locations-allocator.hpp>
 #include <rasterizer/textures.hpp>
 
 #include <minire/material.hpp>
@@ -28,7 +31,10 @@ namespace minire::rasterizer
 
     public:
         explicit Materials(Textures const & textures,
-                           Ubo const & ubo);
+                           Ubo const & ubo,
+                           InstancedBuffersPool & instancedBuffersPool);
+
+        material::Locations const & locations() const { return _attribLocations; }
 
     public:
         class Brush
@@ -37,23 +43,22 @@ namespace minire::rasterizer
             using Sptr = std::shared_ptr<Brush>;
             using Wptr = std::weak_ptr<Brush>;
 
-            explicit Brush(Textures const & textures,
+            explicit Brush(Materials const & materials,
+                           Textures const & textures,
                            Ubo const & ubo,
+                           InstancedBuffersPool & instancedBuffersPool,
                            TemplateRenderingOutput const & tro,
                            material::Shaders && sources,
                            std::unique_ptr<nlohmann::json> && templateParams,
                            models::MeshFeatures const & meshFeatures,
                            Material::Sptr const & material);
 
-            void prepareDrawing(glm::mat4 const & modelTransform,
-                                glm::vec3 const & ambientLight,
-                                glm::vec3 const & emissiveFactor,
-                                material::TextureRefs const & directionalLightsShadowMaps,
-                                material::TextureRefs const & pointLightsShadowMaps,
-                                material::SkinningVector const & skinningVector,
-                                uint32_t const meshId) const;
-
-            material::Locations const & locations() const { return _attribLocations; }
+            // TODO: some parameters can be optional!
+            void draw(UniquePrimitive const &,
+                      PrimitiveInstances const &,
+                      glm::vec3 const & ambientLight,
+                      material::TextureRefs const & directionalLightsShadowMaps,
+                      material::TextureRefs const & pointLightsShadowMaps) const;
 
             Material::Sptr const & material() const { return _material; }
 
@@ -61,37 +66,27 @@ namespace minire::rasterizer
             class TextureUnitHelper;
 
             void setupBuiltinUniforms(TextureUnitHelper & textureUnitHelper,
-                                      glm::mat4 const & modelTransform,
                                       glm::vec3 const & ambientLight,
-                                      glm::vec3 const & emissiveFactor,
                                       material::TextureRefs const & directionalLightsShadowMaps,
-                                      material::TextureRefs const & pointLightsShadowMaps,
-                                      material::SkinningVector const & skinningVector,
-                                      uint32_t const meshId) const;
+                                      material::TextureRefs const & pointLightsShadowMaps) const;
 
             void setupCustomUniforms(TextureUnitHelper & textureUnitHelper) const;
 
         private:
+            Materials const               & _materials;
             Textures const                & _textures;
+            InstancedBuffersPool &          _instancedBuffersPool;
             material::Shaders const         _sources;
             std::unique_ptr<nlohmann::json> _templateParams;
             models::MeshFeatures const      _meshFeatures;
             Material::Sptr                  _material;
             opengl::Program                 _program;
 
-            // Vertex Attributes locations
-
-            material::Locations const       _attribLocations;
-
             // Builtin Uniform prescence
 
-            GLint const _modelUniform;
-            GLint const _bonesUniform;
-            GLint const _directionalLightsShadowMapsUniform;
-            GLint const _pointLightsShadowMapsUniform;
-            GLint const _emissiveFactorUniform;
-            GLint const _ambientLightUniform;
-            GLint const _meshIdUniform;
+            GLint const                     _directionalLightsShadowMapsUniform;
+            GLint const                     _pointLightsShadowMapsUniform;
+            GLint const                     _ambientLightUniform;
 
             // Custom Uniforms
 
@@ -123,8 +118,21 @@ namespace minire::rasterizer
                               models::MeshFeatures>;
         using Store = std::unordered_map<Key, Brush::Wptr>;
 
-        Textures const & _textures;
-        Ubo const &      _ubo;
-        mutable Store    _store;
+        Textures const          & _textures;
+        Ubo const               & _ubo;
+        InstancedBuffersPool    & _instancedBuffersPool;
+
+        // Vertex Attributes locations,
+        // must be the same for all brushes
+
+        LocationsAllocator        _locationsAllocator;
+        material::Locations const _attribLocations;
+        GLint const               _modelAttrib;
+        GLint const               _emissiveFactorAttrib;
+        GLint const               _meshIdAttrib;
+
+        mutable Store             _store;
+
+        friend class Brush;
     };
 }
