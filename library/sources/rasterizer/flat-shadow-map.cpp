@@ -2,6 +2,7 @@
 
 #include <rasterizer/filters/gaussian-blur.hpp>
 #include <rasterizer/mesh.hpp>
+#include <utils/culling-test.hpp>
 #include <utils/frustum.hpp>
 
 #include <minire/errors.hpp>
@@ -384,10 +385,10 @@ namespace minire::rasterizer
         return lightProjection * lightView;
     }
 
-    glm::mat4 FlatShadowMap::perform(CulledPrimitives const & primitives,
-                                     glm::vec3 const & lightPosition,
+    glm::mat4 FlatShadowMap::perform(glm::vec3 const & lightPosition,
                                      glm::vec3 const & lightDirection,
-                                     utils::ViewFrustum const & viewFrustum)
+                                     utils::ViewFrustum const & viewFrustum,
+                                     CullFunction cullFunction)
     {
         // setup GL mode flags
         MINIRE_GL(glEnable, GL_DEPTH_TEST);
@@ -413,6 +414,12 @@ namespace minire::rasterizer
         glm::mat4 const lightVP = buildVP(lightPosition,
                                           glm::normalize(lightDirection),
                                           viewFrustum);
+
+        // cull models against this light source
+        utils::ViewFrustum const & lightFustum = utils::makeFrustum(lightVP);
+        utils::SatPlanes const & satPlanes = utils::precalcSatPlanes(lightFustum);
+        assert(cullFunction);
+        rasterizer::CulledPrimitives const & primitives = cullFunction(satPlanes);
 
         // setup material-specific unifroms
         assert(_material);

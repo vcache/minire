@@ -9,6 +9,7 @@
 #include <opengl/ubo.hpp>
 #include <rasterizer/binding-points.hpp>
 #include <scene-impl.hpp>
+#include <utils/culling-test.hpp>
 #include <utils/frustum.hpp>
 
 #include <glm/gtx/transform.hpp>
@@ -459,11 +460,12 @@ namespace minire
     }
 
     rasterizer::CulledPrimitives
-    Rasterizer::cullPrimitives(SceneImpl const & scene)
+    Rasterizer::cullPrimitives(SceneImpl const & scene,
+                               utils::SatPlanes const & satPlanes)
     {
         rasterizer::CulledPrimitives result;
         // TODO: result.reserve
-        scene.cullModels(
+        scene.cullModels(satPlanes,
             [&result] (rasterizer::Mesh const & mesh,
                        glm::vec3 const & emissiveFactor,
                        glm::mat4 const & transform,
@@ -496,14 +498,12 @@ namespace minire
     {
         auto directionalLights = cullDirectionalLights(scene);
         auto pointLights = cullPointLights(scene);
-        auto primitives = cullPrimitives(scene);
-        shadowPass(scene, primitives, directionalLights, pointLights);
-        colorPass(scene, primitives, directionalLights, pointLights);
+        shadowPass(scene, directionalLights, pointLights);
+        colorPass(scene, directionalLights, pointLights);
         draw2d();
     }
 
     void Rasterizer::shadowPass(SceneImpl const & scene,
-                                rasterizer::CulledPrimitives const & culledPrimitives,
                                 rasterizer::CulledDirectionalLights & culledDirectionalLights,
                                 rasterizer::CulledPointLights & culledPointLights)
     {
@@ -516,8 +516,9 @@ namespace minire
             if (light._shadowMap)
             {
                 light._viewProjection = light._shadowMap->perform(
-                    culledPrimitives, light._position, light._direction,
-                    viewFrustum);
+                    light._position, light._direction, viewFrustum,
+                    [this, &scene](utils::SatPlanes const & satPlanes)
+                    { return cullPrimitives(scene, satPlanes); });
             }
             else
             {
@@ -531,7 +532,9 @@ namespace minire
             if (light._shadowMap)
             {
                 light._shadowMapFarPlane = light._shadowMap->perform(
-                    culledPrimitives, light._position, viewFrustum);
+                    light._position, viewFrustum,
+                    [this, &scene](utils::SatPlanes const & satPlanes)
+                    { return cullPrimitives(scene, satPlanes); });
             }
             else
             {
@@ -541,10 +544,14 @@ namespace minire
     }
 
     void Rasterizer::colorPass(SceneImpl const & scene,
-                               rasterizer::CulledPrimitives const & culledPrimitives,
                                rasterizer::CulledDirectionalLights const & culledDirectionalLights,
                                rasterizer::CulledPointLights const & culledPointLights)
     {
+        // cull primitives againts camera's frustum
+        utils::ViewFrustum const & viewFrustum = scene.viewpoint().viewFrustum();
+        utils::SatPlanes const & satPlanes = utils::precalcSatPlanes(viewFrustum);
+        rasterizer::CulledPrimitives const & culledPrimitives = cullPrimitives(scene, satPlanes);
+
         // setup Primary FBO
         _primaryFbo.bind();
 

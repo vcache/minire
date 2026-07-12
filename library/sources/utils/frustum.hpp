@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
@@ -39,4 +40,7 @@ namespace minire::utils
 
         glm::vec3 center() const;
     };
+
+    // viewProject = projection * view
+    ViewFrustum makeFrustum(glm::mat4 const & viewProject);
 }

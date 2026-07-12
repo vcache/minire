@@ -12,6 +12,8 @@
 #include <cassert>
 #include <memory>
 
+namespace minire::utils { class SatPlanes; }
+
 namespace minire::rasterizer
 {
     class Materials;
@@ -26,15 +28,17 @@ namespace minire::rasterizer
 
     public:
         using Sptr = std::shared_ptr<CubeShadowMap>;
+        using CullFunction =
+            std::function<rasterizer::CulledPrimitives(utils::SatPlanes const &)>;
 
         explicit CubeShadowMap(Materials const & materials,
                                models::ShadowParams const &);
         ~CubeShadowMap();
 
         // Return far plane value
-        float perform(CulledPrimitives const &,
-                      glm::vec3 const & lightPosition,
-                      utils::ViewFrustum const &);
+        float perform(glm::vec3 const & lightPosition,
+                      utils::ViewFrustum const &,
+                      CullFunction cullFunction);
 
         opengl::Texture const & texture() const
         {

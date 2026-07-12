@@ -67,11 +67,9 @@ namespace minire
         // TODO: consider perfomance issues of utils::cullingTest,
         //       maybe it is more performant without this test?
         template<typename Callable>
-        void cullModels(Callable callable) const
+        void cullModels(utils::SatPlanes const & satPlanes,
+                        Callable callable) const
         {
-            utils::ViewFrustum const & viewFrustum = _viewpoint.viewFrustum();
-            utils::SatPlanes const & satPlanes = utils::precalcSatPlanes(viewFrustum);
-
             auto it = _meshLeaves.begin();
             while(it != _meshLeaves.end())
             {

@@ -30,6 +30,7 @@
 #include <glm/mat4x4.hpp>
 
 namespace minire::content { class Manager; }
+namespace minire::utils { class SatPlanes; }
 
 namespace minire
 {
@@ -73,16 +74,15 @@ namespace minire
     private:
         rasterizer::CulledDirectionalLights cullDirectionalLights(SceneImpl const &);
         rasterizer::CulledPointLights cullPointLights(SceneImpl const &);
-        rasterizer::CulledPrimitives cullPrimitives(SceneImpl const &);
+        rasterizer::CulledPrimitives cullPrimitives(SceneImpl const &,
+                                                    utils::SatPlanes const &);
 
     private:
         void shadowPass(SceneImpl const &,
-                        rasterizer::CulledPrimitives const &,
                         rasterizer::CulledDirectionalLights &,
                         rasterizer::CulledPointLights &);
 
         void colorPass(SceneImpl const &,
-                       rasterizer::CulledPrimitives const &,
                        rasterizer::CulledDirectionalLights const &,
                        rasterizer::CulledPointLights const &);
         void draw3d(SceneImpl const &,

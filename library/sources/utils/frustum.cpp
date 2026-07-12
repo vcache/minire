@@ -55,4 +55,40 @@ namespace minire::utils
         result /= static_cast<float>(_vertices.size());
         return result;
     }
+
+    ViewFrustum makeFrustum(glm::mat4 const & viewProject)
+    {
+        glm::mat4 const inversed = glm::inverse(viewProject);
+        auto invProject = [&inversed](glm::vec4 const & ndcVertex)
+        {
+            // TODO: what if worldVertex.w == 0
+            glm::vec4 worldVertex = inversed * ndcVertex;
+            return glm::vec3(worldVertex.x / worldVertex.w,
+                             worldVertex.y / worldVertex.w,
+                             worldVertex.z / worldVertex.w);
+        };
+ 
+        // NOTE: some code is relying on this specific order of vertices,
+        //       they must be changed. See cullingTest() function.
+        return utils::ViewFrustum
+        {
+            ._vertices =
+            {
+                // Near
+                invProject(glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-left
+                invProject(glm::vec4(-1.0f,  1.0f, -1.0f, 1.0f)),   // top-left
+                invProject(glm::vec4( 1.0f,  1.0f, -1.0f, 1.0f)),   // top-right
+                invProject(glm::vec4( 1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-right
+ 
+                // Far
+                invProject(glm::vec4(-1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-left
+                invProject(glm::vec4(-1.0f,  1.0f,  1.0f, 1.0f)),   // top-left
+                invProject(glm::vec4( 1.0f,  1.0f,  1.0f, 1.0f)),   // top-right
+                invProject(glm::vec4( 1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-right
+            },
+            ._nearPlane = inversed * glm::vec4(0.0f, 0.0f, -1.0f, 1.0f),
+            ._farPlane  = inversed * glm::vec4(0.0f, 0.0f,  1.0f, 1.0F),
+        };
+
+    }
 }

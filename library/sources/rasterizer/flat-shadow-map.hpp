@@ -11,9 +11,11 @@
 #include <glm/vec3.hpp>
 
 #include <cassert>
+#include <functional>
 #include <memory>
 
 namespace minire::rasterizer::filters { class GaussianBlur; }
+namespace minire::utils { class SatPlanes; }
 
 namespace minire::rasterizer
 {
@@ -29,16 +31,18 @@ namespace minire::rasterizer
 
     public:
         using Sptr = std::shared_ptr<FlatShadowMap>;
+        using CullFunction =
+            std::function<rasterizer::CulledPrimitives(utils::SatPlanes const &)>;
 
         explicit FlatShadowMap(Materials const & materials,
                                models::ShadowParams const &);
         ~FlatShadowMap();
 
         // Returns light-space VP-matrix
-        glm::mat4 perform(CulledPrimitives const &,
-                          glm::vec3 const & lightPosition,
+        glm::mat4 perform(glm::vec3 const & lightPosition,
                           glm::vec3 const & lightDirection,
-                          utils::ViewFrustum const &);
+                          utils::ViewFrustum const &,
+                          CullFunction cullFunction);
 
         opengl::Texture const & texture() const
         {

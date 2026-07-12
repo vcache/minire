@@ -431,9 +431,9 @@ namespace minire::rasterizer
         }
     }
 
-    float CubeShadowMap::perform(CulledPrimitives const & primitives,
-                                 glm::vec3 const & lightPosition,
-                                 utils::ViewFrustum const & viewFrustum)
+    float CubeShadowMap::perform(glm::vec3 const & lightPosition,
+                                 utils::ViewFrustum const & viewFrustum,
+                                 CullFunction cullFunction)
     {
         // setup GL mode flags
         MINIRE_GL(glEnable, GL_DEPTH_TEST);
@@ -452,6 +452,24 @@ namespace minire::rasterizer
         // calculate planes and light VP
         auto const [near, far] = calcNearFar(viewFrustum);
         CubeVPs const lightVPs = buildVPs(lightPosition, near, far);
+
+        // cull models against this light source
+        utils::SatPlanes const satPlanes
+        {
+            ._min = lightPosition - glm::vec3(far),
+            ._max = lightPosition + glm::vec3(far),
+            ._planes =
+            {
+                glm::vec4( 1.0f,  0.0f,  0.0f, -(lightPosition.x + far)), // +X plane
+                glm::vec4(-1.0f,  0.0f,  0.0f,  (lightPosition.x - far)), // -X plane
+                glm::vec4( 0.0f,  1.0f,  0.0f, -(lightPosition.y + far)), // +Y plane
+                glm::vec4( 0.0f, -1.0f,  0.0f,  (lightPosition.y - far)), // -Y plane
+                glm::vec4( 0.0f,  0.0f,  1.0f, -(lightPosition.z + far)), // +Z plane
+                glm::vec4( 0.0f,  0.0f, -1.0f,  (lightPosition.z - far))  // -Z plane
+            },
+        };
+        assert(cullFunction);
+        rasterizer::CulledPrimitives const & primitives = cullFunction(satPlanes);
 
         // setup material-specific unifroms
         assert(_material);
