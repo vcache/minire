@@ -27,6 +27,10 @@
 
 #include <minire/material.hpp>
 
+#ifndef NDEBUG
+#   include <minire/instrumentation/histogram.hpp>
+#endif
+
 #include <glm/mat4x4.hpp>
 
 namespace minire::content { class Manager; }
@@ -146,5 +150,10 @@ namespace minire
 
         size_t                           _screenWidth;
         size_t                           _screenHeight;
+
+#       ifndef NDEBUG
+        instrumentation::Histogram<>    _statistics;
+#       endif
+
     };
 }

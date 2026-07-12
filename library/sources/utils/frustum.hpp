@@ -10,7 +10,16 @@ namespace minire::utils
     struct ViewFrustum
     {
         // vertices of a frustum in a World coordinates,
-        // (x, y, z) divided by w
+        // (x, y, z) divided by w;
+        // Semantics of vertices is following:
+        // 0: Near plane bottom-left
+        // 1: Near plane top-left
+        // 2: Near plane top-right
+        // 3: Near plane bottom-right
+        // 4: Far plane bottom-left
+        // 5: Far plane top-left
+        // 6: Far plane top-right
+        // 7: Far plane bottom-right
         std::array<glm::vec3, 8> _vertices;
 
         // additionally, unprojected near/far planes,

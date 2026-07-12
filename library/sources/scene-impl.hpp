@@ -9,8 +9,10 @@
 #include <minire/scene.hpp>
 
 #include <material/types.hpp>
+#include <rasterizer/mesh.hpp>
 #include <scene-impl/animations.hpp>
 #include <scene-impl/viewpoint.hpp>
+#include <utils/culling-test.hpp>
 #include <utils/lerpable.hpp>
 
 #include <list>
@@ -21,7 +23,6 @@
 
 namespace minire::content { class Manager; }
 namespace minire::rasterizer { class Billboard; }
-namespace minire::rasterizer { class Mesh; }
 
 namespace minire
 {
@@ -66,6 +67,7 @@ namespace minire
         template<typename Callable>
         void cullModels(Callable callable) const
         {
+            utils::ViewFrustum const & viewFrustum = _viewpoint.viewFrustum();
             auto it = _meshLeaves.begin();
             while(it != _meshLeaves.end())
             {
@@ -81,10 +83,11 @@ namespace minire
 
                         MINIRE_INVARIANT(parent, "a mesh doesn't have a parent");
                         assert(parent->hasGlobalTransform());
-                        if (parent->_effectiveVisible)
+                        assert(mesh->_mesh);
+                        if (parent->_effectiveVisible &&
+                            utils::cullingTest(mesh->_mesh->aabb(), viewFrustum, parent->_globalTransform))
                         {
                             // perform rendering
-                            assert(mesh->_mesh);
                             callable(*mesh->_mesh, mesh->emissiveFactor(),
                                      parent->_globalTransform,
                                      makeSkinningVector(*mesh),
@@ -238,6 +241,12 @@ namespace minire
             }
             return index;
         }
+
+    public:
+        size_t meshesCount() const { return _meshLeaves.size(); }
+        size_t billboardsCount() const { return _billboardsLeaves.size(); }
+        size_t directionalLightsCount() const { return _directionalLightLeaves.size(); }
+        size_t pointLightsCount() const { return _pointLightLeaves.size(); }
 
     private:
         class OpbIdHolder;

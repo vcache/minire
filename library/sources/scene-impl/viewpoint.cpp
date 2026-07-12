@@ -95,6 +95,8 @@ namespace minire::scene
                              worldVertex.z / worldVertex.w);
         };
 
+        // NOTE: some code is relying on this specific order of vertices,
+        //       they must be changed. See cullingTest() function.
         return utils::ViewFrustum
         {
             ._vertices = {
