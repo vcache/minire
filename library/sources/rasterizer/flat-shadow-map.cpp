@@ -15,7 +15,7 @@
 
 #include <cassert>
 #include <limits>
-#include <tuple>
+#include <optional>
 
 namespace minire::rasterizer
 {
@@ -93,18 +93,33 @@ namespace minire::rasterizer
             }, method);
         }
 
-        struct Uniforms
+        struct UniformIndeces
         {
-            static constexpr char kFactorName[] = "kFactor";
-            static constexpr char kLightMatrixName[] = "bznkLightMatrix";
+            static constexpr size_t kNoIndex = std::numeric_limits<size_t>::max();
 
-            material::UserUniformTracker<float, kFactorName>          _factor;
-            material::UserUniformTracker<glm::mat4, kLightMatrixName> _lightMatrix;
+            size_t _kFactor         = kNoIndex;
+            size_t _bznkLightMatrix = kNoIndex;
 
-            explicit Uniforms(material::UserUniforms & userUniforms)
-                : _factor(userUniforms)
-                , _lightMatrix(userUniforms)
-            {}
+            explicit UniformIndeces(material::UniformNames const & names)
+            {
+                for(size_t i = 0; i < names.size(); ++i)
+                {
+                    std::string const & name = names[i];
+
+                    if ("kFactor" == name)
+                    {
+                        _kFactor = i;
+                    }
+                    else if ("bznkLightMatrix" == name)
+                    {
+                        _bznkLightMatrix = i;
+                    }
+                    else
+                    {
+                        MINIRE_THROW("unexpected user uniform: \"{}\"", name);
+                    }
+                }
+            }
         };
 
     public:
@@ -122,13 +137,27 @@ namespace minire::rasterizer
             };
         }
 
-        void updateUserUniforms(material::UserUniforms & userUniforms) const override
+        material::UniformValues const &
+        updateUserUniforms(material::UniformNames const & uniformsNames,
+                           models::TextureResolver const &) const override
         {
-            Uniforms * uniforms = userUniforms.getOrMakeUserData<Uniforms>(userUniforms);
-            assert(uniforms);
+            if (!_uniformIndeces) _uniformIndeces.emplace(uniformsNames);
+            _uniformValues.resize(uniformsNames.size());
 
-            if (_factor) uniforms->_factor.set(*_factor);
-            uniforms->_lightMatrix.set(_lightMatrix);
+            assert(_uniformIndeces);
+
+            // kFactor
+            if (_uniformIndeces->_kFactor != UniformIndeces::kNoIndex)
+            {
+                assert(_uniformIndeces->_kFactor < _uniformValues.size());
+                _uniformValues[_uniformIndeces->_kFactor] = _factor;
+            }
+
+            // bznkLightMatrix
+            assert(_uniformIndeces->_bznkLightMatrix < _uniformValues.size());
+            _uniformValues[_uniformIndeces->_bznkLightMatrix] = _lightMatrix;
+
+            return _uniformValues;
         }
 
         std::string slugImpl() const override
@@ -144,14 +173,17 @@ namespace minire::rasterizer
         {}
 
         void setFactor(float v) { _factor = v; }
-        void unsetFactor() { _factor.reset(); }
         void setLightMatrix(glm::mat4 const & v) { _lightMatrix = v; }
 
     private:
-        models::shadow_params::Method const _method;
-        size_t const                        _instanceKey;
-        std::optional<float>                _factor;
-        glm::mat4                           _lightMatrix;
+        models::shadow_params::Method const   _method;
+        size_t const                          _instanceKey;
+
+        mutable std::optional<UniformIndeces> _uniformIndeces;
+        mutable material::UniformValues       _uniformValues;
+
+        float                                 _factor;
+        glm::mat4                             _lightMatrix;
     };
 
     // FlatShadowMap //
@@ -387,7 +419,7 @@ namespace minire::rasterizer
         _material->setLightMatrix(lightVP);
         std::visit(utils::Overloaded
         {
-            [this](models::shadow_params::method::Standard const &) { _material->unsetFactor(); },
+            [this](models::shadow_params::method::Standard const &) { },
             [this](models::shadow_params::method::ESM const & v)    { _material->setFactor(v._factor); },
             [this](models::shadow_params::method::LogESM const & v) { _material->setFactor(v._factor); },
         }, _shadowParams._method);
@@ -408,7 +440,8 @@ namespace minire::rasterizer
             brush->draw(uniquePrimitive, primitiveInstances,
                         glm::vec3() /* ambientLight */,
                         {} /* directionalLightsShadowMaps */,
-                        {} /* pointLightsShadowMaps */);
+                        {} /* pointLightsShadowMaps */,
+                        _material);
         }
 
         // tidy up

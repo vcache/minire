@@ -54,6 +54,14 @@ namespace minire::rasterizer
             return *_primitives[primitiveIndex]._buffer;
         }
 
+        // Primary material are Mesh-specific material for color pass
+        Material const & material(size_t const primitiveIndex) const
+        {
+            assert(primitiveIndex < _primitives.size());
+            assert(_primitives[primitiveIndex]._material);
+            return *_primitives[primitiveIndex]._material;
+        }
+
         // Primary brushes are Mesh-specific brushes for color pass
         Materials::Brush const & brush(size_t const primitiveIndex) const
         {
@@ -81,13 +89,16 @@ namespace minire::rasterizer
             //              or UV-based animations.
             std::shared_ptr<opengl::VertexBuffer> _buffer;
             models::MeshFeatures const            _meshFeatures;
+            Material::Sptr                        _material;
             Materials::Brush::Sptr                _brush;
 
             explicit Primitive(std::shared_ptr<opengl::VertexBuffer> buffer,
                                models::MeshFeatures const & meshFeatures,
+                               Material::Sptr const & material,
                                Materials::Brush::Sptr const & brush)
                 : _buffer(std::move(buffer))
                 , _meshFeatures(meshFeatures)
+                , _material(material)
                 , _brush(brush)
             {}
         };

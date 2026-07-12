@@ -50,27 +50,27 @@ namespace minire::rasterizer
                            TemplateRenderingOutput const & tro,
                            material::Shaders && sources,
                            std::unique_ptr<nlohmann::json> && templateParams,
-                           models::MeshFeatures const & meshFeatures,
-                           Material::Sptr const & material);
+                           models::MeshFeatures const & meshFeatures);
 
             // TODO: some parameters can be optional!
             void draw(UniquePrimitive const &,
                       PrimitiveInstances const &,
                       glm::vec3 const & ambientLight,
                       material::TextureRefs const & directionalLightsShadowMaps,
-                      material::TextureRefs const & pointLightsShadowMaps) const;
+                      material::TextureRefs const & pointLightsShadowMaps,
+                      Material::Sptr const & materialOverride = {}) const;
 
-            Material::Sptr const & material() const { return _material; }
+            class TextureUnitHelper;
 
         private:
-            class TextureUnitHelper;
 
             void setupBuiltinUniforms(TextureUnitHelper & textureUnitHelper,
                                       glm::vec3 const & ambientLight,
                                       material::TextureRefs const & directionalLightsShadowMaps,
                                       material::TextureRefs const & pointLightsShadowMaps) const;
 
-            void setupCustomUniforms(TextureUnitHelper & textureUnitHelper) const;
+            void setupCustomUniforms(Material const & material,
+                                     TextureUnitHelper & textureUnitHelper) const;
 
         private:
             Materials const               & _materials;
@@ -79,7 +79,6 @@ namespace minire::rasterizer
             material::Shaders const         _sources;
             std::unique_ptr<nlohmann::json> _templateParams;
             models::MeshFeatures const      _meshFeatures;
-            Material::Sptr                  _material;
             opengl::Program                 _program;
 
             // Builtin Uniform prescence
@@ -90,15 +89,8 @@ namespace minire::rasterizer
 
             // Custom Uniforms
 
-            struct UserUniformMeta
-            {
-                Textures::Texture::Sptr _texture;
-                content::Id             _contentId;
-                int const               _location;
-            };
-
-            mutable material::UserUniforms       _userUniforms;
-            mutable std::vector<UserUniformMeta> _userUniformMeta;
+            material::UniformNames const    _userUniformNames;
+            std::vector<GLint> const        _userUniformLocations;
         };
 
         Brush::Sptr getBrush(models::MeshFeatures const &,
@@ -109,6 +101,9 @@ namespace minire::rasterizer
         makeBasicTemplateParams(models::MeshFeatures const &,
                                 std::string const & slug,
                                 std::string const & name) const;
+
+        // just a workaround for better incapsulation
+        static void bindTexture(models::TextureHandle const &);
 
     private:
         // NOTE: The should be dependant on basic template parameters,
@@ -134,5 +129,6 @@ namespace minire::rasterizer
         mutable Store             _store;
 
         friend class Brush;
+        friend class Brush::TextureUnitHelper;
     };
 }

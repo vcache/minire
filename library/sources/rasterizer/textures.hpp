@@ -2,6 +2,7 @@
 
 #include <minire/content/id.hpp>
 #include <minire/models/sampler.hpp>
+#include <minire/models/texture-handle.hpp>
 
 #include <opengl/texture.hpp>
 #include <rasterizer/textures/id.hpp>
@@ -16,9 +17,11 @@ namespace minire::rasterizer
     class Resources;
 
     class Textures
+        : public models::TextureResolver
     {
     public:
         class Texture
+            : public models::TextureHandle
         {
         private:
             Texture() = delete;
@@ -37,7 +40,7 @@ namespace minire::rasterizer
                              models::Sampler const &,
                              bool mipmaps);
 
-            void bind() const { _texture.bind(); }
+            void bind() const override { _texture.bind(); }
 
             size_t width() const { return _width; }
 
@@ -79,6 +82,9 @@ namespace minire::rasterizer
             return contentId ? get(*contentId, sampler, hasMipMaps)
                              : Texture::Sptr();
         }
+
+        models::TextureHandle::Sptr resolve(content::Id const & textureId,
+                                            models::Sampler const & sampler) const override;
 
     private:
         content::Manager & _contentManager;

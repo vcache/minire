@@ -54,7 +54,7 @@ namespace minire::rasterizer
             _aabb.extend(openglVertexBuffer->_aabb);
 
             // setup _primitives and _materials
-            _primitives.emplace_back(std::move(openglVertexBuffer), meshFeatures, brush);
+            _primitives.emplace_back(std::move(openglVertexBuffer), meshFeatures, defaultMaterial, brush);
 
             // quit the function, since it is a special case
             return;
@@ -92,7 +92,7 @@ namespace minire::rasterizer
                 _aabb.extend(vertexBuffer._aabb);
 
                 _primitives.emplace_back(std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)),
-                                         meshFeatures, brush);
+                                         meshFeatures, defaultMaterial, brush);
             },
 
             [this, &source, &defaultMaterial, &materials, &contentManager]
@@ -128,23 +128,26 @@ namespace minire::rasterizer
                 auto prefetched = utils::prefetchGltfFeatures(gltf, meshIndex, contentManager);
 
                 // brushes cache
+                using MatBrushPair = std::pair<Material::Sptr, Materials::Brush::Sptr>;
                 using MatComboKey = std::pair<models::MeshFeatures, size_t>;
-                using BrushMap = std::unordered_map<MatComboKey, Materials::Brush::Sptr>;
+                using BrushMap = std::unordered_map<MatComboKey, MatBrushPair>;
                 BrushMap materialsMap;
                 materialsMap.reserve(prefetched._materialModels.size());
 
                 // brushes vector
-                std::vector<Materials::Brush::Sptr> brushesForPrims;
-                brushesForPrims.reserve(prefetched._primitives.size());
+                std::vector<MatBrushPair> matBrushesForPrims;
+                matBrushesForPrims.reserve(prefetched._primitives.size());
 
                 // iterate primitive to build helper structures
                 for(size_t primIndex = 0; primIndex < prefetched._primitives.size(); ++primIndex)
                 {
                     auto const & primitive = prefetched._primitives[primIndex];
                     MatComboKey const key(primitive._meshFeatures, primitive._materialModel);
-                    Materials::Brush::Sptr & brush = materialsMap[key];
-                    if (!brush)
+                    MatBrushPair & matBrushPair = materialsMap[key];
+                    if (!matBrushPair.first)
                     {
+                        assert(!matBrushPair.second);
+
                         // a new combination found, should build a new material
                         bool const useDefault = primitive._materialModel == utils::GltfMeshFeatures::kNoIndex;
                         MINIRE_INVARIANT(!useDefault || defaultMaterial,"no default material specified: {}", source);
@@ -158,11 +161,13 @@ namespace minire::rasterizer
                                        : prefetched._materialModels[primitive._materialModel];
 
                         assert(effectiveMaterial);
-                        brush = materials.getBrush(primitive._meshFeatures, effectiveMaterial);
+                        matBrushPair.first = effectiveMaterial;
+                        matBrushPair.second = materials.getBrush(primitive._meshFeatures, effectiveMaterial);
                     }
 
-                    assert(brush);
-                    brushesForPrims.emplace_back(brush);
+                    assert(matBrushPair.first);
+                    assert(matBrushPair.second);
+                    matBrushesForPrims.emplace_back(matBrushPair.first, matBrushPair.second);
                 }
 
                 // fetch vertex buffers
@@ -171,14 +176,15 @@ namespace minire::rasterizer
 
                 // build Mesh::Primitive objects
                 assert(vertexBuffers.size() == prefetched._primitives.size());
-                assert(vertexBuffers.size() == brushesForPrims.size());
+                assert(vertexBuffers.size() == matBrushesForPrims.size());
                 _primitives.reserve(vertexBuffers.size());
                 for(size_t i = 0; i < vertexBuffers.size(); ++i)
                 {
                     opengl::VertexBuffer & vertexBuffer = vertexBuffers[i];
                     _aabb.extend(vertexBuffer._aabb);
                     _primitives.emplace_back(std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)),
-                                             prefetched._primitives[i]._meshFeatures, brushesForPrims[i]);
+                                             prefetched._primitives[i]._meshFeatures, matBrushesForPrims[i].first,
+                                             matBrushesForPrims[i].second);
                 }
             },
 

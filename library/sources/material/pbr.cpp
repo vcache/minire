@@ -655,60 +655,62 @@ namespace minire::material
         )";
     }
 
-    namespace
+    Pbr::UniformIndeces::UniformIndeces(material::UniformNames const & names)
     {
-        struct PbrUniforms
+        for(size_t i = 0; i < names.size(); ++i)
         {
-            static constexpr char kAlbedoFactorName[] = "bznkAlbedoFactor";
-            static constexpr char kAlbedoTextureName[] = "bznkAlbedoTexture";
-            static constexpr char kMetallicFactorName[] = "bznkMetallicFactor";
-            static constexpr char kMetallicTextureName[] = "bznkMetallicTexture";
-            static constexpr char kRoughnessFactorName[] = "bznkRoughnessFactor";
-            static constexpr char kRoughnessTextureName[] = "bznkRoughnessTexture";
-            static constexpr char kNormalTextureName[] = "bznkNormalTexture";
-            static constexpr char kNormalScaleName[] = "bznkNormalScale";
-            static constexpr char kAoStrengthName[] = "bznkAoStrength";
-            static constexpr char kAoTextureName[] = "bznkAoTexture";
-            static constexpr char kEmissiveTextureName[] = "bznkEmissiveTexture";
+            std::string const & name = names[i];
 
-            template<char const * U>
-            using TrackerFloat = material::UserUniformTracker<float, U>;
-
-            template<char const * U>
-            using TrackerVec3 = material::UserUniformTracker<glm::vec3, U>;
-
-            template<char const * U>
-            using TrackerTexture = material::UserUniformTracker<material::TextureUniform, U>;
-
-            TrackerVec3<kAlbedoFactorName>        _albedoFactor;
-            TrackerTexture<kAlbedoTextureName>    _albedoTexture;
-            TrackerFloat<kMetallicFactorName>     _metallicFactor;
-            TrackerTexture<kMetallicTextureName>  _metallicTexture;
-            TrackerFloat<kRoughnessFactorName>    _roughnessFactor;
-            TrackerTexture<kRoughnessTextureName> _roughnessTexture;
-            TrackerTexture<kNormalTextureName>    _normalTexture;
-            TrackerFloat<kNormalScaleName>        _normalScale;
-            TrackerFloat<kAoStrengthName>         _aoStrength;
-            TrackerTexture<kAoTextureName>        _aoTexture;
-            TrackerTexture<kEmissiveTextureName>  _emissiveTexture;
-
-            size_t                                _revision;
-
-            explicit PbrUniforms(material::UserUniforms & userUniforms)
-                : _albedoFactor(userUniforms)
-                , _albedoTexture(userUniforms)
-                , _metallicFactor(userUniforms)
-                , _metallicTexture(userUniforms)
-                , _roughnessFactor(userUniforms)
-                , _roughnessTexture(userUniforms)
-                , _normalTexture(userUniforms)
-                , _normalScale(userUniforms)
-                , _aoStrength(userUniforms)
-                , _aoTexture(userUniforms)
-                , _emissiveTexture(userUniforms)
-                , _revision(0)
-            {}
-        };
+            if ("bznkAlbedoFactor" == name)
+            {
+                _albedoFactor = i;
+            }
+            else if ("bznkAlbedoTexture" == name)
+            {
+                _albedoTexture = i;
+            }
+            else if ("bznkMetallicFactor" == name)
+            {
+                _metallicFactor = i;
+            }
+            else if ("bznkMetallicTexture" == name)
+            {
+                _metallicTexture = i;
+            }
+            else if ("bznkRoughnessFactor" == name)
+            {
+                _roughnessFactor = i;
+            }
+            else if ("bznkRoughnessTexture" == name)
+            {
+                _roughnessTexture = i;
+            }
+            else if ("bznkNormalTexture" == name)
+            {
+                _normalTexture = i;
+            }
+            else if ("bznkNormalScale" == name)
+            {
+                _normalScale = i;
+            }
+            else if ("bznkAoStrength" == name)
+            {
+                _aoStrength = i;
+            }
+            else if ("bznkAoTexture" == name)
+            {
+                _aoTexture = i;
+            }
+            else if ("bznkEmissiveTexture" == name)
+            {
+                _emissiveTexture = i;
+            }
+            else
+            {
+                MINIRE_THROW("unexpected user uniform: \"{}\", uniformNames: {}",
+                             name, fmt::join(names, ", "));
+            }
+        }
     }
 
     // NOTE 1: any changes in _model must increase _revision!
@@ -717,7 +719,7 @@ namespace minire::material
 
     Pbr::Pbr(models::PbrMaterial const & model)
         : _model(model)
-        , _revision(1)  // starts from 1 for an initial update
+        , _modelInvalidated(true)
     {}
 
     material::Program Pbr::render() const
@@ -749,62 +751,111 @@ namespace minire::material
         };
     }
 
-    void Pbr::updateUserUniforms(material::UserUniforms & userUniforms) const
+    material::UniformValues const &
+    Pbr::updateUserUniforms(material::UniformNames const & uniformNames,
+                            models::TextureResolver const & textureResolver) const
     {
-        using TextureUniform = material::TextureUniform;
-
-        // fetch specified PBR uniforms
-        PbrUniforms * pbrUniforms = userUniforms.getOrMakeUserData<PbrUniforms>(userUniforms);
-        assert(pbrUniforms);
-
-        // skip if not changed
-        assert(pbrUniforms->_revision <= _revision);
-        if (pbrUniforms->_revision == _revision) return;
-
-        // setup values
-        pbrUniforms->_albedoFactor.set(_model._albedoFactor);
-        if (_model._albedoTexture)
+        // memoize uniform indeces
+        if (!_indeces)
         {
-            pbrUniforms->_albedoTexture.set(
-                TextureUniform{*_model._albedoTexture, _model._albedoSampler});
+            _indeces.emplace(uniformNames);
+            _modelInvalidated = true;
         }
 
-        pbrUniforms->_metallicFactor.set(_model._metallicFactor);
-        if (_model._metallicTexture)
+        // setup uniform values
+        if (_modelInvalidated)
         {
-            pbrUniforms->_metallicTexture.set(
-                TextureUniform{*_model._metallicTexture, _model._metallicSampler});
+            _values.resize(uniformNames.size());
+            assert(_indeces);
+
+            assert(_indeces->_albedoFactor < _values.size());
+            _values[_indeces->_albedoFactor] = _model._albedoFactor;
+            if (_model._albedoTexture)
+            {
+                if (!_albedoTextureHandle)
+                {
+                    _albedoTextureHandle = textureResolver.resolve(*_model._albedoTexture,
+                                                                   _model._albedoSampler);
+                }
+
+                assert(_indeces->_albedoTexture < _values.size());
+                _values[_indeces->_albedoTexture] = _albedoTextureHandle;
+            }
+
+            assert(_indeces->_metallicFactor < _values.size());
+            _values[_indeces->_metallicFactor] = _model._metallicFactor;
+            if (_model._metallicTexture)
+            {
+                if (!_metallicTextureHandle)
+                {
+                    _metallicTextureHandle = textureResolver.resolve(*_model._metallicTexture,
+                                                                     _model._metallicSampler);
+                }
+
+                assert(_indeces->_metallicTexture < _values.size());
+                _values[_indeces->_metallicTexture] = _metallicTextureHandle;
+            }
+
+            assert(_indeces->_roughnessFactor < _values.size());
+            _values[_indeces->_roughnessFactor] = _model._roughnessFactor;
+            if (_model._roughnessTexture)
+            {
+                if (!_roughnessTextureHandle)
+                {
+                    _roughnessTextureHandle = textureResolver.resolve(*_model._roughnessTexture,
+                                                                      _model._roughnessSampler);
+                }
+
+                assert(_indeces->_roughnessTexture < _values.size());
+                _values[_indeces->_roughnessTexture] = _roughnessTextureHandle;
+            }
+
+            if (_model._normalTexture)
+            {
+                if (!_normalTextureHandle)
+                {
+                    _normalTextureHandle = textureResolver.resolve(*_model._normalTexture,
+                                                                   _model._normalSampler);
+                }
+
+                assert(_indeces->_normalTexture < _values.size());
+                _values[_indeces->_normalTexture] = _normalTextureHandle;
+
+                assert(_indeces->_normalScale < _values.size());
+                _values[_indeces->_normalScale] = _model._normalScale;
+            }
+
+            assert(_indeces->_aoStrength < _values.size());
+            _values[_indeces->_aoStrength] = _model._aoStrength;
+            if (_model._aoTexture)
+            {
+                if (!_aoTextureHandle)
+                {
+                    _aoTextureHandle = textureResolver.resolve(*_model._aoTexture,
+                                                               _model._aoSampler);
+                }
+
+                assert(_indeces->_aoTexture < _values.size());
+                _values[_indeces->_aoTexture] = _aoTextureHandle;
+            }
+
+            if (_model._emissiveTexture)
+            {
+                if (!_emissiveTextureHandle)
+                {
+                    _emissiveTextureHandle = textureResolver.resolve(*_model._emissiveTexture,
+                                                                     _model._emissiveSampler);
+                }
+
+                assert(_indeces->_emissiveTexture < _values.size()); 
+                _values[_indeces->_emissiveTexture] = _emissiveTextureHandle;
+            }
+
+            _modelInvalidated = false;
         }
 
-        pbrUniforms->_roughnessFactor.set(_model._roughnessFactor);
-        if (_model._roughnessTexture)
-        {
-            pbrUniforms->_roughnessTexture.set(
-                TextureUniform{*_model._roughnessTexture, _model._roughnessSampler});
-        }
-
-        if (_model._normalTexture)
-        {
-            pbrUniforms->_normalTexture.set(
-                TextureUniform{*_model._normalTexture, _model._normalSampler});
-            pbrUniforms->_normalScale.set(_model._normalScale);
-        }
-
-        pbrUniforms->_aoStrength.set(_model._aoStrength);
-        if (_model._aoTexture)
-        {
-            pbrUniforms->_aoTexture.set(
-                TextureUniform{*_model._aoTexture, _model._aoSampler});
-        }
-
-        if (_model._emissiveTexture)
-        {
-            pbrUniforms->_emissiveTexture.set(
-                TextureUniform{*_model._emissiveTexture, _model._emissiveSampler});
-        }
-
-        // advance brush's revision
-        pbrUniforms->_revision = _revision;
+        assert (_values.size() == uniformNames.size());
+        return _values;
     }
 
     std::string Pbr::slugImpl() const

@@ -83,4 +83,12 @@ namespace minire::rasterizer
 
         return texture;
     }
+
+    models::TextureHandle::Sptr Textures::resolve(content::Id const & textureId,
+                                                  models::Sampler const & sampler) const
+    {
+        Texture::Sptr const & texture = get(textureId, sampler);
+        assert(texture);
+        return texture;
+    }
 }

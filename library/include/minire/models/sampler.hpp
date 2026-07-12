@@ -32,7 +32,7 @@ namespace std
     {
         size_t operator()(::minire::models::Sampler const & sampler) const
         {
-            size_t result = 0x984AB3010DE4AB71ULL;
+            size_t result = 0;
             boost::hash_combine(result, std::hash<int>{}(sampler._minFilter));
             boost::hash_combine(result, std::hash<int>{}(sampler._magFilter));
             boost::hash_combine(result, std::hash<int>{}(sampler._wrapS));
