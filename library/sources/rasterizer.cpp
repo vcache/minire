@@ -4,10 +4,6 @@
 #include <minire/logging.hpp>
 #include <minire/models/shadow-params.hpp>
 
-#ifndef NDEBUG
-#   include <minire/instrumentation/formatters.hpp>
-#endif
-
 #include <opengl.hpp>
 #include <opengl/shader.hpp>
 #include <opengl/ubo.hpp>
@@ -207,9 +203,6 @@ namespace minire
         , _2dProjection(1.0)
         , _screenWidth(static_cast<size_t>(width))
         , _screenHeight(static_cast<size_t>(height))
-#       ifndef NDEBUG
-        , _statistics(std::chrono::seconds(10))
-#       endif
     {
         // TODO: preload textures for sprites
 
@@ -470,13 +463,12 @@ namespace minire
     {
         rasterizer::CulledPrimitives result;
         // TODO: result.reserve
-        size_t visibleMeshes = 0;
         scene.cullModels(
-            [&result, &visibleMeshes] (rasterizer::Mesh const & mesh,
-                                       glm::vec3 const & emissiveFactor,
-                                       glm::mat4 const & transform,
-                                       material::SkinningVectorSptr const & skinningVectorSptr,
-                                       size_t const opbId)
+            [&result] (rasterizer::Mesh const & mesh,
+                       glm::vec3 const & emissiveFactor,
+                       glm::mat4 const & transform,
+                       material::SkinningVectorSptr const & skinningVectorSptr,
+                       size_t const opbId)
             {
                 MINIRE_INVARIANT(opbId <= std::numeric_limits<uint32_t>::max(),
                                  "too large opbId: {}", opbId);
@@ -495,25 +487,7 @@ namespace minire
                         });
                     primitiveInstances._skinningVectors.emplace_back(skinningVectorSptr);
                 }
-
-                ++visibleMeshes;
             });
-
-#       ifndef NDEBUG
-        if (scene.meshesCount() != 0)
-        {
-            double const visibleMeshesPercentage =
-                static_cast<double>(visibleMeshes) / static_cast<double>(scene.meshesCount()) * 100.0;
-            _statistics.collectMeasurement("visible-meshes", visibleMeshesPercentage);
-
-            if (_statistics.isExpired())
-            {
-                auto aggregation = _statistics.fetch();
-                MINIRE_INFO("Culling efficiency report:\n{}",
-                            instrumentation::tabulate<double>(*aggregation));
-            }
-        }
-#       endif
 
         return result;
     }
