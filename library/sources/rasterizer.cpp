@@ -470,9 +470,7 @@ namespace minire
     {
         rasterizer::CulledPrimitives result;
         // TODO: result.reserve
-#       ifndef NDEBUG
         size_t visibleMeshes = 0;
-#       endif
         scene.cullModels(
             [&result, &visibleMeshes] (rasterizer::Mesh const & mesh,
                                        glm::vec3 const & emissiveFactor,
