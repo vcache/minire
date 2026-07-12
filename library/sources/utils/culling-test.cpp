@@ -9,36 +9,19 @@
 
 namespace minire::utils
 {
-    // Separating Axis Theorem (SAT)
-    //
-    // NOTE: This code is heavy rely on the order of ViewFrustum::_vertices!
-    //       Don't change them without fixing this function.
-    bool cullingTest(Aabb const & aabb,
-                     ViewFrustum const & viewFrustum,
-                     glm::mat4 const & globalTransform)
+    SatPlanes precalcSatPlanes(ViewFrustum const & viewFrustum)
     {
-        // transform the local AABB into world space
-        Aabb worldAabb = aabb;
-        worldAabb.transform(globalTransform);
-
-        // fast rejection (SAT Phase 1): test Frustum bounding box against World AABB
-        glm::vec3 fMin = viewFrustum[0];
-        glm::vec3 fMax = viewFrustum[0];
+        // frustum AABB
+        glm::vec3 min = viewFrustum[0];
+        glm::vec3 max = viewFrustum[0];
         for (size_t i = 1; i < viewFrustum.size(); ++i)
         {
-            fMin = glm::min(fMin, viewFrustum[i]);
-            fMax = glm::max(fMax, viewFrustum[i]);
+            min = glm::min(min, viewFrustum[i]);
+            max = glm::max(max, viewFrustum[i]);
         }
 
-        if (fMax.x < worldAabb.min().x || fMin.x > worldAabb.max().x) return false;
-        if (fMax.y < worldAabb.min().y || fMin.y > worldAabb.max().y) return false;
-        if (fMax.z < worldAabb.min().z || fMin.z > worldAabb.max().z) return false;
-
-        // compute frustum center to ensure our normals always point outward
-        glm::vec3 const center = viewFrustum.center();
-
         // helper to generate a plane from 3 points
-        auto makePlane = [&viewFrustum, &center]
+        auto makePlane = [&viewFrustum, center = viewFrustum.center()]
             (int i0, int i1, int i2) -> glm::vec4
             {
                 glm::vec3 const v0 = viewFrustum[i0];
@@ -66,22 +49,45 @@ namespace minire::utils
                 return glm::vec4(normal, -glm::dot(normal, v0));
             };
 
-        // construct the 6 Frustum planes directly using the guaranteed layout
-        std::array<glm::vec4, 6> const planes
+        // construct the 6 Frustum planes
+        return SatPlanes
         {
-            makePlane(0, 1, 2), // Near
-            makePlane(4, 5, 6), // Far
-            makePlane(0, 4, 5), // Left
-            makePlane(3, 7, 6), // Right
-            makePlane(1, 5, 6), // Top
-            makePlane(0, 4, 7)  // Bottom
+            ._min = min,
+            ._max = max,
+            ._planes = std::array<glm::vec4, 6>
+            {
+                makePlane(0, 1, 2), // Near
+                makePlane(4, 5, 6), // Far
+                makePlane(0, 4, 5), // Left
+                makePlane(3, 7, 6), // Right
+                makePlane(1, 5, 6), // Top
+                makePlane(0, 4, 7)  // Bottom
+            }
         };
+    }
+
+    // Separating Axis Theorem (SAT)
+    //
+    // NOTE: This code is heavy rely on the order of ViewFrustum::_vertices!
+    //       Don't change them without fixing this function.
+    bool cullingTest(Aabb const & aabb,
+                     SatPlanes const & satPlanes,
+                     glm::mat4 const & globalTransform)
+    {
+        // transform the local AABB into world space
+        Aabb worldAabb = aabb;
+        worldAabb.transform(globalTransform);
+
+        // fast rejection (SAT Phase 1): test Frustum bounding box against World AABB
+        if (satPlanes._max.x < worldAabb.min().x || satPlanes._min.x > worldAabb.max().x) return false;
+        if (satPlanes._max.y < worldAabb.min().y || satPlanes._min.y > worldAabb.max().y) return false;
+        if (satPlanes._max.z < worldAabb.min().z || satPlanes._min.z > worldAabb.max().z) return false;
 
         // test World AABB against the 6 Frustum Planes (SAT Phase 2)
-        for (int p = 0; p < 6; ++p)
+        for (size_t i = 0; i < satPlanes._planes.size(); ++i)
         {
-            glm::vec3 n = glm::vec3(planes[p]);
-            float d = planes[p].w;
+            glm::vec3 const n = glm::vec3(satPlanes._planes[i]);
+            float const d = satPlanes._planes[i].w;
 
             // pick the single AABB vertex that is most "inside" the negative plane normal
             glm::vec3 minPt

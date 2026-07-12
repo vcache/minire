@@ -64,10 +64,14 @@ namespace minire
 
         auto const & pixelEdgeOutlines() const { return _pixelEdgeOutlines; }
 
+        // TODO: consider perfomance issues of utils::cullingTest,
+        //       maybe it is more performant without this test?
         template<typename Callable>
         void cullModels(Callable callable) const
         {
             utils::ViewFrustum const & viewFrustum = _viewpoint.viewFrustum();
+            utils::SatPlanes const & satPlanes = utils::precalcSatPlanes(viewFrustum);
+
             auto it = _meshLeaves.begin();
             while(it != _meshLeaves.end())
             {
@@ -85,7 +89,7 @@ namespace minire
                         assert(parent->hasGlobalTransform());
                         assert(mesh->_mesh);
                         if (parent->_effectiveVisible &&
-                            utils::cullingTest(mesh->_mesh->aabb(), viewFrustum, parent->_globalTransform))
+                            utils::cullingTest(mesh->_mesh->aabb(), satPlanes, parent->_globalTransform))
                         {
                             // perform rendering
                             callable(*mesh->_mesh, mesh->emissiveFactor(),
