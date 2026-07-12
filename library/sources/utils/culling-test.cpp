@@ -70,14 +70,9 @@ namespace minire::utils
     //
     // NOTE: This code is heavy rely on the order of ViewFrustum::_vertices!
     //       Don't change them without fixing this function.
-    bool cullingTest(Aabb const & aabb,
-                     SatPlanes const & satPlanes,
-                     glm::mat4 const & globalTransform)
+    bool cullingTest(Aabb const & worldAabb,
+                     SatPlanes const & satPlanes)
     {
-        // transform the local AABB into world space
-        Aabb worldAabb = aabb;
-        worldAabb.transform(globalTransform);
-
         // fast rejection (SAT Phase 1): test Frustum bounding box against World AABB
         if (satPlanes._max.x < worldAabb.min().x || satPlanes._min.x > worldAabb.max().x) return false;
         if (satPlanes._max.y < worldAabb.min().y || satPlanes._min.y > worldAabb.max().y) return false;

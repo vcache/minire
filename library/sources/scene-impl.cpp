@@ -148,6 +148,19 @@ namespace minire
         Object::revalidate(mask);
     }
 
+    utils::Aabb const & SceneImpl::MeshLeaf::worldAabb(glm::mat4 const & globalTransform,
+                                                       size_t globalTransformRevision) const
+    {
+        if (_worldRevision != globalTransformRevision)
+        {
+            assert(_mesh);
+            _worldAabb = _mesh->aabb();
+            _worldAabb.transform(globalTransform);
+            _worldRevision = globalTransformRevision;
+        }
+        return _worldAabb;
+    }
+
     void SceneImpl::DirectionalLightLeaf::revalidate(Mask mask)
     {
         if (invalidatedAny(mask & kColor))
@@ -712,6 +725,7 @@ namespace minire
                                                              : kIdentityMatrix;
             _globalTransform = parentGlobalTransform * _localTransformMatrix;
             _globalPosition = _globalTransform * kGlobalOrigin; // will drop "w"
+            ++_globalTransformRevision;
 
             dropMask |= kParentTransformChanged;
             invalidateChildren<Node::Sptr>(kParentTransformChanged);

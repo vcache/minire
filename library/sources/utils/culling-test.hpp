@@ -1,6 +1,5 @@
 #pragma once
 
-#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
@@ -24,7 +23,6 @@ namespace minire::utils
 
     SatPlanes precalcSatPlanes(ViewFrustum const &);
 
-    bool cullingTest(Aabb const & aabb,
-                     SatPlanes const & satPlanes,
-                     glm::mat4 const & globalTransform);
+    bool cullingTest(Aabb const & worldAabb,
+                     SatPlanes const & satPlanes);
 }

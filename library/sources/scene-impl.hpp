@@ -88,8 +88,9 @@ namespace minire
                         MINIRE_INVARIANT(parent, "a mesh doesn't have a parent");
                         assert(parent->hasGlobalTransform());
                         assert(mesh->_mesh);
-                        if (parent->_effectiveVisible &&
-                            utils::cullingTest(mesh->_mesh->aabb(), satPlanes, parent->_globalTransform))
+                        utils::Aabb const & worldAabb = mesh->worldAabb(parent->_globalTransform,
+                                                                        parent->_globalTransformRevision);
+                        if (parent->_effectiveVisible && utils::cullingTest(worldAabb, satPlanes))
                         {
                             // perform rendering
                             callable(*mesh->_mesh, mesh->emissiveFactor(),
@@ -314,6 +315,9 @@ namespace minire
 
             void revalidate(Mask = kAllFlags) override;
 
+            utils::Aabb const & worldAabb(glm::mat4 const & globalTransform,
+                                          size_t globalTransformRevision) const;
+
         private:
             struct SkinBone
             {
@@ -326,6 +330,9 @@ namespace minire
             SkinBones                         _skinBones;
             std::weak_ptr<Node>               _skinOrigin;
             std::unique_ptr<OpbIdHolder>      _opbId;
+
+            mutable utils::Aabb               _worldAabb;
+            mutable size_t                    _worldRevision = 0;
 
             friend class SceneImpl;
         };
@@ -616,6 +623,7 @@ namespace minire
             LerpableTransform     _localTransform;
             glm::vec3             _globalPosition;
             glm::mat4             _globalTransform;
+            size_t                _globalTransformRevision = 0;
             glm::mat4             _localTransformMatrix;
             Wptr                  _parent;
             ChildrenMap           _children;
