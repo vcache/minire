@@ -3,13 +3,13 @@
 #include <minire/content/manager.hpp>
 #include <minire/logging.hpp>
 #include <minire/models/shadow-params.hpp>
+#include <minire/utils/culling-test.hpp>
 
 #include <opengl.hpp>
 #include <opengl/shader.hpp>
 #include <opengl/ubo.hpp>
 #include <rasterizer/binding-points.hpp>
 #include <scene-impl.hpp>
-#include <utils/culling-test.hpp>
 #include <utils/frustum.hpp>
 
 #include <glm/gtx/transform.hpp>
@@ -355,19 +355,18 @@ namespace minire
         return id;
     }
 
-    rasterizer::CulledDirectionalLights
-    Rasterizer::cullDirectionalLights(SceneImpl const & scene)
+    void Rasterizer::cullDirectionalLights(SceneImpl const & scene)
     {
-        rasterizer::CulledDirectionalLights result;
-        result.reserve(rasterizer::Ubo::maxDirectionalLights());
+        _culledDirectionalLights.clear();
+        _culledDirectionalLights.reserve(rasterizer::Ubo::maxDirectionalLights());
         size_t shadowMapIndex = 0;
         scene.cullDirectionalLights(
             rasterizer::Ubo::maxDirectionalLights(),
-            [this, &result, &shadowMapIndex](size_t const /*index*/,
-                                             glm::vec3 const & position,
-                                             glm::vec3 const & direction,
-                                             glm::vec3 const & color,
-                                             models::MaybeShadowParams const & shadowParams)
+            [this, &shadowMapIndex](size_t const /*index*/,
+                                    glm::vec3 const & position,
+                                    glm::vec3 const & direction,
+                                    glm::vec3 const & color,
+                                    models::MaybeShadowParams const & shadowParams)
             {
                 rasterizer::FlatShadowMap::Sptr shadowMap;
 
@@ -395,7 +394,7 @@ namespace minire
                     shadowMapIndex++;
                 }
 
-                result.emplace_back(rasterizer::CulledDirectionalLight
+                _culledDirectionalLights.emplace_back(rasterizer::CulledDirectionalLight
                 {
                     ._position = position,
                     ._direction = direction,
@@ -404,22 +403,20 @@ namespace minire
                     ._viewProjection = glm::identity<glm::mat4>(),
                 });
             });
-        return result;
     }
 
-    rasterizer::CulledPointLights
-    Rasterizer::cullPointLights(SceneImpl const & scene)
+    void Rasterizer::cullPointLights(SceneImpl const & scene)
     {
-        rasterizer::CulledPointLights result;
-        result.reserve(rasterizer::Ubo::maxPointLights());
+        _culledPointLights.clear();
+        _culledPointLights.reserve(rasterizer::Ubo::maxPointLights());
         size_t shadowMapIndex = 0;
         scene.cullPointLights(
             rasterizer::Ubo::maxPointLights(),
-            [this, &result, &shadowMapIndex](size_t const /*index*/,
-                                             glm::vec3 const & position,
-                                             glm::vec4 const & color,
-                                             glm::vec4 const & attenuation,
-                                             models::MaybeShadowParams const & shadowParams)
+            [this, &shadowMapIndex](size_t const /*index*/,
+                                    glm::vec3 const & position,
+                                    glm::vec4 const & color,
+                                    glm::vec4 const & attenuation,
+                                    models::MaybeShadowParams const & shadowParams)
             {
                 rasterizer::CubeShadowMap::Sptr shadowMap;
 
@@ -447,7 +444,7 @@ namespace minire
                     shadowMapIndex++;
                 }
 
-                result.emplace_back(rasterizer::CulledPointLight
+                _culledPointLights.emplace_back(rasterizer::CulledPointLight
                 {
                     ._position = position,
                     ._color = color,
@@ -456,17 +453,14 @@ namespace minire
                     ._shadowMapFarPlane = 0,
                 });
             });
-        return result;
     }
 
-    rasterizer::CulledPrimitives
-    Rasterizer::cullPrimitives(SceneImpl const & scene,
-                               utils::SatPlanes const & satPlanes)
+    void Rasterizer::cullPrimitives(SceneImpl const & scene,
+                                    utils::FrustumPlanes const & frustumPlanes,
+                                    rasterizer::CulledPrimitives & output)
     {
-        rasterizer::CulledPrimitives result;
-        // TODO: result.reserve
-        scene.cullModels(satPlanes,
-            [&result] (rasterizer::Mesh const & mesh,
+        scene.cullModels(frustumPlanes,
+            [&output] (rasterizer::Mesh const & mesh,
                        glm::vec3 const & emissiveFactor,
                        glm::mat4 const & transform,
                        material::SkinningVectorSptr const & skinningVectorSptr,
@@ -478,7 +472,7 @@ namespace minire
                 for(size_t i = 0; i < mesh.primitives(); ++i)
                 {
                     rasterizer::UniquePrimitive uniquePrimitive{mesh, i};
-                    rasterizer::PrimitiveInstances & primitiveInstances = result[uniquePrimitive];
+                    rasterizer::PrimitiveInstances & primitiveInstances = output[uniquePrimitive];
 
                     primitiveInstances._attribs.emplace_back(
                         rasterizer::PrimitiveInstances::Attribs
@@ -490,35 +484,31 @@ namespace minire
                     primitiveInstances._skinningVectors.emplace_back(skinningVectorSptr);
                 }
             });
-
-        return result;
     }
 
     void Rasterizer::draw(SceneImpl const & scene)
     {
-        auto directionalLights = cullDirectionalLights(scene);
-        auto pointLights = cullPointLights(scene);
-        shadowPass(scene, directionalLights, pointLights);
-        colorPass(scene, directionalLights, pointLights);
+        cullDirectionalLights(scene);
+        cullPointLights(scene);
+        shadowPass(scene);
+        colorPass(scene);
         draw2d();
     }
 
-    void Rasterizer::shadowPass(SceneImpl const & scene,
-                                rasterizer::CulledDirectionalLights & culledDirectionalLights,
-                                rasterizer::CulledPointLights & culledPointLights)
+    void Rasterizer::shadowPass(SceneImpl const & scene)
     {
-        // TODO: maybe do min/max w/ scene AABB?
         utils::ViewFrustum const & viewFrustum = scene.viewpoint().viewFrustum();
 
         // build shadow maps for directional lights (if any)
-        for(rasterizer::CulledDirectionalLight & light : culledDirectionalLights)
+        for(rasterizer::CulledDirectionalLight & light : _culledDirectionalLights)
         {
             if (light._shadowMap)
             {
                 light._viewProjection = light._shadowMap->perform(
                     light._position, light._direction, viewFrustum,
-                    [this, &scene](utils::SatPlanes const & satPlanes)
-                    { return cullPrimitives(scene, satPlanes); });
+                    [this, &scene](utils::FrustumPlanes const & frustumPlanes,
+                                   rasterizer::CulledPrimitives & output)
+                    { return cullPrimitives(scene, frustumPlanes, output); });
             }
             else
             {
@@ -527,14 +517,15 @@ namespace minire
         }
 
         // build shadow maps for point lights (if any)
-        for(rasterizer::CulledPointLight & light : culledPointLights)
+        for(rasterizer::CulledPointLight & light : _culledPointLights)
         {
             if (light._shadowMap)
             {
                 light._shadowMapFarPlane = light._shadowMap->perform(
                     light._position, viewFrustum,
-                    [this, &scene](utils::SatPlanes const & satPlanes)
-                    { return cullPrimitives(scene, satPlanes); });
+                    [this, &scene](utils::FrustumPlanes const & frustumPlanes,
+                                   rasterizer::CulledPrimitives & output)
+                    { return cullPrimitives(scene, frustumPlanes, output); });
             }
             else
             {
@@ -543,14 +534,13 @@ namespace minire
         }
     }
 
-    void Rasterizer::colorPass(SceneImpl const & scene,
-                               rasterizer::CulledDirectionalLights const & culledDirectionalLights,
-                               rasterizer::CulledPointLights const & culledPointLights)
+    void Rasterizer::colorPass(SceneImpl const & scene)
     {
         // cull primitives againts camera's frustum
         utils::ViewFrustum const & viewFrustum = scene.viewpoint().viewFrustum();
-        utils::SatPlanes const & satPlanes = utils::precalcSatPlanes(viewFrustum);
-        rasterizer::CulledPrimitives const & culledPrimitives = cullPrimitives(scene, satPlanes);
+        utils::FrustumPlanes const & frustumPlanes = utils::precalcFrustumPlanes(viewFrustum);
+        _culledPrimitives.clear();
+        cullPrimitives(scene, frustumPlanes, _culledPrimitives);
 
         // setup Primary FBO
         _primaryFbo.bind();
@@ -567,12 +557,12 @@ namespace minire
         MINIRE_GL(glClearBufferuiv, GL_COLOR, 1, &clearId);
 
         // actualize shadow maps vector for directional lights
-        _directionalLightsShadowMaps.resize(culledDirectionalLights.size());
+        _directionalLightsShadowMaps.resize(_culledDirectionalLights.size());
         for(size_t i = 0; i < _directionalLightsShadowMaps.size(); i++)
         {
-            if (culledDirectionalLights[i]._shadowMap)
+            if (_culledDirectionalLights[i]._shadowMap)
             {
-                auto const & flatShadowMap = *culledDirectionalLights[i]._shadowMap;
+                auto const & flatShadowMap = *_culledDirectionalLights[i]._shadowMap;
                 _directionalLightsShadowMaps[i] = &flatShadowMap.texture();
             }
             else
@@ -582,12 +572,12 @@ namespace minire
         }
 
         // actualize shadow maps vector for point lights
-        _pointLightsShadowMaps.resize(culledPointLights.size());
+        _pointLightsShadowMaps.resize(_culledPointLights.size());
         for(size_t i = 0; i < _pointLightsShadowMaps.size(); i++)
         {
-            if (culledPointLights[i]._shadowMap)
+            if (_culledPointLights[i]._shadowMap)
             {
-                auto const & cubeShadowMap = *culledPointLights[i]._shadowMap;
+                auto const & cubeShadowMap = *_culledPointLights[i]._shadowMap;
                 _pointLightsShadowMaps[i] = &cubeShadowMap.texture();
             }
             else
@@ -606,9 +596,9 @@ namespace minire
             auto const & [mvp, revision] = viewpoint.mvp();
             _ubo.setViewProjection(mvp, revision);
             _ubo.setViewPosition(glm::vec4(viewpoint.position(), 1.0f));
-            _ubo.setLights(culledDirectionalLights, culledPointLights);
+            _ubo.setLights(_culledDirectionalLights, _culledPointLights);
             _ubo.bind();
-            draw3d(scene, culledPrimitives, _directionalLightsShadowMaps,
+            draw3d(scene, _culledPrimitives, _directionalLightsShadowMaps,
                    _pointLightsShadowMaps);
         }
 
@@ -701,6 +691,7 @@ namespace minire
         MINIRE_GL(glDepthFunc, GL_LEQUAL);
         MINIRE_GL(glEnable, GL_BLEND);
         MINIRE_GL(glBlendFunc, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        MINIRE_GL(glDepthMask, GL_FALSE);
         _billboards.draw(scene);
     }
 

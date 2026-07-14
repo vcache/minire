@@ -12,7 +12,7 @@
 #include <cassert>
 #include <memory>
 
-namespace minire::utils { class SatPlanes; }
+namespace minire::utils { class FrustumPlanes; }
 
 namespace minire::rasterizer
 {
@@ -29,7 +29,7 @@ namespace minire::rasterizer
     public:
         using Sptr = std::shared_ptr<CubeShadowMap>;
         using CullFunction =
-            std::function<rasterizer::CulledPrimitives(utils::SatPlanes const &)>;
+            std::function<void(utils::FrustumPlanes const &, rasterizer::CulledPrimitives &)>;
 
         explicit CubeShadowMap(Materials const & materials,
                                models::ShadowParams const &);
@@ -51,12 +51,13 @@ namespace minire::rasterizer
     private:
         class Material;
 
-        Materials const           & _materials;
-        models::ShadowParams const _shadowParams;
-        size_t const               _meshConsumerKey;
-        std::shared_ptr<Material>  _material;
-        opengl::Texture::Uptr      _depthTexture;
-        opengl::Texture::Uptr      _shadowTexture;
-        opengl::FBO                _fbo;
+        Materials const             & _materials;
+        models::ShadowParams const   _shadowParams;
+        size_t const                 _meshConsumerKey;
+        std::shared_ptr<Material>    _material;
+        opengl::Texture::Uptr        _depthTexture;
+        opengl::Texture::Uptr        _shadowTexture;
+        opengl::FBO                  _fbo;
+        rasterizer::CulledPrimitives _culledPrimitives;
     };
 }

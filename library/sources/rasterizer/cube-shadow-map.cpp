@@ -454,7 +454,7 @@ namespace minire::rasterizer
         CubeVPs const lightVPs = buildVPs(lightPosition, near, far);
 
         // cull models against this light source
-        utils::SatPlanes const satPlanes
+        utils::FrustumPlanes const frustumPlanes
         {
             ._min = lightPosition - glm::vec3(far),
             ._max = lightPosition + glm::vec3(far),
@@ -469,7 +469,8 @@ namespace minire::rasterizer
             },
         };
         assert(cullFunction);
-        rasterizer::CulledPrimitives const & primitives = cullFunction(satPlanes);
+        _culledPrimitives.clear();
+        cullFunction(frustumPlanes, _culledPrimitives);
 
         // setup material-specific unifroms
         assert(_material);
@@ -484,7 +485,7 @@ namespace minire::rasterizer
         }, _shadowParams._method);
 
         // perform the drawing
-        for(auto const & [uniquePrimitive, primitiveInstances] : primitives)
+        for(auto const & [uniquePrimitive, primitiveInstances] : _culledPrimitives)
         {
             Materials::Brush::Sptr & brush = uniquePrimitive._mesh.extraBrush(
                 uniquePrimitive._primitiveIndex, _meshConsumerKey);

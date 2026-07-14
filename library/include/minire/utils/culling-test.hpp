@@ -7,10 +7,10 @@
 
 namespace minire::utils
 {
+    struct ViewFrustum; // TODO: maybe make it public?
     class Aabb;
-    class ViewFrustum;
 
-    struct SatPlanes
+    struct FrustumPlanes
     {
         // for fast rejection phase (SAT Phase 1)
         glm::vec3                _min;
@@ -21,8 +21,8 @@ namespace minire::utils
         std::array<glm::vec4, 6> _planes;
     };
 
-    SatPlanes precalcSatPlanes(ViewFrustum const &);
+    FrustumPlanes precalcFrustumPlanes(ViewFrustum const &);
 
     bool cullingTest(Aabb const & worldAabb,
-                     SatPlanes const & satPlanes);
+                     FrustumPlanes const & frustumPlanes);
 }

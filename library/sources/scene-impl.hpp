@@ -7,12 +7,14 @@
 #include <minire/models/scene-path.hpp>
 #include <minire/models/transform.hpp>
 #include <minire/scene.hpp>
+#include <minire/scene/spatial-index.hpp>
+#include <minire/utils/culling-test.hpp>
 
 #include <material/types.hpp>
 #include <rasterizer/mesh.hpp>
 #include <scene-impl/animations.hpp>
 #include <scene-impl/viewpoint.hpp>
-#include <utils/culling-test.hpp>
+#include <scene/spatial-handler.hpp>
 #include <utils/lerpable.hpp>
 
 #include <list>
@@ -34,6 +36,9 @@ namespace minire
         class Node;
         class BillboardLeaf;
 
+        static constexpr scene::IndexLayer kMeshLayer       = 0;
+        static constexpr scene::IndexLayer kBillboardLayer  = 1;
+
     public:
         explicit SceneImpl(Rasterizer &);
 
@@ -47,6 +52,8 @@ namespace minire
         scene::SceneItem fetchSceneItem(size_t const x, size_t const y) const override;
 
         scene::SceneItem fetchHotSceneItem() const override;
+
+        void setupSpatialIndex(scene::SpatialIndex::Uptr &&) override;
 
     public:
         void setViewport(size_t width, size_t height);
@@ -64,115 +71,96 @@ namespace minire
 
         auto const & pixelEdgeOutlines() const { return _pixelEdgeOutlines; }
 
-        // TODO: consider perfomance issues of utils::cullingTest,
-        //       maybe it is more performant without this test?
         template<typename Callable>
-        void cullModels(utils::SatPlanes const & satPlanes,
+        void cullModels(utils::FrustumPlanes const & frustumPlanes,
                         Callable callable) const
         {
-            auto it = _meshLeaves.begin();
-            while(it != _meshLeaves.end())
+            assert(_spatialIndex);
+            _meshCullBuffer.clear();
+            _spatialIndex->cull(frustumPlanes, kMeshLayer, _meshCullBuffer);
+            for (void * opaque : _meshCullBuffer)
             {
-                if (auto mesh = it->lock(); mesh)
+                if (MeshLeaf * meshLeaf = static_cast<MeshLeaf *>(opaque);
+                    meshLeaf && meshLeaf->visible())
                 {
-                    if (mesh->visible())
+                    // estimate a pivot (origin) point of a model
+                    auto parent = meshLeaf->_skinOrigin.lock();
+
+                    // no valid skinOrigin, thus fallback to a parent
+                    if (!parent) parent = meshLeaf->_parent.lock();
+
+                    MINIRE_INVARIANT(parent, "a mesh doesn't have a parent");
+                    assert(parent->hasGlobalTransform());
+                    assert(meshLeaf->_mesh);
+
+                    // TODO: is this cullingTest redundant and can be safely skipped?
+                    if (parent->_effectiveVisible &&
+                        utils::cullingTest(meshLeaf->worldAabb(), frustumPlanes))
                     {
-                        // estimate a pivot (origin) point of a model
-                        auto parent = mesh->_skinOrigin.lock();
-
-                        // no valid skinOrigin, thus fallback to a parent
-                        if (!parent) parent = mesh->_parent.lock();
-
-                        MINIRE_INVARIANT(parent, "a mesh doesn't have a parent");
-                        assert(parent->hasGlobalTransform());
-                        assert(mesh->_mesh);
-                        utils::Aabb const & worldAabb = mesh->worldAabb(parent->_globalTransform,
-                                                                        parent->_globalTransformRevision);
-                        if (parent->_effectiveVisible && utils::cullingTest(worldAabb, satPlanes))
-                        {
-                            // perform rendering
-                            callable(*mesh->_mesh, mesh->emissiveFactor(),
-                                     parent->_globalTransform,
-                                     makeSkinningVector(*mesh),
-                                     mesh->opbId());
-                        }
+                        // perform rendering
+                        callable(*meshLeaf->_mesh, meshLeaf->emissiveFactor(),
+                                 parent->_globalTransform, makeSkinningVector(*meshLeaf),
+                                 meshLeaf->opbId());
                     }
-
-                    ++it;
-                }
-                else
-                {
-                    it = _meshLeaves.erase(it);
                 }
             }
         }
 
         template<typename Callable>
-        void cullBillboards(Callable callable) const
+        void cullBillboards(utils::FrustumPlanes const & frustumPlanes,
+                            Callable callable) const
         {
             // perform culling
-            using Element = std::tuple<float /* dist */,
-                                       size_t /* zOrder */,
-                                       std::shared_ptr<Node>, /* locked parent */
-                                       std::shared_ptr<BillboardLeaf> /* locked billboard */ >;
-            std::vector<Element> culled;
-            culled.reserve(_billboardsLeaves.size());
+            assert(_spatialIndex);
+            _billboardCullBuffer.clear();
+            _spatialIndex->cull(frustumPlanes, kBillboardLayer, _billboardCullBuffer);
+            _billboardWideCullBuffer.reserve(_billboardCullBuffer.size());
             glm::vec3 const forwardVector = _viewpoint.forwardVector();
-
-            for(auto it = _billboardsLeaves.begin();
-                it != _billboardsLeaves.end();)
+            for(void * opaque : _billboardCullBuffer)
             {
-                if (auto const & billboard = it->second.lock(); billboard)
+                if (BillboardLeaf * billboardLeaf = static_cast<BillboardLeaf *>(opaque);
+                    billboardLeaf && billboardLeaf->visible())
                 {
-                    if (billboard->visible())
+                    auto parent = billboardLeaf->_parent.lock();
+                    MINIRE_INVARIANT(parent, "a billboard doesn't have a parent");
+                    if (parent->_effectiveVisible &&
+                        utils::cullingTest(billboardLeaf->worldAabb(), frustumPlanes))
                     {
-                        auto parent = billboard->_parent.lock();
-                        MINIRE_INVARIANT(parent, "a billboard doesn't have a parent");
-                        if (parent->_effectiveVisible)
-                        {
-                            assert(parent->hasGlobalTransform());
-                            assert(billboard->_billboard);
-
-                            float const distToCam = glm::dot(parent->_globalPosition - _viewpoint.position(),
-                                                             forwardVector);
-
-                            culled.emplace_back(distToCam, it->first, parent, billboard);
-                        }
+                        assert(parent->hasGlobalTransform());
+                        assert(billboardLeaf->_billboard);
+                        float const distToCam = glm::dot(parent->_globalPosition - _viewpoint.position(),
+                                                         forwardVector);
+                        _billboardWideCullBuffer.emplace_back(distToCam, parent, billboardLeaf);
                     }
-                    ++it;
-                }
-                else
-                {
-                    it = _billboardsLeaves.erase(it);
                 }
             }
 
             // sort by distance to a camera
-            std::ranges::sort(culled,
-                [](Element const & lhs, Element const & rhs)
+            std::ranges::sort(_billboardWideCullBuffer,
+                [](BillboardElement const & lhs, BillboardElement const & rhs)
                 {
-                    return std::tie(std::get<0>(rhs), std::get<1>(lhs))
-                         < std::tie(std::get<0>(lhs), std::get<1>(rhs));
+                    BillboardLeaf const * left = std::get<2>(lhs);
+                    BillboardLeaf const * right = std::get<2>(rhs);
+                    return std::tie(std::get<0>(rhs), left->_zOrder, left)
+                         < std::tie(std::get<0>(lhs), right->_zOrder, right);
                 });
 
             // issue callbacks
-            for(Element const & element : culled)
+            for(BillboardElement const & element : _billboardWideCullBuffer)
             {
-                auto const & parent = std::get<2>(element);
-                auto const & billboard = std::get<3>(element);
+                auto const & parent = std::get<1>(element);
+                auto const & billboardLeaf = std::get<2>(element);
                 assert(parent);
-                assert(billboard);
-                callable(*billboard->_billboard, parent->_globalTransform,
-                         billboard->opbId());
+                assert(billboardLeaf);
+                callable(*billboardLeaf->_billboard,
+                         parent->_globalTransform,
+                         billboardLeaf->opbId());
             }
         }
 
         template<typename Callable>
         size_t cullDirectionalLights(size_t limit, Callable callable) const
         {
-            // TODO: sort by "front-to-back"
-            // TODO: sort by distance and cull the farest
-
             size_t index = 0;
             auto it = _directionalLightLeaves.begin();
             while(it != _directionalLightLeaves.end() && index < limit)
@@ -210,9 +198,6 @@ namespace minire
         template<typename Callable>
         size_t cullPointLights(size_t limit, Callable callable) const
         {
-            // TODO: sort by "front-to-back"
-            // TODO: sort by distance and cull the farest
-
             size_t index = 0;
             auto it = _pointLightLeaves.begin();
             while(it != _pointLightLeaves.end() && index < limit)
@@ -228,7 +213,7 @@ namespace minire
                             assert(parent->hasGlobalTransform());
                             auto const & current = pointLight->current();
                             callable(index,
-                                     parent->_globalPosition, // TODO: it could be taken from _globalTransform
+                                     parent->_globalPosition,
                                      current._color,
                                      current._attenuation,
                                      current._shadowParams);
@@ -244,12 +229,6 @@ namespace minire
             }
             return index;
         }
-
-    public:
-        size_t meshesCount() const { return _meshLeaves.size(); }
-        size_t billboardsCount() const { return _billboardsLeaves.size(); }
-        size_t directionalLightsCount() const { return _directionalLightLeaves.size(); }
-        size_t pointLightsCount() const { return _pointLightLeaves.size(); }
 
     private:
         class OpbIdHolder;
@@ -313,8 +292,9 @@ namespace minire
 
             void revalidate(Mask = kAllFlags) override;
 
-            utils::Aabb const & worldAabb(glm::mat4 const & globalTransform,
-                                          size_t globalTransformRevision) const;
+            utils::Aabb const & worldAabb() const { return _worldAabb; }
+
+            void onParentTransformChanged(glm::mat4 const & globalTransform);
 
         private:
             struct SkinBone
@@ -328,9 +308,8 @@ namespace minire
             SkinBones                         _skinBones;
             std::weak_ptr<Node>               _skinOrigin;
             std::unique_ptr<OpbIdHolder>      _opbId;
-
-            mutable utils::Aabb               _worldAabb;
-            mutable size_t                    _worldRevision = 0;
+            utils::Aabb                       _worldAabb;
+            scene::SpatialHandler             _spatialHandler;
 
             friend class SceneImpl;
         };
@@ -420,9 +399,17 @@ namespace minire
 
             void revalidate(Mask = kAllFlags) override;
 
+            utils::Aabb const & worldAabb() const { return _worldAabb; }
+
+            void onParentTransformChanged(glm::mat4 const & globalTransform);
+
         private:
             std::shared_ptr<rasterizer::Billboard> _billboard;
             std::unique_ptr<OpbIdHolder>           _opbId;
+            size_t const                           _zOrder;
+
+            utils::Aabb                            _worldAabb;
+            scene::SpatialHandler                  _spatialHandler;
 
             friend class SceneImpl;
         };
@@ -568,6 +555,9 @@ namespace minire
             template<typename T>
             void invalidateChildren(Mask);
 
+            template<typename T>
+            void notifyLeavesTransformChanged(glm::mat4 const &);
+
             bool advanceAnimation();
 
             AnimationTracksSptr
@@ -621,7 +611,6 @@ namespace minire
             LerpableTransform     _localTransform;
             glm::vec3             _globalPosition;
             glm::mat4             _globalTransform;
-            size_t                _globalTransformRevision = 0;
             glm::mat4             _localTransformMatrix;
             Wptr                  _parent;
             ChildrenMap           _children;
@@ -659,14 +648,13 @@ namespace minire
         };
 
     private:
+        // TODO: avoid Wptr in critical loop,
+        //       maybe use trivial implementation of SpatialIndex (something like so)
+
         using ActiveCamera = std::variant<std::monostate,
                                           PerspectiveCameraLeaf::Wptr,
                                           OrthographicCameraLeaf::Wptr>;
 
-        using BillboardsLeafRecord = std::pair<size_t, BillboardLeaf::Wptr>;
-
-        using MeshLeaves = std::list<MeshLeaf::Wptr>;
-        using BillboardsLeaves = std::list<BillboardsLeafRecord>;
         using DirectionalLightLeaves = std::list<DirectionalLightLeaf::Wptr>;
         using PointLightLeaves = std::list<PointLightLeaf::Wptr>;
 
@@ -679,6 +667,11 @@ namespace minire
         using OpbIdToSceneItem = std::unordered_map<OpbId, WeakSceneItem>;
 
         using PixelEdgeOutlines = std::unordered_map<OpbId, models::outline::PixelEdge>;
+
+        using BillboardElement = std::tuple<float /* dist */,
+                                            std::shared_ptr<Node>, /* locked parent */
+                                            BillboardLeaf *>;
+        using BillboardElements = std::vector<BillboardElement>;
 
     private:
         void revalidate(Node *, Node::Mask);
@@ -698,6 +691,11 @@ namespace minire
     private:
         Rasterizer                   & _rasterizer;
 
+        // NOTE: while destructing, Leaves will release SpatialHandler
+        //       which reference to _spatialIndex, therefore,
+        //       it must be destroyed the last one.
+        scene::SpatialIndex::Uptr      _spatialIndex;
+
         // NOTE: while destructing, Leaves will release OpbId's,
         //       thereofe _vacantOpbIds and _opbIdToSceneItem must
         //       be destroyed last.
@@ -716,10 +714,12 @@ namespace minire
         size_t                         _nodesEstimate = 1;
 
         mutable PixelEdgeOutlines      _pixelEdgeOutlines;
-        mutable MeshLeaves             _meshLeaves;
-        mutable BillboardsLeaves       _billboardsLeaves;
+
+        mutable std::vector<void *>    _meshCullBuffer;
+        mutable std::vector<void *>    _billboardCullBuffer;
         mutable DirectionalLightLeaves _directionalLightLeaves;
         mutable PointLightLeaves       _pointLightLeaves;
+        mutable BillboardElements      _billboardWideCullBuffer;
 
         friend class Node;
         friend class MeshLeaf;

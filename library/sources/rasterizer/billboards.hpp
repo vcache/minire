@@ -5,6 +5,8 @@
 namespace minire { class SceneImpl; }
 namespace minire::content { class Manager; }
 namespace minire::scene { class Viewpoint; }
+namespace minire::utils { class Aabb; }
+namespace minire::utils { class FrustumPlanes; }
 
 #include <glm/mat4x4.hpp>
 
@@ -26,6 +28,8 @@ namespace minire::rasterizer
         std::shared_ptr<Billboard> create(models::Billboard const &) const;
 
         void draw(SceneImpl const &) const;
+
+        utils::Aabb const & aabb(Billboard const &) const;
 
     public:
         class Program;

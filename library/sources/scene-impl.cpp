@@ -6,6 +6,7 @@
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
+#include <minire/scene/spatial-index/brute-force.hpp>
 #include <minire/utils/demangle.hpp>
 #include <minire/utils/geometry.hpp>
 #include <minire/utils/overloaded.hpp>
@@ -106,7 +107,12 @@ namespace minire
         , _opbId(scene._enableOpb // OpbId is always allocated (even if disabled in a model)
                     ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
                     : std::unique_ptr<SceneImpl::OpbIdHolder>())
+        , _worldAabb()
+        , _spatialHandler(*scene._spatialIndex, this, kMeshLayer, _worldAabb)
     {
+        auto p = _parent.lock();
+        onParentTransformChanged(p ? p->_globalTransform : glm::mat4(1.0f));
+
         // calling at the end, to avoid unwanted calls to virtual methods
         Object::propagate(); // must be called before "setAllowPropagation" !
         setAllowPropagation(true);
@@ -148,17 +154,12 @@ namespace minire
         Object::revalidate(mask);
     }
 
-    utils::Aabb const & SceneImpl::MeshLeaf::worldAabb(glm::mat4 const & globalTransform,
-                                                       size_t globalTransformRevision) const
+    void SceneImpl::MeshLeaf::onParentTransformChanged(glm::mat4 const & globalTransform)
     {
-        if (_worldRevision != globalTransformRevision)
-        {
-            assert(_mesh);
-            _worldAabb = _mesh->aabb();
-            _worldAabb.transform(globalTransform);
-            _worldRevision = globalTransformRevision;
-        }
-        return _worldAabb;
+        assert(_mesh);
+        _worldAabb = _mesh->aabb();
+        _worldAabb.transform(globalTransform);
+        _spatialHandler.update(_worldAabb);
     }
 
     void SceneImpl::DirectionalLightLeaf::revalidate(Mask mask)
@@ -225,7 +226,13 @@ namespace minire
         , _opbId(scene._enableOpb // OpbId is always allocated (even if disabled in a model)
                     ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
                     : std::unique_ptr<SceneImpl::OpbIdHolder>())
+        , _zOrder(model._zOrder)
+        , _worldAabb()
+        , _spatialHandler(*scene._spatialIndex, this, kBillboardLayer, _worldAabb)
     {
+        auto p = _parent.lock();
+        onParentTransformChanged(p ? p->_globalTransform : glm::mat4(1.0f));
+
         // calling at the end, to avoid unwanted calls to virtual methods
         Object::propagate(); // must be called before "setAllowPropagation" !
         setAllowPropagation(true);
@@ -267,6 +274,14 @@ namespace minire
         Object::revalidate(mask);
     }
 
+    void SceneImpl::BillboardLeaf::onParentTransformChanged(glm::mat4 const & globalTransform)
+    {
+        assert(_billboard);
+        _worldAabb = _scene._rasterizer.billboards().aabb(*_billboard);
+        _worldAabb.transform(globalTransform);
+        _spatialHandler.update(_worldAabb);
+    }
+
     // SceneImpl::Node //
 
     scene::Node::Sptr SceneImpl::Node::make(std::string const & name, models::Node model)
@@ -292,9 +307,6 @@ namespace minire
             auto [_, inserted] = _children.emplace(name, meshLeaf);
             MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
         }
-
-        // TODO: probably can be replaced to _opbIdToSceneItem
-        _scene._meshLeaves.push_back(meshLeaf);
 
         if (meshLeaf->_opbId)
         {
@@ -385,13 +397,6 @@ namespace minire
         auto billboardLeaf = std::make_shared<BillboardLeaf>(name, model, weak_from_this(), billboard, _scene);
         auto [_, inserted] = _children.emplace(name, billboardLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
-
-        // TODO: can be replaced by _opbIdToSceneItem
-        _scene._billboardsLeaves.emplace_back(model._zOrder, billboardLeaf);
-        _scene._billboardsLeaves.sort([](auto const & a, auto const & b)
-            {
-                return a.first < b.first;
-            });
 
         if (billboardLeaf->_opbId)
         {
@@ -725,7 +730,8 @@ namespace minire
                                                              : kIdentityMatrix;
             _globalTransform = parentGlobalTransform * _localTransformMatrix;
             _globalPosition = _globalTransform * kGlobalOrigin; // will drop "w"
-            ++_globalTransformRevision;
+            notifyLeavesTransformChanged<MeshLeaf::Sptr>(_globalTransform);
+            notifyLeavesTransformChanged<BillboardLeaf::Sptr>(_globalTransform);
 
             dropMask |= kParentTransformChanged;
             invalidateChildren<Node::Sptr>(kParentTransformChanged);
@@ -825,6 +831,19 @@ namespace minire
             {
                 assert(*item);
                 (*item)->invalidate(mask, false);
+            }
+        }
+    }
+
+    template<typename T>
+    void SceneImpl::Node::notifyLeavesTransformChanged(glm::mat4 const & globalTransform)
+    {
+        for(auto const & [_, child] : _children)
+        {
+            if (T const * item = std::get_if<T>(&child); item)
+            {
+                assert(*item);
+                (*item)->onParentTransformChanged(globalTransform);
             }
         }
     }
@@ -1004,6 +1023,7 @@ namespace minire
 
     SceneImpl::SceneImpl(Rasterizer & rasterizer)
         : _rasterizer(rasterizer)
+        , _spatialIndex(std::make_unique<scene::spatial_index::BruteForce>())
         , _enableOpb(true)  // TODO: make OPB optional (as an attachable unit for The NextGenPipeline (NGP))
                             // TODO: MASS should be disable when OPB is used
     {
@@ -1069,6 +1089,23 @@ namespace minire
         _root = std::make_shared<Node>("(the root)",
             models::Node{models::Transform{}},
             Node::Wptr(), *this);
+    }
+
+    void SceneImpl::setupSpatialIndex(scene::SpatialIndex::Uptr && spatialIndex)
+    {
+        reset();
+
+        if (spatialIndex)
+        {
+            _spatialIndex = std::move(spatialIndex);
+        }
+        else
+        {
+            _spatialIndex = std::make_unique<scene::spatial_index::BruteForce>();
+        }
+
+        // SpatialIndex must always persist
+        assert(_spatialIndex);
     }
 
     scene::SceneItem SceneImpl::fetchSceneItem(size_t const x, size_t const y) const

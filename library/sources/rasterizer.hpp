@@ -30,7 +30,7 @@
 #include <glm/mat4x4.hpp>
 
 namespace minire::content { class Manager; }
-namespace minire::utils { class SatPlanes; }
+namespace minire::utils { class FrustumPlanes; }
 
 namespace minire
 {
@@ -72,19 +72,15 @@ namespace minire
 
 
     private:
-        rasterizer::CulledDirectionalLights cullDirectionalLights(SceneImpl const &);
-        rasterizer::CulledPointLights cullPointLights(SceneImpl const &);
-        rasterizer::CulledPrimitives cullPrimitives(SceneImpl const &,
-                                                    utils::SatPlanes const &);
+        void cullDirectionalLights(SceneImpl const &);
+        void cullPointLights(SceneImpl const &);
+        void cullPrimitives(SceneImpl const &, utils::FrustumPlanes const &,
+                            rasterizer::CulledPrimitives & out);
 
     private:
-        void shadowPass(SceneImpl const &,
-                        rasterizer::CulledDirectionalLights &,
-                        rasterizer::CulledPointLights &);
+        void shadowPass(SceneImpl const &);
+        void colorPass(SceneImpl const &);
 
-        void colorPass(SceneImpl const &,
-                       rasterizer::CulledDirectionalLights const &,
-                       rasterizer::CulledPointLights const &);
         void draw3d(SceneImpl const &,
                     rasterizer::CulledPrimitives const &,
                     material::TextureRefs const &,
@@ -98,53 +94,57 @@ namespace minire
         class ScreenPassUbo;
 
     private:
-        content::Manager               & _contentManager;
+        content::Manager                  & _contentManager;
 
         // Object required fo Multi-Render Target (MRT)
-        opengl::FBO                      _primaryFbo;
-        opengl::Texture::Uptr            _colorBuffer;
-        opengl::Texture::Uptr            _idBuffer;
-        opengl::RBO::Uptr                _depthRbo;
-        opengl::VAO                      _screenQuadVao;
-        opengl::VBO                      _screenQuadVbo;
-        opengl::Program                  _screenQuadProgram;
-        GLint const                      _screenTextureUniform;
-        GLint const                      _idTextureUniform;
-        GLint const                      _outlineIdsUniform;
-        GLint const                      _outlineIdsCountUniform;
-        opengl::PBO::Uptr                _hotFragmentPbo; // PBO for ID under the cursor (a hot fragment)
-        size_t                           _hotFragmentX = 0;
-        size_t                           _hotFragmentY = 0;
-        std::unique_ptr<ScreenPassUbo>   _screenPassUbo;
+        opengl::FBO                         _primaryFbo;
+        opengl::Texture::Uptr               _colorBuffer;
+        opengl::Texture::Uptr               _idBuffer;
+        opengl::RBO::Uptr                   _depthRbo;
+        opengl::VAO                         _screenQuadVao;
+        opengl::VBO                         _screenQuadVbo;
+        opengl::Program                     _screenQuadProgram;
+        GLint const                         _screenTextureUniform;
+        GLint const                         _idTextureUniform;
+        GLint const                         _outlineIdsUniform;
+        GLint const                         _outlineIdsCountUniform;
+        opengl::PBO::Uptr                   _hotFragmentPbo; // PBO for ID under the cursor (a hot fragment)
+        size_t                              _hotFragmentX = 0;
+        size_t                              _hotFragmentY = 0;
+        std::unique_ptr<ScreenPassUbo>      _screenPassUbo;
 
         // NOTE: the order of these is ridiculously vital (see ctor)
-        rasterizer::Ubo                  _ubo;
+        rasterizer::Ubo                     _ubo;
 
-        rasterizer::InstancedBuffersPool _instancedBuffersPool;
-        rasterizer::Coordinates          _coordinates;
-        rasterizer::Lines                _lines;
-        rasterizer::Textures             _textures;
-        rasterizer::Materials            _materials;
-        rasterizer::VertexBuffers        _vertexBuffers;
-        rasterizer::Meshes               _meshes;
-        rasterizer::Fonts                _fonts;
-        rasterizer::Labels               _labels;
-        rasterizer::Sprites              _sprites;
-        rasterizer::Billboards           _billboards;
+        rasterizer::InstancedBuffersPool    _instancedBuffersPool;
+        rasterizer::Coordinates             _coordinates;
+        rasterizer::Lines                   _lines;
+        rasterizer::Textures                _textures;
+        rasterizer::Materials               _materials;
+        rasterizer::VertexBuffers           _vertexBuffers;
+        rasterizer::Meshes                  _meshes;
+        rasterizer::Fonts                   _fonts;
+        rasterizer::Labels                  _labels;
+        rasterizer::Sprites                 _sprites;
+        rasterizer::Billboards              _billboards;
 
-        FlatShadowMaps                   _flatShadowMaps;
-        material::TextureRefs            _directionalLightsShadowMaps;
+        FlatShadowMaps                      _flatShadowMaps;
+        material::TextureRefs               _directionalLightsShadowMaps;
 
-        CubeShadowMaps                   _cubeShadowMaps;
-        material::TextureRefs            _pointLightsShadowMaps;
+        CubeShadowMaps                      _cubeShadowMaps;
+        material::TextureRefs               _pointLightsShadowMaps;
 
-        rasterizer::Resources            _resources;
+        rasterizer::CulledPrimitives        _culledPrimitives; // for color pass
+        rasterizer::CulledDirectionalLights _culledDirectionalLights;
+        rasterizer::CulledPointLights       _culledPointLights;
 
-        glm::mat4                        _2dProjection;
-        rasterizer::Drawable::PtrsList   _drawables;
-        size_t                           _modelsUsage;
+        rasterizer::Resources               _resources;
 
-        size_t                           _screenWidth;
-        size_t                           _screenHeight;
+        glm::mat4                           _2dProjection;
+        rasterizer::Drawable::PtrsList      _drawables;
+        size_t                              _modelsUsage;
+
+        size_t                              _screenWidth;
+        size_t                              _screenHeight;
     };
 }

@@ -4,6 +4,8 @@
 #include <minire/errors.hpp>
 #include <minire/models/billboard.hpp>
 #include <minire/models/font-face.hpp>
+#include <minire/utils/aabb.hpp>
+#include <minire/utils/culling-test.hpp>
 #include <minire/utils/overloaded.hpp>
 
 #include <opengl.hpp>
@@ -296,13 +298,24 @@ namespace minire::rasterizer
                 layout(location = 0) out vec4 bznkOutColor;
                 layout(location = 1) out uint bznkOutMeshId;
 
+                float getFactor(uint fontIndex, ivec2 offset)
+                {
+                    //float fgFactor = texture(bznkFonts[bznkFragFont], bznkFragUv).r;
+                    switch(fontIndex)
+                    {
+                        case 0u: return texelFetch(bznkFonts[0], offset, 0).r;
+                        case 1u: return texelFetch(bznkFonts[1], offset, 0).r;
+                        case 2u: return texelFetch(bznkFonts[2], offset, 0).r;
+                        default: return 0.0;
+                    }
+                }
+
                 void main()
                 {
                     // TODO: should use texture() instead texel() (but have to normalize UVs)
                     ivec2 offset = ivec2(bznkFragUv);
-                    float fgFactor = texelFetch(bznkFonts[bznkFragFont], offset, 0).r;
 
-                    //float fgFactor = texture(bznkFonts[bznkFragFont], bznkFragUv).r;
+                    float fgFactor = getFactor(bznkFragFont, offset);
                     float bgFactor = 1.0 - fgFactor;
                     bznkOutColor = bznkFragBgColor * bgFactor
                                  + bznkFragFgColor * fgFactor;
@@ -400,12 +413,22 @@ namespace minire::rasterizer
                 layout(location = 0) out vec4 bznkOutColor;
                 layout(location = 1) out uint bznkOutMeshId;
 
+                float getFactor(uint fontIndex, ivec2 offset)
+                {
+                    //float fgFactor = texture(bznkFonts[bznkFragFont], bznkFragUv).r;
+                    switch(fontIndex)
+                    {
+                        case 0u: return texelFetch(bznkFonts[0], offset, 0).r;
+                        case 1u: return texelFetch(bznkFonts[1], offset, 0).r;
+                        case 2u: return texelFetch(bznkFonts[2], offset, 0).r;
+                        default: return 0.0;
+                    }
+                }
+
                 void main()
                 {
                     ivec2 offset = ivec2(bznkFragUv);
-                    float fgFactor = texelFetch(bznkFonts[bznkFragFont], offset, 0).r;
-
-                    //float fgFactor = texture(bznkFonts[bznkFragFont], bznkFragUv).r;
+                    float fgFactor = getFactor(bznkFragFont, offset);
                     float bgFactor = 1.0 - fgFactor;
                     bznkOutColor = bznkFragBgColor * bgFactor
                                  + bznkFragFgColor * fgFactor;
@@ -460,11 +483,20 @@ namespace minire::rasterizer
     class Billboard
     {
     public:
+        explicit Billboard(utils::Aabb const & aabb)
+            : _aabb(aabb)
+        {}
+
         virtual ~Billboard() = default;
         virtual void draw(glm::mat4 const & transform,
                           scene::Viewpoint const & viewpoint,
                           glm::mat4 const & viewProj,
                           SceneImpl::OpbId const &) const = 0;
+
+        utils::Aabb const & aabb() const { return _aabb; }
+
+    private:
+        utils::Aabb const _aabb;
     };
 
     namespace
@@ -473,10 +505,12 @@ namespace minire::rasterizer
             : public rasterizer::Billboard
         {
         public:
-            explicit SpriteBillboard(Textures::Texture::Sptr const & texture,
+            explicit SpriteBillboard(utils::Aabb const & aabb,
+                                     Textures::Texture::Sptr const & texture,
                                      std::vector<sprites::Vertex> const & vertices,
                                      Billboards::ProgramSptr const & program)
-                : _texture(texture)
+                : Billboard(aabb)
+                , _texture(texture)
                 , _vertexBuffer(vertices)
                 , _program(program)
             {
@@ -510,12 +544,14 @@ namespace minire::rasterizer
         public:
             using FontSptr = std::shared_ptr<Font const>;
 
-            explicit LabelBillboard(FontSptr fontRegular,
+            explicit LabelBillboard(utils::Aabb const & aabb,
+                                    FontSptr fontRegular,
                                     FontSptr fontBold,
                                     FontSptr fontItalic,
                                     std::vector<labels::Vertex> const & vertices,
                                     Billboards::ProgramSptr program)
-                : _fontRegular(fontRegular)
+                : Billboard(aabb)
+                , _fontRegular(fontRegular)
                 , _fontBold(fontBold)
                 , _fontItalic(fontItalic)
                 , _vertexBuffer(vertices)
@@ -605,10 +641,27 @@ namespace minire::rasterizer
 
         glm::vec2 pixelFix(glm::vec2 const & in)
         {
-            return glm::vec2(
+            return glm::vec2
+            (
                 std::floor(in.x) + .5f,
                 std::floor(in.y) + .5f
             );
+        }
+
+        // Only applicable for world-space billboards
+        template<typename T>
+        utils::Aabb makeAabb(std::vector<T> const & vertices)
+        {
+            float radius = 0.0f;
+            for (auto const & vertex : vertices)
+            {
+                radius = std::max(radius, glm::length(vertex._pos));
+            }
+
+            utils::Aabb aabb;
+            aabb.extend(glm::vec3(-radius));
+            aabb.extend(glm::vec3(radius));
+            return aabb;
         }
     }
 
@@ -661,7 +714,9 @@ namespace minire::rasterizer
                     vertex._rep /= textureSize;
                     vertex._dims /= textureSize;
                 }
-                return std::make_shared<SpriteBillboard>(textureSptr, vertices, _worldPlacedSprite);
+
+                return std::make_shared<SpriteBillboard>(makeAabb(vertices), textureSptr, vertices,
+                                                         _worldPlacedSprite);
             },
 
             [&](models::Billboard::Screen const & screen)
@@ -672,7 +727,8 @@ namespace minire::rasterizer
                     vertex._pos -= alignment;
                     vertex._pos += screen._screenOffset;
                 }
-                return std::make_shared<SpriteBillboard>(textureSptr, vertices, _screenPlacedSprite);
+                return std::make_shared<SpriteBillboard>(utils::Aabb(), textureSptr, vertices,
+                                                         _screenPlacedSprite);
             }
         }, billboard._placement);
     }
@@ -721,7 +777,8 @@ namespace minire::rasterizer
             {
                 adjustWorldPosition(realContentSize, world, vertices);
                 return std::make_shared<LabelBillboard>(
-                    fontRegular, fontBold, fontItalic, vertices, _worldPlacedLabel);
+                    makeAabb(vertices), fontRegular, fontBold, fontItalic, vertices,
+                    _worldPlacedLabel);
             },
 
             [&](models::Billboard::Screen const & screen)
@@ -734,7 +791,8 @@ namespace minire::rasterizer
                     vertex._pos = pixelFix(vertex._pos);
                 }
                 return std::make_shared<LabelBillboard>(
-                    fontRegular, fontBold, fontItalic, vertices, _screenPlacedLabel);
+                    utils::Aabb(), fontRegular, fontBold, fontItalic, vertices,
+                    _screenPlacedLabel);
             }
 
         }, billboard._placement);
@@ -743,18 +801,24 @@ namespace minire::rasterizer
     void Billboards::draw(SceneImpl const & scene) const
     {
         scene::Viewpoint const & viewpoint = scene.viewpoint();
+        utils::FrustumPlanes const & frustumPlanes = utils::precalcFrustumPlanes(viewpoint.viewFrustum());
         assert(viewpoint.hasCamera());
 
         auto const viewProj = viewpoint.projection() * viewpoint.view();
 
         // NOTE: assuming that billboards from the same node are already sorted
         //       (i.e. has correct relative order)
-        scene.cullBillboards(
+        scene.cullBillboards(frustumPlanes,
             [&viewpoint, &viewProj](rasterizer::Billboard const & billboard,
                                     glm::mat4 const & transform,
                                     SceneImpl::OpbId const opbId)
             {
                 billboard.draw(transform, viewpoint, viewProj, opbId);
             });
+    }
+
+    utils::Aabb const & Billboards::aabb(Billboard const & billboard) const
+    {
+        return billboard.aabb();
     }
 }

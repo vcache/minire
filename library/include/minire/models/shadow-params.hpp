@@ -1,6 +1,9 @@
 #pragma once
 
+#include <glm/vec3.hpp>
+
 #include <optional>
+#include <utility>
 #include <variant>
 
 namespace minire::models

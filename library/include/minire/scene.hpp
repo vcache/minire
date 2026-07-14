@@ -50,6 +50,8 @@ namespace minire
         class Billboard;
         class Node;
 
+        class SpatialIndex;
+
         using SceneItem = std::variant<std::monostate,
                                        std::shared_ptr<Mesh>,
                                        std::shared_ptr<DirectionalLight>,
@@ -660,6 +662,10 @@ namespace minire
         // A faster method to fetch a Mesh under the mouse cursor.
         // Returns only visible and renderable Scene leaves (Mesh or Billboard).
         virtual scene::SceneItem fetchHotSceneItem() const = 0;
+
+        // IMPORTANT NOTE: this operation will reset the scene (just as calling a reset()).
+        //                 This restriction will be lifted in the future.
+        virtual void setupSpatialIndex(std::unique_ptr<scene::SpatialIndex> &&) = 0;
 
     public:
         glm::vec3 const & ambientLight() const { return _ambientLight; }

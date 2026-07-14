@@ -2,12 +2,12 @@
 
 #include <rasterizer/filters/gaussian-blur.hpp>
 #include <rasterizer/mesh.hpp>
-#include <utils/culling-test.hpp>
 #include <utils/frustum.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 #include <minire/material.hpp>
+#include <minire/utils/culling-test.hpp>
 #include <minire/utils/overloaded.hpp>
 
 #include <glm/gtx/transform.hpp>
@@ -385,6 +385,18 @@ namespace minire::rasterizer
         return lightProjection * lightView;
     }
 
+    /*
+        TODO: optimization idea from ai: The "Caster/Receiver" Extrusion
+            If you want to get highly optimized (especially for directional lights),
+            you don't actually need to test the light frustum against all objects.
+            You only care about objects that cast shadows onto visible surfaces.
+
+            - Find the AABB of the actual visible geometry.
+            - Extrude that AABB backwards along the light vector.
+            - Only test objects against this extruded shape.
+
+            (aka Shadow Caster Culling or Light Space Extrusion)
+    */
     glm::mat4 FlatShadowMap::perform(glm::vec3 const & lightPosition,
                                      glm::vec3 const & lightDirection,
                                      utils::ViewFrustum const & viewFrustum,
@@ -417,9 +429,10 @@ namespace minire::rasterizer
 
         // cull models against this light source
         utils::ViewFrustum const & lightFustum = utils::makeFrustum(lightVP);
-        utils::SatPlanes const & satPlanes = utils::precalcSatPlanes(lightFustum);
+        utils::FrustumPlanes const & frustumPlanes = utils::precalcFrustumPlanes(lightFustum);
         assert(cullFunction);
-        rasterizer::CulledPrimitives const & primitives = cullFunction(satPlanes);
+        _culledPrimitives.clear();
+        cullFunction(frustumPlanes, _culledPrimitives);
 
         // setup material-specific unifroms
         assert(_material);
@@ -432,7 +445,7 @@ namespace minire::rasterizer
         }, _shadowParams._method);
 
         // perform the drawing
-        for(auto const & [uniquePrimitive, primitiveInstances] : primitives)
+        for(auto const & [uniquePrimitive, primitiveInstances] : _culledPrimitives)
         {
             Materials::Brush::Sptr & brush = uniquePrimitive._mesh.extraBrush(
                 uniquePrimitive._primitiveIndex, _meshConsumerKey);

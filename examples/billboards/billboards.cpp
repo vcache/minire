@@ -22,7 +22,7 @@ namespace
             return minire::text::FormattedString(
                 "Hello world",
                 minire::text::Format().background(glm::vec4(0, 0, 0, 0))
-                                      .foreground(glm::vec4(1, 0, 0, 0)));
+                                      .foreground(glm::vec4(1, 0, 0, 1)));
         }
 
         void onStart() override

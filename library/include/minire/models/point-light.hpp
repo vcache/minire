@@ -2,6 +2,7 @@
 
 #include <minire/models/shadow-params.hpp>
 
+#include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
