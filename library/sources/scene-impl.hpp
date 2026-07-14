@@ -114,6 +114,7 @@ namespace minire
             assert(_spatialIndex);
             _billboardCullBuffer.clear();
             _spatialIndex->cull(frustumPlanes, kBillboardLayer, _billboardCullBuffer);
+            _billboardWideCullBuffer.clear();
             _billboardWideCullBuffer.reserve(_billboardCullBuffer.size());
             glm::vec3 const forwardVector = _viewpoint.forwardVector();
             for(void * opaque : _billboardCullBuffer)
