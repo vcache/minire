@@ -6,6 +6,8 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#include <optional>
+
 namespace minire::models
 {
     /*
@@ -63,5 +65,7 @@ namespace minire::models
             _color       = glm::mix(prev._color,       last._color,       weight);
             _attenuation = glm::mix(prev._attenuation, last._attenuation, weight);
         }
+
+        std::optional<float> maxRadius() const;
     };
 }

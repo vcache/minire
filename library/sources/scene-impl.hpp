@@ -38,6 +38,7 @@ namespace minire
 
         static constexpr scene::IndexLayer kMeshLayer       = 0;
         static constexpr scene::IndexLayer kBillboardLayer  = 1;
+        static constexpr scene::IndexLayer kPointLightLayer = 2;
 
     public:
         explicit SceneImpl(Rasterizer &);
@@ -197,35 +198,36 @@ namespace minire
         }
 
         template<typename Callable>
-        size_t cullPointLights(size_t limit, Callable callable) const
+        size_t cullPointLights(utils::FrustumPlanes const & frustumPlanes,
+                               size_t limit, Callable callable) const
         {
+            assert(_spatialIndex);
+            _pointLightCullBuffer.clear();
+            _spatialIndex->cull(frustumPlanes, kPointLightLayer, _pointLightCullBuffer);
+
             size_t index = 0;
-            auto it = _pointLightLeaves.begin();
-            while(it != _pointLightLeaves.end() && index < limit)
+            for (void * opaque : _pointLightCullBuffer)
             {
-                if (auto const & pointLight = it->lock(); pointLight)
+                if (PointLightLeaf * pointLightLeaf = static_cast<PointLightLeaf *>(opaque);
+                    pointLightLeaf && pointLightLeaf->visible())
                 {
-                    if (pointLight->visible())
+                    auto parent = pointLightLeaf->_parent.lock();
+                    MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
+                    if (parent->_effectiveVisible &&
+                        utils::cullingTest(pointLightLeaf->worldAabb(), frustumPlanes))
                     {
-                        auto parent = pointLight->_parent.lock();
-                        MINIRE_INVARIANT(parent, "a point light doesn't have a parent");
-                        if (parent->_effectiveVisible)
-                        {
-                            assert(parent->hasGlobalTransform());
-                            auto const & current = pointLight->current();
-                            callable(index,
-                                     parent->_globalPosition,
-                                     current._color,
-                                     current._attenuation,
-                                     current._shadowParams);
-                            ++index;
-                        }
+                        assert(parent->hasGlobalTransform());
+                        auto const & current = pointLightLeaf->current();
+                        callable(index,
+                                 parent->_globalPosition,
+                                 current._color,
+                                 current._attenuation,
+                                 current._shadowParams);
+                        ++index;
+
+                        if (index >= limit)
+                            break;
                     }
-                    ++it;
-                }
-                else
-                {
-                    it = _pointLightLeaves.erase(it);
                 }
             }
             return index;
@@ -351,9 +353,24 @@ namespace minire
                                   models::PointLight>
         {
         public:
-            using LerpableLeaf::LerpableLeaf;
+            explicit PointLightLeaf(std::string name,
+                                    ModelType const & model,
+                                    std::weak_ptr<Node> parent,
+                                    SceneImpl & scene);
 
             void revalidate(Mask = kAllFlags) override;
+
+            utils::Aabb const & worldAabb() const { return _worldAabb; }
+
+            void onParentTransformChanged(glm::mat4 const & globalTransform);
+
+        private:
+            utils::Aabb localAabb() const;
+
+        private:
+            utils::Aabb           _localAabb;
+            utils::Aabb           _worldAabb;
+            scene::SpatialHandler _spatialHandler;
         };
 
         class PerspectiveCameraLeaf final
@@ -719,7 +736,7 @@ namespace minire
         mutable std::vector<void *>    _meshCullBuffer;
         mutable std::vector<void *>    _billboardCullBuffer;
         mutable DirectionalLightLeaves _directionalLightLeaves;
-        mutable PointLightLeaves       _pointLightLeaves;
+        mutable std::vector<void *>    _pointLightCullBuffer;
         mutable BillboardElements      _billboardWideCullBuffer;
 
         friend class Node;

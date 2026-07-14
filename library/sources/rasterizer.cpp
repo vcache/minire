@@ -405,12 +405,13 @@ namespace minire
             });
     }
 
-    void Rasterizer::cullPointLights(SceneImpl const & scene)
+    void Rasterizer::cullPointLights(SceneImpl const & scene,
+                                     utils::FrustumPlanes const & frustumPlanes)
     {
         _culledPointLights.clear();
         _culledPointLights.reserve(rasterizer::Ubo::maxPointLights());
         size_t shadowMapIndex = 0;
-        scene.cullPointLights(
+        scene.cullPointLights(frustumPlanes,
             rasterizer::Ubo::maxPointLights(),
             [this, &shadowMapIndex](size_t const /*index*/,
                                     glm::vec3 const & position,
@@ -488,17 +489,19 @@ namespace minire
 
     void Rasterizer::draw(SceneImpl const & scene)
     {
+        utils::ViewFrustum const & viewFrustum = scene.viewpoint().viewFrustum();
+        utils::FrustumPlanes const & frustumPlanes = utils::precalcFrustumPlanes(viewFrustum);
+
         cullDirectionalLights(scene);
-        cullPointLights(scene);
-        shadowPass(scene);
-        colorPass(scene);
+        cullPointLights(scene, frustumPlanes);
+        shadowPass(scene, viewFrustum);
+        colorPass(scene, frustumPlanes);
         draw2d();
     }
 
-    void Rasterizer::shadowPass(SceneImpl const & scene)
+    void Rasterizer::shadowPass(SceneImpl const & scene,
+                                utils::ViewFrustum const & viewFrustum)
     {
-        utils::ViewFrustum const & viewFrustum = scene.viewpoint().viewFrustum();
-
         // build shadow maps for directional lights (if any)
         for(rasterizer::CulledDirectionalLight & light : _culledDirectionalLights)
         {
@@ -534,11 +537,10 @@ namespace minire
         }
     }
 
-    void Rasterizer::colorPass(SceneImpl const & scene)
+    void Rasterizer::colorPass(SceneImpl const & scene,
+                               utils::FrustumPlanes const & frustumPlanes)
     {
         // cull primitives againts camera's frustum
-        utils::ViewFrustum const & viewFrustum = scene.viewpoint().viewFrustum();
-        utils::FrustumPlanes const & frustumPlanes = utils::precalcFrustumPlanes(viewFrustum);
         _culledPrimitives.clear();
         cullPrimitives(scene, frustumPlanes, _culledPrimitives);
 

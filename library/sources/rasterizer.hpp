@@ -73,13 +73,13 @@ namespace minire
 
     private:
         void cullDirectionalLights(SceneImpl const &);
-        void cullPointLights(SceneImpl const &);
+        void cullPointLights(SceneImpl const &, utils::FrustumPlanes const &);
         void cullPrimitives(SceneImpl const &, utils::FrustumPlanes const &,
                             rasterizer::CulledPrimitives & out);
 
     private:
-        void shadowPass(SceneImpl const &);
-        void colorPass(SceneImpl const &);
+        void shadowPass(SceneImpl const &, utils::ViewFrustum const &);
+        void colorPass(SceneImpl const &, utils::FrustumPlanes const &);
 
         void draw3d(SceneImpl const &,
                     rasterizer::CulledPrimitives const &,

@@ -173,12 +173,44 @@ namespace minire
         Object::revalidate(mask);
     }
 
+    SceneImpl::PointLightLeaf::PointLightLeaf(std::string name,
+                                              ModelType const & model,
+                                              std::weak_ptr<Node> parent,
+                                              SceneImpl & scene)
+        : LerpableLeaf(std::move(name), model, std::move(parent), scene)
+        , _localAabb(localAabb())
+        , _worldAabb()
+        , _spatialHandler(*scene._spatialIndex, this, kPointLightLayer, _worldAabb)
+    {
+        auto p = _parent.lock(); // recalc worldAabb
+        onParentTransformChanged(p ? p->_globalTransform : glm::mat4(1.0f));
+    }
+
+    void SceneImpl::PointLightLeaf::onParentTransformChanged(glm::mat4 const & globalTransform)
+    {
+        _worldAabb = _localAabb;
+        _worldAabb.transform(globalTransform);
+        _spatialHandler.update(_worldAabb);
+    }
+
+    // TODO: possible bug, localAabb (and therefore worldAabb) won't be lerped
+    utils::Aabb SceneImpl::PointLightLeaf::localAabb() const
+    {
+        float const maxRadius = current().maxRadius().value_or(100000.0f);
+        return utils::Aabb(-maxRadius, -maxRadius, -maxRadius,
+                            maxRadius,  maxRadius,  maxRadius);
+    }
+
     void SceneImpl::PointLightLeaf::revalidate(Mask mask)
     {
         if (invalidatedAny(mask & (kColor | kAttenuation)))
         {
             // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
+
+            _localAabb = localAabb();
+            auto p = _parent.lock(); // recalc _worldAabb
+            onParentTransformChanged(p ? p->_globalTransform : glm::mat4(1.0f));
         }
 
         Object::revalidate(mask);
@@ -363,7 +395,6 @@ namespace minire
         auto pointLightLeaf = std::make_shared<PointLightLeaf>(name, model, weak_from_this(), _scene);
         auto [_, inserted] = _children.emplace(name, pointLightLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
-        _scene._pointLightLeaves.push_back(pointLightLeaf);
         return pointLightLeaf;
     }
 
@@ -732,6 +763,7 @@ namespace minire
             _globalPosition = _globalTransform * kGlobalOrigin; // will drop "w"
             notifyLeavesTransformChanged<MeshLeaf::Sptr>(_globalTransform);
             notifyLeavesTransformChanged<BillboardLeaf::Sptr>(_globalTransform);
+            notifyLeavesTransformChanged<PointLightLeaf::Sptr>(_globalTransform);
 
             dropMask |= kParentTransformChanged;
             invalidateChildren<Node::Sptr>(kParentTransformChanged);
