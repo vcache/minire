@@ -152,9 +152,9 @@ namespace minire::scene
         IndexLayer layer(IndexableId indexableId) const { return _idManager.layer(indexableId); }
 
         template<typename Callback>
-        void iterate(Callback && callback) const
+        void iterate(IndexLayer indexLayer, Callback && callback) const
         {
-            _idManager.iterate(std::forward<Callback>(callback));
+            _idManager.iterate(indexLayer, std::forward<Callback>(callback));
         }
 
     private:

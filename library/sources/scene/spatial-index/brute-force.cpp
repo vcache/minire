@@ -3,12 +3,11 @@
 namespace minire::scene::spatial_index
 {
     void BruteForce::cull(utils::FrustumPlanes const &,
-                          IndexLayer targetIndexLayer,
+                          IndexLayer indexLayer,
                           std::vector<IndexPayload *> & output) const
     {
-        iterate(targetIndexLayer,
-                [&output, targetIndexLayer]
-                (IndexableId, IndexPayload * payload, IndexLayer)
+        iterate(indexLayer,
+                [&output] (IndexableId, IndexPayload * payload, IndexLayer)
                 {
                     output.emplace_back(payload);
                 });
