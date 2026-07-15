@@ -111,7 +111,8 @@ namespace minire
         , _spatialHandler(*scene._spatialIndex, this, kMeshLayer, _worldAabb)
     {
         auto p = _parent.lock();
-        onParentTransformChanged(p ? p->_globalTransform : glm::mat4(1.0f));
+        onParentTransformChanged(p && p->hasGlobalTransform() ? p->_globalTransform
+                                                              : glm::mat4(1.0f));
 
         // calling at the end, to avoid unwanted calls to virtual methods
         Object::propagate(); // must be called before "setAllowPropagation" !
@@ -183,7 +184,8 @@ namespace minire
         , _spatialHandler(*scene._spatialIndex, this, kPointLightLayer, _worldAabb)
     {
         auto p = _parent.lock(); // recalc worldAabb
-        onParentTransformChanged(p ? p->_globalTransform : glm::mat4(1.0f));
+        onParentTransformChanged(p && p->hasGlobalTransform() ? p->_globalTransform
+                                                              : glm::mat4(1.0f));
     }
 
     void SceneImpl::PointLightLeaf::onParentTransformChanged(glm::mat4 const & globalTransform)
@@ -210,7 +212,8 @@ namespace minire
 
             _localAabb = localAabb();
             auto p = _parent.lock(); // recalc _worldAabb
-            onParentTransformChanged(p ? p->_globalTransform : glm::mat4(1.0f));
+            onParentTransformChanged(p && p->hasGlobalTransform() ? p->_globalTransform
+                                                                  : glm::mat4(1.0f));
         }
 
         Object::revalidate(mask);
@@ -263,7 +266,8 @@ namespace minire
         , _spatialHandler(*scene._spatialIndex, this, kBillboardLayer, _worldAabb)
     {
         auto p = _parent.lock();
-        onParentTransformChanged(p ? p->_globalTransform : glm::mat4(1.0f));
+        onParentTransformChanged(p && p->hasGlobalTransform() ? p->_globalTransform
+                                                              : glm::mat4(1.0f));
 
         // calling at the end, to avoid unwanted calls to virtual methods
         Object::propagate(); // must be called before "setAllowPropagation" !

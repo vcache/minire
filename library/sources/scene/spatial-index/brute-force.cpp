@@ -6,11 +6,11 @@ namespace minire::scene::spatial_index
                           IndexLayer targetIndexLayer,
                           std::vector<IndexPayload *> & output) const
     {
-        iterate([&output, targetIndexLayer]
-                (IndexableId, IndexPayload * payload, IndexLayer indexLayer)
+        iterate(targetIndexLayer,
+                [&output, targetIndexLayer]
+                (IndexableId, IndexPayload * payload, IndexLayer)
                 {
-                    if (indexLayer == targetIndexLayer)
-                        output.emplace_back(payload);
+                    output.emplace_back(payload);
                 });
     }
 

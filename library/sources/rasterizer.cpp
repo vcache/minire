@@ -555,8 +555,8 @@ namespace minire
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // clean up ID buffer
-        GLuint clearId = 0;
-        MINIRE_GL(glClearBufferuiv, GL_COLOR, 1, &clearId);
+        static std::array<GLuint, 4> const clearId{0, 0, 0, 0};
+        MINIRE_GL(glClearBufferuiv, GL_COLOR, 1, clearId.data());
 
         // actualize shadow maps vector for directional lights
         _directionalLightsShadowMaps.resize(_culledDirectionalLights.size());

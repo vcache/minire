@@ -74,12 +74,12 @@ namespace minire::scene
             }
 
             template<typename Callback>
-            void iterate(Callback callback) const
+            void iterate(IndexLayer indexLayer, Callback callback) const
             {
                 assert(_payloads.size() == _payloadLayers.size());
                 for(IndexableId i = 0; i < _payloads.size(); ++i)
                 {
-                    if (_payloads[i])
+                    if (_payloads[i] && indexLayer == _payloadLayers[i])
                         callback(i, _payloads[i], _payloadLayers[i]);
                 }
             }
