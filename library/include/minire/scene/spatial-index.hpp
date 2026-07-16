@@ -84,6 +84,17 @@ namespace minire::scene
                 }
             }
 
+            template<typename Callback>
+            void iterate(Callback callback) const
+            {
+                assert(_payloads.size() == _payloadLayers.size());
+                for(IndexableId i = 0; i < _payloads.size(); ++i)
+                {
+                    if (_payloads[i])
+                        callback(i, _payloads[i], _payloadLayers[i]);
+                }
+            }
+
         private:
             std::vector<IndexableId> _freeIds;
             std::vector<T *>         _payloads;
@@ -155,6 +166,12 @@ namespace minire::scene
         void iterate(IndexLayer indexLayer, Callback && callback) const
         {
             _idManager.iterate(indexLayer, std::forward<Callback>(callback));
+        }
+
+        template<typename Callback>
+        void iterate(Callback && callback) const
+        {
+            _idManager.iterate(std::forward<Callback>(callback));
         }
 
     private:
