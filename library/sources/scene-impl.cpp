@@ -1218,14 +1218,14 @@ namespace minire
 
     void SceneImpl::revalidate(Node * root, Node::Mask mask)
     {
-        std::vector<Node *> queue{root};
-        queue.reserve(_nodesEstimate);
-        while (!queue.empty())
+        _revalidationQueue.clear();
+        _revalidationQueue.push_back(root);
+        while (!_revalidationQueue.empty())
         {
             // fetch a node
-            Node * node = queue.back();
+            Node * node = _revalidationQueue.back();
             assert(node);
-            queue.pop_back();
+            _revalidationQueue.pop_back();
 
             // revalidate the node itself
             // (it may set/drop children flags)
@@ -1240,12 +1240,12 @@ namespace minire
             {
                 std::visit(utils::Overloaded
                 {
-                    [&queue, mask](Node::Sptr & childNode)
+                    [this, mask](Node::Sptr & childNode)
                     {
                         assert(childNode);
                         if (childNode->invalidatedAny(mask))
                         {
-                            queue.emplace_back(childNode.get());
+                            _revalidationQueue.emplace_back(childNode.get());
                         }
                     },
                     [this, mask, &setHasActivateLeaf](auto & leaf)
@@ -1276,8 +1276,6 @@ namespace minire
             {
                 node->invalidate(Node::kHasActivateChildren);
             }
-
-            _nodesEstimate = std::max(_nodesEstimate, queue.size());
         }
     }
 
@@ -1341,7 +1339,6 @@ namespace minire
 #       ifndef NDEBUG
         // for debug-only: ensure that no nodes has been left invalidated
         std::vector<Node const *> queue;
-        queue.reserve(_nodesEstimate);
         while(!queue.empty())
         {
             Node const * node = queue.back();

@@ -729,7 +729,6 @@ namespace minire
         size_t                         _epochNumber = 0;
         double                         _lerpWeight = 0;
         double                         _frameTime = 0;
-        size_t                         _nodesEstimate = 1;
 
         mutable PixelEdgeOutlines      _pixelEdgeOutlines;
 
@@ -738,6 +737,8 @@ namespace minire
         mutable DirectionalLightLeaves _directionalLightLeaves;
         mutable std::vector<void *>    _pointLightCullBuffer;
         mutable BillboardElements      _billboardWideCullBuffer;
+
+        std::vector<Node *>            _revalidationQueue;
 
         friend class Node;
         friend class MeshLeaf;
