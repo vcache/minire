@@ -154,28 +154,23 @@ namespace minire::scene::spatial_index
         utils::Aabb const aabb(frustumPlanes._min, frustumPlanes._max);
 
         // traverse the frustum's aabb
-        size_t const startOffset = output.size();
+        _requestId += 1;
         iterateTouchedCells(aabb,
             [indexLayer, &output, this] (size_t, GridCell const & gridCell)
             {
                 for(IndexableId id : gridCell._items)
                 {
+                    if (_requestIds[id] == _requestId)
+                        continue;
+
                     if (IndexPayload * payload = get(id);
                         layer(id) == indexLayer && payload)
                     {                        
                         output.emplace_back(payload);
+                        _requestIds[id] = _requestId;
                     }                   
                 }
             });
-
-        // deduplicate
-        if (output.size() > startOffset)
-        {
-            auto begin = output.begin() + startOffset;
-            std::ranges::sort(begin, output.end());
-            auto ret = std::ranges::unique(begin, output.end());
-            output.erase(ret.begin(), ret.end());
-        }
     }
 
     void PlanarGrid::createImpl(IndexableId indexableId,
@@ -191,6 +186,7 @@ namespace minire::scene::spatial_index
         // it's AABB must stored in the heap
         _idToAabb.resize(std::max(_idToAabb.size(), indexableId + 1));
         _idToAabb[indexableId] = aabb;
+        _requestIds.resize(_idToAabb.size());
 
         // ensure the current grid has room for the new element
         if (extend(aabb)) // may modify _idToCells, _grid, _rows, _cols, and _aabb
@@ -256,6 +252,7 @@ namespace minire::scene::spatial_index
         assert(indexableId < _idToCells.size());
         _idToCells[indexableId].clear();
         _idToAabb[indexableId] = utils::Aabb();
+        _requestIds[indexableId] = 0;
     }
 
     template<typename Callback>

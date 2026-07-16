@@ -460,6 +460,7 @@ namespace minire
                                     utils::FrustumPlanes const & frustumPlanes,
                                     rasterizer::CulledPrimitives & output)
     {
+        assert(output.empty());
         scene.cullModels(frustumPlanes,
             [&output] (rasterizer::Mesh const & mesh,
                        glm::vec3 const & emissiveFactor,

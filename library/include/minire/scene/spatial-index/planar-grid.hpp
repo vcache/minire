@@ -59,21 +59,24 @@ namespace minire::scene::spatial_index
 
         using GridCells = std::vector<size_t>;   // offsets in _grid
 
-        glm::vec2 const          _tileSize;
+        glm::vec2 const             _tileSize;
 
         // forward index
-        size_t                   _rows = 0;     // corresponds to x
-        size_t                   _cols = 0;     // corresponds to z
-        std::vector<GridCell>    _grid;         // grid of _rows * _cols items
+        size_t                      _rows = 0;     // corresponds to x
+        size_t                      _cols = 0;     // corresponds to z
+        std::vector<GridCell>       _grid;         // grid of _rows * _cols items
 
         // backward index
-        std::vector<GridCells>   _idToCells;    // offsets in _grid, maps IndexableId to a GridCells
+        std::vector<GridCells>      _idToCells;    // offsets in _grid, maps IndexableId to a GridCells
 
         // a heap (primary store)
-        std::vector<utils::Aabb> _idToAabb;     // AABBs of stored items
+        std::vector<utils::Aabb>    _idToAabb;     // AABBs of stored items, maps IndexableId to AABB
 
         // index parameters
-        utils::Aabb              _aabb;         // the index's boundaries
+        utils::Aabb                 _aabb;         // the index's boundaries
+
+        mutable size_t              _requestId = 0;
+        mutable std::vector<size_t> _requestIds;
 
         friend class SpatialHandler;
     };
