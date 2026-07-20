@@ -553,6 +553,7 @@ namespace minire
         assert(_screenHeight != 0);
         MINIRE_GL(glViewport, 0, 0, _screenWidth, _screenHeight);
         MINIRE_GL(glClearColor, 0.0f, 0.2f, 0.2f, 1.0f); // TODO: into parameters
+        MINIRE_GL(glDepthMask, GL_TRUE); // ensure depth-buffer is writable for (GL_DEPTH_BUFFER_BIT)
         MINIRE_GL(glClear, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // clean up ID buffer
@@ -674,8 +675,8 @@ namespace minire
         MINIRE_GL(glCullFace, GL_BACK);
         MINIRE_GL(glEnable, GL_MULTISAMPLE);
         MINIRE_GL(glEnable, GL_DEPTH_TEST);
-        MINIRE_GL(glDepthFunc, GL_LESS);
         MINIRE_GL(glDepthMask, GL_TRUE);
+        MINIRE_GL(glDepthFunc, GL_LESS);
         MINIRE_GL(glDisable, GL_BLEND);
         MINIRE_GL(glBlendFunc, GL_ONE, GL_ZERO);
 
@@ -691,10 +692,10 @@ namespace minire
 
         // draw billboards
         MINIRE_GL(glDisable, GL_CULL_FACE);
+        MINIRE_GL(glDepthMask, GL_FALSE);
         MINIRE_GL(glDepthFunc, GL_LEQUAL);
         MINIRE_GL(glEnable, GL_BLEND);
         MINIRE_GL(glBlendFunc, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        MINIRE_GL(glDepthMask, GL_FALSE);
         _billboards.draw(scene);
     }
 
