@@ -113,14 +113,13 @@ namespace minire::scene
     private:
         // Should be used only by SpatialHandler
         IndexableId create(IndexPayload * payload,
-                           IndexLayer indexLayer,
-                           utils::Aabb const & aabb)
+                           IndexLayer indexLayer)
         {
             assert(payload);
             IndexableId const id = _idManager.allocate(payload, indexLayer);
             try
             {
-                createImpl(id, aabb);
+                createImpl(id);
                 return id;
             }
             catch(...)
@@ -155,7 +154,7 @@ namespace minire::scene
         // Implemetations can assert that IndexableIds are tightly-allocated and valid.
         // IndexableId can be re-used after calling eraseImpl(), therefore
         // implementations must poperly clean their internal states.
-        virtual void createImpl(IndexableId, utils::Aabb const &) = 0;
+        virtual void createImpl(IndexableId) = 0;
         virtual void updateImpl(IndexableId, utils::Aabb const &) = 0;
         virtual void eraseImpl(IndexableId) = 0;
 

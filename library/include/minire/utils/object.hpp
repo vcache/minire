@@ -5,26 +5,44 @@
 #include <memory>
 #include <string>
 
+// implementation details to ignored
+namespace minire { class SceneImpl; }
+
 namespace minire::utils
 {
+    class ObjectBase
+    {
+    public:
+        virtual ~ObjectBase() = default;
+
+    protected:
+        using Mask = size_t;
+
+        static constexpr Mask kNoFlags = 0;
+        static constexpr Mask kAllFlags = std::numeric_limits<Mask>::max();
+
+        virtual bool invalidated() const = 0;
+
+        virtual void invalidate(Mask mask = kAllFlags) = 0;
+        virtual void revalidate(Mask mask = kAllFlags) = 0;
+
+    private:
+        static constexpr size_t kNoIndex = std::numeric_limits<size_t>::max();
+        size_t _activationIndex = kNoIndex;
+
+        friend class ::minire::SceneImpl;
+    };
+
     template<typename Derived,
              typename Model,
              bool kImmutable = false>
     class Object
+        : public ObjectBase
     {
     public:
         using Sptr = std::shared_ptr<Derived>;
         using Wptr = std::weak_ptr<Derived>;
         using ModelType = Model;
-
-        explicit Object(std::string name,
-                        Model model)
-            : _name(name)
-            , _model(std::move(model))
-            , _flags(0)
-        {}
-
-        virtual ~Object() = default;
 
     public:
         std::string const & name() const { return _name; }
@@ -35,6 +53,7 @@ namespace minire::utils
             return _model;
         }
 
+        // NOTE: must not be called from ctor (due to a call to virtual invalidate())
         template<typename T>
         void setModel(T && model)
         {
@@ -45,11 +64,17 @@ namespace minire::utils
         }
 
     protected:
-        using Mask = size_t;
-        static constexpr Mask kAllFlags = std::numeric_limits<Mask>::max();
+        explicit Object(std::string name,
+                        Model model,
+                        Mask initial)
+            : _name(name)
+            , _model(std::move(model))
+            , _flags(initial)
+        {}
 
+    protected:
         // NOTE: Descendants should also call Object::revalidate()
-        virtual void revalidate(Mask mask = kAllFlags) { _flags &= ~mask; }
+        void revalidate(Mask mask = kAllFlags) override { _flags &= ~mask; }
 
         static constexpr Mask mkMask(size_t index)
         {
@@ -62,32 +87,12 @@ namespace minire::utils
 
         // TODO: maybe change semantics from invalidate/revalidate to set/clear?
 
-        bool invalidated() const { return _flags != 0; }
+        bool invalidated() const override { return _flags != kNoFlags; }
 
-        bool invalidatedAny(Mask mask) const { return 0 != (_flags & mask); }
+        bool invalidatedAny(Mask mask) const { return kNoFlags != (_flags & mask); }
         bool invalidatedAll(Mask mask) const { return mask == (_flags & mask); }
 
-        // NOTE: since "invalidate" calls a virtual methods,
-        //       it shouldn't be called from a constructor.
-
-        void invalidate()
-        {
-            _flags = kAllFlags;
-            if (_allowPropagation) propagate(kAllFlags);
-        }
-
-        void invalidate(Mask mask, bool allowPropagation = true)
-        {
-            _flags |= mask;
-            if (_allowPropagation && allowPropagation && mask) propagate(mask);
-        }
-
-        void setAllowPropagation(bool v) { _allowPropagation = v; }
-
-        // called only for a newly set flags only
-        virtual void propagate(Mask) {}
-
-        void propagate() { propagate(_flags); }
+        void invalidate(Mask mask = kAllFlags) override { _flags |= mask; }
 
     protected:
         Model & model(Mask mask)
@@ -100,7 +105,6 @@ namespace minire::utils
         std::string const _name;
         Model             _model;
         Mask              _flags = 0;
-        bool              _allowPropagation = false; // TODO: get rid of this hack
     };
 
     // A helper for detachable-objects

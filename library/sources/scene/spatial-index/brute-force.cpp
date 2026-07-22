@@ -13,7 +13,7 @@ namespace minire::scene::spatial_index
                 });
     }
 
-    void BruteForce::createImpl(IndexableId, utils::Aabb const &) {}
+    void BruteForce::createImpl(IndexableId) {}
     void BruteForce::updateImpl(IndexableId, utils::Aabb const &) {}
     void BruteForce::eraseImpl(IndexableId) {}
 }

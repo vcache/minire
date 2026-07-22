@@ -126,7 +126,7 @@ namespace
             auto camera = camNode->make(cameraModel);
             camera->activate();
 
-            auto lightNode = scene().root().make(Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f))});
+            auto lightNode = scene().root().make("bulb-node", Node{Transform(glm::vec3(2.0f,  2.0f, 2.0f))});
             lightNode->make("bulb", PointLight(glm::vec4(1, 1, 1, 500), 2, std::nullopt, true));
 
             _cubeNode = scene().root().make("cube-node", Node{Transform()});

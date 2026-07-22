@@ -29,7 +29,7 @@ namespace minire::scene::spatial_index
                   std::vector<IndexPayload *> & output) const override;
 
     private:
-        void createImpl(IndexableId, utils::Aabb const &) override;
+        void createImpl(IndexableId) override;
         void updateImpl(IndexableId, utils::Aabb const &) override;
         void eraseImpl(IndexableId) override;
 
@@ -46,18 +46,18 @@ namespace minire::scene::spatial_index
         template<typename Callback>
         void iterateTouchedCells(utils::Aabb const &, Callback) const;
 
-        template<typename T>
-        void eraseElement(std::vector<T> & container, T element);
+        void eraseFromCell(size_t cellIndex, size_t itemOffset);
 
     private:
-        using IndexableIds = std::vector<IndexableId>;
-
         struct GridCell
         {
+            using IndexableIds = std::vector<IndexableId>;
+
             IndexableIds _items;
         };
 
-        using GridCells = std::vector<size_t>;   // offsets in _grid
+        using GridCellPointer = std::pair<size_t, size_t>;  // (offset in _grid, offset in _items)
+        using GridCells = std::vector<GridCellPointer>;
 
         glm::vec2 const             _tileSize;
 
@@ -67,7 +67,7 @@ namespace minire::scene::spatial_index
         std::vector<GridCell>       _grid;         // grid of _rows * _cols items
 
         // backward index
-        std::vector<GridCells>      _idToCells;    // offsets in _grid, maps IndexableId to a GridCells
+        std::vector<GridCells>      _idToCells;    // offsets in _grid, maps IndexableId to a GridCell's elem
 
         // a heap (primary store)
         std::vector<utils::Aabb>    _idToAabb;     // AABBs of stored items, maps IndexableId to AABB

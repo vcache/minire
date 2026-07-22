@@ -15,16 +15,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <limits>
+#include <type_traits>
 #include <vector>
 
 namespace minire
 {
-    /**
-     * PLAN:
-     *  - think about sorting (per program/per material/per texture)
-     *  - visible/invisible different lists: nodes, sprites, labels
-     *  - think culling index abstraction
-     * */
+    static constexpr size_t kNoDepth = std::numeric_limits<size_t>::max();
 
     // OpbIdHolder //
 
@@ -56,28 +53,30 @@ namespace minire
     // SceneImpl::Leaf //
 
     template<typename Derived, typename ObjectType>
+    SceneImpl::Leaf<Derived, ObjectType>::Leaf(std::string name,
+                                               typename ObjectType::ModelType const & model,
+                                               std::shared_ptr<Node> const & parent,
+                                               SceneImpl & scene)
+        : ObjectType(std::move(name), model, ObjectType::kNoFlags)
+        , _parent(parent)
+        , _depth(parent && parent->_depth != kNoDepth ? parent->_depth + 1 : kNoDepth)
+        , _scene(scene)
+    {}
+
+    template<typename Derived, typename ObjectType>
     void SceneImpl::Leaf<Derived, ObjectType>::setParent(scene::Node::Sptr const & newParentIface)
     {
-        SceneImpl::setParent(*this, newParentIface);
+        _scene.setParent(*this, newParentIface);
         ObjectType::invalidate();
     }
 
     template<typename Derived, typename ObjectType>
-    void SceneImpl::Leaf<Derived, ObjectType>::propagate(ObjectType::Mask mask)
+    void SceneImpl::Leaf<Derived, ObjectType>::invalidate(ObjectType::Mask mask)
     {
         if (mask)
         {
-            assert(mask & ObjectType::kBaseMask);
-            invalidateParent(Node::kHasPendedActivation);
-        }
-    }
-
-    template<typename Derived, typename ObjectType>
-    void SceneImpl::Leaf<Derived, ObjectType>::invalidateParent(ObjectType::Mask mask)
-    {
-        if (auto parent = _parent.lock(); parent)
-        {
-            parent->invalidate(mask);
+            assert(mask & (ObjectType::kBaseMask | kParentTransformChanged | kActiveLerp));
+            _scene.activateLeaf(this, mask);
         }
     }
 
@@ -95,29 +94,30 @@ namespace minire
         return result;
     }
 
+    template<typename Derived, typename ObjectType>
+    SceneImpl::Leaf<Derived, ObjectType>::~Leaf()
+    {
+        if (ObjectType::invalidated())
+        {
+            _scene.eraseLeaf(this);
+        }
+        assert(!_scene.isLeafActivated(this));
+    }
+
     // SceneImpl::*Leaf //
 
     SceneImpl::MeshLeaf::MeshLeaf(std::string name,
-                                  models::Mesh const & model,
-                                  std::weak_ptr<Node> parent,
+                                  models::Mesh && model,
+                                  std::shared_ptr<Node> const & parent,
                                   std::shared_ptr<rasterizer::Mesh> const & mesh,
                                   SceneImpl & scene)
-        : Leaf(std::move(name), model, parent, scene)
+        : Leaf(std::move(name), std::move(model), parent, scene)
         , _mesh(mesh)
         , _opbId(scene._enableOpb // OpbId is always allocated (even if disabled in a model)
                     ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
                     : std::unique_ptr<SceneImpl::OpbIdHolder>())
-        , _worldAabb()
-        , _spatialHandler(*scene._spatialIndex, this, kMeshLayer, _worldAabb)
-    {
-        auto p = _parent.lock();
-        onParentTransformChanged(p && p->hasGlobalTransform() ? p->_globalTransform
-                                                              : glm::mat4(1.0f));
-
-        // calling at the end, to avoid unwanted calls to virtual methods
-        Object::propagate(); // must be called before "setAllowPropagation" !
-        setAllowPropagation(true);
-    }
+        , _spatialHandler(*scene._spatialIndex, this, kMeshLayer)
+    {}
 
     SceneImpl::OpbId SceneImpl::MeshLeaf::opbId() const
     {
@@ -126,13 +126,14 @@ namespace minire
 
     void SceneImpl::MeshLeaf::revalidate(Mask mask)
     {
+        auto p = _parent.lock();
         if (OpbId const id = opbId();
             invalidatedAny(mask & kOutline) && id != 0)
         {
-            auto p = _parent.lock();
             models::Outline const & effectiveOutline =
                 p && std::holds_alternative<std::monostate>(outline()) ? p->_effectiveOutline
                                                                        : outline();
+
             std::visit(utils::Overloaded
             {
                 [this, id](std::monostate const &)
@@ -150,17 +151,18 @@ namespace minire
             }, effectiveOutline);
         }
 
+        if (invalidatedAny(mask & kParentTransformChanged))
+        {
+            assert(_mesh);
+            _worldAabb = _mesh->aabb();
+            _worldAabb.transform(p && p->hasGlobalTransform() ? p->_globalTransform
+                                                              : glm::mat4(1));
+            _spatialHandler.update(_worldAabb);
+        }
+
         // don't need anything for kEnableOpb (every frame is simply reread)
 
         Object::revalidate(mask);
-    }
-
-    void SceneImpl::MeshLeaf::onParentTransformChanged(glm::mat4 const & globalTransform)
-    {
-        assert(_mesh);
-        _worldAabb = _mesh->aabb();
-        _worldAabb.transform(globalTransform);
-        _spatialHandler.update(_worldAabb);
     }
 
     void SceneImpl::DirectionalLightLeaf::revalidate(Mask mask)
@@ -169,6 +171,13 @@ namespace minire
         {
             // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
+            _scene.invalidateDeferred(this, kActiveLerp);
+        }
+
+        if (invalidatedAny(mask & kActiveLerp) &&
+            lerp(_scene._lerpWeight, _scene._epochNumber))
+        {
+            _scene.invalidateDeferred(this, kActiveLerp);
         }
 
         Object::revalidate(mask);
@@ -176,24 +185,12 @@ namespace minire
 
     SceneImpl::PointLightLeaf::PointLightLeaf(std::string name,
                                               ModelType const & model,
-                                              std::weak_ptr<Node> parent,
+                                              std::shared_ptr<Node> const & parent,
                                               SceneImpl & scene)
-        : LerpableLeaf(std::move(name), model, std::move(parent), scene)
+        : LerpableLeaf(std::move(name), model, parent, scene)
         , _localAabb(localAabb())
-        , _worldAabb()
-        , _spatialHandler(*scene._spatialIndex, this, kPointLightLayer, _worldAabb)
-    {
-        auto p = _parent.lock(); // recalc worldAabb
-        onParentTransformChanged(p && p->hasGlobalTransform() ? p->_globalTransform
-                                                              : glm::mat4(1.0f));
-    }
-
-    void SceneImpl::PointLightLeaf::onParentTransformChanged(glm::mat4 const & globalTransform)
-    {
-        _worldAabb = _localAabb;
-        _worldAabb.transform(globalTransform);
-        _spatialHandler.update(_worldAabb);
-    }
+        , _spatialHandler(*scene._spatialIndex, this, kPointLightLayer)
+    {}
 
     // TODO: possible bug, localAabb (and therefore worldAabb) won't be lerped
     utils::Aabb SceneImpl::PointLightLeaf::localAabb() const
@@ -205,15 +202,32 @@ namespace minire
 
     void SceneImpl::PointLightLeaf::revalidate(Mask mask)
     {
+        bool forceWorldAabbRecalc = false;
+
         if (invalidatedAny(mask & (kColor | kAttenuation)))
         {
             // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
+            _scene.invalidateDeferred(this, kActiveLerp);
 
             _localAabb = localAabb();
-            auto p = _parent.lock(); // recalc _worldAabb
-            onParentTransformChanged(p && p->hasGlobalTransform() ? p->_globalTransform
-                                                                  : glm::mat4(1.0f));
+            forceWorldAabbRecalc = true;
+        }
+
+        if (invalidatedAny(mask & kParentTransformChanged) ||
+            forceWorldAabbRecalc)
+        {
+            auto p = _parent.lock();
+            _worldAabb = _localAabb;
+            _worldAabb.transform(p && p->hasGlobalTransform() ? p->_globalTransform
+                                                              : glm::mat4(1));
+            _spatialHandler.update(_worldAabb);
+        }
+
+        if (invalidatedAny(mask & kActiveLerp) &&
+            lerp(_scene._lerpWeight, _scene._epochNumber))
+        {
+            _scene.invalidateDeferred(this, kActiveLerp);
         }
 
         Object::revalidate(mask);
@@ -225,6 +239,13 @@ namespace minire
         {
             // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
+            _scene.invalidateDeferred(this, kActiveLerp);
+        }
+
+        if (invalidatedAny(mask & kActiveLerp) &&
+            lerp(_scene._lerpWeight, _scene._epochNumber))
+        {
+            _scene.invalidateDeferred(this, kActiveLerp);
         }
 
         Object::revalidate(mask);
@@ -241,6 +262,13 @@ namespace minire
         {
             // a value has changed (probably a new epoch started)
             Lerpable::update(_scene._epochNumber, model());
+            _scene.invalidateDeferred(this, kActiveLerp);
+        }
+
+        if (invalidatedAny(mask & kActiveLerp) &&
+            lerp(_scene._lerpWeight, _scene._epochNumber))
+        {
+            _scene.invalidateDeferred(this, kActiveLerp);
         }
 
         Object::revalidate(mask);
@@ -253,7 +281,7 @@ namespace minire
 
     SceneImpl::BillboardLeaf::BillboardLeaf(std::string name,
                                             models::Billboard model,
-                                            std::weak_ptr<Node> parent,
+                                            std::shared_ptr<Node> const & parent,
                                             std::shared_ptr<rasterizer::Billboard> const & billboard,
                                             SceneImpl & scene)
         : Leaf(std::move(name), std::move(model), parent, scene)
@@ -262,17 +290,8 @@ namespace minire
                     ? std::make_unique<SceneImpl::OpbIdHolder>(scene)
                     : std::unique_ptr<SceneImpl::OpbIdHolder>())
         , _zOrder(model._zOrder)
-        , _worldAabb()
-        , _spatialHandler(*scene._spatialIndex, this, kBillboardLayer, _worldAabb)
-    {
-        auto p = _parent.lock();
-        onParentTransformChanged(p && p->hasGlobalTransform() ? p->_globalTransform
-                                                              : glm::mat4(1.0f));
-
-        // calling at the end, to avoid unwanted calls to virtual methods
-        Object::propagate(); // must be called before "setAllowPropagation" !
-        setAllowPropagation(true);
-    }
+        , _spatialHandler(*scene._spatialIndex, this, kBillboardLayer)
+    {}
 
     SceneImpl::OpbId SceneImpl::BillboardLeaf::opbId() const
     {
@@ -281,10 +300,11 @@ namespace minire
 
     void SceneImpl::BillboardLeaf::revalidate(Mask mask)
     {
+        auto p = _parent.lock();
+
         if (OpbId const id = opbId();
             invalidatedAny(mask & kOutline) && id != 0)
         {
-            auto p = _parent.lock();
             models::Outline const & effectiveOutline =
                 p && std::holds_alternative<std::monostate>(outline()) ? p->_effectiveOutline
                                                                        : outline();
@@ -305,17 +325,18 @@ namespace minire
             }, effectiveOutline);
         }
 
+        if (invalidatedAny(mask & kParentTransformChanged))
+        {
+            assert(_billboard);
+            _worldAabb = _scene._rasterizer.billboards().aabb(*_billboard);
+            _worldAabb.transform(p && p->hasGlobalTransform() ? p->_globalTransform
+                                                              : glm::mat4(1));
+            _spatialHandler.update(_worldAabb);
+        }
+
         // don't need anything for kEnableOpb (every frame is simply reread)
 
         Object::revalidate(mask);
-    }
-
-    void SceneImpl::BillboardLeaf::onParentTransformChanged(glm::mat4 const & globalTransform)
-    {
-        assert(_billboard);
-        _worldAabb = _scene._rasterizer.billboards().aabb(*_billboard);
-        _worldAabb.transform(globalTransform);
-        _spatialHandler.update(_worldAabb);
     }
 
     // SceneImpl::Node //
@@ -323,21 +344,22 @@ namespace minire
     scene::Node::Sptr SceneImpl::Node::make(std::string const & name, models::Node model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
-        Node::Sptr node = std::make_shared<Node>(name, std::move(model), weak_from_this(), _scene);
+        Node::Sptr node = std::make_shared<Node>(name, std::move(model), shared_from_this(), _scene);
         auto [_, inserted] = _children.emplace(name, node);
         MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into \"{}\"", name, this->name());
-        node->invalidate(kLocalTransformDirty);
         return node;
     }
 
-    scene::Mesh::Sptr SceneImpl::Node::make(std::string const & name, models::Mesh model)
+    scene::Mesh::Sptr SceneImpl::Node::make(std::string const & name, models::Mesh modelSrc)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
-        auto mesh = _scene._rasterizer.meshes().getMesh(model._source,
-                                                        model._defaultMaterial);
+        auto mesh = _scene._rasterizer.meshes().getMesh(modelSrc._source,
+                                                        modelSrc._defaultMaterial);
         assert(mesh);
 
-        auto meshLeaf = std::make_shared<MeshLeaf>(name, model, weak_from_this(), mesh, _scene);
+        auto meshLeaf = std::make_shared<MeshLeaf>(name, std::move(modelSrc),
+                                                   shared_from_this(), mesh, _scene);
+        models::Mesh const & modelRef = meshLeaf->model(); // NOTE: "model" was moved-out !!
 
         {
             auto [_, inserted] = _children.emplace(name, meshLeaf);
@@ -347,13 +369,16 @@ namespace minire
         if (meshLeaf->_opbId)
         {
             OpbId const opbId = meshLeaf->_opbId->id();
-            auto [_, inserted] = _scene._opbIdToSceneItem.emplace(opbId, meshLeaf);
-            MINIRE_INVARIANT(inserted, "failed to store OPB ID ({}) of \"{}\"", opbId, name);
+            assert(opbId != 0);
+            _scene._opbIdToSceneItem.resize(std::max<size_t>(_scene._opbIdToSceneItem.size(), opbId + 1));
+            MINIRE_INVARIANT(std::holds_alternative<std::monostate>(_scene._opbIdToSceneItem[opbId]),
+                             "failed to store OPB ID ({}) of \"{}\"", opbId, name);
+            _scene._opbIdToSceneItem[opbId] = meshLeaf;
         }
 
-        if (model._skin)
+        if (modelRef._skin)
         {
-            models::Mesh::Skin::Bones const & bones = model._skin->_bones;
+            models::Mesh::Skin::Bones const & bones = modelRef._skin->_bones;
             meshLeaf->_skinBones.reserve(bones.size());
 
             MINIRE_INVARIANT(bones.size() <= rasterizer::Constants::kMaxBones,
@@ -372,12 +397,11 @@ namespace minire
                 });
             }
 
-            meshLeaf->_skinOrigin = model._skin->_origin ? nodeFromPointer(*model._skin->_origin)
+            meshLeaf->_skinOrigin = modelRef._skin->_origin ? nodeFromPointer(*modelRef._skin->_origin)
                                                          : Node::Wptr();
         }
 
         meshLeaf->invalidate();
-
         return meshLeaf;
     }
 
@@ -385,10 +409,12 @@ namespace minire
                                                         models::DirectionalLight model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
-        auto directionalLightLeaf = std::make_shared<DirectionalLightLeaf>(name, model, weak_from_this(), _scene);
+        auto directionalLightLeaf = std::make_shared<DirectionalLightLeaf>(name, std::move(model),
+                                                                           shared_from_this(), _scene);
         auto [_, inserted] = _children.emplace(name, directionalLightLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
         _scene._directionalLightLeaves.push_back(directionalLightLeaf);
+        directionalLightLeaf->invalidate();
         return directionalLightLeaf;
     }
 
@@ -396,9 +422,11 @@ namespace minire
                                                   models::PointLight model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
-        auto pointLightLeaf = std::make_shared<PointLightLeaf>(name, model, weak_from_this(), _scene);
+        auto pointLightLeaf = std::make_shared<PointLightLeaf>(name, std::move(model),
+                                                               shared_from_this(), _scene);
         auto [_, inserted] = _children.emplace(name, pointLightLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
+        pointLightLeaf->invalidate();
         return pointLightLeaf;
     }
 
@@ -406,9 +434,11 @@ namespace minire
                                                          models::PerspectiveCamera model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
-        auto perspectiveCameraLeaf = std::make_shared<PerspectiveCameraLeaf>(name, model, weak_from_this(), _scene);
+        auto perspectiveCameraLeaf = std::make_shared<PerspectiveCameraLeaf>(name, std::move(model),
+                                                                             shared_from_this(), _scene);
         auto [_, inserted] = _children.emplace(name, perspectiveCameraLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
+        perspectiveCameraLeaf->invalidate();
         return perspectiveCameraLeaf;
     }
 
@@ -416,9 +446,11 @@ namespace minire
                                                           models::OrthographicCamera model)
     {
         MINIRE_INVARIANT(!name.empty(), "a name is empty");
-        auto orthographicCameraLeaf = std::make_shared<OrthographicCameraLeaf>(name, model, weak_from_this(), _scene);
+        auto orthographicCameraLeaf = std::make_shared<OrthographicCameraLeaf>(name, std::move(model),
+                                                                               shared_from_this(), _scene);
         auto [_, inserted] = _children.emplace(name, orthographicCameraLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
+        orthographicCameraLeaf->invalidate();
         return orthographicCameraLeaf;
     }
 
@@ -429,19 +461,22 @@ namespace minire
         auto billboard = _scene._rasterizer.billboards().create(model);
         assert(billboard);
 
-        auto billboardLeaf = std::make_shared<BillboardLeaf>(name, model, weak_from_this(), billboard, _scene);
+        auto billboardLeaf = std::make_shared<BillboardLeaf>(name, std::move(model),
+                                                             shared_from_this(), billboard, _scene);
         auto [_, inserted] = _children.emplace(name, billboardLeaf);
         MINIRE_INVARIANT(inserted, "failed to insert {} into {}", name, this->name());
 
         if (billboardLeaf->_opbId)
         {
             OpbId const opbId = billboardLeaf->_opbId->id();
-            auto [_, inserted] = _scene._opbIdToSceneItem.emplace(opbId, billboardLeaf);
-            MINIRE_INVARIANT(inserted, "failed to store OPB ID ({}) of \"{}\"", opbId, name);
+            assert(opbId != 0);
+            _scene._opbIdToSceneItem.resize(std::max<size_t>(_scene._opbIdToSceneItem.size(), opbId + 1));
+            MINIRE_INVARIANT(std::holds_alternative<std::monostate>(_scene._opbIdToSceneItem[opbId]),
+                             "failed to store OPB ID ({}) of \"{}\"", opbId, name);
+            _scene._opbIdToSceneItem[opbId] = billboardLeaf;
         }
 
         billboardLeaf->invalidate();
-
         return billboardLeaf;
     }
 
@@ -490,8 +525,7 @@ namespace minire
     //       it will work, but ill-logic.
     void SceneImpl::Node::setParent(scene::Node::Sptr const & newParentIface)
     {
-        SceneImpl::setParent(*this, newParentIface);
-        invalidate(kParentTransformChanged);
+        _scene.setParent(*this, newParentIface);
     }
 
     models::ScenePath SceneImpl::Node::absPath() const
@@ -545,17 +579,29 @@ namespace minire
 
     SceneImpl::Node::Node(std::string name,
                           Object::ModelType && model,
-                          Wptr parent,
+                          Sptr const & parent,
                           SceneImpl & scene)
-        : scene::Node(std::move(name), std::move(model))
+        : scene::Node(std::move(name), std::move(model), kNoFlags)
         , _scene(scene)
-        , _localTransform(origin())
+        , _depth(parent ? (parent->_depth != kNoDepth ? parent->_depth + 1 : kNoDepth) : 0) // NOTE: have to be 0 for the "_root"-case
+        , _localTransform(std::as_const(*this).origin())
+        , _globalTransform(glm::mat4(1))
         , _parent(parent)
         , _playbackStack(*this)
+        , _effectiveOutline(std::monostate())
+        , _effectiveVisible(true)
     {
-        // calling at the end, to avoid unwanted calls to virtual methods
-        Object::propagate(); // must be called before "setAllowPropagation" !
-        setAllowPropagation(true);
+        // NOTE: calling it with explicit "Node::"-qualifier to ensure
+        //       safety of virtual call from a ctor
+        Node::invalidate(kDirtyTransform);
+    }
+
+    SceneImpl::Node::~Node()
+    {
+        if (kNoDepth != _depth)
+        {
+            _scene.changeNodeLevel(this, _depth, kNoDepth);
+        }
     }
 
     bool SceneImpl::Node::lerp(float weight, size_t epochNumber)
@@ -678,8 +724,9 @@ namespace minire
                 if (hasTrack)
                 {
                     // NOTE: don't perform actual lerp for animable targets
+                    bool const changed = current != targetNode->_localTransform.current();
                     targetNode->_localTransform.setCurrent(_scene._epochNumber, current);
-                    targetNode->invalidate(kLocalTransformDirty);
+                    if (changed) _scene.activateNode(targetNode.get(), kDirtyTransform);
                 }
             }
         }
@@ -696,168 +743,113 @@ namespace minire
         return 0 != _playbackStack.size();
     }
 
-    void SceneImpl::Node::revalidate(Mask mask)
+    void SceneImpl::Node::revalidateAnimation()
     {
-        Mask newMask = 0;
-        Mask dropMask = 0;
+        assert(invalidatedAll(kActiveAnimation));
+        revalidate(kActiveAnimation);
+        // NOTE: advanceAnimation() will kDirtyTransform if needed
+        if (advanceAnimation())
+        {
+            // animation can be advanced again during the next advance()
+            _scene.invalidateDeferred(this, kActiveAnimation);
+        }
+    }
+
+    void SceneImpl::Node::revalidateOrigin()
+    {
+        assert(invalidatedAll(kOrigin));
+        revalidate(kOrigin);
+         // std::as_const to ensure it won't cause invalidation of origin()
+        _localTransform.update(_scene._epochNumber,
+                               std::as_const(*this).origin());
+        _scene.activateNode(this, kActiveLerp);
+    }
+
+    void SceneImpl::Node::revalidateLerp()
+    {
+        assert(invalidatedAll(kActiveLerp));
+        revalidate(kActiveLerp);
+        if (lerp(_scene._lerpWeight, _scene._epochNumber))
+        {
+            _scene.activateNode(this, kDirtyTransform);
+            _scene.invalidateDeferred(this, kActiveLerp);
+        }
+    }
+
+    void SceneImpl::Node::revalidateTransform()
+    {
+        static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
+        static const glm::vec4 kGlobalOrigin(0, 0, 0, 1);
+
+        assert(invalidatedAll(kDirtyTransform));
+        revalidate(kDirtyTransform);
+
+        // update local transform
+        // TODO: localTransform.matrix() is pretty expensive, should avoid it
+        //       if only parent's transform has been changed
+        models::Transform const & localTransform = _localTransform.current();
+        _localTransformMatrix = localTransform.matrix();
+
+        // recalc global transform
+        auto parent = _parent.lock();
+        assert(!parent || parent->hasGlobalTransform());
+        glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransform
+                                                         : kIdentityMatrix;
+        if (glm::mat4 globalTransform = parentGlobalTransform * _localTransformMatrix;
+            _globalTransform != globalTransform)
+        {
+            _globalTransform = std::move(globalTransform);
+            _globalPosition = _globalTransform * kGlobalOrigin; // will drop "w"
+
+            // ensure that children's matrices will be recalculated
+            invalidateChildren<MeshLeaf::Sptr>(MeshLeaf::kParentTransformChanged);
+            invalidateChildren<PointLightLeaf::Sptr>(PointLightLeaf::kParentTransformChanged);
+            invalidateChildren<BillboardLeaf::Sptr>(BillboardLeaf::kParentTransformChanged);
+            invalidateChildren<Node::Sptr>(Node::kDirtyTransform);
+        }
+    }
+
+    void SceneImpl::Node::revalidateOutline()
+    {
+        assert(invalidatedAll(kOutline));
+        revalidate(kOutline);
 
         auto parent = _parent.lock();
-
-        // Animation
-
-        if (mask & kAnimation) // is it an Animation pass?
+        models::Outline const & newOutline =
+            std::holds_alternative<std::monostate>(outline()) && parent
+                ? parent->_effectiveOutline // the node has no explicitly-set outline and the Node has a parent, inherit it from a parent
+                : outline();                // the node has no parent or it's outline is explicitly set
+        if (_effectiveOutline != newOutline)
         {
-            if (advanceAnimation())
-            {
-                // animation can be advanced again
-                newMask |= kAnimation;
-            }
-            else
-            {
-                // animation is terminated
-                dropMask |= kAnimation;
-            }
+            _effectiveOutline = newOutline;
+            invalidateChildren<Node::Sptr>(Node::kOutline);
+            invalidateChildren<MeshLeaf::Sptr>(MeshLeaf::kOutline);
+            invalidateChildren<BillboardLeaf::Sptr>(BillboardLeaf::kOutline);
         }
-
-        // Lerping
-
-        if (invalidatedAny(mask & (kHasPendedActivation | kOrigin)))
-        {
-            if (invalidatedAny(mask & kOrigin))
-            {
-                _localTransform.update(_scene._epochNumber, origin());
-                newMask |= kHasActivateChildren;
-
-                dropMask |= kOrigin;
-            }
-            dropMask |= kHasPendedActivation;
-        }
-
-        if (invalidatedAny(mask & kHasActivateChildren))
-        {
-            if (lerp(_scene._lerpWeight, _scene._epochNumber))
-            {
-                newMask |= (kHasActivateChildren | kLocalTransformDirty);
-            }
-            else
-            {
-                dropMask |= kHasActivateChildren;
-            }
-        }
-
-        // Global transform
-
-        if (invalidatedAny(mask & (kLocalTransformDirty | kParentTransformChanged)))
-        {
-            static const glm::mat4 kIdentityMatrix(glm::identity<glm::mat4>());
-            static const glm::vec4 kGlobalOrigin(0, 0, 0, 1);
-
-            if (invalidatedAny(mask & kLocalTransformDirty))
-            {
-                // NOTE: localTransform.matrix() is pretty expensive!
-                models::Transform const & localTransform = _localTransform.current();
-                _localTransformMatrix = localTransform.matrix();
-                dropMask |= kLocalTransformDirty;
-            }
-
-            assert(!parent || parent->hasGlobalTransform());
-            glm::mat4 const & parentGlobalTransform = parent ? parent->_globalTransform
-                                                             : kIdentityMatrix;
-            _globalTransform = parentGlobalTransform * _localTransformMatrix;
-            _globalPosition = _globalTransform * kGlobalOrigin; // will drop "w"
-            notifyLeavesTransformChanged<MeshLeaf::Sptr>(_globalTransform);
-            notifyLeavesTransformChanged<BillboardLeaf::Sptr>(_globalTransform);
-            notifyLeavesTransformChanged<PointLightLeaf::Sptr>(_globalTransform);
-
-            dropMask |= kParentTransformChanged;
-            invalidateChildren<Node::Sptr>(kParentTransformChanged);
-        }
-
-        if (invalidatedAny(mask & kGlobalTransformGray))
-        {
-            dropMask |= kGlobalTransformGray;
-        }
-
-        // Visibility
-
-        if (invalidatedAny(mask & kChildVisibilityInvalidated))
-        {
-            // just drop the flag
-            dropMask |= kChildVisibilityInvalidated;
-        }
-
-        if (invalidatedAny(mask & (kVisible | kParentVisibilityInvalidated)))
-        {
-            bool const oldEffectiveVisible = _effectiveVisible;
-            _effectiveVisible = visible() && (parent ? parent->_effectiveVisible : true);
-            if (oldEffectiveVisible != _effectiveVisible)
-            {
-                invalidateChildren<Node::Sptr>(kParentVisibilityInvalidated);
-            }
-            dropMask |= (kParentVisibilityInvalidated | kVisible);
-        }
-
-        // Outline
-
-        if (invalidatedAny(mask & kChildOutlineInvalidated))
-        {
-            dropMask |= kChildOutlineInvalidated;
-        }
-
-        if (invalidatedAny(mask & (kOutline | kParentOutlineInvalidated)))
-        {
-            models::Outline const & newOutline =
-                std::holds_alternative<std::monostate>(outline()) && parent
-                    ? parent->_effectiveOutline // the node has no explicitly-set outline and the Node has a parent, inherit it from a parent
-                    : outline();                // the node has no parent or it's outline is explicitly set
-            if (_effectiveOutline != newOutline)
-            {
-                _effectiveOutline = newOutline;
-                invalidateChildren<Node::Sptr>(kParentOutlineInvalidated);
-                invalidateChildren<MeshLeaf::Sptr>(kOutline);
-                invalidateChildren<BillboardLeaf::Sptr>(kOutline);
-            }
-            dropMask |= (kParentOutlineInvalidated | kOutline);
-        }
-
-        Object::revalidate(dropMask);
-        invalidate(newMask);
     }
 
-    void SceneImpl::Node::propagate(Mask mask)
+    void SceneImpl::Node::revalidateVisiblity()
     {
-        assert(invalidatedAll(mask));
+        assert(invalidatedAll(kVisible));
+        revalidate(kVisible);
 
-        // don't propagate model's flags to parents
-        Mask newParentMask = mask & ~kBaseMask;
-
-        if (mask & kOrigin)
+        auto parent = _parent.lock();
+        bool const oldEffectiveVisible = _effectiveVisible;
+        _effectiveVisible = visible() && (parent ? parent->_effectiveVisible : true);
+        if (oldEffectiveVisible != _effectiveVisible)
         {
-            newParentMask |= kHasPendedActivation;
+            invalidateChildren<Node::Sptr>(Node::kVisible);
         }
-
-        if (mask & kOutline)
-        {
-            newParentMask |= kChildOutlineInvalidated;
-        }
-
-        if (mask & kVisible)
-        {
-            newParentMask |= kChildVisibilityInvalidated;
-        }
-
-        if (mask & (kLocalTransformDirty | kParentTransformChanged))
-        {
-            newParentMask |= kGlobalTransformGray;
-            newParentMask &= ~(kLocalTransformDirty | kParentTransformChanged);
-        }
-
-        // propagate flags upwards (own flags and by-pass ones)
-        invalidateParent(newParentMask);
     }
 
-    // NOTE: won't propagate upwards, only updates flags of given children
-    // NOTE: won't propagate recursively, only the direct children will be affected
+    void SceneImpl::Node::invalidate(Mask mask)
+    {
+        // NOTE: SceneImpl::activateNode() will call Object::invalidate of this Node,
+        //       so, don't need to re-call it here.
+        _scene.activateNode(this, mask);
+    }
+
+    // NOTE: won't propagate upwards or downwards, only updates flags of direct children!
     template<typename T>
     void SceneImpl::Node::invalidateChildren(Mask mask)
     {
@@ -866,34 +858,7 @@ namespace minire
             if (T const * item = std::get_if<T>(&child); item)
             {
                 assert(*item);
-                (*item)->invalidate(mask, false);
-            }
-        }
-    }
-
-    template<typename T>
-    void SceneImpl::Node::notifyLeavesTransformChanged(glm::mat4 const & globalTransform)
-    {
-        for(auto const & [_, child] : _children)
-        {
-            if (T const * item = std::get_if<T>(&child); item)
-            {
-                assert(*item);
-                (*item)->onParentTransformChanged(globalTransform);
-            }
-        }
-    }
-
-    void SceneImpl::Node::invalidateParent(Mask mask)
-    {
-        assert(0 == (mask & (kBaseMask | kLocalTransformDirty | kParentTransformChanged)));
-        if (mask)
-        {
-            for(auto parent = _parent.lock();
-                parent && !parent->invalidatedAll(mask);
-                parent = parent->_parent.lock())
-            {
-                parent->invalidate(mask, false);
+                (*item)->invalidate(mask);
             }
         }
     }
@@ -994,7 +959,7 @@ namespace minire
         auto newAnimation = std::make_unique<SceneImpl::ActiveAnimation>(
             it->second, repeats, speedScale);
         _activeAnimations.emplace_back(std::move(newAnimation));
-        _node.invalidate(SceneImpl::Node::kAnimation);
+        _node.invalidate(SceneImpl::Node::kActiveAnimation);
     }
 
     void SceneImpl::PlaybackStackImpl::push(models::AnimationTracks animationTracks,
@@ -1004,7 +969,7 @@ namespace minire
         auto newAnimation = std::make_unique<SceneImpl::ActiveAnimation>(
             _node.instantiateTracks(animationTracks), repeats, speedScale);
         _activeAnimations.emplace_back(std::move(newAnimation));
-        _node.invalidate(SceneImpl::Node::kAnimation);
+        _node.invalidate(SceneImpl::Node::kActiveAnimation);
     }
 
     void SceneImpl::PlaybackStackImpl::pop()
@@ -1041,9 +1006,8 @@ namespace minire
             return _maxOpbId++;
         }
 
-        auto it = _vacantOpbIds.begin();
-        OpbId result = *it;
-        _vacantOpbIds.erase(it);
+        OpbId result = _vacantOpbIds.back();
+        _vacantOpbIds.pop_back();
 
         assert(!_pixelEdgeOutlines.contains(result));
 
@@ -1052,9 +1016,13 @@ namespace minire
 
     void SceneImpl::releaseOpbId(OpbId opbId)
     {
-        _opbIdToSceneItem.erase(opbId);
+        assert(opbId != 0);
+
+        assert(opbId < _opbIdToSceneItem.size());
+        _opbIdToSceneItem[opbId] = std::monostate();
+
         _pixelEdgeOutlines.erase(opbId);
-        _vacantOpbIds.insert(opbId);
+        _vacantOpbIds.emplace_back(opbId);
     }
 
     SceneImpl::SceneImpl(Rasterizer & rasterizer)
@@ -1122,9 +1090,17 @@ namespace minire
 
     void SceneImpl::reset()
     {
+        _pendedActivations.reset();
+
+        _meshCullBuffer.clear();
+        _billboardCullBuffer.clear();
+        _directionalLightLeaves.clear();
+        _pointLightCullBuffer.clear();
+        _billboardWideCullBuffer.clear();
+
         _root = std::make_shared<Node>("(the root)",
             models::Node{models::Transform{}},
-            Node::Wptr(), *this);
+            Node::Sptr(), *this);
     }
 
     void SceneImpl::setupSpatialIndex(scene::SpatialIndex::Uptr && spatialIndex)
@@ -1168,8 +1144,7 @@ namespace minire
         if (0 == opbId)
             return std::monostate();
 
-        auto it = _opbIdToSceneItem.find(opbId);
-        if (it == _opbIdToSceneItem.cend())
+        if (opbId >= _opbIdToSceneItem.size())
             return std::monostate();
 
         return std::visit(utils::Overloaded
@@ -1177,7 +1152,7 @@ namespace minire
             [](std::monostate const &) -> scene::SceneItem { return std::monostate(); },
             [](MeshLeaf::Wptr const & item) -> scene::SceneItem { return item.lock(); },
             [](BillboardLeaf::Wptr const & item) -> scene::SceneItem { return item.lock(); },
-        }, it->second);
+        }, _opbIdToSceneItem[opbId]);
     }
 
     void SceneImpl::setViewport(size_t weight, size_t height)
@@ -1216,69 +1191,6 @@ namespace minire
         }, _activeCamera);
     }
 
-    void SceneImpl::revalidate(Node * root, Node::Mask mask)
-    {
-        _revalidationQueue.clear();
-        _revalidationQueue.push_back(root);
-        while (!_revalidationQueue.empty())
-        {
-            // fetch a node
-            Node * node = _revalidationQueue.back();
-            assert(node);
-            _revalidationQueue.pop_back();
-
-            // revalidate the node itself
-            // (it may set/drop children flags)
-            if (node->invalidatedAny(mask))
-            {
-                node->revalidate(mask);
-            }
-
-            // schedule children for revalidation
-            bool setHasActivateLeaf = false;
-            for(auto & [_, child] : node->_children)
-            {
-                std::visit(utils::Overloaded
-                {
-                    [this, mask](Node::Sptr & childNode)
-                    {
-                        assert(childNode);
-                        if (childNode->invalidatedAny(mask))
-                        {
-                            _revalidationQueue.emplace_back(childNode.get());
-                        }
-                    },
-                    [this, mask, &setHasActivateLeaf](auto & leaf)
-                    {
-                        using Leaf = std::decay_t<decltype(leaf)>;
-                        assert(leaf);
-
-                        bool const leafRevalidation =
-                            mask & (Node::kHasPendedActivation | Node::kParentOutlineInvalidated);
-
-                        if (leafRevalidation && leaf->invalidated())
-                        {
-                            leaf->revalidate(Leaf::element_type::kBaseMask);
-                        }
-
-                        if (Node::kHasActivateChildren & mask)
-                        {
-                            if (leaf->lerp(_lerpWeight, _epochNumber))
-                            {
-                                setHasActivateLeaf |= true;
-                            }
-                        }
-                    },
-                }, child);
-            }
-
-            if (setHasActivateLeaf)
-            {
-                node->invalidate(Node::kHasActivateChildren);
-            }
-        }
-    }
-
     /**
      * - objects that were set directly (via setOrigin() and such),
      *   will be lerped (where applicable). Such objects are affected by
@@ -1300,41 +1212,68 @@ namespace minire
         assert(epochNumber >= _epochNumber);
         bool const epochStarted = epochNumber != _epochNumber;
         _epochNumber = epochNumber;
-
-        // 1. advance animable objects
-
         _frameTime = frameTime;
-        revalidate(_root.get(), Node::kAnimation);
 
-        // 2. advance directly set values for a new Epoch or
-        //    perform lerping for continuing Epoch
+        assert(_deferredNodesInvalidation.empty());
+        assert(_deferredLeavesInvalidation.empty());
 
+        // Pass 1. advance animable objects
+        _pendedActivations.flush(&ActivationLevel::_activeAnimations,
+                                 [](Node & node) { node.revalidateAnimation(); });
+
+        // Pass 2. advance directly set values for a new Epoch or
+        //         perform lerping for continuing Epoch
         if (epochStarted)
         {
             // transfer accumulated models state into scene instances
-            revalidate(_root.get(), Node::kHasPendedActivation | Node::kOrigin);
+            _pendedActivations.flush(&ActivationLevel::_dirtyOrigins,
+                                     [](Node & node) { node.revalidateOrigin(); });
         }
 
         _lerpWeight = epochDuration != 0 ? epochTime / epochDuration : 1.0;
         assert(_lerpWeight >= 0);
-        revalidate(_root.get(), Node::kHasActivateChildren);
+        _pendedActivations.flush(&ActivationLevel::_activeLerps,
+                                 [](Node & node) { node.revalidateLerp(); });
 
-        // 3. revalidate effective values
-        //    (transforms, viewport, visibility, etc)
+        // Pass 3. revalidate effective values
+        //         (transforms, outlines, visibility, etc)
+        _pendedActivations.flush(&ActivationLevel::_dirtyTransforms,
+                                 [](Node & node) { node.revalidateTransform(); });
+        _pendedActivations.flush(&ActivationLevel::_dirtyOutlines,
+                                 [](Node & node) { node.revalidateOutline(); });
+        _pendedActivations.flush(&ActivationLevel::_dirtyVisibility,
+                                 [](Node & node) { node.revalidateVisiblity(); });
 
-        revalidate(_root.get(), Node::kVisible |
-                                Node::kParentVisibilityInvalidated |
-                                Node::kChildVisibilityInvalidated);
+        // Leaves pass
+        for(size_t i = 0; i < _pendedActivations._leaves.size(); ++i)
+        {
+            utils::ObjectBase * leaf = _pendedActivations._leaves[i];
 
-        revalidate(_root.get(), Node::kOutline |
-                                Node::kParentOutlineInvalidated |
-                                Node::kChildOutlineInvalidated);
+            assert(leaf);
+            leaf->revalidate();
+            leaf->_activationIndex = leaf->kNoIndex;
+        }
+        _pendedActivations._leaves.clear();
 
-        revalidate(_root.get(), Node::kLocalTransformDirty |
-                                Node::kParentTransformChanged |
-                                Node::kGlobalTransformGray);
-
+        // Viewport may be changed if Camera's node has been transformed
         actualizeViewpoint();
+
+        // apply deferred invalidations (for the next advance() call)
+        for(auto const & [node, mask] : _deferredNodesInvalidation)
+        {
+            assert(node);
+            node->invalidate(mask); // invalidate() MUST NOT alter
+                                    // _deferredNodesInvalidation
+        }
+        _deferredNodesInvalidation.clear();
+
+        for(auto const & [leaf, mask] : _deferredLeavesInvalidation)
+        {
+            assert(leaf);
+            leaf->invalidate(mask); // invalidate() MUST NOT alter
+                                    // _deferredLeavesInvalidation
+        }
+        _deferredLeavesInvalidation.clear();
 
 #       ifndef NDEBUG
         // for debug-only: ensure that no nodes has been left invalidated
@@ -1344,28 +1283,149 @@ namespace minire
             Node const * node = queue.back();
             queue.pop_back();
 
-            // NOTE: Node::kAnimation may be stored between iterations
+            // NOTE: Node::kActiveAnimation may be stored between iterations
             assert(node);
-            assert(node->invalidatedAny(Node::kAnimation) ||
+            assert(node->invalidatedAny(Node::kActiveAnimation) ||
                    !node->invalidated());
 
             for(auto & [_, child] : node->_children)
             {
                 std::visit(utils::Overloaded
                 {
-                    [&queue](Node::Sptr & childNode)
+                    [&queue](Node::Sptr const & childNode)
                     {
                         assert(childNode);
                         queue.emplace_back(childNode.get());
                     },
-                    [](auto & leaf) { assert(leaf && !leaf->invalidated()); },
+                    [](auto const & leaf) { assert(leaf && !leaf->invalidated()); },
                 }, child);
             }
         }
 #       endif
     }
 
-    // TODO: should be a static method?
+    void SceneImpl::invalidateDeferred(Node * node, Node::Mask mask)
+    {
+        _deferredNodesInvalidation.emplace_back(node, mask);
+    }
+
+    template<typename Derived, typename ObjectType>
+    void SceneImpl::invalidateDeferred(Leaf<Derived, ObjectType> * leaf,
+                                       typename ObjectType::Mask mask)
+    {
+        _deferredLeavesInvalidation.emplace_back(leaf, mask);
+    }
+
+    template<typename Callback>
+    void SceneImpl::activationMappings(Callback callback)
+    {
+        using MemberPtr = std::vector<Node *> ActivationLevel::*;
+        using Mapping = std::pair<Node::Mask, MemberPtr>;
+        static constexpr std::array<Mapping, 6> kActivationMappings
+        {
+            Mapping{Node::kActiveAnimation, &ActivationLevel::_activeAnimations},
+            Mapping{Node::kOrigin,          &ActivationLevel::_dirtyOrigins},
+            Mapping{Node::kActiveLerp,      &ActivationLevel::_activeLerps},
+            Mapping{Node::kDirtyTransform,  &ActivationLevel::_dirtyTransforms},
+            Mapping{Node::kOutline,         &ActivationLevel::_dirtyOutlines},
+            Mapping{Node::kVisible,         &ActivationLevel::_dirtyVisibility}
+        };
+
+        for(auto const & [mask, member] : kActivationMappings)
+        {
+            callback(mask, member);
+        }
+    }
+
+    void SceneImpl::activateNode(Node * node, Node::Mask mask)
+    {
+        assert(node);
+        if (size_t const depth = node->_depth; depth != kNoDepth)
+        {
+             // prepare a level to be filled
+            _pendedActivations._nodes.resize(std::max(_pendedActivations._nodes.size(), depth + 1));
+            ActivationLevel & activationLevel = _pendedActivations._nodes[depth];
+
+            activationMappings(
+                [mask, node, &activationLevel]
+                (Node::Mask mappingMask, auto member)
+                {
+                    if (mask & mappingMask)
+                    {
+                        activationLevel.activate(member, node, mask);
+                    }
+                });
+        }
+    }
+
+    void SceneImpl::changeNodeLevel(Node * node, size_t oldDepth, size_t newDepth)
+    {
+        assert(node);
+
+        // fetch an old level
+        assert(oldDepth < _pendedActivations._nodes.size());
+        ActivationLevel & oldActivationLevel = _pendedActivations._nodes[oldDepth];
+
+        // maybe prepare a new level
+        ActivationLevel * newActivationLevel = nullptr;
+        if (kNoDepth != newDepth)
+        {
+            _pendedActivations._nodes.resize(std::max(_pendedActivations._nodes.size(), newDepth + 1));
+            newActivationLevel = &_pendedActivations._nodes[newDepth];
+        }
+
+        // perform change operations
+        activationMappings(
+            [&oldActivationLevel, newActivationLevel, node]
+            (Node::Mask mask, auto member)
+            {
+                if (oldActivationLevel.erase(member, node) && newActivationLevel)
+                {
+                    newActivationLevel->activate(member, node, mask, true);
+                }
+            });
+    }
+
+    template<typename Derived, typename ObjectType>
+    void SceneImpl::activateLeaf(Leaf<Derived, ObjectType> * leaf,
+                                 typename ObjectType::Mask mask)
+    {
+        assert(leaf);
+        if (!leaf->invalidated())
+        {
+            // leaf can be added to the activation list just once by an any flags
+            _pendedActivations._leaves.push_back(leaf);
+            assert(leaf->_activationIndex == leaf->kNoIndex);
+            leaf->_activationIndex = _pendedActivations._leaves.size() - 1;
+        }
+        leaf->ObjectType::invalidate(mask);
+    }
+
+    template<typename Derived, typename ObjectType>
+    void SceneImpl::eraseLeaf(Leaf<Derived, ObjectType> * leaf)
+    {
+        if (size_t const leafIndex = leaf->_activationIndex;
+            leafIndex != leaf->kNoIndex)
+        {
+            assert(leafIndex < _pendedActivations._leaves.size());
+
+            utils::ObjectBase * movedLeaf = _pendedActivations._leaves.back();
+            _pendedActivations._leaves[leafIndex] = movedLeaf;
+
+            movedLeaf->_activationIndex = leafIndex;
+
+            _pendedActivations._leaves.pop_back();
+            leaf->_activationIndex = leaf->kNoIndex;
+        }
+    }
+
+    bool SceneImpl::isLeafActivated(utils::ObjectBase * leaf)
+    {
+        auto it = std::ranges::find(_pendedActivations._leaves, leaf);
+        return it != _pendedActivations._leaves.cend();
+    }
+
+    // TODO: shouldn't be a static method?
     material::SkinningVectorSptr
     SceneImpl::makeSkinningVector(MeshLeaf const & mesh) const
     {
@@ -1410,10 +1470,11 @@ namespace minire
 
         // find a new parent and insert element to a new parent's children
         SceneImpl::Node::Sptr newParent = std::static_pointer_cast<SceneImpl::Node>(newParentIface);
+        auto itemHardCopy = oldIterator->second;    // an explicit copy to ensure item's lifetime
+                                                    // in case when newParent is nullptr
         if (newParent)
         {
-            auto [_, inserted] = newParent->_children.emplace(oldIterator->first,
-                                                              oldIterator->second);
+            auto [_, inserted] = newParent->_children.emplace(oldIterator->first, itemHardCopy);
             MINIRE_INVARIANT(inserted, "failed to insert \"{}\" into a new parent node (\"{}\")",
                              item.name(), newParent->name());
         }
@@ -1421,13 +1482,67 @@ namespace minire
         // reset _parent for the element
         item._parent = newParent;
 
-        // erase the element from an old parent
+        // erase the element from an old parent, must be safe
+        // since itemHardCopy keeps an Sptr reference to item
         oldParent->_children.erase(oldIterator);
 
-        if (newParent)
+        // rebuild tree structure
+        if constexpr(std::is_same_v<ItemType, Node>)
         {
-            item.propagate();
-        }
+            // mark current node invalidated, all children's
+            // will be transforms will be invalidated during advance()
+            item.invalidate(Node::kDirtyTransform);
 
+            std::vector<Node *> queue{&item};
+            while(!queue.empty())
+            {
+                // fetch the next item
+                Node * current = queue.back();
+                queue.pop_back();
+                assert(current);
+
+                // recalculate current's _depth
+                auto parent = current->_parent.lock();
+                size_t const oldDepth = current->_depth;
+                current->_depth = parent && parent->_depth != kNoDepth ? parent->_depth + 1
+                                                                       : kNoDepth;
+                if (oldDepth != current->_depth)
+                {
+                    // rebuild activation lists for current
+                    changeNodeLevel(current, oldDepth, current->_depth);
+
+                    // process children
+                    for(auto const & [_, child] : current->_children)
+                    {
+                        std::visit(utils::Overloaded
+                        {
+                            [&queue](Node::Sptr const & node)
+                            {
+                                // enqueue Node to be traversed
+                                assert(node);
+                                queue.push_back(node.get());
+                            },
+                            [current](auto const & leaf)
+                            {
+                                // update a leaf in-place
+                                assert(leaf);
+                                leaf->_depth = current->_depth != kNoDepth ? current->_depth + 1
+                                                                           : kNoDepth;
+                                using Leaf = std::decay_t<decltype(leaf)>::element_type;
+                                static_assert(!std::is_same_v<Leaf, SceneImpl::Node>,
+                                              "the visitor is broken!");
+                            }
+                        }, child);
+                    }
+                }
+            }
+        }
+        else
+        {
+            // leaves don't need any traverse
+            item._depth = newParent && newParent->_depth != kNoDepth ? newParent->_depth + 1
+                                                                     : kNoDepth;
+            item.invalidate(ItemType::kParentTransformChanged);
+        }
     }
 }
