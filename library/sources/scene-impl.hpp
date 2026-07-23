@@ -9,6 +9,8 @@
 #include <minire/scene.hpp>
 #include <minire/scene/spatial-index.hpp>
 #include <minire/utils/culling-test.hpp>
+#include <minire/utils/no-value.hpp>
+#include <minire/utils/object.hpp>
 
 #include <material/types.hpp>
 #include <rasterizer/mesh.hpp>
@@ -17,6 +19,8 @@
 #include <scene/spatial-handler.hpp>
 #include <utils/lerpable.hpp>
 
+#include <array>
+#include <bit> // for std::has_single_bit
 #include <list>
 #include <memory>
 #include <string>
@@ -250,25 +254,27 @@ namespace minire
 
             explicit Leaf(std::string name,
                           typename ObjectType::ModelType const & model,
-                          std::weak_ptr<Node> parent,
-                          SceneImpl & scene)
-                : ObjectType(std::move(name), model)
-                , _parent(parent)
-                , _scene(scene)
-            {}
+                          std::shared_ptr<Node> const & parent,
+                          SceneImpl & scene);
+
+            virtual ~Leaf();
 
             scene::Node::Wptr parent() const override { return _parent; }
             void setParent(scene::Node::Sptr const & newParent) override;
             models::ScenePath absPath() const override;
 
         private:
-            using ObjectType::propagate;
+            static constexpr ObjectType::Mask kParentTransformChanged =
+                ObjectType::mkMask(ObjectType::kFlagsCount + 0);
 
-            void propagate(ObjectType::Mask) override;
-            void invalidateParent(ObjectType::Mask);
+            static constexpr ObjectType::Mask kActiveLerp =
+                ObjectType::mkMask(ObjectType::kFlagsCount + 1);
+
+            void invalidate(ObjectType::Mask = ObjectType::kAllFlags) override;
 
         private:
             std::weak_ptr<Node> _parent;
+            size_t              _depth;
             SceneImpl         & _scene;
 
             friend class SceneImpl;
@@ -280,8 +286,8 @@ namespace minire
         {
         public:
             explicit MeshLeaf(std::string name,
-                              models::Mesh const & model,
-                              std::weak_ptr<Node> parent,
+                              models::Mesh && model,
+                              std::shared_ptr<Node> const & parent,
                               std::shared_ptr<rasterizer::Mesh> const & mesh,
                               SceneImpl & scene);
 
@@ -296,8 +302,6 @@ namespace minire
             void revalidate(Mask = kAllFlags) override;
 
             utils::Aabb const & worldAabb() const { return _worldAabb; }
-
-            void onParentTransformChanged(glm::mat4 const & globalTransform);
 
         private:
             struct SkinBone
@@ -325,15 +329,11 @@ namespace minire
         public:
             explicit LerpableLeaf(std::string name,
                                   ModelType const & model,
-                                  std::weak_ptr<Node> parent,
+                                  std::shared_ptr<Node> const & parent,
                                   SceneImpl & scene)
                 : Leaf<Derived, SceneType>(std::move(name), model, parent, scene)
                 , utils::Lerpable<ModelType>(model)
-            {
-                // calling at the end, to avoid unwanted calls to virtual methods
-                SceneType::propagate(); // must be called before "setAllowPropagation" !
-                SceneType::setAllowPropagation(true);
-            }
+            {}
         };
 
         class DirectionalLightLeaf final
@@ -355,14 +355,12 @@ namespace minire
         public:
             explicit PointLightLeaf(std::string name,
                                     ModelType const & model,
-                                    std::weak_ptr<Node> parent,
+                                    std::shared_ptr<Node> const & parent,
                                     SceneImpl & scene);
 
             void revalidate(Mask = kAllFlags) override;
 
             utils::Aabb const & worldAabb() const { return _worldAabb; }
-
-            void onParentTransformChanged(glm::mat4 const & globalTransform);
 
         private:
             utils::Aabb localAabb() const;
@@ -403,7 +401,7 @@ namespace minire
         public:
             explicit BillboardLeaf(std::string name,
                                    models::Billboard model,
-                                   std::weak_ptr<Node> parent,
+                                   std::shared_ptr<Node> const & parent,
                                    std::shared_ptr<rasterizer::Billboard> const & billboard,
                                    SceneImpl & scene);
 
@@ -418,8 +416,6 @@ namespace minire
             void revalidate(Mask = kAllFlags) override;
 
             utils::Aabb const & worldAabb() const { return _worldAabb; }
-
-            void onParentTransformChanged(glm::mat4 const & globalTransform);
 
         private:
             std::shared_ptr<rasterizer::Billboard> _billboard;
@@ -518,8 +514,10 @@ namespace minire
 
             Node(std::string name,
                  Object::ModelType && model,
-                 Wptr parent,
+                 Sptr const & parent,
                  SceneImpl & scene);
+
+            ~Node();
 
         public:
             scene::Node::Sptr make(std::string const & name, models::Node) override;
@@ -559,22 +557,21 @@ namespace minire
 
             bool hasGlobalTransform() const
             {
-                return !invalidatedAny(kLocalTransformDirty |
-                                       kGlobalTransformGray |
-                                       kParentTransformChanged);
+                return !invalidatedAny(kDirtyTransform);
             }
 
-            using scene::Node::propagate;
+            void revalidateAnimation();
+            void revalidateOrigin();
+            void revalidateLerp();
+            void revalidateTransform();
+            void revalidateOutline();
+            void revalidateVisiblity();
 
-            void revalidate(Mask = kAllFlags) override;
-            void propagate(Object::Mask) override;
-            void invalidateParent(Mask);
+            // marking a final to ensure it is safe to call from ctor
+            void invalidate(Mask = kAllFlags) final;
 
             template<typename T>
             void invalidateChildren(Mask);
-
-            template<typename T>
-            void notifyLeavesTransformChanged(glm::mat4 const &);
 
             bool advanceAnimation();
 
@@ -593,39 +590,13 @@ namespace minire
             using ChildrenMap = std::unordered_map<std::string, Child>;
             using LerpableTransform = utils::Lerpable<models::Transform>;
 
-            // set if a Node has some Leaf or inner Node which can be lerped
-            static constexpr Mask kHasActivateChildren         = mkMask(kFlagsCount + 0);
-
-            // some Leaves or Nodes has values to be revalidated at the new epoch
-            static constexpr Mask kHasPendedActivation         = mkMask(kFlagsCount + 1);
-
-            // effective visibility of a node should be re-evaluated
-            // due to change of some of parent's effective visibility
-            static constexpr Mask kParentVisibilityInvalidated = mkMask(kFlagsCount + 2);
-
-            // recalc visibility of some of nested nodes
-            static constexpr Mask kChildVisibilityInvalidated  = mkMask(kFlagsCount + 3);
-
-            // own transform is outdated
-            static constexpr Mask kLocalTransformDirty         = mkMask(kFlagsCount + 4);
-
-            // own transform is outdated
-            static constexpr Mask kParentTransformChanged      = mkMask(kFlagsCount + 5);
-
-            // own transform is clean, but some children are outdated
-            static constexpr Mask kGlobalTransformGray         = mkMask(kFlagsCount + 6);
-
-            // node itself or some of its children (maybe nested) has an active animation
-            static constexpr Mask kAnimation                   = mkMask(kFlagsCount + 7);
-
-            // recalc outline of some of nested nodes
-            static constexpr Mask kChildOutlineInvalidated     = mkMask(kFlagsCount + 8);
-
-            // effective outline of a node should be re-evaluated
-            // due to change of some of parent's effective outline
-            static constexpr Mask kParentOutlineInvalidated    = mkMask(kFlagsCount + 9);
+            // NOTE: these flags just reflect queues of ActivationLevel
+            static constexpr Mask kActiveAnimation  = mkMask(kFlagsCount + 0);
+            static constexpr Mask kActiveLerp       = mkMask(kFlagsCount + 1);
+            static constexpr Mask kDirtyTransform   = mkMask(kFlagsCount + 2);
 
             SceneImpl           & _scene;
+            size_t                _depth;
             LerpableTransform     _localTransform;
             glm::vec3             _globalPosition;
             glm::mat4             _globalTransform;
@@ -634,8 +605,19 @@ namespace minire
             ChildrenMap           _children;
             AnimationSet          _animationSet;
             PlaybackStackImpl     _playbackStack;
-            models::Outline       _effectiveOutline = std::monostate();
-            bool                  _effectiveVisible = true;
+            models::Outline       _effectiveOutline;
+            bool                  _effectiveVisible;
+
+            // NOTE: will shadow ObjectBase::kNoIndex
+            static constexpr size_t kNoIndex = utils::kNoValue<uint32_t>;
+
+            // NOTE: using here int32 because int64 are way excessive
+            uint32_t              _activeAnimationsIndex = kNoIndex;
+            uint32_t              _dirtyOriginsIndex = kNoIndex;
+            uint32_t              _activeLerpsIndex = kNoIndex;
+            uint32_t              _dirtyTransformsIndex = kNoIndex;
+            uint32_t              _dirtyOutlinesIndex = kNoIndex;
+            uint32_t              _dirtyVisibilityIndex = kNoIndex;
 
         private:
             struct ItemIterator
@@ -681,9 +663,11 @@ namespace minire
                                            BillboardLeaf::Wptr>;
 
         // Object Picking Buffer
-        using OpbIdsSet = std::unordered_set<OpbId>; // TODO: consider std::hive
-        using OpbIdToSceneItem = std::unordered_map<OpbId, WeakSceneItem>;
+        using OpbIdsList = std::vector<OpbId>;
+        using OpbIdToSceneItem = std::vector<WeakSceneItem>;
 
+        // NOTE: this container should be very small in size,
+        //       so std::unordered_map should have fine performance
         using PixelEdgeOutlines = std::unordered_map<OpbId, models::outline::PixelEdge>;
 
         using BillboardElement = std::tuple<float /* dist */,
@@ -691,13 +675,107 @@ namespace minire
                                             BillboardLeaf *>;
         using BillboardElements = std::vector<BillboardElement>;
 
+        struct NodeLocator;
+
+        struct ActivationLevel
+        {
+            // activation lists of a given level
+            std::vector<Node *> _activeAnimations;
+            std::vector<Node *> _dirtyOrigins;
+            std::vector<Node *> _activeLerps;
+            std::vector<Node *> _dirtyTransforms;
+            std::vector<Node *> _dirtyOutlines;
+            std::vector<Node *> _dirtyVisibility;
+
+            // healper functions
+            template<typename Target, typename Callback>
+            void flush(Target ActivationLevel::* listPtr,
+                       uint32_t Node::* indexPtr,
+                       Callback callback);
+
+            template<typename Target>
+            void activate(Target ActivationLevel::* listPtr,
+                          uint32_t Node::* indexPtr,
+                          Node * node);
+
+            template<typename Target>
+            bool erase(Target ActivationLevel::* listPtr,
+                       uint32_t Node::* indexPtr,
+                       Node * node);
+        };
+
+        struct ActivatedNodeLocator
+        {
+            Node::Mask                             _mask;
+            std::vector<Node *> ActivationLevel::* _listPtr;
+            uint32_t Node::*                       _indexPtr;
+        };
+
+        static constexpr ActivatedNodeLocator kActiveAnimationLocator
+        {
+            Node::kActiveAnimation, &ActivationLevel::_activeAnimations, &Node::_activeAnimationsIndex
+        };
+
+        static constexpr ActivatedNodeLocator kDirtyOriginLocator
+        {
+            Node::kOrigin, &ActivationLevel::_dirtyOrigins, &Node::_dirtyOriginsIndex
+        };
+
+        static constexpr ActivatedNodeLocator kActiveLerpLocator
+        {
+            Node::kActiveLerp, &ActivationLevel::_activeLerps, &Node::_activeLerpsIndex
+        };
+
+        static constexpr ActivatedNodeLocator kDirtyTransformLocator
+        {
+            Node::kDirtyTransform, &ActivationLevel::_dirtyTransforms, &Node::_dirtyTransformsIndex
+        };
+
+        static constexpr ActivatedNodeLocator kDirtyOutlineLocator
+        {
+            Node::kOutline, &ActivationLevel::_dirtyOutlines, &Node::_dirtyOutlinesIndex
+        };
+
+        static constexpr ActivatedNodeLocator kDirtyVisibleLocator
+        {
+            Node::kVisible, &ActivationLevel::_dirtyVisibility, &Node::_dirtyVisibilityIndex
+        };
+
+        struct ActivationLevels
+        {
+            // an index is a "level", 0 is a root-level
+            std::vector<ActivationLevel>     _nodes;
+
+            // leaves don't need tree-like traversal, so,
+            // just keep them in a flat vector
+            std::vector<utils::ObjectBase *> _leaves;
+
+            // healper functions
+            template<typename Target, typename Callback>
+            void flush(Target ActivationLevel::* target,
+                       uint32_t Node::* indexPtr,
+                       Callback callback)
+            {
+                for(size_t level = 0; level < _nodes.size(); ++level)
+                {
+                    _nodes[level].flush(target, indexPtr, callback);
+                }
+            }
+        };
+
+        template<typename Callback>
+        void activationMappings(Callback callback);
+
+        using DeferredNodesInvalidation = std::vector<std::pair<Node *, Node::Mask>>;
+        using DeferredLeavesInvalidation = std::vector<std::pair<utils::ObjectBase *,
+                                                                 utils::ObjectBase::Mask>>;
+
     private:
-        void revalidate(Node *, Node::Mask);
         void actualizeViewpoint();
         material::SkinningVectorSptr makeSkinningVector(MeshLeaf const &) const;
 
         template<typename ItemType>
-        static void setParent(ItemType &, scene::Node::Sptr const &);
+        void setParent(ItemType &, scene::Node::Sptr const &);
 
         OpbId allocateOpbId();
         void releaseOpbId(OpbId);
@@ -705,6 +783,25 @@ namespace minire
         scene::SceneItem fetchSceneItem(OpbId const) const;
 
         // TODO: lerpable _ambientLight
+
+        // Nodes activations
+        void activateNode(Node *, Node::Mask);
+        void changeNodeLevel(Node *, size_t oldDepth, size_t newDepth);
+
+        // Leaves activations
+        template<typename Derived, typename ObjectType>
+        void activateLeaf(Leaf<Derived, ObjectType> *,
+                          typename ObjectType::Mask);
+
+        template<typename Derived, typename ObjectType>
+        void eraseLeaf(Leaf<Derived, ObjectType> *);
+
+        // Deferred invalidations
+        void invalidateDeferred(Node *, Node::Mask);
+
+        template<typename Derived, typename ObjectType>
+        void invalidateDeferred(Leaf<Derived, ObjectType> *,
+                                typename ObjectType::Mask);
 
     private:
         Rasterizer                   & _rasterizer;
@@ -714,12 +811,17 @@ namespace minire
         //       it must be destroyed the last one.
         scene::SpatialIndex::Uptr      _spatialIndex;
 
+        // NOTE: while destructing, Nodes and Leaves will call changeNodeLevel
+        //       eraseLeaf (during destruction of _root), therefore, _pendedActivations
+        //       must be destroyed only after destruction of _root.
+        ActivationLevels               _pendedActivations;
+
         // NOTE: while destructing, Leaves will release OpbId's,
         //       thereofe _vacantOpbIds and _opbIdToSceneItem must
         //       be destroyed last.
         //       So the order of members declaration is vital here.
         bool const                     _enableOpb;
-        OpbIdsSet                      _vacantOpbIds;
+        OpbIdsList                     _vacantOpbIds;
         OpbIdToSceneItem               _opbIdToSceneItem;
         OpbId                          _maxOpbId = 1;
 
@@ -738,7 +840,8 @@ namespace minire
         mutable std::vector<void *>    _pointLightCullBuffer;
         mutable BillboardElements      _billboardWideCullBuffer;
 
-        std::vector<Node *>            _revalidationQueue;
+        DeferredNodesInvalidation      _deferredNodesInvalidation;
+        DeferredLeavesInvalidation     _deferredLeavesInvalidation;
 
         friend class Node;
         friend class MeshLeaf;

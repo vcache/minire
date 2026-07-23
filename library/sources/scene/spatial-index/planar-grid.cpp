@@ -134,7 +134,7 @@ namespace minire::scene::spatial_index
                     {
                         assert(cellIndex < grid.size());
                         grid[cellIndex]._items.emplace_back(indexableId);
-                        idToCells[indexableId].emplace_back(cellIndex);
+                        idToCells[indexableId].emplace_back(cellIndex, grid[cellIndex]._items.size() - 1);
                     });
             });
 
@@ -165,18 +165,21 @@ namespace minire::scene::spatial_index
 
                     if (IndexPayload * payload = get(id);
                         layer(id) == indexLayer && payload)
-                    {                        
+                    {
                         output.emplace_back(payload);
                         _requestIds[id] = _requestId;
-                    }                   
+                    }
                 }
             });
     }
 
-    void PlanarGrid::createImpl(IndexableId indexableId,
-                                utils::Aabb const & aabb)
+    void PlanarGrid::createImpl(IndexableId indexableId)
     {
-        updateImpl(indexableId, aabb);
+        // since the base class has allocated IndexableId,
+        // it will appear in iterate() call; so have to
+        // build index item with trivial AABB to allocate
+        // corresponding structures
+        updateImpl(indexableId, utils::Aabb());
     }
 
     void PlanarGrid::updateImpl(IndexableId indexableId,
@@ -211,29 +214,32 @@ namespace minire::scene::spatial_index
                 }
 #               endif
 
-                auto it = std::ranges::find(oldGridCells, index);
+                auto it = std::ranges::find_if(oldGridCells,
+                    [index](GridCellPointer const & p) { return p.first == index; });
+
                 if (it != oldGridCells.end())
                 {
-                    // already exists, do nothing, remove from oldGridCells,
-                    // to secure it from further removal,
-                    // don't need to update _buckets
+                    // already exists, do nothing, remove from oldGridCells
+                    size_t const itemOffset = it->second;
                     *it = oldGridCells.back();
                     oldGridCells.pop_back();
+
+                    newGridCells.emplace_back(index, itemOffset);
                 }
                 else
                 {
                     // a new cell is affected, register self into this cell
+                    size_t const itemOffset = gridCell._items.size();
                     gridCell._items.emplace_back(indexableId);
-                }
 
-                newGridCells.emplace_back(index);
+                    newGridCells.emplace_back(index, itemOffset);
+                }
             });
 
         // delete from old ones (non-secured residue of oldGridCells)
-        for (size_t const index : oldGridCells)
+        for (auto const & [cellIndex, itemOffset] : oldGridCells)
         {
-            assert(index < _grid.size());
-            eraseElement(_grid[index]._items, indexableId);
+            eraseFromCell(cellIndex, itemOffset);
         }
 
         std::swap(newGridCells, oldGridCells);
@@ -241,15 +247,15 @@ namespace minire::scene::spatial_index
 
     void PlanarGrid::eraseImpl(IndexableId indexableId)
     {
-        // update forward index
-        iterateGridCells(indexableId,
-            [indexableId, this](GridCell & gridCell)
-            {
-                eraseElement(gridCell._items, indexableId);
-            });
+        assert(indexableId < _idToCells.size());
+
+        // update forward index using the exact locations
+        for (auto const & [cellIndex, itemOffset] : _idToCells[indexableId])
+        {
+            eraseFromCell(cellIndex, itemOffset);
+        }
 
         // update backward index and update buckets stats
-        assert(indexableId < _idToCells.size());
         _idToCells[indexableId].clear();
         _idToAabb[indexableId] = utils::Aabb();
         _requestIds[indexableId] = 0;
@@ -286,16 +292,25 @@ namespace minire::scene::spatial_index
     }
 
     // assuming that elemnt MUST persists somewhere in the container
-    template<typename T>
-    void PlanarGrid::eraseElement(std::vector<T> & container, T element)
+    void PlanarGrid::eraseFromCell(size_t cellIndex, size_t itemOffset)
     {
-        // find an element to delete
-        assert(!container.empty());
-        auto it = std::ranges::find(container, element);
-        assert(it != container.end());
+        GridCell & cell = _grid[cellIndex];
+        assert(itemOffset < cell._items.size());
 
-        // perform the removal
-        *it = std::move(container.back());
-        container.pop_back();
+        if (itemOffset != cell._items.size() - 1)
+        {
+            // move the last element into the erased slot
+            IndexableId const movedId = cell._items.back();
+            cell._items[itemOffset] = movedId;
+
+            // update the back-reference of 'movedId'
+            GridCells & movedIdCells = _idToCells[movedId];
+            auto it = std::ranges::find_if(movedIdCells,
+                [cellIndex](GridCellPointer const & p) { return p.first == cellIndex; });
+            assert(it != movedIdCells.end());
+            it->second = itemOffset; // patch the offset
+        }
+
+        cell._items.pop_back();
     }
 }

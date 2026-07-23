@@ -58,8 +58,8 @@ namespace minire::scene::spatial_index::test
     TEST(PlanarIndex, TrivialCase)
     {
         PlanarGrid planarGrid;
-        SpatialHandler spatialHandler(planarGrid, mockPayload(kPayload0), 0,
-                                      utils::Aabb{-1, -1, -1, 1, 1, 1});
+        SpatialHandler spatialHandler(planarGrid, mockPayload(kPayload0), 0);
+        spatialHandler.update(utils::Aabb{-1, -1, -1, 1, 1, 1});
 
         for(auto const & frustumPlanes : {kSmallFrustum, kTrivialFrustum, kLargeFrustum})
         {
@@ -77,8 +77,8 @@ namespace minire::scene::spatial_index::test
     TEST(PlanarIndex, DisjointElement)
     {
         PlanarGrid planarGrid;
-        SpatialHandler spatialHandler(planarGrid, mockPayload(kPayload0), 0,
-                                      utils::Aabb{100, 100, 100, 102, 102, 102});
+        SpatialHandler spatialHandler(planarGrid, mockPayload(kPayload0), 0);
+        spatialHandler.update(utils::Aabb{100, 100, 100, 102, 102, 102});
 
         std::vector<IndexPayload *> output;
         planarGrid.cull(kTrivialFrustum, 0, output);
@@ -88,8 +88,8 @@ namespace minire::scene::spatial_index::test
     TEST(PlanarIndex, ElementUpdateCulling)
     {
         PlanarGrid planarGrid;
-        SpatialHandler spatialHandler(planarGrid, mockPayload(kPayload0), 0,
-                                      utils::Aabb{-0.5, -0.5, -0.5, 0.5, 0.5, 0.5});
+        SpatialHandler spatialHandler(planarGrid, mockPayload(kPayload0), 0);
+        spatialHandler.update(utils::Aabb{-0.5, -0.5, -0.5, 0.5, 0.5, 0.5});
 
         std::vector<IndexPayload *> output;
         
@@ -116,8 +116,8 @@ namespace minire::scene::spatial_index::test
         std::vector<IndexPayload *> output;
 
         {
-            SpatialHandler spatialHandler(planarGrid, mockPayload(kPayload0), 0,
-                                          utils::Aabb{-1, -1, -1, 1, 1, 1});
+            SpatialHandler spatialHandler(planarGrid, mockPayload(kPayload0), 0);
+            spatialHandler.update(utils::Aabb{-1, -1, -1, 1, 1, 1});
             planarGrid.cull(kTrivialFrustum, 0, output);
             ASSERT_EQ(output.size(), 1);
         }
@@ -132,12 +132,12 @@ namespace minire::scene::spatial_index::test
         PlanarGrid planarGrid(glm::vec2(1, 1));
         
         // is inside
-        std::optional<SpatialHandler> h0(std::in_place, planarGrid, mockPayload(kPayload0), 0,
-                                         utils::Aabb{-1, -1, -1, 1, 1, 1});
+        std::optional<SpatialHandler> h0(std::in_place, planarGrid, mockPayload(kPayload0), 0);
+        h0->update(utils::Aabb{-1, -1, -1, 1, 1, 1});
 
         // is outside
-        std::optional<SpatialHandler> h1(std::in_place, planarGrid, mockPayload(kPayload1), 0,
-                                         utils::Aabb{10, 10, 10, 12, 12, 12});
+        std::optional<SpatialHandler> h1(std::in_place, planarGrid, mockPayload(kPayload1), 0);
+        h1->update(utils::Aabb{10, 10, 10, 12, 12, 12});
 
         std::vector<IndexPayload *> output;
         
@@ -169,8 +169,8 @@ namespace minire::scene::spatial_index::test
         //        linear searches will kill the performance
         PlanarGrid planarGrid(glm::vec2(50, 50));
         
-        SpatialHandler giantElement(planarGrid, mockPayload(kPayload0), 0,
-                                    utils::Aabb{-500, -500, -500, 500, 500, 500});
+        SpatialHandler giantElement(planarGrid, mockPayload(kPayload0), 0);
+        giantElement.update(utils::Aabb{-500, -500, -500, 500, 500, 500});
 
         std::vector<IndexPayload *> output;
         planarGrid.cull(kLargeFrustum, 0, output);
@@ -185,10 +185,11 @@ namespace minire::scene::spatial_index::test
         //        linear searches will kill the performance
         PlanarGrid planarGrid(glm::vec2(100, 100));
         
-        SpatialHandler farNegative(planarGrid, mockPayload(kPayload0), 0,
-                                   utils::Aabb{-100000, -100000, -100000, -99999, -99999, -99999});
-        SpatialHandler farPositive(planarGrid, mockPayload(kPayload1), 0,
-                                   utils::Aabb{100000, 100000, 100000, 100001, 100001, 100001});
+        SpatialHandler farNegative(planarGrid, mockPayload(kPayload0), 0);
+        farNegative.update(utils::Aabb{-100000, -100000, -100000, -99999, -99999, -99999});
+
+        SpatialHandler farPositive(planarGrid, mockPayload(kPayload1), 0);
+        farPositive.update(utils::Aabb{100000, 100000, 100000, 100001, 100001, 100001});
 
         std::vector<IndexPayload *> output;
         planarGrid.cull(kTrivialFrustum, 0, output);
@@ -200,9 +201,14 @@ namespace minire::scene::spatial_index::test
     {
         PlanarGrid planarGrid;
         
-        SpatialHandler mesh(planarGrid, mockPayload(kPayload0), 0, utils::Aabb{-1, -1, -1, 1, 1, 1});
-        SpatialHandler light(planarGrid, mockPayload(kPayload1), 1, utils::Aabb{-1, -1, -1, 1, 1, 1});
-        SpatialHandler bboard(planarGrid, mockPayload(kPayload2), 2, utils::Aabb{-1, -1, -1, 1, 1, 1});
+        SpatialHandler mesh(planarGrid, mockPayload(kPayload0), 0);
+        mesh.update(utils::Aabb{-1, -1, -1, 1, 1, 1});
+
+        SpatialHandler light(planarGrid, mockPayload(kPayload1), 1);
+        light.update(utils::Aabb{-1, -1, -1, 1, 1, 1});
+
+        SpatialHandler bboard(planarGrid, mockPayload(kPayload2), 2);
+        bboard.update(utils::Aabb{-1, -1, -1, 1, 1, 1});
 
         std::vector<IndexPayload *> output;
 

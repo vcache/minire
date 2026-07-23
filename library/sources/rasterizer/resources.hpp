@@ -23,9 +23,6 @@ namespace minire::rasterizer
     public:
         // NOTE: LayerId can be "". Although seems strange, but must be a valid case.
         using LayerId = std::string;
-        using Key = std::variant<textures::Id,
-                                 meshes::Id,
-                                 vertex_buffers::Id>;
 
     public:
         // creates a new Layer and makes it current;
@@ -41,22 +38,44 @@ namespace minire::rasterizer
         LayerId const & current() const { return _current; }
 
     public:
-        std::any const & find(Key const &) const;
+        std::any const & find(textures::Id const &) const;
+        std::any const & find(meshes::Id const &) const;
+        std::any const & find(vertex_buffers::Id const &) const;
 
-        void insert(Key, std::any, bool override = false);
+        void insert(textures::Id, std::any, bool override = false);
+        void insert(meshes::Id, std::any, bool override = false);
+        void insert(vertex_buffers::Id, std::any, bool override = false);
 
         // TODO: this one might have linear complexity
-        void erase(Key const &);
+        void erase(textures::Id const &);
+        void erase(meshes::Id const &);
+        void erase(vertex_buffers::Id const &);
 
     private:
+        template<typename T, typename K>
+        std::any const & find(T & container, K const & key) const;
+
+        template<typename T, typename K>
+        void insert(T & container, K key, std::any data, bool override);
+
+        template<typename T, typename K>
+        void erase(T & container, K const & key);
+
+    private:
+        using Key = std::variant<textures::Id,
+                                 meshes::Id,
+                                 vertex_buffers::Id>;
+
         struct Contents
         {
             std::any _data;
             LayerId  _layer;
         };
 
-        LayerId                               _current;
-        std::unordered_map<Key, Contents>     _store;
-        std::unordered_multimap<LayerId, Key> _layers;
+        LayerId                                          _current;
+        std::unordered_map<textures::Id, Contents>       _textures;
+        std::unordered_map<meshes::Id, Contents>         _meshes;
+        std::unordered_map<vertex_buffers::Id, Contents> _vertexBuffers;
+        std::unordered_multimap<LayerId, Key>            _layers;
     };
 }

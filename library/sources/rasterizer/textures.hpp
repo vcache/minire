@@ -69,10 +69,7 @@ namespace minire::rasterizer
                           models::Sampler const & sampler = {},
                           bool hasMipMaps = true) const
         {
-            textures::Id key{._contentId = contentId,
-                             ._sampler = sampler,
-                             ._hasMipMaps = hasMipMaps};
-            return get(key);
+            return get(textures::Id(contentId, sampler, hasMipMaps));
         }
 
         Texture::Sptr get(content::MaybeId const & contentId,

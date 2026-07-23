@@ -13,10 +13,9 @@ namespace minire::scene
     public:
         explicit SpatialHandler(SpatialIndex & spatialIndex,
                                 IndexPayload * payload,
-                                IndexLayer indexLayer,
-                                utils::Aabb const & aabb)
+                                IndexLayer indexLayer)
             : _spatialIndex(&spatialIndex)
-            , _indexableId(_spatialIndex->create(payload, indexLayer, aabb))
+            , _indexableId(_spatialIndex->create(payload, indexLayer))
         {
             assert(payload);
         }

@@ -135,7 +135,7 @@ namespace minire::rasterizer
                    models::Sprite model,
                    Textures const & textures,
                    Program const & program)
-            : Sprite(name, std::move(model))
+            : Sprite(name, std::move(model), kNoFlags)
             , _textures(textures)
             , _program(program)
             , _texture(fetchTexture())

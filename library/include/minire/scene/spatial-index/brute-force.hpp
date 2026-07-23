@@ -13,7 +13,7 @@ namespace minire::scene::spatial_index
                   std::vector<IndexPayload *> & output) const override;
 
     private:
-        void createImpl(IndexableId, utils::Aabb const &) override;
+        void createImpl(IndexableId) override;
         void updateImpl(IndexableId, utils::Aabb const &) override;
         void eraseImpl(IndexableId) override;
 

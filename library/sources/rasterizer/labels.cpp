@@ -161,13 +161,11 @@ namespace minire::rasterizer
                   Fonts const & fonts,
                   Program const & program,
                   content::Manager & contentManager)
-            : Label(name, std::move(model))
+            : Label(name, std::move(model), kAllFlags)
             , _fonts(fonts)
             , _program(program)
             , _contentManager(contentManager)
-        {
-            invalidate();
-        }
+        {}
 
     public:
         // TODO: consider to put projection into UBO
