@@ -9,6 +9,7 @@
 #include <minire/scene.hpp>
 #include <minire/scene/spatial-index.hpp>
 #include <minire/utils/culling-test.hpp>
+#include <minire/utils/no-value.hpp>
 #include <minire/utils/object.hpp>
 
 #include <material/types.hpp>
@@ -607,6 +608,17 @@ namespace minire
             models::Outline       _effectiveOutline;
             bool                  _effectiveVisible;
 
+            // NOTE: will shadow ObjectBase::kNoIndex
+            static constexpr size_t kNoIndex = utils::kNoValue<uint32_t>;
+
+            // NOTE: using here int32 because int64 are way excessive
+            uint32_t              _activeAnimationsIndex = kNoIndex;
+            uint32_t              _dirtyOriginsIndex = kNoIndex;
+            uint32_t              _activeLerpsIndex = kNoIndex;
+            uint32_t              _dirtyTransformsIndex = kNoIndex;
+            uint32_t              _dirtyOutlinesIndex = kNoIndex;
+            uint32_t              _dirtyVisibilityIndex = kNoIndex;
+
         private:
             struct ItemIterator
             {
@@ -663,6 +675,8 @@ namespace minire
                                             BillboardLeaf *>;
         using BillboardElements = std::vector<BillboardElement>;
 
+        struct NodeLocator;
+
         struct ActivationLevel
         {
             // activation lists of a given level
@@ -675,52 +689,57 @@ namespace minire
 
             // healper functions
             template<typename Target, typename Callback>
-            void flush(Target ActivationLevel::* target,
-                       Callback callback)
-            {
-                auto & container = this->*target;
-                size_t const size = container.size();
-                for(size_t i = 0; i < size; ++i)
-                {
-                    assert(container[i]);
-                    callback(*container[i]);
-                }
-                assert(size == container.size());
-                container.clear();
-                // if (size > 0)
-                // {
-                //     container.erase(container.begin(), container.begin() + size);
-                // }
-            }
+            void flush(Target ActivationLevel::* listPtr,
+                       uint32_t Node::* indexPtr,
+                       Callback callback);
 
             template<typename Target>
-            void activate(Target ActivationLevel::* target,
+            void activate(Target ActivationLevel::* listPtr,
+                          uint32_t Node::* indexPtr,
                           Node * node, Node::Mask const mask,
-                          bool const force = false)
-            {
-                assert(node);
-                assert(std::has_single_bit(mask));
-                if (force || !node->invalidatedAny(mask))
-                {
-                    auto & container = this->*target;
-                    container.push_back(node);
-                    node->Object::invalidate(mask);
-                }
-            }
+                          bool const force = false);
 
             template<typename Target>
-            bool erase(Target ActivationLevel::* target, Node * node)
-            {
-                auto & container = this->*target;
-                if (auto it = std::ranges::find(container, node);
-                    it != container.end())
-                {
-                    *it = container.back();
-                    container.pop_back();
-                    return true;
-                }
-                return false;
-            }
+            bool erase(Target ActivationLevel::* listPtr,
+                       uint32_t Node::* indexPtr,
+                       Node * node);
+        };
+
+        struct ActivatedNodeLocator
+        {
+            Node::Mask                             _mask;
+            std::vector<Node *> ActivationLevel::* _listPtr;
+            uint32_t Node::*                       _indexPtr;
+        };
+
+        static constexpr ActivatedNodeLocator kActiveAnimationLocator
+        {
+            Node::kActiveAnimation, &ActivationLevel::_activeAnimations, &Node::_activeAnimationsIndex
+        };
+
+        static constexpr ActivatedNodeLocator kDirtyOriginLocator
+        {
+            Node::kOrigin, &ActivationLevel::_dirtyOrigins, &Node::_dirtyOriginsIndex
+        };
+
+        static constexpr ActivatedNodeLocator kActiveLerpLocator
+        {
+            Node::kActiveLerp, &ActivationLevel::_activeLerps, &Node::_activeLerpsIndex
+        };
+
+        static constexpr ActivatedNodeLocator kDirtyTransformLocator
+        {
+            Node::kDirtyTransform, &ActivationLevel::_dirtyTransforms, &Node::_dirtyTransformsIndex
+        };
+
+        static constexpr ActivatedNodeLocator kDirtyOutlineLocator
+        {
+            Node::kOutline, &ActivationLevel::_dirtyOutlines, &Node::_dirtyOutlinesIndex
+        };
+
+        static constexpr ActivatedNodeLocator kDirtyVisibleLocator
+        {
+            Node::kVisible, &ActivationLevel::_dirtyVisibility, &Node::_dirtyVisibilityIndex
         };
 
         struct ActivationLevels
@@ -735,11 +754,12 @@ namespace minire
             // healper functions
             template<typename Target, typename Callback>
             void flush(Target ActivationLevel::* target,
+                       uint32_t Node::* indexPtr,
                        Callback callback)
             {
                 for(size_t level = 0; level < _nodes.size(); ++level)
                 {
-                    _nodes[level].flush(target, callback);
+                    _nodes[level].flush(target, indexPtr, callback);
                 }
             }
 
@@ -782,8 +802,6 @@ namespace minire
 
         template<typename Derived, typename ObjectType>
         void eraseLeaf(Leaf<Derived, ObjectType> *);
-
-        bool isLeafActivated(utils::ObjectBase *);
 
         // Deferred invalidations
         void invalidateDeferred(Node *, Node::Mask);

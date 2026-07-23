@@ -1,5 +1,7 @@
 #pragma once
 
+#include <minire/utils/no-value.hpp>
+
 #include <cassert>
 #include <limits>
 #include <memory>
@@ -27,7 +29,7 @@ namespace minire::utils
         virtual void revalidate(Mask mask = kAllFlags) = 0;
 
     private:
-        static constexpr size_t kNoIndex = std::numeric_limits<size_t>::max();
+        static constexpr size_t kNoIndex = kNoValue<size_t>;
         size_t _activationIndex = kNoIndex;
 
         friend class ::minire::SceneImpl;

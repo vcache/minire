@@ -101,7 +101,6 @@ namespace minire
         {
             _scene.eraseLeaf(this);
         }
-        assert(!_scene.isLeafActivated(this));
     }
 
     // SceneImpl::*Leaf //
@@ -1191,6 +1190,24 @@ namespace minire
         }, _activeCamera);
     }
 
+    template<typename Target, typename Callback>
+    void SceneImpl::ActivationLevel::flush(Target ActivationLevel::* listPtr,
+                                           uint32_t Node::* indexPtr,
+                                           Callback callback)
+    {
+        auto & container = this->*listPtr;
+        size_t const size = container.size();
+        for(size_t i = 0; i < size; ++i)
+        {
+            Node * node = container[i];
+            assert(node);
+            callback(*node);
+            node->*indexPtr = Node::kNoIndex;
+        }
+        assert(size == container.size());
+        container.clear();
+    }
+
     /**
      * - objects that were set directly (via setOrigin() and such),
      *   will be lerped (where applicable). Such objects are affected by
@@ -1218,7 +1235,8 @@ namespace minire
         assert(_deferredLeavesInvalidation.empty());
 
         // Pass 1. advance animable objects
-        _pendedActivations.flush(&ActivationLevel::_activeAnimations,
+        _pendedActivations.flush(kActiveAnimationLocator._listPtr,
+                                 kActiveAnimationLocator._indexPtr,
                                  [](Node & node) { node.revalidateAnimation(); });
 
         // Pass 2. advance directly set values for a new Epoch or
@@ -1226,22 +1244,27 @@ namespace minire
         if (epochStarted)
         {
             // transfer accumulated models state into scene instances
-            _pendedActivations.flush(&ActivationLevel::_dirtyOrigins,
+            _pendedActivations.flush(kDirtyOriginLocator._listPtr,
+                                     kDirtyOriginLocator._indexPtr,
                                      [](Node & node) { node.revalidateOrigin(); });
         }
 
         _lerpWeight = epochDuration != 0 ? epochTime / epochDuration : 1.0;
         assert(_lerpWeight >= 0);
-        _pendedActivations.flush(&ActivationLevel::_activeLerps,
+        _pendedActivations.flush(kActiveLerpLocator._listPtr,
+                                 kActiveLerpLocator._indexPtr,
                                  [](Node & node) { node.revalidateLerp(); });
 
         // Pass 3. revalidate effective values
         //         (transforms, outlines, visibility, etc)
-        _pendedActivations.flush(&ActivationLevel::_dirtyTransforms,
+        _pendedActivations.flush(kDirtyTransformLocator._listPtr,
+                                 kDirtyTransformLocator._indexPtr,
                                  [](Node & node) { node.revalidateTransform(); });
-        _pendedActivations.flush(&ActivationLevel::_dirtyOutlines,
+        _pendedActivations.flush(kDirtyOutlineLocator._listPtr,
+                                 kDirtyOutlineLocator._indexPtr,
                                  [](Node & node) { node.revalidateOutline(); });
-        _pendedActivations.flush(&ActivationLevel::_dirtyVisibility,
+        _pendedActivations.flush(kDirtyVisibleLocator._listPtr,
+                                 kDirtyVisibleLocator._indexPtr,
                                  [](Node & node) { node.revalidateVisiblity(); });
 
         // Leaves pass
@@ -1319,21 +1342,29 @@ namespace minire
     template<typename Callback>
     void SceneImpl::activationMappings(Callback callback)
     {
-        using MemberPtr = std::vector<Node *> ActivationLevel::*;
-        using Mapping = std::pair<Node::Mask, MemberPtr>;
-        static constexpr std::array<Mapping, 6> kActivationMappings
-        {
-            Mapping{Node::kActiveAnimation, &ActivationLevel::_activeAnimations},
-            Mapping{Node::kOrigin,          &ActivationLevel::_dirtyOrigins},
-            Mapping{Node::kActiveLerp,      &ActivationLevel::_activeLerps},
-            Mapping{Node::kDirtyTransform,  &ActivationLevel::_dirtyTransforms},
-            Mapping{Node::kOutline,         &ActivationLevel::_dirtyOutlines},
-            Mapping{Node::kVisible,         &ActivationLevel::_dirtyVisibility}
-        };
+        callback(kActiveAnimationLocator);
+        callback(kDirtyOriginLocator);
+        callback(kActiveLerpLocator);
+        callback(kDirtyTransformLocator);
+        callback(kDirtyOutlineLocator);
+        callback(kDirtyVisibleLocator);
+    }
 
-        for(auto const & [mask, member] : kActivationMappings)
+    template<typename Target>
+    void SceneImpl::ActivationLevel::activate(Target ActivationLevel::* listPtr,
+                                              uint32_t Node::* indexPtr,
+                                              Node * node, Node::Mask const mask,
+                                              bool const force)
+    {
+        assert(node);
+        assert(std::has_single_bit(mask));
+        if (force || !node->invalidatedAny(mask))
         {
-            callback(mask, member);
+            auto & container = this->*listPtr;
+            container.push_back(node);
+            node->*indexPtr = container.size() - 1;
+            assert(Node::kNoIndex != node->*indexPtr);
+            node->Object::invalidate(mask);
         }
     }
 
@@ -1348,14 +1379,40 @@ namespace minire
 
             activationMappings(
                 [mask, node, &activationLevel]
-                (Node::Mask mappingMask, auto member)
+                (ActivatedNodeLocator const & locator)
                 {
-                    if (mask & mappingMask)
+                    if (mask & locator._mask)
                     {
-                        activationLevel.activate(member, node, mask);
+                        activationLevel.activate(locator._listPtr,
+                                                 locator._indexPtr,
+                                                 node, mask & locator._mask);
                     }
                 });
         }
+    }
+
+    template<typename Target>
+    bool SceneImpl::ActivationLevel::erase(Target ActivationLevel::* listPtr,
+                                           uint32_t Node::* indexPtr,
+                                           Node * node)
+    {
+        assert(node);
+        if (size_t const index = node->*indexPtr;
+            index != Node::kNoIndex)
+        {
+            auto & container = this->*listPtr;
+            assert(index < container.size());
+
+            Node * movedNode = container.back();
+            container[index] = movedNode;
+            movedNode->*indexPtr = index;
+
+            container.pop_back();
+            node->*indexPtr = Node::kNoIndex;
+
+            return true;
+        }
+        return false;
     }
 
     void SceneImpl::changeNodeLevel(Node * node, size_t oldDepth, size_t newDepth)
@@ -1377,11 +1434,11 @@ namespace minire
         // perform change operations
         activationMappings(
             [&oldActivationLevel, newActivationLevel, node]
-            (Node::Mask mask, auto member)
+            (ActivatedNodeLocator const & locator)
             {
-                if (oldActivationLevel.erase(member, node) && newActivationLevel)
+                if (oldActivationLevel.erase(locator._listPtr, locator._indexPtr, node) && newActivationLevel)
                 {
-                    newActivationLevel->activate(member, node, mask, true);
+                    newActivationLevel->activate(locator._listPtr, locator._indexPtr, node, locator._mask, true);
                 }
             });
     }
@@ -1417,12 +1474,6 @@ namespace minire
             _pendedActivations._leaves.pop_back();
             leaf->_activationIndex = leaf->kNoIndex;
         }
-    }
-
-    bool SceneImpl::isLeafActivated(utils::ObjectBase * leaf)
-    {
-        auto it = std::ranges::find(_pendedActivations._leaves, leaf);
-        return it != _pendedActivations._leaves.cend();
     }
 
     // TODO: shouldn't be a static method?
