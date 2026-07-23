@@ -1358,8 +1358,8 @@ namespace minire
     {
         assert(node);
         assert(std::has_single_bit(mask));
-        assert(node->*indexPtr == Node::kNoIndex);
-        if (force || !node->invalidatedAny(mask))
+        if (node->*indexPtr == Node::kNoIndex &&
+            (force || !node->invalidatedAny(mask)))
         {
             auto & container = this->*listPtr;
             container.push_back(node);
