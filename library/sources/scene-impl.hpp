@@ -696,8 +696,7 @@ namespace minire
             template<typename Target>
             void activate(Target ActivationLevel::* listPtr,
                           uint32_t Node::* indexPtr,
-                          Node * node, Node::Mask const mask,
-                          bool const force = false);
+                          Node * node);
 
             template<typename Target>
             bool erase(Target ActivationLevel::* listPtr,
@@ -761,12 +760,6 @@ namespace minire
                 {
                     _nodes[level].flush(target, indexPtr, callback);
                 }
-            }
-
-            void reset()
-            {
-                _nodes.clear();
-                _leaves.clear();
             }
         };
 

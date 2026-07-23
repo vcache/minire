@@ -11,12 +11,31 @@ namespace minire::rasterizer::textures
 {
     struct Id
     {
-        content::Id     _contentId;
-        models::Sampler _sampler;
-        bool            _hasMipMaps;
+        content::Id     const _contentId;
+        models::Sampler const _sampler;
+        bool            const _hasMipMaps;
+        size_t          const _hash;
+
+        explicit Id(content::Id contentId,
+                    models::Sampler sampler,
+                    bool hasMipMaps)
+            : _contentId(std::move(contentId))
+            , _sampler(std::move(sampler))
+            , _hasMipMaps(hasMipMaps)
+            , _hash([this]()
+            {
+                size_t result = 0;
+                boost::hash_combine(result, std::hash<minire::content::Id>{}(_contentId));
+                boost::hash_combine(result, std::hash<minire::models::Sampler>{}(_sampler));
+                boost::hash_combine(result, std::hash<bool>{}(_hasMipMaps));
+                return result;
+            }())
+        {}
 
         bool operator==(Id const & o) const
         {
+            if (_hash != o._hash) return false;
+
             return std::tie(  _contentId,   _sampler,   _hasMipMaps)
                 == std::tie(o._contentId, o._sampler, o._hasMipMaps);
         }
@@ -30,11 +49,7 @@ namespace std
     {
         size_t operator()(::minire::rasterizer::textures::Id const & v) const
         {
-            size_t result = 0;
-            boost::hash_combine(result, std::hash<minire::content::Id>{}(v._contentId));
-            boost::hash_combine(result, std::hash<minire::models::Sampler>{}(v._sampler));
-            boost::hash_combine(result, std::hash<bool>{}(v._hasMipMaps));
-            return result;
+            return v._hash;
         }
     };
 }

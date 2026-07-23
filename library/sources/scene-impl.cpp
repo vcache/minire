@@ -1089,14 +1089,48 @@ namespace minire
 
     void SceneImpl::reset()
     {
-        _pendedActivations.reset();
-
         _meshCullBuffer.clear();
         _billboardCullBuffer.clear();
         _directionalLightLeaves.clear();
         _pointLightCullBuffer.clear();
         _billboardWideCullBuffer.clear();
 
+        _root.reset(); // explicitly calling dtors so that they'll
+                       // clean up _pendedActivations
+
+        // clean up activation indeces for Nodes that may
+        // be hold by a user via Sptr
+        for(ActivationLevel & nodesLevel : _pendedActivations._nodes)
+        {
+            activationMappings([&nodesLevel]
+                (ActivatedNodeLocator const & locator)
+                {
+                    auto const listPtr = locator._listPtr;
+                    auto const indexPtr = locator._indexPtr;
+                    for(Node * residualNode : nodesLevel.*listPtr)
+                    {
+                        assert(residualNode);
+                        residualNode->*indexPtr = Node::kNoIndex;
+                    }
+                    (nodesLevel.*listPtr).clear();
+                });
+        }
+        _pendedActivations._nodes.clear();
+
+        for(utils::ObjectBase * leaf : _pendedActivations._leaves)
+        {
+            assert(leaf);
+            leaf->_activationIndex = utils::ObjectBase::kNoIndex;
+        }
+        _pendedActivations._leaves.clear();
+
+        assert(_deferredNodesInvalidation.empty());
+        _deferredNodesInvalidation.clear();
+
+        assert(_deferredLeavesInvalidation.empty());
+        _deferredLeavesInvalidation.clear();
+
+        // building a new root noed
         _root = std::make_shared<Node>("(the root)",
             models::Node{models::Transform{}},
             Node::Sptr(), *this);
@@ -1201,8 +1235,8 @@ namespace minire
         {
             Node * node = container[i];
             assert(node);
-            callback(*node);
             node->*indexPtr = Node::kNoIndex;
+            callback(*node);
         }
         assert(size == container.size());
         container.clear();
@@ -1353,19 +1387,15 @@ namespace minire
     template<typename Target>
     void SceneImpl::ActivationLevel::activate(Target ActivationLevel::* listPtr,
                                               uint32_t Node::* indexPtr,
-                                              Node * node, Node::Mask const mask,
-                                              bool const force)
+                                              Node * node)
     {
         assert(node);
-        assert(std::has_single_bit(mask));
-        if (node->*indexPtr == Node::kNoIndex &&
-            (force || !node->invalidatedAny(mask)))
+        if (node->*indexPtr == Node::kNoIndex)
         {
             auto & container = this->*listPtr;
             container.push_back(node);
+            assert(container.size() < Node::kNoIndex);
             node->*indexPtr = container.size() - 1;
-            assert(Node::kNoIndex != node->*indexPtr);
-            node->Object::invalidate(mask);
         }
     }
 
@@ -1374,22 +1404,20 @@ namespace minire
         assert(node);
         if (size_t const depth = node->_depth; depth != kNoDepth)
         {
-             // prepare a level to be filled
+            // prepare a level to be filled
             _pendedActivations._nodes.resize(std::max(_pendedActivations._nodes.size(), depth + 1));
             ActivationLevel & activationLevel = _pendedActivations._nodes[depth];
-
             activationMappings(
                 [mask, node, &activationLevel]
                 (ActivatedNodeLocator const & locator)
                 {
                     if (mask & locator._mask)
                     {
-                        activationLevel.activate(locator._listPtr,
-                                                 locator._indexPtr,
-                                                 node, mask & locator._mask);
+                        activationLevel.activate(locator._listPtr, locator._indexPtr, node);
                     }
                 });
         }
+        node->Object::invalidate(mask);
     }
 
     template<typename Target>
@@ -1398,7 +1426,7 @@ namespace minire
                                            Node * node)
     {
         assert(node);
-        if (size_t const index = node->*indexPtr;
+        if (uint32_t const index = node->*indexPtr;
             index != Node::kNoIndex)
         {
             auto & container = this->*listPtr;
@@ -1437,9 +1465,10 @@ namespace minire
             [&oldActivationLevel, newActivationLevel, node]
             (ActivatedNodeLocator const & locator)
             {
-                if (oldActivationLevel.erase(locator._listPtr, locator._indexPtr, node) && newActivationLevel)
+                if (oldActivationLevel.erase(locator._listPtr, locator._indexPtr, node) &&
+                    newActivationLevel)
                 {
-                    newActivationLevel->activate(locator._listPtr, locator._indexPtr, node, locator._mask, true);
+                    newActivationLevel->activate(locator._listPtr, locator._indexPtr, node);
                 }
             });
     }
@@ -1466,6 +1495,7 @@ namespace minire
             leafIndex != leaf->kNoIndex)
         {
             assert(leafIndex < _pendedActivations._leaves.size());
+            assert(_pendedActivations._leaves[leafIndex] == leaf);
 
             utils::ObjectBase * movedLeaf = _pendedActivations._leaves.back();
             _pendedActivations._leaves[leafIndex] = movedLeaf;

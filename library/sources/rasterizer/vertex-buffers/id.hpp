@@ -10,10 +10,18 @@ namespace minire::rasterizer::vertex_buffers
 {
     struct Id
     {
-        content::Id _contentId;
+        content::Id const _contentId;
+        size_t      const _hash;
+
+        explicit Id(content::Id contentId)
+            : _contentId(std::move(contentId))
+            , _hash(std::hash<::minire::content::Id>{}(_contentId))
+        {}
 
         bool operator==(Id const & o) const
         {
+            if (_hash != o._hash) return false;
+
             return std::tie(  _contentId)
                 == std::tie(o._contentId);
         }
@@ -27,7 +35,7 @@ namespace std
     {
         size_t operator()(::minire::rasterizer::vertex_buffers::Id const & v) const
         {
-            return std::hash<::minire::content::Id>{}(v._contentId);
+            return v._hash;
         }
     };
 }
