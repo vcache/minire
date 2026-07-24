@@ -1,7 +1,7 @@
 #pragma once
 
+#include <minire/content/handle.hpp>
 #include <minire/content/id.hpp>
-#include <minire/content/path.hpp>
 #include <minire/models/animations.hpp>
 #include <minire/models/billboard.hpp>
 #include <minire/models/camera.hpp>
@@ -498,7 +498,7 @@ namespace minire
             template<typename T>
             auto make(T model) { return make(utils::newUuid(), std::move(model)); }
 
-            virtual void makeFromSource(content::Path const &, content::Manager &, bool visible) = 0;
+            virtual void makeFromSource(content::Handle const &, content::Manager &, bool visible) = 0;
 
         public:
             static constexpr Mask kInfinitely = std::numeric_limits<size_t>::max();

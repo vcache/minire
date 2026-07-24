@@ -1,6 +1,6 @@
 #pragma once
 
-#include <minire/content/path.hpp>
+#include <minire/content/handle.hpp>
 #include <minire/material.hpp>
 #include <minire/models/node-pointer.hpp>
 #include <minire/models/outline.hpp>
@@ -30,7 +30,7 @@ namespace minire::models
                                                   // I.e. _bones[3] corresponds to JOINTS_0.z
         };
 
-        content::Path         _source;
+        content::Handle     _source;
 
         // TODO: should it be a default (i.e. fallback) material or
         //       an override-material?

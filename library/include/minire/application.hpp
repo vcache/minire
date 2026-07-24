@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minire/application/input-handler.hpp>
+#include <minire/content/handle.hpp>
 #include <minire/content/id.hpp>
 #include <minire/errors.hpp>
 #include <minire/label.hpp>
@@ -91,7 +92,7 @@ namespace minire
         std::unique_ptr<utils::TextLayout> layout(text::FormattedString const & text,
                                                   content::Id const & fontFace) const;
 
-        utils::Aabb measure(content::Path const & path) const;
+        utils::Aabb measure(content::Handle const & path) const;
 
         // TODO: a Scene should be detachable. So that user might have several prepared scenes
         //       which can be switched to an active.

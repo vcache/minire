@@ -528,7 +528,7 @@ namespace minire
             scene::OrthographicCamera::Sptr make(std::string const &, models::OrthographicCamera) override;
             scene::Billboard::Sptr make(std::string const &, models::Billboard) override;
 
-            void makeFromSource(content::Path const &, content::Manager &, bool visible) override;
+            void makeFromSource(content::Handle const &, content::Manager &, bool visible) override;
 
         public:
             void makeAnimationSet(models::AnimationSet animationSet) override;

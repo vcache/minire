@@ -234,7 +234,7 @@ namespace minire
         return text::layout(text, fontData);
     }
 
-    utils::Aabb Application::measure(content::Path const & path) const
+    utils::Aabb Application::measure(content::Handle const & path) const
     {
         return utils::buildAabb(_contentManager, path);
     }

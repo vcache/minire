@@ -33,14 +33,14 @@ namespace minire::rasterizer
 
         std::shared_ptr<Mesh> getMesh(meshes::Id const &);
 
-        std::shared_ptr<Mesh> getMesh(content::Path const & source,
+        std::shared_ptr<Mesh> getMesh(content::Handle const & source,
                                       Material::Sptr const & defaultMaterial = {})
         {
             return getMesh(meshes::Id(source, defaultMaterial));
         }
 
     private:
-        std::shared_ptr<Mesh> load(content::Path const & source,
+        std::shared_ptr<Mesh> load(content::Handle const & source,
                                    Material::Sptr const & defaultMaterial);
 
     private:

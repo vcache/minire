@@ -155,9 +155,7 @@ namespace minire::scene
                     ._name = mesh.name.empty() ? utils::newUuid() : mesh.name,
                     ._model = models::Mesh
                     {
-                        ._source = content::mkPath(sourceId,
-                                                   content::path::Special::kMeshes,
-                                                   meshId),
+                        ._source = content::mkPath(sourceId, content::path::Special::kMeshes, meshId),
                         ._defaultMaterial = {},
                         ._skin = {}, // will be (maybe) updated in instantiatePendedMeshes()
                         ._visible = visible,

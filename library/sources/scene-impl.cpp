@@ -479,7 +479,7 @@ namespace minire
         return billboardLeaf;
     }
 
-    void SceneImpl::Node::makeFromSource(content::Path const & source,
+    void SceneImpl::Node::makeFromSource(content::Handle const & source,
                                          content::Manager & contentManager,
                                          bool visible)
     {

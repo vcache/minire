@@ -38,7 +38,7 @@ namespace minire::rasterizer
         return token;
     }
 
-    std::shared_ptr<Mesh> Meshes::load(content::Path const & source,
+    std::shared_ptr<Mesh> Meshes::load(content::Handle const & source,
                                        Material::Sptr const & defaultMaterial)
     {
         return std::make_shared<Mesh>(source, defaultMaterial, _contentManager, _materials,

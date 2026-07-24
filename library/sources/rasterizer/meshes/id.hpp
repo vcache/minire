@@ -1,6 +1,6 @@
 #pragma once
 
-#include <minire/content/path.hpp>
+#include <minire/content/handle.hpp>
 #include <minire/material.hpp>
 
 #include <boost/container_hash/hash.hpp> // for hash_combine
@@ -11,18 +11,18 @@ namespace minire::rasterizer::meshes
 {
     struct Id
     {
-        content::Path  const _contentPath;
-        Material::Sptr const _defaultMaterial;
-        size_t         const _hash;
+        content::Handle const _contentPath;
+        Material::Sptr  const _defaultMaterial;
+        size_t          const _hash;
 
-        explicit Id(content::Path contentPath,
+        explicit Id(content::Handle contentPath,
                     Material::Sptr const & defaultMaterial)
             : _contentPath(std::move(contentPath))
             , _defaultMaterial(defaultMaterial)
             , _hash([this]()
             {
                 size_t result = 0;
-                boost::hash_combine(result, std::hash<content::Path>{}(_contentPath));
+                boost::hash_combine(result, std::hash<content::Handle>{}(_contentPath));
                 boost::hash_combine(result, std::hash<Material::Sptr>{}(_defaultMaterial));
                 return result;
             }())
@@ -30,8 +30,6 @@ namespace minire::rasterizer::meshes
 
         bool operator==(Id const & o) const
         {
-            if (_hash != o._hash) return false;
-
             return std::tie(  _contentPath,   _defaultMaterial)
                 == std::tie(o._contentPath, o._defaultMaterial);
         }
