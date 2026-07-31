@@ -119,7 +119,7 @@ namespace minire
             assert(_spatialIndex);
             _billboardCullBuffer.clear();
             _spatialIndex->cull(frustumPlanes, kBillboardLayer, _billboardCullBuffer);
-            _billboardWideCullBuffer.clear();
+            assert(_billboardWideCullBuffer.empty());
             _billboardWideCullBuffer.reserve(_billboardCullBuffer.size());
             glm::vec3 const forwardVector = _viewpoint.forwardVector();
             for(void * opaque : _billboardCullBuffer)
@@ -162,6 +162,9 @@ namespace minire
                          parent->_globalTransform,
                          billboardLeaf->opbId());
             }
+
+            // must be clean, because it holds shared_ptrs
+            _billboardWideCullBuffer.clear();
         }
 
         template<typename Callable>
