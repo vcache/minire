@@ -76,10 +76,10 @@ namespace minire::gui::components
         glm::vec2 const newPosition(contentArea._left, contentArea._top);
         glm::vec2 const newDimensions(contentArea._width, contentArea._height);
         utils::Rect const newClippingWindow(
-            clippingWindow._left,
-            clippingWindow._top,
-            clippingWindow._left + clippingWindow._width,     // TODO: +1 ?
-            clippingWindow._top + clippingWindow._height);    // TODO: +1 ?
+            std::floor(clippingWindow._left),
+            std::floor(clippingWindow._top),
+            std::ceil(clippingWindow._left + clippingWindow._width),
+            std::ceil(clippingWindow._top + clippingWindow._height));
 
         if (!_sprite)
         {
