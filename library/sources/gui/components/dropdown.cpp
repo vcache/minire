@@ -203,7 +203,8 @@ namespace minire::gui::components
             });
 
         Component & overlay = overlayController().push(_tongueOverlay->_tag,
-                                                       _tongueOverlay->_defaultHandler);
+            overlay_input_mode::Active{_tongueOverlay->_defaultHandler});
+
         _tongueOverlay->_listview = overlay.emplace<ListView>(
             concat(style(), kName), "__tongue__",
             _tongueItemBuilderCallback ? _tongueItemBuilderCallback

@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <variant>
 
 namespace minire::text { class FormattedString; }
 namespace minire::utils { class TextLayout; }
@@ -19,6 +20,19 @@ namespace minire::utils { class TextLayout; }
 namespace minire::gui
 {
     class Component;
+
+    namespace overlay_input_mode
+    {
+        struct Active
+        {
+            application::InputHandler::Wptr _fallbackHandler;
+        };
+
+        struct Transparent {};
+    }
+
+    using OverlayInputMode = std::variant<overlay_input_mode::Active,
+                                          overlay_input_mode::Transparent>;
 
     // TODO: rename to somethinng more appropriate.
 
@@ -30,7 +44,7 @@ namespace minire::gui
         virtual ~OverlayController() = default;
 
         virtual Component & push(std::string const & tag,
-                                 application::InputHandler::Wptr = {}) = 0;
+                                 OverlayInputMode const & = overlay_input_mode::Active{}) = 0;
 
         virtual std::string const & topTag() const = 0;
 

@@ -70,13 +70,13 @@ namespace minire
         gui::Component & guiTop();
         std::string const & guiTopTag() const;
 
-        gui::Component & guiPush(
-            std::string, application::InputHandler::Wptr fallbackHandler = {});
+        gui::Component & guiPush(std::string const & tag,
+                                 gui::OverlayInputMode const & = gui::overlay_input_mode::Active{});
 
         void guiPop();
 
         gui::Component & push(std::string const & tag,
-                              application::InputHandler::Wptr = {}) override;
+                              gui::OverlayInputMode const & = gui::overlay_input_mode::Active{}) override;
 
         std::string const & topTag() const override;
 
@@ -116,18 +116,16 @@ namespace minire
     private:
         struct Overlay
         {
-            gui::Component::Sptr            _root;
-            gui::Component::Wptr            _focused;
-            gui::Component::Wptr            _hovered;
-            gui::Component::Wptr            _toClick;
-            models::MouseButton             _clickButton;
-            std::string                     _tag;
-            application::InputHandler::Wptr _fallbackHandler;
+            gui::Component::Sptr  _root;
+            gui::Component::Wptr  _focused;
+            gui::Component::Wptr  _hovered;
+            gui::Component::Wptr  _toClick;
+            models::MouseButton   _clickButton;
+            std::string           _tag;
+            gui::OverlayInputMode _inputMode;
         };
 
-        Overlay & topOverlay();
-
-        Overlay const & topOverlay() const;
+        Overlay & topOverlayForInput();
 
     private:
         void setHover(gui::Component::Sptr const &);

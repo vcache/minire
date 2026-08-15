@@ -14,6 +14,22 @@
 
 namespace minire
 {
+    namespace
+    {
+        bool isActiveMode(gui::OverlayInputMode const & inputMode)
+        {
+            return std::holds_alternative<gui::overlay_input_mode::Active>(inputMode);
+        }
+
+        application::InputHandler::Sptr
+        fallbackHandler(gui::OverlayInputMode const & inputMode)
+        {
+            assert(std::holds_alternative<gui::overlay_input_mode::Active>(inputMode));
+            auto const & active = std::get<gui::overlay_input_mode::Active>(inputMode);
+            return active._fallbackHandler.lock();
+        }
+    }
+
     GuiApplication::~GuiApplication()
     {
         while(_overlays.size() > 1) // don't pop the first one
@@ -23,12 +39,12 @@ namespace minire
     }
 
     gui::Component & GuiApplication::guiPush(
-        std::string tag, application::InputHandler::Wptr fallbackHandler)
+        std::string const & tag, gui::OverlayInputMode const & inputMode)
     {
         // cancel all in-progress operation in a current Overlay
-        if (!_overlays.empty())
+        if (!_overlays.empty() && isActiveMode(inputMode))
         {
-            Overlay & overlay = topOverlay();
+            Overlay & overlay = topOverlayForInput();
 
             // TODO: maybe focus shouldn't be lost, but instead
             //       frozen and returned after pop()
@@ -73,8 +89,8 @@ namespace minire
             ._hovered = {},
             ._toClick = {},
             ._clickButton = {},
-            ._tag = std::move(tag),
-            ._fallbackHandler = fallbackHandler,
+            ._tag = tag,
+            ._inputMode = inputMode,
         });
 
         _mouseUpdated = true; // force recalc hovered
@@ -90,16 +106,16 @@ namespace minire
         _overlays.pop_back();
     }
 
-    GuiApplication::Overlay & GuiApplication::topOverlay()
+    GuiApplication::Overlay & GuiApplication::topOverlayForInput()
     {
         assert(!_overlays.empty());
-        return _overlays.back();
-    }
-
-    GuiApplication::Overlay const & GuiApplication::topOverlay() const
-    {
-        assert(!_overlays.empty());
-        return _overlays.back();
+        for(auto it = _overlays.rbegin();
+            it != _overlays.rend(); ++it)
+        {
+            if (isActiveMode(it->_inputMode))
+                return *it;
+        }
+        MINIRE_THROW("no overlay for input");
     }
 
     void GuiApplication::onStart()
@@ -149,7 +165,7 @@ namespace minire
 
     bool GuiApplication::handle(application::OnMouseWheel const & e)
     {
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
 
         if (auto focused = overlay._focused.lock(); focused)
         {
@@ -161,7 +177,7 @@ namespace minire
             destination->handle(e);
             return true;
         }
-        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        else if (auto sink = fallbackHandler(overlay._inputMode); sink)
         {
             return sink->handle(e);
         }
@@ -175,7 +191,7 @@ namespace minire
         _mouseY = e._absY;
         _mouseUpdated = true;
 
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
 
         if (auto clickTarget = overlay._toClick.lock();
             clickTarget && clickTarget->_isDraggable.get() &&
@@ -190,7 +206,7 @@ namespace minire
             destination->handle(e);
             return true;
         }
-        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        else if (auto sink = fallbackHandler(overlay._inputMode); sink)
         {
             return sink->handle(e);
         }
@@ -200,7 +216,7 @@ namespace minire
 
     bool GuiApplication::handle(application::OnMouseDown const & e)
     {
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
 
         if (auto destination = hovered(); destination)
         {
@@ -217,7 +233,7 @@ namespace minire
             destination->handle(e);
             return true;
         }
-        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        else if (auto sink = fallbackHandler(overlay._inputMode); sink)
         {
             return sink->handle(e);
         }
@@ -227,7 +243,7 @@ namespace minire
 
     bool GuiApplication::handle(application::OnMouseUp const & e)
     {
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
         auto clickTarget = overlay._toClick.lock();
 
         if (clickTarget && clickTarget->_isDraggable.get() &&
@@ -262,7 +278,7 @@ namespace minire
             destination->handle(e);
             return true;
         }
-        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        else if (auto sink = fallbackHandler(overlay._inputMode); sink)
         {
             return sink->handle(e);
         }
@@ -272,13 +288,13 @@ namespace minire
 
     bool GuiApplication::handle(application::OnKeyUp const & e)
     {
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
         if (auto focused = overlay._focused.lock(); focused)
         {
             focused->handle(e);
             return true;
         }
-        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        else if (auto sink = fallbackHandler(overlay._inputMode); sink)
         {
             return sink->handle(e);
         }
@@ -296,13 +312,13 @@ namespace minire
             return true;
         }
 
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
         if (auto focused = overlay._focused.lock(); focused)
         {
             focused->handle(e);
             return true;
         }
-        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        else if (auto sink = fallbackHandler(overlay._inputMode); sink)
         {
             return sink->handle(e);
         }
@@ -312,13 +328,13 @@ namespace minire
 
     bool GuiApplication::handle(application::OnTextInput const & e)
     {
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
         if (auto focused = overlay._focused.lock(); focused)
         {
             focused->handle(e);
             return true;
         }
-        else if (auto sink = overlay._fallbackHandler.lock(); sink)
+        else if (auto sink = fallbackHandler(overlay._inputMode); sink)
         {
             return sink->handle(e);
         }
@@ -328,7 +344,7 @@ namespace minire
 
     void GuiApplication::setFocus(gui::Component::Sptr const & component)
     {
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
         auto focused = overlay._focused.lock();
 
         if (focused == component)
@@ -351,7 +367,7 @@ namespace minire
 
     void GuiApplication::setHover(gui::Component::Sptr const & component)
     {
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
         auto hovered = overlay._hovered.lock();
 
         if (hovered == component)
@@ -375,7 +391,7 @@ namespace minire
 
     gui::Component::Sptr GuiApplication::hovered()
     {
-        Overlay & overlay = topOverlay();
+        Overlay & overlay = topOverlayForInput();
 
         if (auto result = overlay._hovered.lock();
             result && !_mouseUpdated)
@@ -419,29 +435,32 @@ namespace minire
 
     gui::Component const & GuiApplication::guiTop() const
     {
-        Overlay const & overlay = topOverlay();
+        assert(!_overlays.empty());
+        Overlay const & overlay = _overlays.back();
         assert(overlay._root);
         return *overlay._root;
     }
 
     gui::Component & GuiApplication::guiTop()
     {
-        Overlay & overlay = topOverlay();
+        assert(!_overlays.empty());
+        Overlay & overlay = _overlays.back();
         assert(overlay._root);
         return *overlay._root;
     }
 
     std::string const & GuiApplication::guiTopTag() const
     {
-        Overlay const & overlay = topOverlay();
+        assert(!_overlays.empty());
+        Overlay const & overlay = _overlays.back();
         assert(overlay._root);
         return overlay._tag;
     }
 
     gui::Component & GuiApplication::push(std::string const & tag,
-                                          application::InputHandler::Wptr fallbackHandler)
+                                          gui::OverlayInputMode const & overlayInputMode)
     {
-        return guiPush(tag,  fallbackHandler);
+        return guiPush(tag, overlayInputMode);
     }
 
     std::string const & GuiApplication::topTag() const
