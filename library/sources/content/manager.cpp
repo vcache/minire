@@ -1,6 +1,7 @@
 #include <minire/content/manager.hpp>
 
 #include <minire/errors.hpp>
+#include <minire/formats/audio-clip.hpp>
 #include <minire/formats/bdf.hpp>
 #include <minire/formats/gltf.hpp>
 #include <minire/formats/image.hpp>
@@ -26,24 +27,30 @@ namespace minire::content
     {
         std::lock_guard<std::recursive_mutex> guard(_mutex);
 
-        bool fatal = false;
-        for(auto & [id, assetBlock] : _store)
+        auto checkStorage = [](Store const & store)
         {
-            if (assetBlock._usage != 0)
+            if (!store.empty())
             {
-                // not throwing because it is a dtor
-                MINIRE_ERROR("Some Leases have outlived their Manager for \"{}\"! "
-                             "This is very bad and some terrible things are likely to happen :(", id);
-                fatal = true;
-            }
-        }
+                for(auto & [id, assetBlock] : store)
+                {
+                    if (assetBlock._usage != 0)
+                    {
+                        // not throwing because it is a dtor
+                        MINIRE_ERROR("Some Leases have outlived their Manager for \"{}\" ({})! "
+                                     "This is very bad and some terrible things are likely to happen :(",
+                                     id, assetBlock._usage);
+                    }
+                }
 
-        if (fatal)
-        {
-            // should't continue to work in a damaged environment
-            MINIRE_ERROR("The program will be terminated due voilations of critical invariants.");
-            std::abort();
-        }
+                // should't continue to work in a damaged environment
+                MINIRE_ERROR("The program will be terminated due voilations of critical invariants. "
+                             "Manager leases are left, or forgot to call Manager::clear()?");
+                std::abort();
+            }
+        };
+
+        checkStorage(_store);
+        checkStorage(_garbage);
     }
 
     void Manager::setReader(Reader::Uptr reader)
@@ -156,6 +163,17 @@ namespace minire::content
         MINIRE_INVARIANT(inserted, "failed to upload raw asset: {}", id);
         _layers.emplace(_currentLayer, id);
         return std::unique_ptr<Lease>(new Lease(it, *this));
+    }
+
+    void Manager::clear()
+    {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+
+        assert(_store.empty());
+        while(!_garbage.empty())
+        {
+            cleanup(_garbage.begin());
+        }
     }
 
     void Manager::cleanup(bool force)
@@ -293,6 +311,19 @@ namespace minire::content::readers
             MINIRE_INVARIANT(in.is_open(), "failed to open: {}", path.string());
             in.read(content.data(), content.size());
             return content;
+        }
+        else if (".wav" == ext || ".wave" == ext || ".aif" == ext || ".aiff" == ext ||
+                 ".flac" == ext || ".fla" == ext ||
+                 ".mod" == ext || ".s3m" == ext || ".xm" == ext || ".it" == ext ||
+                    ".med" == ext || ".669" == ext || ".dsm" == ext || ".amf" == ext ||
+                    ".psm" == ext ||
+                 ".mp1" == ext || ".mp2" == ext || ".mp3" == ext ||
+                 ".ogg" == ext || ".oga" == ext ||
+                 ".mid" == ext || ".midi" == ext || ".rmi" == ext ||
+                 ".opus" == ext ||
+                 ".wv" == ext || ".wvc" == ext)
+        {
+            return std::make_shared<formats::AudioClip>(path);
         }
         else
         {

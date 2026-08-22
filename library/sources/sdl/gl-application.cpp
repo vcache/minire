@@ -47,8 +47,9 @@ namespace minire::sdl
 
     GlApplication::GlApplication(int width, int height,
                                  std::string const & title,
-                                 models::MsaaParams const & msaaParams)
-        : Application(width, height, title, msaaParams)
+                                 models::MsaaParams const & msaaParams,
+                                 models::MixerParams const & mixerParams)
+        : Application(width, height, title, msaaParams, mixerParams)
         , _SDLGlContext()
     {
         try

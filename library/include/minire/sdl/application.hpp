@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minire/models/image.hpp>
+#include <minire/models/mixer-params.hpp>
 #include <minire/models/mouse-button.hpp>
 #include <minire/models/msaa-params.hpp>
 #include <minire/models/system-cursor.hpp>
@@ -24,6 +25,8 @@ union SDL_Event;
 
 namespace minire::sdl
 {
+    class AudioMixer;
+
     class Application
     {
         struct SdlCursorDeleter
@@ -43,7 +46,8 @@ namespace minire::sdl
     public:
         Application(int width, int height,
                     std::string const & title,
-                    models::MsaaParams const & = {});
+                    models::MsaaParams const & = {},
+                    models::MixerParams const & = {});
         virtual ~Application();
 
         void run();
@@ -114,6 +118,10 @@ namespace minire::sdl
         bool isPressed(::SDL_Scancode) const;
 
     protected:
+        AudioMixer & audioMixer()             { assert(_audioMixer); return *_audioMixer; }
+        AudioMixer const & audioMixer() const { assert(_audioMixer); return *_audioMixer; }
+
+    protected:
         uint32_t ticks() const { return _frameTicks; } // milliseconds, msec
         size_t width() const { return _width; }
         size_t height() const { return _height; }
@@ -127,12 +135,15 @@ namespace minire::sdl
         void handleResize(int w, int h);
 
     private:
-        SDL_Window  * _window;
-        size_t        _width;
-        size_t        _height;
-        std::string   _title;
-        uint32_t      _frameTicks;
-        SdlCursorUptr _cursor;
-        bool          _working;
+        using AudioMixerSptr = std::shared_ptr<AudioMixer>;
+
+        SDL_Window   * _window;
+        size_t         _width;
+        size_t         _height;
+        std::string    _title;
+        uint32_t       _frameTicks;
+        SdlCursorUptr  _cursor;
+        AudioMixerSptr _audioMixer;
+        bool           _working;
     };
 }

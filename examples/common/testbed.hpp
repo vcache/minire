@@ -428,6 +428,7 @@ namespace minire::examples
 
             // Main loop
             application.run();
+            lease.reset(); // TODO: dirty hack to make Manager::clear() happy
 
             // Finish
             return EXIT_SUCCESS;

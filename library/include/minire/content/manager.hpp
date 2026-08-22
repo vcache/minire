@@ -82,6 +82,7 @@ namespace minire::content
         std::unique_ptr<Lease> upload(Id const &, Asset);
 
     public:
+        void clear();
         void cleanup(bool force = false);
 
     private:

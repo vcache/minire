@@ -16,6 +16,7 @@ find_package(OpenGL REQUIRED)
 
 # Configure SDL
 find_package(SDL2 REQUIRED)
+find_package(SDL2_mixer REQUIRED)
 
 # Configure fmt::format (TODO: remove it after moving to C++20)
 find_package(fmt REQUIRED)
@@ -79,6 +80,8 @@ target_link_libraries(minire
 
     "${SDL2_LIBRARIES}"
     "${OPENGL_LIBRARIES}"
+
+    SDL2_mixer::SDL2_mixer
 )
 
 target_compile_features(minire PUBLIC "${MINIRE_CXX_STD}")

@@ -35,7 +35,8 @@ namespace minire
         Application(int width, int height,
                     std::string const & title,
                     content::Manager & contentManager,
-                    models::MsaaParams const & = {});
+                    models::MsaaParams const & = {},
+                    models::MixerParams const & = {});
         ~Application() override;
 
     protected:

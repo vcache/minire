@@ -4,6 +4,7 @@
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
+#include <minire/sdl/audio-mixer.hpp>
 
 #include <fmt/format.h>
 #include <SDL2/SDL.h>
@@ -109,11 +110,13 @@ namespace minire::sdl
 
     Application::Application(int width, int height,
                              std::string const & title,
-                             models::MsaaParams const & msaaParams)
+                             models::MsaaParams const & msaaParams,
+                             models::MixerParams const & mixerParams)
         : _window(nullptr)
         , _width(width)
         , _height(height)
         , _title(title)
+        , _audioMixer(std::make_shared<AudioMixer>(mixerParams))
         , _working(true)
     {
         MINIRE_INVARIANT(width > 0 && height > 0,

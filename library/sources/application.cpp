@@ -36,8 +36,9 @@ namespace minire
     Application::Application(int width, int height,
                              std::string const & title,
                              content::Manager & contentManager,
-                             models::MsaaParams const & msaaParams)
-        : sdl::GlApplication(width, height, title, msaaParams)
+                             models::MsaaParams const & msaaParams,
+                             models::MixerParams const & mixerParams)
+        : sdl::GlApplication(width, height, title, msaaParams, mixerParams)
         , _contentManager(contentManager)
         , _rasterizer(std::make_unique<Rasterizer>(contentManager, width, height))
         , _scene(std::make_unique<SceneImpl>(*_rasterizer))
@@ -71,7 +72,14 @@ namespace minire
         }
     }
 
-    Application::~Application() = default;
+    Application::~Application()
+    {
+        // ContentManager may have cached data (such as AudioClip), which
+        // must be erased before dtor of base application.
+        // Assuming that all assets are already moved to garbage (i.e. no
+        // active leases).
+        _contentManager.clear();
+    }
 
     Application::RayCasterSptr const & Application::rayCaster() const
     {

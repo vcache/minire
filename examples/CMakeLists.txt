@@ -1,5 +1,6 @@
 add_subdirectory(aabb-reader)
 add_subdirectory(animated-skinning)
+add_subdirectory(audio-clip)
 add_subdirectory(billboards)
 add_subdirectory(bouncing-sprite)
 add_subdirectory(camera-switch)
