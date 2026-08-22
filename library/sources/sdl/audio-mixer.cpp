@@ -252,6 +252,12 @@ namespace minire::sdl
         return false;
     }
 
+    void AudioMixer::Pool::stop()
+    {
+        MINIRE_INVARIANT(!_audioMixer.expired(), "AudioMixer is expired");
+        ::Mix_HaltGroup(_tag);
+    }
+
     // AudioMixer //
 
     AudioMixer::AudioMixer(models::MixerParams const & mixerParams)

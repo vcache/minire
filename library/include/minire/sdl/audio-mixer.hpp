@@ -122,6 +122,9 @@ namespace minire::sdl
             bool play(formats::AudioClip const &,
                       int const loops = 0) const;
 
+            // Interrupt all current playbacks
+            void stop();
+
         public:
             // NOTE: passing AudioMixer::Sptr by r-value ref to prevent exceptions
             explicit Pool(AudioMixer::Sptr && audioMixer,
