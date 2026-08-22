@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <cassert>
 #include <optional>
-#include <utility>
 
 namespace minire::sdl
 {
