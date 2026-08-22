@@ -147,6 +147,9 @@ namespace minire::sdl
         };
 
     public:
+        size_t totalTracks() const { return _channels; }
+        size_t availableTracks() const { return _freeChannels.size(); }
+
         Pool::Sptr makePool(size_t size, bool strictSize = true);
         Pool::Sptr makePool(); // all empty Tracks
 
