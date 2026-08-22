@@ -411,6 +411,11 @@ namespace minire::sdl
         ::Mix_VolumeMusic(volumeToInteger(volume));
     }
 
+    bool AudioMixer::isPlayingStream() const
+    {
+        return 1 == ::Mix_PlayingMusic();
+    }
+
     // Just a wrapper to help keeping AudioClip internal private
     ::Mix_Chunk * AudioMixer::asChunk(formats::AudioClip const & audioClip)
     {

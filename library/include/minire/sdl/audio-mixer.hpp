@@ -47,6 +47,7 @@ namespace minire::sdl
                     int const loops = 0) const;
         float streamVolume() const;
         void setStreamVolume(float);
+        bool isPlayingStream() const;
 
     public:
         class Pool;
