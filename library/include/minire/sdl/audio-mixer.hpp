@@ -49,6 +49,7 @@ namespace minire::sdl
 
         void stream(formats::AudioClip const &,
                     int const loops = 0) const;
+        void stopStream();
         float streamVolume() const;
         void setStreamVolume(float);
         bool isPlayingStream() const;

@@ -432,6 +432,11 @@ namespace minire::sdl
         }
     }
 
+    void AudioMixer::stopStream()
+    {
+        ::Mix_HaltMusic();
+    }
+
     float AudioMixer::streamVolume() const
     {
         if (_streamVolume < 0) _streamVolume = ::Mix_VolumeMusic(-1);
