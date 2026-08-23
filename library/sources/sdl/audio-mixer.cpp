@@ -104,6 +104,11 @@ namespace minire::sdl
         if (auto pool = _pool.lock(); pool)
         {
             assert(_channel >= 0);
+            if (0 != ::Mix_HaltChannel(_channel))
+            {
+                MINIRE_ERROR("Mix_HaltChannel ({}): {}",
+                             _channel, ::Mix_GetError());
+            }
             pool->returnLease(_channel);
         }
     }
