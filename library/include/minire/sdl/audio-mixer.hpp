@@ -14,6 +14,10 @@ namespace minire::sdl
     // or infinitely if loops == -1.
     //
     // Make sure AudioMixer won't outlive Player or Pool.
+    //
+    // This class cached some of values of SDL_Mixer's global state, therefore,
+    // changes them manually (via SDL_mixer API, or second instance of AudioMixer)
+    // will break the AudioMixer and should be avoided.
     class AudioMixer
         : public std::enable_shared_from_this<AudioMixer>
     {
@@ -60,14 +64,19 @@ namespace minire::sdl
             Player& operator=(Player const &) = delete;
 
         public:
-            Player(Player && other);
-            Player& operator=(Player && other);
+            Player(Player && other) noexcept;
+            Player& operator=(Player && other) noexcept;
 
             ~Player();
 
         public:
             void play(formats::AudioClip const &,
                       int const loops = 0) const;
+
+            // NOTE: Player::setVolume can be called very often
+            //       even when the volume didn't change.
+            //       Since a Player is an exclusive user of a Track,
+            //       it can safely cache volume's value.
 
             float volume() const;
             void setVolume(float);
@@ -80,14 +89,12 @@ namespace minire::sdl
         private:
             // NOTE: passing std::weak_ptr by r-value ref to prevent exceptions
             explicit Player(std::weak_ptr<Pool> && pool,
-                            int channel) noexcept
-                : _pool(std::move(pool))
-                , _channel(channel)
-            {}
+                            int channel) noexcept;
 
         private:
             std::weak_ptr<Pool> _pool;
             int                 _channel = -1;
+            mutable int         _volume = -1;
 
             friend class Pool;
         };
@@ -168,6 +175,9 @@ namespace minire::sdl
         size_t                    _channels = 0;
         std::vector<int>          _freeTags;
         int                       _nextTag = 0;
+
+        mutable int               _masterVolume = -1;
+        mutable int               _streamVolume = -1;
 
         friend class Pool;
     };

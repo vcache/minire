@@ -12,6 +12,11 @@ namespace minire::formats
 {
     namespace
     {
+        float volumeToFloat(int const volume)
+        {
+            return static_cast<float>(volume) / static_cast<float>(MIX_MAX_VOLUME);
+        }
+
         int volumeToInteger(float const volume)
         {
             return std::lround(static_cast<float>(MIX_MAX_VOLUME) *
@@ -29,7 +34,7 @@ namespace minire::formats
             {
                 _sdlChunk = ::Mix_LoadWAV(_filename.c_str());
                 MINIRE_INVARIANT(_sdlChunk, "Mix_LoadWAV failed: {}", ::Mix_GetError());
-                ::Mix_VolumeChunk(_sdlChunk, volumeToInteger(_volume));
+                ::Mix_VolumeChunk(_sdlChunk, _volume);
             });
         assert(_sdlChunk);
         return _sdlChunk;
@@ -46,18 +51,28 @@ namespace minire::formats
         return _sdlMusic;
     }
 
+    float AudioClip::volume() const
+    {
+        if (_volume < 0)
+            _volume = _sdlChunk ? ::Mix_VolumeChunk(_sdlChunk, -1)
+                                : MIX_MAX_VOLUME; // default volume of SDL_Chunk
+        return volumeToFloat(_volume);
+    }
+
     void AudioClip::setVolume(float volume)
     {
-        _volume = volume;
-        if (_sdlChunk)
+        int const newVolume = volumeToInteger(volume);
+        if (_sdlChunk && (_volume < 0 || newVolume != _volume))
         {
-            ::Mix_VolumeChunk(_sdlChunk, volumeToInteger(_volume));
+            ::Mix_VolumeChunk(_sdlChunk, newVolume);
         }
 
         if (_sdlMusic)
         {
             MINIRE_WARNING("setVolume will be ignored for streaming");
         }
+
+        _volume = newVolume;
     }
 
     // Assuming no users AudioClip by the time it will be destroyed,

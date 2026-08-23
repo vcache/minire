@@ -32,7 +32,7 @@ namespace minire::formats
 
         // NOTE: in case of streaming, this volume does nothing.
         //       Only AudioMixer::setStreamVolume is taken into account.
-        float volume() const { return _volume; }
+        float volume() const;
         void setVolume(float);
 
         ~AudioClip();
@@ -45,7 +45,7 @@ namespace minire::formats
 
     private:
         std::string const      _filename;
-        float                  _volume = 1.0f;
+        mutable int            _volume = -1;
 
         mutable ::Mix_Chunk *  _sdlChunk = nullptr;
         mutable ::Mix_Music *  _sdlMusic = nullptr;

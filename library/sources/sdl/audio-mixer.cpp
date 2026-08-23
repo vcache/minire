@@ -42,14 +42,14 @@ namespace minire::sdl
 
             RaiiWrapper(RaiiWrapper && other)
                 : _data(std::move(other._data))
-            {
-                other._data.reset();
-            }
+                , _deleter(std::move(other._deleter))
+            {}
 
             RaiiWrapper& operator=(RaiiWrapper && other)
             {
                 RaiiWrapper tmp(std::move(other));
-                std::swap(_data, other._data);
+                std::swap(_data, tmp._data);
+                std::swap(_deleter, tmp._deleter);
                 return *this;
             }
 
@@ -80,19 +80,22 @@ namespace minire::sdl
 
     // AudioMixer::Player //
 
-    AudioMixer::Player::Player(Player && other)
-        : _pool(other._pool)
+    AudioMixer::Player::Player(Player && other) noexcept
+        : _pool(std::move(other._pool))
         , _channel(other._channel)
+        , _volume(other._volume)
     {
         other._pool.reset();
         other._channel = -1;
+        other._volume = -1;
     }
 
-    AudioMixer::Player& AudioMixer::Player::operator=(Player && other)
+    AudioMixer::Player& AudioMixer::Player::operator=(Player && other) noexcept
     {
         Player tmp(std::move(other));
-        std::swap(_pool, other._pool);
-        std::swap(_channel, other._channel);
+        std::swap(_pool, tmp._pool);
+        std::swap(_channel, tmp._channel);
+        std::swap(_volume, tmp._volume);
         return *this;
     }
 
@@ -104,6 +107,12 @@ namespace minire::sdl
             pool->returnLease(_channel);
         }
     }
+
+    AudioMixer::Player::Player(std::weak_ptr<Pool> && pool,
+                               int channel) noexcept
+        : _pool(std::move(pool))
+        , _channel(channel)
+    {}
 
     void AudioMixer::Player::play(formats::AudioClip const & audioClip,
                                   int const loops) const
@@ -122,14 +131,20 @@ namespace minire::sdl
     {
         assert(_channel >= 0);
         MINIRE_INVARIANT(!_pool.expired(), "Pool is expired");
-        return volumeToFloat(::Mix_Volume(_channel, -1));
+        if (_volume < 0) _volume = ::Mix_Volume(_channel, -1);
+        return volumeToFloat(_volume);
     }
 
     void AudioMixer::Player::setVolume(float volume)
     {
         assert(_channel >= 0);
         MINIRE_INVARIANT(!_pool.expired(), "Pool is expired");
-        ::Mix_Volume(_channel, volumeToInteger(volume));
+        int const newVolume = volumeToInteger(volume);
+        if (_volume < 0 || newVolume != _volume)
+        {
+            ::Mix_Volume(_channel, newVolume);
+            _volume = newVolume;
+        }
     }
 
     void AudioMixer::Player::stop()
@@ -387,12 +402,18 @@ namespace minire::sdl
 
     float AudioMixer::masterVolume() const
     {
-        return volumeToFloat(::Mix_MasterVolume(-1));
+        if (_masterVolume < 0) _masterVolume = ::Mix_MasterVolume(-1);
+        return volumeToFloat(_masterVolume);
     }
 
     void AudioMixer::setMasterVolume(float volume)
     {
-        ::Mix_MasterVolume(volumeToInteger(volume));
+        if (int const newMasterVolume = volumeToInteger(volume);
+            _masterVolume < 0 || _masterVolume != newMasterVolume)
+        {
+            ::Mix_MasterVolume(newMasterVolume);
+            _masterVolume = newMasterVolume;
+        }
     }
 
     void AudioMixer::stream(formats::AudioClip const & audioClip,
@@ -408,12 +429,18 @@ namespace minire::sdl
 
     float AudioMixer::streamVolume() const
     {
-        return volumeToFloat(::Mix_VolumeMusic(-1));
+        if (_streamVolume < 0) _streamVolume = ::Mix_VolumeMusic(-1);
+        return volumeToFloat(_streamVolume);
     }
 
     void AudioMixer::setStreamVolume(float volume)
     {
-        ::Mix_VolumeMusic(volumeToInteger(volume));
+        if (int const newStreamVolume = volumeToInteger(volume);
+            _streamVolume < 0 || _streamVolume != newStreamVolume)
+        {
+            ::Mix_VolumeMusic(newStreamVolume);
+            _streamVolume = newStreamVolume;
+        }
     }
 
     bool AudioMixer::isPlayingStream() const
