@@ -29,6 +29,39 @@ namespace minire::formats
                 postprocess(width, height, channels, "(binary data)");
             }
 
+            explicit
+            StbImage(std::istream & istream)
+            {
+                int width = 0, height = 0;
+                int channels = 0; // 8-bit components per pixel
+
+                static constexpr ::stbi_io_callbacks kCallbacks
+                {
+                    .read = [](void * user, char * data, int size) -> int
+                    {
+                        auto & stream = *static_cast<std::istream *>(user);
+                        stream.read(data, size);
+                        return static_cast<int>(stream.gcount());
+                    },
+
+                    .skip = [](void * user, int n)
+                    {
+                        auto & stream = *static_cast<std::istream *>(user);
+                        stream.clear(); // Clear EOF/fail flags before seeking
+                        stream.seekg(n, std::ios_base::cur);
+                    },
+
+                    .eof = [](void * user) -> int
+                    {
+                        auto & stream = *static_cast<std::istream *>(user);
+                        return stream.eof() ? 1 : 0;
+                    }
+                };
+
+                _data = ::stbi_load_from_callbacks(&kCallbacks, &istream, &width, &height, &channels, 0);
+                postprocess(width, height, channels, "(stream)");
+            }
+
             ~StbImage() override
             {
                 free();
@@ -100,5 +133,10 @@ namespace minire::formats
     models::Image::Sptr loadImage(unsigned char const * buffer, size_t length)
     {
         return std::make_shared<StbImage>(buffer, length);
+    }
+
+    models::Image::Sptr loadImage(std::istream & istream)
+    {
+        return std::make_shared<StbImage>(istream);
     }
 }

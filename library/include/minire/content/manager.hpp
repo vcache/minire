@@ -6,6 +6,7 @@
 #include <minire/utils/demangle.hpp>
 
 #include <cassert>
+#include <filesystem>
 #include <limits>
 #include <mutex>
 #include <string>
@@ -115,6 +116,8 @@ namespace minire::content
         Lease& operator=(Lease &&) = delete;
 
     public:
+        using Uptr = std::unique_ptr<Lease>;
+
         Id const & id() const
         {
             assert(_asset != _manager._store.cend());
@@ -244,3 +247,37 @@ namespace minire::content::readers
         std::vector<Reader::Uptr> _readers;
     };
 }
+
+#ifdef MINIRE_HAS_PHYSFS
+
+namespace minire::content::readers
+{
+    // NOTE: PhysicsFS will call PHYSFS_init/PHYSFS_deinit automatically,
+    //       therefore, you should avoid calling them manually, because
+    //       it will break init/deinit symmetry.
+    // See PhysicsFS3 documentation for details about PhysicsFS behaviour:
+    //  https://wiki.icculus.org/PhysicsFS3/CategoryPhysicsFS
+    class PhysFS : public Reader
+    {
+        PhysFS(PhysFS const &) = delete;
+        PhysFS & operator=(PhysFS const &) = delete;
+
+    public:
+        // Usually should just pass argv[0].
+        // Assuming argv0 is immutable. Must not pass
+        // different argv0 when creating several
+        // instances of PhysFS.
+        explicit PhysFS(char const * argv0);
+        ~PhysFS() override;
+
+        Asset load(Id const &) const override;
+
+    public:
+        // Will throw in case of error.
+        void mount(std::filesystem::path const & newDir,    // platform-independent (differs from PhysFS!)
+                   std::string const & mountPoint,          // NULL or "" is equivalent to "/".
+                   bool appendToPath = true);               // append to search path (or to prepend)
+    };
+}
+
+#endif // MINIRE_HAS_PHYSFS

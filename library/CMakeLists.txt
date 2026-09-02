@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
+# TODO: avoid global add_definitions and use target_compile_definitions instead
+
 # Common options
 set(MINIRE_CXX_STD cxx_std_20)
 set(MINIRE_COMP_OPTS -Wall -Wextra -pedantic -Werror)
@@ -26,6 +28,31 @@ find_package(glm REQUIRED)
 
 # Configure GTest
 find_package(GTest)
+
+# Configure PhysicsFS
+option(USE_PHYSFS "Enable PhysicsFS support" ON)
+if(USE_PHYSFS)
+    find_package(physfs CONFIG QUIET)
+    if(NOT physfs_FOUND)
+        find_package(PhysFS QUIET)
+    endif()
+
+    if(physfs_FOUND OR PhysFS_FOUND)
+        if(TARGET physfs)
+            set(PHYSFS_LINK_TARGET "physfs")
+        elseif(TARGET PhysFS::PhysFS)
+            set(PHYSFS_LINK_TARGET "PhysFS::PhysFS")
+        else()
+            add_library(PhysFS::PhysFS INTERFACE IMPORTED)
+            target_include_directories(PhysFS::PhysFS INTERFACE "${PHYSFS_INCLUDE_DIR}")
+            target_link_libraries(PhysFS::PhysFS INTERFACE "${PHYSFS_LIBRARY}")
+            set(PHYSFS_LINK_TARGET "PhysFS::PhysFS")
+        endif()
+    else()
+        message(WARNING "PhysicsFS not found! Building without it.")
+        set(USE_PHYSFS OFF)
+    endif()
+endif()
 
 # Setup defines
 add_definitions(-DCMAKE_CURRENT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
@@ -71,6 +98,10 @@ file(GLOB_RECURSE MINIRE_TESTS
 
 add_library(minire ${MINIRE_SRCS} ${CMAKE_CURRENT_BINARY_DIR}/minire-data.cpp)
 
+if(USE_PHYSFS)
+    target_compile_definitions(minire PUBLIC MINIRE_HAS_PHYSFS)
+endif()
+
 target_link_libraries(minire
     "${CMAKE_THREAD_LIBS_INIT}"
 
@@ -80,8 +111,9 @@ target_link_libraries(minire
 
     "${SDL2_LIBRARIES}"
     "${OPENGL_LIBRARIES}"
-
     SDL2_mixer::SDL2_mixer
+
+    ${PHYSFS_LINK_TARGET}
 )
 
 target_compile_features(minire PUBLIC "${MINIRE_CXX_STD}")
@@ -95,6 +127,7 @@ target_include_directories(minire PUBLIC
     "${SDL2_INCLUDE_DIRS}"
     "${OPENGL_INCLUDE_DIRS}" # TODO: Added in version 3.29.
     "${Boost_INCLUDE_DIRS}"
+    ${PHYSFS_INCLUDE_DIR}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources"
 )
 

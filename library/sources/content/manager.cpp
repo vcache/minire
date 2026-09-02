@@ -10,14 +10,105 @@
 
 #include <boost/algorithm/string.hpp>
 
+#ifdef MINIRE_HAS_PHYSFS
+#   include <content/manager/physfs-istream.hpp>
+#   include <physfs.h>
+#endif
+
 #include <cassert>
 #include <cstdlib> // for std::abort
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <new> // for std::bac_alloc
 
 namespace minire::content
 {
+    namespace
+    {
+        std::optional<std::streamsize> sizeOf(std::istream & istream)
+        {
+            std::streampos original_pos = istream.tellg();
+            if (original_pos == std::streampos(-1))
+            {
+                return std::nullopt;
+            }
+
+            istream.seekg(0, std::ios::end);
+            std::streampos end_pos = istream.tellg();
+
+            istream.seekg(original_pos);
+            return end_pos - original_pos;
+        }
+
+        Asset load(Id const & id, std::unique_ptr<std::istream> istream)
+        {
+            assert(istream);
+
+            std::string ext = std::filesystem::path(id).extension().string();
+            boost::algorithm::to_lower(ext);
+
+            if (".png"  == ext ||
+                ".jpg"  == ext ||
+                ".jpeg" == ext ||
+                ".tga"  == ext)
+            {
+                models::Image::Sptr image = formats::loadImage(*istream);
+                MINIRE_INVARIANT(image, "an image wasn't loaded: \"{}\"", id);
+                return image;
+            }
+            else if (".obj"  == ext)
+            {
+                return formats::loadObj(*istream);
+            }
+            else if (".gltf"  == ext)
+            {
+                // TODO: might not work correctly w/ separated .bin files
+                //       Implement "::tinygltf::FsCallbacks" into the Manager
+                return formats::loadGltf(*istream);
+            }
+            else if (".glb"  == ext)
+            {
+                return formats::loadGlb(*istream);
+            }
+            else if (".bdf"  == ext)
+            {
+                return std::make_shared<formats::Bdf>(*istream, id);
+            }
+            else if (".txt" == ext)
+            {
+                if (auto size = sizeOf(*istream); size)
+                {
+                    std::string content(*size, '\0');
+                    istream->read(content.data(), content.size());
+                    content.resize(static_cast<size_t>(istream->gcount()));
+                    return content;
+                }
+
+                // fallback to byte-to-byte reading
+                return std::string((std::istreambuf_iterator<char>(*istream)),
+                                    std::istreambuf_iterator<char>());
+            }
+            else if (".wav" == ext || ".wave" == ext || ".aif" == ext || ".aiff" == ext ||
+                     ".flac" == ext || ".fla" == ext ||
+                     ".mod" == ext || ".s3m" == ext || ".xm" == ext || ".it" == ext ||
+                        ".med" == ext || ".669" == ext || ".dsm" == ext || ".amf" == ext ||
+                        ".psm" == ext ||
+                     ".mp1" == ext || ".mp2" == ext || ".mp3" == ext ||
+                     ".ogg" == ext || ".oga" == ext ||
+                     ".mid" == ext || ".midi" == ext || ".rmi" == ext ||
+                     ".opus" == ext ||
+                     ".wv" == ext || ".wvc" == ext)
+            {
+                return std::make_shared<formats::AudioClip>(std::move(istream));
+            }
+            else
+            {
+                MINIRE_THROW("Unknown content type (\"{}\"): {}", ext, id);
+            }
+        }
+    }
+
     Manager::Manager(size_t sizeLimit)
         : _sizeLimit(sizeLimit)
         , _sizeCurrent(0)
@@ -271,64 +362,10 @@ namespace minire::content::readers
                     // TODO: it won't work on non-Posix OS (i.e. *indows)
         MINIRE_INVARIANT(std::filesystem::exists(path),
                          "a file doesn't exist: {}", path.string());
-
-        std::string ext = path.extension();
-        boost::algorithm::to_lower(ext);
-
         MINIRE_INFO("Reading an asset from a file: {}", path.string());
-        if (".png"  == ext ||
-            ".jpg" == ext ||
-            ".jpeg" == ext ||
-            ".tga" == ext)
-        {
-            models::Image::Sptr image = formats::loadImage(path);
-            MINIRE_INVARIANT(image, "an image wasn't loaded: {}", path.string());
-            return image;
-        }
-        else if (".obj"  == ext)
-        {
-            return formats::loadObj(path);
-        }
-        else if (".gltf"  == ext)
-        {
-            // TODO: might not work correctly w/ separated .bin files
-            //       Implement "::tinygltf::FsCallbacks" into the Manager
-            return formats::loadGltf(path);
-        }
-        else if (".glb"  == ext)
-        {
-            return formats::loadGlb(path);
-        }
-        else if (".bdf"  == ext)
-        {
-            return std::make_shared<formats::Bdf>(path);
-        }
-        else if (".txt" == ext)
-        {
-            auto size = std::filesystem::file_size(path);
-            std::string content(size, '\0');
-            std::ifstream in(path);
-            MINIRE_INVARIANT(in.is_open(), "failed to open: {}", path.string());
-            in.read(content.data(), content.size());
-            return content;
-        }
-        else if (".wav" == ext || ".wave" == ext || ".aif" == ext || ".aiff" == ext ||
-                 ".flac" == ext || ".fla" == ext ||
-                 ".mod" == ext || ".s3m" == ext || ".xm" == ext || ".it" == ext ||
-                    ".med" == ext || ".669" == ext || ".dsm" == ext || ".amf" == ext ||
-                    ".psm" == ext ||
-                 ".mp1" == ext || ".mp2" == ext || ".mp3" == ext ||
-                 ".ogg" == ext || ".oga" == ext ||
-                 ".mid" == ext || ".midi" == ext || ".rmi" == ext ||
-                 ".opus" == ext ||
-                 ".wv" == ext || ".wvc" == ext)
-        {
-            return std::make_shared<formats::AudioClip>(path);
-        }
-        else
-        {
-            MINIRE_THROW("Unknown content type (\"{}\"): {}", ext, path.string());
-        }
+        auto istream = std::make_unique<std::ifstream>(path, std::ios::in | std::ios::binary);
+        MINIRE_INVARIANT(istream->is_open(), "failed to open: \"{}\"", id);
+        return ::minire::content::load(id, std::move(istream));
     }
 }
 
@@ -352,3 +389,104 @@ namespace minire::content::readers
         return std::monostate();
     }
 }
+
+#ifdef MINIRE_HAS_PHYSFS
+
+namespace minire::content::readers
+{
+    namespace
+    {
+        class PhysFSGuard
+        {
+        public:
+            static PhysFSGuard & instance()
+            {
+                static PhysFSGuard gPhysFSGuard;
+                return gPhysFSGuard;
+            }
+
+            void increase(char const * argv0)
+            {
+                std::unique_lock<std::mutex> lock(_initMutex);
+
+                MINIRE_INVARIANT(_argv0.empty() || argv0 == _argv0,
+                                 "argv0 has changed: {} -> {}",
+                                 _argv0, argv0);
+
+                _usages++;
+                if (_usages > 0 && 0 == ::PHYSFS_isInit())
+                {
+                    MINIRE_INVARIANT(0 != ::PHYSFS_init(argv0), "PHYSFS_init failed: {}",
+                                     getLastError());
+                    MINIRE_INFO("PhysFS is initialized");
+                    _argv0 = argv0;
+                }
+            }
+
+            void decrease()
+            {
+                std::unique_lock<std::mutex> lock(_initMutex);
+
+                assert(_usages != 0);
+                _usages--;
+                if (_usages == 0 && 0 != ::PHYSFS_isInit())
+                {
+                    if (0 == ::PHYSFS_deinit())
+                    {
+                        MINIRE_ERROR("PHYSFS_deinit failed: {}", getLastError());
+                    }
+                    MINIRE_INFO("PhysFS is de-initialized");
+                }
+            }
+
+        public:
+            static char const * getLastError()
+            {
+                ::PHYSFS_ErrorCode const errCode = ::PHYSFS_getLastErrorCode();
+                return ::PHYSFS_getErrorByCode(errCode);
+            }
+
+        private:
+            size_t      _usages = 0;
+            std::mutex  _initMutex;
+            std::string _argv0;
+        };
+    }
+
+    PhysFS::PhysFS(char const * argv0)
+    {
+        PhysFSGuard::instance().increase(argv0);
+    }
+
+    PhysFS::~PhysFS()
+    {
+        // NOTE: must be safe in case of PhysFS's move,
+        //       because a new instance will be created
+        //       before destruction of an old one.
+        PhysFSGuard::instance().decrease();
+    }
+
+    Asset PhysFS::load(Id const & id) const
+    {
+        MINIRE_INVARIANT(0 != ::PHYSFS_exists(id.c_str()),
+                         "Asset doesn't exist: {}", id);
+
+        MINIRE_INFO("Reading an asset from a PhysFs: {}", id);
+
+        auto istream = std::make_unique<manager::PhysFSIStream>(id);
+        return ::minire::content::load(id, std::move(istream));
+    }
+
+    void PhysFS::mount(std::filesystem::path const & newDir,
+                       std::string const & mountPoint,
+                       bool appendToPath)
+    {
+        // NOTE: newDir.string().c_str() returns UTF8 of platform-specific path
+        MINIRE_INVARIANT(0 != ::PHYSFS_mount(newDir.string().c_str(), mountPoint.c_str(), appendToPath),
+                         "PHYSFS_mount failed (\"{}\", \"{}\", {}): {}",
+                         newDir.string().c_str(), mountPoint, appendToPath,
+                         PhysFSGuard::getLastError());
+    }
+}
+
+#endif // MINIRE_HAS_PHYSFS

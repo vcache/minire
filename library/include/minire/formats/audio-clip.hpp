@@ -1,5 +1,6 @@
 #pragma once
 
+#include <istream>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -29,6 +30,7 @@ namespace minire::formats
         using Wptr = std::weak_ptr<AudioClip>;
 
         explicit AudioClip(std::string const &);
+        explicit AudioClip(std::unique_ptr<std::istream>);
 
         // NOTE: in case of streaming, this volume does nothing.
         //       Only AudioMixer::setStreamVolume is taken into account.
@@ -44,13 +46,15 @@ namespace minire::formats
         std::string const & filename() const { return _filename; }
 
     private:
-        std::string const      _filename;
-        mutable int            _volume = -1;
+        std::string const             _filename;
+        std::unique_ptr<std::istream> _istream;
 
-        mutable ::Mix_Chunk *  _sdlChunk = nullptr;
-        mutable ::Mix_Music *  _sdlMusic = nullptr;
-        mutable std::once_flag _sdlChunkFlag;
-        mutable std::once_flag _sdlMusicFlag;
+        mutable int                   _volume = -1;
+
+        mutable ::Mix_Chunk         * _sdlChunk = nullptr;
+        mutable ::Mix_Music         * _sdlMusic = nullptr;
+        mutable std::once_flag        _sdlChunkFlag;
+        mutable std::once_flag        _sdlMusicFlag;
 
         friend class minire::content::Manager;
         friend class minire::sdl::AudioMixer;
