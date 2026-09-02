@@ -248,10 +248,11 @@ namespace minire::content::readers
     };
 }
 
-#ifdef MINIRE_HAS_PHYSFS
-
 namespace minire::content::readers
 {
+
+#ifdef MINIRE_HAS_PHYSFS
+
     // NOTE: PhysicsFS will call PHYSFS_init/PHYSFS_deinit automatically,
     //       therefore, you should avoid calling them manually, because
     //       it will break init/deinit symmetry.
@@ -278,6 +279,27 @@ namespace minire::content::readers
                    std::string const & mountPoint,          // NULL or "" is equivalent to "/".
                    bool appendToPath = true);               // append to search path (or to prepend)
     };
-}
+#else
+
+    class PhysFS
+    {
+    public:
+        template <typename T = void>
+        PhysFS(...)
+        {
+            static_assert(sizeof(T) == 0,
+                "(!!!) PhysFS isn't available (libminire is built w/o PhysicsFS support)");
+        }
+
+        template <typename T = void>
+        operator T()
+        {
+            static_assert(sizeof(T) == 0,
+                "(!!!) PhysFS isn't available (libminire is built w/o PhysicsFS support)");
+            return {};
+        }
+    };
 
 #endif // MINIRE_HAS_PHYSFS
+
+}
