@@ -1,9 +1,9 @@
 include(examples-kit)
 
-find_package(Boost COMPONENTS program_options REQUIRED)
+find_package(Boost CONFIG COMPONENTS program_options REQUIRED)
 
 CreateMinireExample(
     gltf-viewer
     LIBRARIES
-        ${Boost_PROGRAM_OPTIONS_LIBRARY}
+        Boost::program_options
 )

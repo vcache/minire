@@ -10,7 +10,7 @@ set(MINIRE_COMP_OPTS -Wall -Wextra -pedantic -Werror)
 find_package(Threads REQUIRED)
 
 # Configure boost library
-find_package(Boost COMPONENTS headers REQUIRED)
+find_package(Boost CONFIG COMPONENTS headers REQUIRED)
 
 # Configure OpenGL
 set(OpenGL_GL_PREFERENCE GLVND)
@@ -126,7 +126,6 @@ target_include_directories(minire PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/../3rd-party"
     "${SDL2_INCLUDE_DIRS}"
     "${OPENGL_INCLUDE_DIRS}" # TODO: Added in version 3.29.
-    "${Boost_INCLUDE_DIRS}"
     ${PHYSFS_INCLUDE_DIR}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources"
 )
