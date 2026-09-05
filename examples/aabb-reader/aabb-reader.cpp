@@ -39,6 +39,8 @@ int main()
             MINIRE_INFO("{}: {}", path, aabb);
         }
 
+        manager.clear();
+
         // Finish
         return EXIT_SUCCESS;
     }

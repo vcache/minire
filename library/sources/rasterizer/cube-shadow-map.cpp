@@ -380,13 +380,13 @@ namespace minire::rasterizer
     namespace
     {
         CubeVPs buildVPs(glm::vec3 const & lightPosition,
-                         float const near,
-                         float const far)
+                         float const nearPlane,
+                         float const farPlane)
         {
             // build projection matrix
             float const aspect = 1.0f; // width/height, but they are the same
             glm::mat4 const projection = glm::perspective(glm::radians(90.0f),
-                                                          aspect, near, far);
+                                                          aspect, nearPlane, farPlane);
 
             // build VP matrices
             return CubeVPs
@@ -426,8 +426,8 @@ namespace minire::rasterizer
                 max = glm::max(max, vertex);
             }
 
-            float const far = glm::compMax(max - min);
-            return std::make_pair(kNear, far);
+            float const farPlane = glm::compMax(max - min);
+            return std::make_pair(kNear, farPlane);
         }
     }
 
@@ -450,22 +450,22 @@ namespace minire::rasterizer
         MINIRE_GL(glClear, GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
         // calculate planes and light VP
-        auto const [near, far] = calcNearFar(viewFrustum);
-        CubeVPs const lightVPs = buildVPs(lightPosition, near, far);
+        auto const [nearPlane, farPlane] = calcNearFar(viewFrustum);
+        CubeVPs const lightVPs = buildVPs(lightPosition, nearPlane, farPlane);
 
         // cull models against this light source
         utils::FrustumPlanes const frustumPlanes
         {
-            ._min = lightPosition - glm::vec3(far),
-            ._max = lightPosition + glm::vec3(far),
+            ._min = lightPosition - glm::vec3(farPlane),
+            ._max = lightPosition + glm::vec3(farPlane),
             ._planes =
             {
-                glm::vec4( 1.0f,  0.0f,  0.0f, -(lightPosition.x + far)), // +X plane
-                glm::vec4(-1.0f,  0.0f,  0.0f,  (lightPosition.x - far)), // -X plane
-                glm::vec4( 0.0f,  1.0f,  0.0f, -(lightPosition.y + far)), // +Y plane
-                glm::vec4( 0.0f, -1.0f,  0.0f,  (lightPosition.y - far)), // -Y plane
-                glm::vec4( 0.0f,  0.0f,  1.0f, -(lightPosition.z + far)), // +Z plane
-                glm::vec4( 0.0f,  0.0f, -1.0f,  (lightPosition.z - far))  // -Z plane
+                glm::vec4( 1.0f,  0.0f,  0.0f, -(lightPosition.x + farPlane)), // +X plane
+                glm::vec4(-1.0f,  0.0f,  0.0f,  (lightPosition.x - farPlane)), // -X plane
+                glm::vec4( 0.0f,  1.0f,  0.0f, -(lightPosition.y + farPlane)), // +Y plane
+                glm::vec4( 0.0f, -1.0f,  0.0f,  (lightPosition.y - farPlane)), // -Y plane
+                glm::vec4( 0.0f,  0.0f,  1.0f, -(lightPosition.z + farPlane)), // +Z plane
+                glm::vec4( 0.0f,  0.0f, -1.0f,  (lightPosition.z - farPlane))  // -Z plane
             },
         };
         assert(cullFunction);
@@ -476,7 +476,7 @@ namespace minire::rasterizer
         assert(_material);
         _material->setShadowMatrices(lightVPs);
         _material->setLightPos(lightPosition);
-        _material->setFarPlane(far);
+        _material->setFarPlane(farPlane);
         std::visit(utils::Overloaded
         {
             [this](models::shadow_params::method::Standard const &) { },
@@ -507,6 +507,6 @@ namespace minire::rasterizer
         // tidy up
         _fbo.unbind();
 
-        return far;
+        return farPlane;
     }
 }

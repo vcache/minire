@@ -27,7 +27,6 @@ namespace minire::models
             kTriangleStrip, // GL_TRIANGLE_STRIP
             kTriangleFan,   // GL_TRIANGLE_FAN
             kQuads,         // GL_QUADS
-            kQuadStrip,     // GL_QUAD_STRIP
         };
 
         enum class DataType

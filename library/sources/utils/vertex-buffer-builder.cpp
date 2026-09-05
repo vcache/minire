@@ -25,7 +25,6 @@ namespace minire::utils
                 case models::VertexBuffer::DrawMode::kTriangleStrip: return GL_TRIANGLE_STRIP;
                 case models::VertexBuffer::DrawMode::kTriangleFan:   return GL_TRIANGLE_FAN;
                 case models::VertexBuffer::DrawMode::kQuads:         return GL_QUADS;
-                case models::VertexBuffer::DrawMode::kQuadStrip:     return GL_QUAD_STRIP;
             }
             MINIRE_THROW("unknown draw mode: {}", static_cast<int>(drawMode));
         }

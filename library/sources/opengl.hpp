@@ -1,10 +1,6 @@
 #pragma once
 
-// TODO: http://stackoverflow.com/questions/3032386/glgenbuffers-not-defined
-#define GL_GLEXT_PROTOTYPES
-
-#include <GL/gl.h>
-#include <GL/glext.h>
+#include <glad/gl.h>
 
 #include <string_view>
 

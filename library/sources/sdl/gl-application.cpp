@@ -5,6 +5,8 @@
 
 #include <opengl.hpp>
 
+#include <SDL2/SDL.h>
+
 namespace minire::sdl
 {
     namespace
@@ -67,6 +69,10 @@ namespace minire::sdl
             {
                 MINIRE_THROW("SDL_GL_CreateContext failed: {}", ::SDL_GetError());
             }
+
+
+            MINIRE_INVARIANT(::gladLoadGL((GLADloadfunc)SDL_GL_GetProcAddress),
+                             "gladLoadGL failed");
 
             MINIRE_INFO("OpenGL: {}", (const char *) ::glGetString(GL_VERSION));
 

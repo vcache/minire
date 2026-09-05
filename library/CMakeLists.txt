@@ -29,6 +29,9 @@ find_package(glm REQUIRED)
 # Configure GTest
 find_package(GTest)
 
+# Inject GLAD
+add_subdirectory(../3rd-party/glad 3rd-party/glad)
+
 # Configure PhysicsFS
 option(USE_PHYSFS "Enable PhysicsFS support" ON)
 if(USE_PHYSFS)
@@ -92,6 +95,13 @@ file(GLOB_RECURSE MINIRE_SRCS
      "${CMAKE_CURRENT_SOURCE_DIR}/sources/*.cpp")
 list(FILTER MINIRE_SRCS EXCLUDE REGEX "_test.cpp$")
 
+# Exclude OS-specific source files
+if(WIN32)
+    list(FILTER MINIRE_SRCS EXCLUDE REGEX "-linux\\.cpp$")
+else()
+    list(FILTER MINIRE_SRCS EXCLUDE REGEX "-windows\\.cpp$")
+endif()
+
 file(GLOB_RECURSE MINIRE_TESTS
      LIST_DIRECTORIES FALSE
      "${CMAKE_CURRENT_SOURCE_DIR}/sources/*_test.cpp")
@@ -114,6 +124,7 @@ target_link_libraries(minire
     SDL2_mixer::SDL2_mixer
 
     ${PHYSFS_LINK_TARGET}
+    glad
 )
 
 target_compile_features(minire PUBLIC "${MINIRE_CXX_STD}")
@@ -134,15 +145,16 @@ target_compile_options(minire PRIVATE ${MINIRE_COMP_OPTS})
 
 # Build unit tests
 
-if (GTest_FOUND)
+# TODO: cannot build under WIN32 because of a conflict between gtest's main() and SDL_main()
+if (GTest_FOUND AND NOT WIN32)
+    include(GoogleTest)
     file(GLOB_RECURSE MINIRE_TESTS
          LIST_DIRECTORIES FALSE
          "${CMAKE_CURRENT_SOURCE_DIR}/sources/*_test.cpp")  # TODO: why underscore instead hyphen?
     add_executable(minire-tests ${MINIRE_TESTS})
     target_compile_features(minire-tests PUBLIC "${MINIRE_CXX_STD}")
-    target_link_libraries(minire-tests minire ${GTEST_BOTH_LIBRARIES})
+    target_link_libraries(minire-tests minire GTest::gtest GTest::gtest_main)
     target_include_directories(minire-tests PUBLIC
-        ${GTEST_INCLUDE_DIR}
         "${CMAKE_CURRENT_SOURCE_DIR}/sources")
     target_compile_options(minire-tests PRIVATE ${MINIRE_COMP_OPTS})
     gtest_add_tests(TARGET minire-tests)
