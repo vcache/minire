@@ -132,6 +132,7 @@ namespace minire::rasterizer
                 _program.setUniform(_bznkProjection, viewpoint.projection());
                 _program.setUniform(_bznkTexture, 0);
                 _program.setUniform(_bznkMeshId, opbId);
+                _program.validate();
             }
 
         private:
@@ -229,6 +230,7 @@ namespace minire::rasterizer
                 _program.setUniform(_bznkViewProj, viewProj);
                 _program.setUniform(_bznkTexture, 0);
                 _program.setUniform(_bznkMeshId, opbId);
+                _program.validate();
             }
 
         private:
@@ -349,6 +351,7 @@ namespace minire::rasterizer
                 _program.setUniform(_bznkProjection, viewpoint.projection());
                 _program.setUniform(_bznkFonts, kTextureUnits);
                 _program.setUniform(_bznkMeshId, opbId);
+                _program.validate();
             }
 
         private:
@@ -466,6 +469,7 @@ namespace minire::rasterizer
                 _program.setUniform(_bznkViewProj, viewProj);
                 _program.setUniform(_bznkFonts, kTextureUnits);
                 _program.setUniform(_bznkMeshId, opbId);
+                _program.validate();
             }
 
         private:

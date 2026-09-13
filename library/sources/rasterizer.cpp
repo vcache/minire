@@ -662,6 +662,8 @@ namespace minire
         // run the pass
         _screenQuadVao.bind();
         MINIRE_GL(glDisable, GL_BLEND);
+
+        _screenQuadProgram.validate();
         MINIRE_GL(glDrawArrays, GL_TRIANGLES, 0, 6);
     }
 

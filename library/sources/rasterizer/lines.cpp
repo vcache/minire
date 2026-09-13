@@ -70,6 +70,7 @@ namespace minire::rasterizer
             {
                 _program.use();
                 _vao.bind();
+                _program.validate();
                 MINIRE_GL(glDrawArrays, GL_LINES, 0, _vboCount);
             }
         }

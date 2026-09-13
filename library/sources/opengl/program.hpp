@@ -166,6 +166,13 @@ namespace minire::opengl
             MINIRE_GL(glUniform1uiv, location, value.size(), value.data());
         }
 
+    public:
+        // Should be called right before drawing command.
+        // Validates FSM's state (not the program itself).
+        // Will throw in case of error.
+        // Does nothing in Release build (when NDEBUG not defined).
+        void validate() const;
+
     private:
         std::vector<Shader::Sptr> _shaders;
         GLuint                    _id = 0;

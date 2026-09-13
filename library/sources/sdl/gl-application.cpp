@@ -70,7 +70,6 @@ namespace minire::sdl
                 MINIRE_THROW("SDL_GL_CreateContext failed: {}", ::SDL_GetError());
             }
 
-
             MINIRE_INVARIANT(::gladLoadGL((GLADloadfunc)SDL_GL_GetProcAddress),
                              "gladLoadGL failed");
 

@@ -374,7 +374,6 @@ namespace minire::rasterizer
         opengl::VertexBuffer const & vertexBuffer =
             uniquePrimitive._mesh.vertexBuffer(uniquePrimitive._primitiveIndex);
 
-        // perform drawing
         // fetch VAO and additional VBO
         opengl::VAO const & vao = vertexBuffer._vao;
         vao.bind();
@@ -449,6 +448,7 @@ namespace minire::rasterizer
         }
 
         // draw elements
+        _program.validate();
         vertexBuffer.drawElementsInstanced(primitiveInstances.size());
 
         // create a fence

@@ -141,6 +141,11 @@ namespace minire::rasterizer
             _program.setUniform(_clippingWindow, value);
         }
 
+        void validate() const
+        {
+            _program.validate();
+        }
+
     private:
         opengl::Program _program;
         GLint           _fontsUniform;
@@ -196,6 +201,7 @@ namespace minire::rasterizer
             _program.setPositionUniform(pixelFix(m._position));
             _program.setClippingWindow(m._clippingWindow);
 
+            _program.validate();
             assert(_vertexBuffer);
             _vertexBuffer->draw();
         }

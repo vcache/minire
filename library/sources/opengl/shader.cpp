@@ -29,6 +29,20 @@ namespace minire::opengl
 
             return result.str();
         }
+
+        std::string shaderTypeToString(GLenum shaderType)
+        {
+            switch (shaderType)
+            {
+                case GL_VERTEX_SHADER:          return "VERTEX";
+                case GL_FRAGMENT_SHADER:        return "FRAGMENT";
+                case GL_GEOMETRY_SHADER:        return "GEOMETRY";
+                case GL_COMPUTE_SHADER:         return "COMPUTE";
+                case GL_TESS_CONTROL_SHADER:    return "TESS_CONTROL";
+                case GL_TESS_EVALUATION_SHADER: return "TESS_EVALUATION";
+                default:                        return "UNKNOWN";
+            }
+        }
     }
 
     /*!
@@ -37,6 +51,7 @@ namespace minire::opengl
     Shader::Shader(GLenum type, std::string const & source)
         : _id(0)
         , _type(type)
+        , _source(source)
     {
         try
         {
@@ -81,5 +96,11 @@ namespace minire::opengl
         {
             ::glDeleteShader(_id);
         }
+    }
+
+    std::string Shader::sourcePretty() const
+    {
+        return fmt::format("Shader type: {}\n", shaderTypeToString(_type),
+                           addLineNums(_source));
     }
 }

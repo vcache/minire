@@ -15,12 +15,17 @@ namespace minire::opengl
         Shader(GLenum type, std::string const & source);
         ~Shader();
 
+        GLenum type() const { return _type; }
+        std::string const & source() const { return _source; }
+        std::string sourcePretty() const;
+
     private:
         GLuint getId() const { return _id; }
 
     private:
-        GLuint _id;
-        GLenum _type;
+        GLuint            _id;
+        GLenum const      _type;
+        std::string const _source;
 
         friend class Program;
 

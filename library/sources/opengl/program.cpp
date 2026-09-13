@@ -2,6 +2,8 @@
 
 #include <minire/errors.hpp>
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <vector>
 
@@ -55,16 +57,6 @@ namespace minire::opengl
             {
                 MINIRE_THROW("program linking error:\n{}", getInfoLog());
             }
-
-            // Perform validation
-            MINIRE_GL(glValidateProgram, _id);
-
-            GLint valid;
-            MINIRE_GL(glGetProgramiv, _id, GL_VALIDATE_STATUS, &valid);
-            if (valid != GL_TRUE)
-            {
-                MINIRE_THROW("program Validation failed:\n{}", getInfoLog());
-            }
         }
         catch(...)
         {
@@ -114,5 +106,28 @@ namespace minire::opengl
         }
 
         return std::string();
+    }
+
+    void Program::validate() const
+    {
+#       ifndef NDEBUG
+        MINIRE_GL(glValidateProgram, _id);
+
+        GLint valid;
+        MINIRE_GL(glGetProgramiv, _id, GL_VALIDATE_STATUS, &valid);
+        if (valid != GL_TRUE)
+        {
+            std::string shaders;
+            for(auto const & shader : _shaders)
+            {
+                shaders += fmt::format("=== BEGIN OF SHADER ===\n"
+                                       "{}\n=== END OF SHADER ===\n",
+                                       shader->sourcePretty());
+            }
+
+            MINIRE_THROW("program Validation failed:\n{}\n\nShaders are:\n{}",
+                         getInfoLog(), shaders);
+        }
+#       endif
     }
 }

@@ -78,6 +78,11 @@ namespace minire::rasterizer::filters
             _program.setUniform(_horizontal, horizontal);
         }
 
+        void validate() const
+        {
+            _program.validate();
+        }
+
     private:
         opengl::Program _program;
         GLint const     _horizontal = -1;
@@ -113,12 +118,16 @@ namespace minire::rasterizer::filters
         _program->use(true);
         MINIRE_GL(glBindImageTexture, 0, target.id(), 0, GL_FALSE, 0, GL_READ_ONLY, _textureFormat);
         MINIRE_GL(glBindImageTexture, 1, _temp.id(), 0, GL_FALSE, 0, GL_WRITE_ONLY, _textureFormat);
+
+        _program->validate();
         MINIRE_GL(glDispatchCompute, (_width + 127) / 128, _height, 1);
         MINIRE_GL(glMemoryBarrier, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         _program->use(false);
         MINIRE_GL(glBindImageTexture, 0, _temp.id(), 0, GL_FALSE, 0, GL_READ_ONLY, _textureFormat);
         MINIRE_GL(glBindImageTexture, 1, target.id(), 0, GL_FALSE, 0, GL_WRITE_ONLY, _textureFormat);
+
+        _program->validate();
         MINIRE_GL(glDispatchCompute, (_height + 127) / 128, _width, 1);
         MINIRE_GL(glMemoryBarrier, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
