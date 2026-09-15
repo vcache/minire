@@ -127,6 +127,10 @@ target_link_libraries(minire
     glad
 )
 
+if(WIN32)
+    target_link_libraries(minire PRIVATE shell32 ole32 bcrypt)
+endif()
+
 target_compile_features(minire PUBLIC "${MINIRE_CXX_STD}")
 
 # TODO: make 3rd-party optional (take em' from the system or
