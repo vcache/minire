@@ -1,5 +1,6 @@
 #pragma once
 
+#include <minire/models/display-mode.hpp>
 #include <minire/models/image.hpp>
 #include <minire/models/mixer-params.hpp>
 #include <minire/models/mouse-button.hpp>
@@ -16,12 +17,14 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
-class SDL_Renderer;
 class SDL_Texture;
 class SDL_Window;
 class SDL_WindowEvent;
 union SDL_Event;
+
+namespace minire::utils { class FpsLimiter; }
 
 namespace minire::sdl
 {
@@ -122,6 +125,17 @@ namespace minire::sdl
         AudioMixer const & audioMixer() const { assert(_audioMixer); return *_audioMixer; }
 
     protected:
+        size_t displayCount() const;
+        size_t displayId() const;
+        models::DisplayMode nativeDisplayMode(size_t displayId) const;
+        std::vector<models::DisplayMode> displayModes(size_t displayId) const;
+
+        enum class VideoMode { kWindowed, kBorderless, kFullscreen, };
+        void setVideoOptions(VideoMode, size_t width, size_t height);
+
+        void setMaxFps(size_t); // 0 = no limit
+
+    protected:
         uint32_t ticks() const { return _frameTicks; } // milliseconds, msec
         size_t width() const { return _width; }
         size_t height() const { return _height; }
@@ -136,6 +150,7 @@ namespace minire::sdl
 
     private:
         using AudioMixerSptr = std::shared_ptr<AudioMixer>;
+        using FpsLimiterUptr = std::unique_ptr<utils::FpsLimiter>;
 
         SDL_Window   * _window;
         size_t         _width;
@@ -144,6 +159,7 @@ namespace minire::sdl
         uint32_t       _frameTicks;
         SdlCursorUptr  _cursor;
         AudioMixerSptr _audioMixer;
+        FpsLimiterUptr _fpsLimiter;
         bool           _working;
     };
 }

@@ -1,6 +1,7 @@
 #include <minire/sdl/application.hpp>
 
 #include <utils/fps-counter.hpp>
+#include <utils/fps-limiter.hpp>
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
@@ -8,6 +9,7 @@
 
 #include <fmt/format.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_video.h>
 
 namespace minire::sdl
 {
@@ -117,6 +119,7 @@ namespace minire::sdl
         , _height(height)
         , _title(title)
         , _audioMixer(std::make_shared<AudioMixer>(mixerParams))
+        , _fpsLimiter(std::make_unique<utils::FpsLimiter>())
         , _working(true)
     {
         MINIRE_INVARIANT(width > 0 && height > 0,
@@ -307,6 +310,112 @@ namespace minire::sdl
         return keyboardState[code];
     }
 
+    size_t Application::displayCount() const
+    {
+        int result = ::SDL_GetNumVideoDisplays();
+        MINIRE_INVARIANT(result >= 1, "SDL_GetNumVideoDisplays failed: {}",
+                         ::SDL_GetError());
+        return static_cast<size_t>(result);
+    }
+
+    size_t Application::displayId() const
+    {
+        assert(_window);
+        int result = ::SDL_GetWindowDisplayIndex(_window);
+        MINIRE_INVARIANT(result >= 0, "SDL_GetWindowDisplayIndex failed: {}",
+                         ::SDL_GetError());
+        return static_cast<size_t>(result);
+    }
+
+    namespace
+    {
+        models::DisplayMode toDisplayMode(::SDL_DisplayMode const & displayMode)
+        {
+            MINIRE_INVARIANT(displayMode.w > 0 && displayMode.h > 0 && displayMode.refresh_rate > 0,
+                             "SDL_DisplayMode is corrupted: {}, {}, {}",
+                             displayMode.w, displayMode.h, displayMode.refresh_rate);
+            return models::DisplayMode
+            {
+                ._width = static_cast<size_t>(displayMode.w),
+                ._height = static_cast<size_t>(displayMode.h),
+                ._refreshRate = static_cast<size_t>(displayMode.refresh_rate),
+            };
+        }
+    }
+
+    models::DisplayMode Application::nativeDisplayMode(size_t displayId) const
+    {
+        ::SDL_DisplayMode mode;
+        MINIRE_INVARIANT(0 == ::SDL_GetDesktopDisplayMode(displayId, &mode),
+                         "SDL_GetDesktopDisplayMode failed: {}", ::SDL_GetError());
+        return toDisplayMode(mode);
+    }
+
+    std::vector<models::DisplayMode> Application::displayModes(size_t displayId) const
+    {
+        int const numModes = ::SDL_GetNumDisplayModes(displayId);
+        MINIRE_INVARIANT(numModes >= 0, "SDL_GetNumDisplayModes failed: {}",
+                         ::SDL_GetError());
+        std::vector<models::DisplayMode> result;
+        result.reserve(numModes);
+        for(size_t i = 0; i < static_cast<size_t>(numModes); ++i)
+        {
+            SDL_DisplayMode mode;
+            MINIRE_INVARIANT(0 == ::SDL_GetDisplayMode(displayId, i, &mode),
+                             "SDL_GetDisplayMode failed: {}", ::SDL_GetError());
+            result.emplace_back(toDisplayMode(mode));
+        }
+        return result;
+    }
+
+    void Application::setVideoOptions(VideoMode videoMode, size_t width, size_t height)
+    {
+        assert(_window);
+        switch(videoMode)
+        {
+            case VideoMode::kWindowed:
+            {
+                int currentDisplay = ::SDL_GetWindowDisplayIndex(_window);
+                MINIRE_INVARIANT(currentDisplay >= 0, "SDL_GetWindowDisplayIndex failed: {}",
+                                 ::SDL_GetError());
+                MINIRE_INVARIANT(0 == ::SDL_SetWindowFullscreen(_window, 0),
+                                 "SDL_SetWindowFullscreen failed: {}", ::SDL_GetError());
+                ::SDL_SetWindowSize(_window, width, height);
+                ::SDL_SetWindowPosition(_window, SDL_WINDOWPOS_CENTERED_DISPLAY(currentDisplay),
+                                        SDL_WINDOWPOS_CENTERED_DISPLAY(currentDisplay));
+                break;
+            }
+
+            case VideoMode::kBorderless:
+                MINIRE_INVARIANT(0 == ::SDL_SetWindowFullscreen(_window, SDL_WINDOW_FULLSCREEN_DESKTOP),
+                                 "SDL_SetWindowFullscreen failed: {}", ::SDL_GetError());
+                ::SDL_SetWindowSize(_window, width, height);
+                break;
+
+            case VideoMode::kFullscreen:
+            {
+                ::SDL_DisplayMode displayMode;
+                displayMode.w = width;
+                displayMode.h = height;
+                displayMode.refresh_rate = 0;
+                displayMode.format = 0;
+                displayMode.driverdata = 0;
+
+                MINIRE_INVARIANT(0 == ::SDL_SetWindowDisplayMode(_window, &displayMode),
+                                 "SDL_SetWindowDisplayMode failed: {}", ::SDL_GetError());
+                MINIRE_INVARIANT(0 == ::SDL_SetWindowFullscreen(_window, SDL_WINDOW_FULLSCREEN),
+                                 "SDL_SetWindowFullscreen failed: {}", ::SDL_GetError());
+                break;
+            }
+        }
+    }
+
+    void Application::setMaxFps(size_t maxFps)
+    {
+        assert(_fpsLimiter);
+        _fpsLimiter->setMaxFps(maxFps);
+    }
+
     void Application::handleResize(int w, int h)
     {
         MINIRE_INVARIANT(w > 0 && h > 0,
@@ -383,6 +492,11 @@ namespace minire::sdl
                 onTextInput(std::string(e.text.text));
                 break;
 
+            case SDL_RENDER_TARGETS_RESET:
+                MINIRE_ERROR("SDL_RENDER_TARGETS_RESET received, restart is required");
+                stop();
+                break;
+
             default:
                 MINIRE_DEBUG("Unhandled SDL event: {:#x}", e.type);
         }
@@ -392,13 +506,15 @@ namespace minire::sdl
 
     void Application::onEnd() {}
 
-    // TODO: add FPS limiter
     void Application::run()
     {
         utils::FpsCounter fpsCounter(2);
         onStart();
         while(_working)
         {
+            assert(_fpsLimiter);
+            _fpsLimiter->maybeSleep();
+
             _frameTicks = SDL_GetTicks();
 
             // events handling

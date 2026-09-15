@@ -1095,8 +1095,14 @@ namespace minire
         _pointLightCullBuffer.clear();
         _billboardWideCullBuffer.clear();
 
+        _vacantOpbIds.clear();
+        _opbIdToSceneItem.clear();
+        _viewpoint = scene::Viewpoint();
+        _maxOpbId = 1;
+
         _root.reset(); // explicitly calling dtors so that they'll
                        // clean up _pendedActivations
+        _activeCamera = std::monostate();
 
         // clean up activation indeces for Nodes that may
         // be hold by a user via Sptr
