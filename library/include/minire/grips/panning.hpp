@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 
 namespace minire::grips
 {
@@ -15,6 +16,19 @@ namespace minire::grips
     class Panning
     {
     public:
+        Panning() = default;
+
+        explicit Panning(glm::vec3 minTarget, glm::vec3 maxTarget)
+            : _minTarget(minTarget)
+            , _maxTarget(maxTarget)
+        {}
+
+        void setLimits(glm::vec3 minTarget, glm::vec3 maxTarget)
+        {
+            _minTarget = minTarget;
+            _maxTarget = maxTarget;
+        }
+
         void start(int mouseX, int mouseY)
         {
             assert(!isActive());
@@ -59,7 +73,7 @@ namespace minire::grips
                               glm::cross(kUp, column0) * horVerScale[1];
                 }
             }
-            return target + _offset;
+            return glm::clamp(target + _offset, _minTarget, _maxTarget);
         }
 
         void finish(glm::vec3 & target)
@@ -67,7 +81,7 @@ namespace minire::grips
             assert(isActive());
             if (isActive())
             {
-                target += _offset;
+                target = glm::clamp(target + _offset, _minTarget, _maxTarget);
                 _offset = glm::vec3(0.0f);
                 _active = false;
             }
@@ -105,6 +119,8 @@ namespace minire::grips
     private:
         glm::vec2 _begin = glm::vec2(0.0f);   // screen space
         glm::vec3 _offset = glm::vec3(0.0f);  // world space
+        glm::vec3 _minTarget = glm::vec3(std::numeric_limits<float>::lowest());
+        glm::vec3 _maxTarget = glm::vec3(std::numeric_limits<float>::max());
         bool      _active = false;
     };
 }
