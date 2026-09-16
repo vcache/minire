@@ -253,16 +253,24 @@ namespace minire::gui::components
             _scrollbar->step() = 1.0;
             _scrollbar->setValue(0);
             _scrollbar->setCallback(std::in_place_type<scrollbar::OnValueChanged>, "__scroll__",
-                [this](Component &, scrollbar::OnValueChanged const & e)
+                [this](Component &, scrollbar::OnValueChanged const &)
                 {
-                    size_t const totalLines = _contents.get().size();
-                    float const amplitude = totalLines > _showLines
-                        ? static_cast<float>(totalLines - _showLines) : .0f;
-                    _offset = static_cast<size_t>(e._current * amplitude);
+                    recalcOffset();
                 });
 
             _contentContainer = emplace<Component>(kContentId);
             _contentContainer->layout() = _contentLayout;
+        }
+    }
+
+    void ListView::recalcOffset()
+    {
+        if (_scrollbar)
+        {
+            size_t const totalLines = _contents.get().size();
+            float const amplitude = totalLines > _showLines
+                ? static_cast<float>(totalLines - _showLines) : .0f;
+            _offset = static_cast<size_t>(_scrollbar->value() * amplitude);
         }
     }
 
@@ -353,10 +361,19 @@ namespace minire::gui::components
             }
 
             _heightLimit = heightLimit;
+
+        }
+
+        if (_contents.isInvalidated())
+        {
+            recalcOffset();
+        }
+        else
+        {
+            _offset.revalidate();
         }
 
         _contents.revalidate();
-        _offset.revalidate();
         _lineHeight.revalidate();
 
         return zOffset;

@@ -135,6 +135,8 @@ namespace minire::gui::components
 
         Selected actualSelected() const;
 
+        void recalcOffset();
+
     private:
         class ListViewLayout;
 
