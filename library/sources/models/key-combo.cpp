@@ -409,7 +409,7 @@ namespace minire::models
 
     KeyCombo::KeyCombo(::SDL_Scancode scancode, uint16_t mods)
         : _scancode(scancode)
-        , _mods(mods)
+        , _mods(mods & kAllowedModMask)
     {
         if (gKeycodesMapRev().find(_scancode) == gKeycodesMapRev().cend())
         {
