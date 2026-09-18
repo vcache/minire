@@ -27,6 +27,7 @@ namespace minire::content
         virtual ~Reader() = default;
 
         virtual Asset load(Id const & id) const = 0;
+        virtual std::vector<Id> list(Id const &) const = 0;
     };
 
     // The manager manages only RAM-allocated items.
@@ -78,6 +79,9 @@ namespace minire::content
         // May forcefully run GC in case of std::bad_alloc caught.
         std::unique_ptr<Lease> borrow(Id const &);
 
+        // May not be supported by some of Readers
+        std::vector<Id> list(Id const &) const;
+
     public:
         // TODO: add "shadow" flag into a Store key to avoid Id's namespace cluttering
         std::unique_ptr<Lease> upload(Id const &, Asset);
@@ -96,7 +100,7 @@ namespace minire::content
         void cleanup(Store::iterator); // thread-unsafe
 
     private:
-        std::recursive_mutex _mutex;
+mutable std::recursive_mutex _mutex;
         LayerId              _currentLayer;
         Reader::Uptr         _reader;
         size_t const         _sizeLimit = 0;
@@ -203,6 +207,7 @@ namespace minire::content::readers
 
     public:
         Asset load(Id const &) const override;
+        std::vector<Id> list(Id const &) const override;
 
     private:
         std::unordered_map<content::Id, content::Asset> _store;
@@ -220,6 +225,7 @@ namespace minire::content::readers
 
     public:
         Asset load(Id const &) const override;
+        std::vector<Id> list(Id const &) const override;
 
     private:
         std::string _prefix;
@@ -232,6 +238,7 @@ namespace minire::content::readers
     {
     public:
         Asset load(Id const &) const override;
+        std::vector<Id> list(Id const &) const override;
 
         Chained & append(Reader::Uptr);
 
@@ -272,6 +279,7 @@ namespace minire::content::readers
         ~PhysFS() override;
 
         Asset load(Id const &) const override;
+        std::vector<Id> list(Id const &) const override;
 
     public:
         // Will throw in case of error.

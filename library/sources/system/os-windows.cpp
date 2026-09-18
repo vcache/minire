@@ -9,6 +9,10 @@
 #include <lmcons.h>
 #include <shlobj.h>
 #include <knownfolders.h>
+#include <winnls.h>
+
+#include <algorithm>
+#include <cctype>
 
 namespace minire::system
 {
@@ -50,5 +54,58 @@ namespace minire::system
         ::CoTaskMemFree(widePath);
 
         return result;
+    }
+
+    std::string getUserLanguage()
+    {
+        ULONG numLanguages = 0;
+        ULONG bufferSize = 0;
+
+        // query the preferred UI languages (e.g. L"en-US\0ja-JP\0\0")
+        if (::GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &numLanguages, nullptr, &bufferSize);
+            bufferSize > 0)
+        {
+            std::wstring buffer(bufferSize, L'\0');
+            if (::GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &numLanguages, buffer.data(), &bufferSize);
+                numLanguages > 0)
+            {
+                std::string lang;
+                for (wchar_t wc : buffer)
+                {
+                    if (wc == L'-' || wc == L'_' || wc == L'\0')
+                    {
+                        break;
+                    }
+                    lang.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(wc))));
+                }
+
+                if (!lang.empty())
+                {
+                    return lang;
+                }
+            }
+        }
+
+        // fallback: query default locale name (e.g. L"en-US")
+        wchar_t localeName[LOCALE_NAME_MAX_LENGTH] = {0};
+        if (::GetUserDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH) > 0)
+        {
+            std::string lang;
+            for (wchar_t wc : localeName)
+            {
+                if (wc == L'-' || wc == L'_' || wc == L'\0')
+                {
+                    break;
+                }
+                lang.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(wc))));
+            }
+
+            if (!lang.empty())
+            {
+                return lang;
+            }
+        }
+
+        return "en";
     }
 }

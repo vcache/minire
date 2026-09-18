@@ -2,13 +2,17 @@
 
 #include <minire/errors.hpp>
 
-#include <cstdlib>
-#include <cstring>
-
 #include <pwd.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
 #define gettid() syscall(SYS_gettid)
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
 
 namespace minire::system
 {
@@ -52,5 +56,43 @@ namespace minire::system
         }
 
         MINIRE_THROW("Could not resolve user home directory");
+    }
+
+    std::string getUserLanguage()
+    {
+        static std::array<std::string, 4> const kEnvVars
+        {
+            "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"
+        };
+
+        for (std::string const & var : kEnvVars)
+        {
+            char const * val = std::getenv(var.c_str());
+            if (!val || *val == '\0')
+            {
+                continue;
+            }
+
+            std::string lang;
+            for (char const * p = val; *p != '\0'; ++p)
+            {
+                if (*p == '_' || *p == '.' || *p == '@' || *p == ':' || *p == '-')
+                {
+                    break;
+                }
+
+                if (std::isalpha(*p))
+                {
+                    lang.push_back(std::tolower(*p));
+                }
+            }
+
+            if (!lang.empty() && lang != "c" && lang != "posix")
+            {
+                return lang;
+            }
+        }
+
+        return "en";
     }
 }

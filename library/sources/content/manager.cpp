@@ -75,7 +75,7 @@ namespace minire::content
             {
                 return std::make_shared<formats::Bdf>(*istream, id);
             }
-            else if (".txt" == ext)
+            else if (".txt" == ext || ".json" == ext)
             {
                 if (auto size = sizeOf(*istream); size)
                 {
@@ -195,6 +195,13 @@ namespace minire::content
             cleanup(true);
             return borrowImpl(id);
         }
+    }
+
+    std::vector<Id> Manager::list(Id const & id) const
+    {
+        std::lock_guard<std::recursive_mutex> guard(_mutex);
+        MINIRE_INVARIANT(_reader, "can't list assets, no reader set: {}", id);
+        return _reader->list(id);
     }
 
     std::unique_ptr<Lease> Manager::borrowImpl(Id const & id)
@@ -343,6 +350,11 @@ namespace minire::content::readers
         return it != _store.cend() ? it->second
                                    : Asset(std::monostate());
     }
+
+    std::vector<Id> InMemory::list(Id const &) const
+    {
+        MINIRE_THROW("InMemory::list method isn't supported");
+    }
 }
 
 namespace minire::content::readers
@@ -367,6 +379,25 @@ namespace minire::content::readers
         MINIRE_INVARIANT(istream->is_open(), "failed to open: \"{}\"", id);
         return ::minire::content::load(id, std::move(istream));
     }
+
+    std::vector<Id> Filesystem::list(Id const & id) const
+    {
+        std::filesystem::path path(_prefix);
+        path /= id; // TODO: this is pretty dangerous due possible ".."'s
+                    // TODO: it won't work on non-Posix OS (i.e. *indows)
+        MINIRE_INVARIANT(std::filesystem::exists(path),
+                         "a file doesn't exist: {}", path.string());
+        MINIRE_INVARIANT(std::filesystem::is_directory(path),
+                         "not a directory: {}", path.string());
+        MINIRE_INFO("Listing an assets by path: {}", path.string());
+
+        std::vector<Id> result;
+        for (auto const & entry : std::filesystem::directory_iterator(path))
+        {
+            result.emplace_back(entry.path().filename().string());
+        }
+        return result;
+    }
 }
 
 namespace minire::content::readers
@@ -387,6 +418,11 @@ namespace minire::content::readers
                 return asset;
         }
         return std::monostate();
+    }
+
+    std::vector<Id> Chained::list(Id const &) const
+    {
+        MINIRE_THROW("Chained::list method isn't supported");
     }
 }
 
@@ -475,6 +511,24 @@ namespace minire::content::readers
 
         auto istream = std::make_unique<manager::PhysFSIStream>(id);
         return ::minire::content::load(id, std::move(istream));
+    }
+
+    std::vector<Id> PhysFS::list(Id const & id) const
+    {
+        MINIRE_INVARIANT(0 != ::PHYSFS_exists(id.c_str()),
+                         "Path doesn't exist: {}", id);
+        std::vector<Id> result;
+        auto callback = [](void * data, char const * /*origdir*/, char const* fname)
+        {
+            auto * result = static_cast<std::vector<Id> *>(data);
+            assert(result);
+            result->emplace_back(fname);
+            return PHYSFS_ENUM_OK;
+        };
+        MINIRE_INVARIANT(0 != ::PHYSFS_enumerate(id.c_str(), callback, &result),
+                         "PHYSFS_enumerate failed ({}): {}",
+                         id.c_str(), PhysFSGuard::getLastError());
+        return result;
     }
 
     void PhysFS::mount(std::filesystem::path const & newDir,
