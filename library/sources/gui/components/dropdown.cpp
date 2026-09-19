@@ -25,7 +25,8 @@ namespace minire::gui::components
     {
     public:
         explicit DefaultHandler(Dropdown & dropdown)
-            : _dropdown(dropdown)
+            : InputHandler(true)
+            , _dropdown(dropdown)
         {}
 
         bool handle(application::OnMouseUp const &)
