@@ -82,6 +82,8 @@ namespace minire::rasterizer::materials
                     {{ minire_set_guard("skinning-attribs") }}
                 {% endif %}
 
+                layout(location = {{ minire_instanced_model_attrib_location }}) in uint minireInstanceId;
+
                 layout(std430, binding = {{ minire_skinning_ssbo_binding_point }})
                 readonly buffer MinireSkinningVectors
                 {
@@ -90,7 +92,7 @@ namespace minire::rasterizer::materials
 
                 mat4 minireBoneMatrix(uint boneIndex)
                 {
-                    uint offset = (uint(gl_InstanceID) * {{ minire_max_bones }}u + boneIndex) * 3u;
+                    uint offset = (minireInstanceId * {{ minire_max_bones }}u + boneIndex) * 3u;
 
                     vec4 row0 = minireBones[offset + 0u];
                     vec4 row1 = minireBones[offset + 1u];

@@ -125,7 +125,7 @@ namespace minire::rasterizer
 
     models::MeshFeatures VertexBuffers::meshFeatures(content::Id const & id) const
     {
-        auto tmp = find(id, _resources); 
+        auto tmp = find(id, _resources);
         return tmp->_meshFeatures;
     }
 

@@ -5,9 +5,12 @@
 #include <minire/models/mesh-features.hpp>
 
 #include <material/types.hpp>
+#include <opengl.hpp>
+#include <opengl/shared-vertex-buffer.hpp>
 #include <opengl/vertex-buffer.hpp>
 
 #include <limits>
+#include <memory>
 #include <vector>
 
 namespace minire::content { class Manager; }
@@ -38,6 +41,15 @@ namespace minire::utils
 
     GltfMeshFeatures prefetchGltfFeatures(std::shared_ptr<::tinygltf::Model> const &,
                                          size_t const meshIndex, content::Manager &);
+
+    GLenum gltfModeToGlMode(int gltfMode);
+
+    std::unique_ptr<opengl::SharedVertexSubBuffer>
+    createVertexSubBuffer(::tinygltf::Model const &,
+                          size_t const meshIndex,
+                          size_t const primitiveIndex,
+                          models::MeshFeatures const &,
+                          opengl::SharedVertexBuffer &);
 
     std::vector<opengl::VertexBuffer>
     createVertexBuffers(::tinygltf::Model const &,

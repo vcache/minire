@@ -8,6 +8,7 @@
 #include <minire/utils/std-pair-hash.hpp>
 
 #include <rasterizer/materials.hpp>
+#include <rasterizer/shared-vertex-buffers.hpp>
 #include <rasterizer/vertex-buffers.hpp>
 #include <utils/gltf-interpreters.hpp>
 #include <utils/obj-interpreters.hpp>
@@ -22,7 +23,8 @@ namespace minire::rasterizer
                               Material::Sptr const & defaultMaterial,
                               content::Manager & contentManager,
                               Materials const & materials,
-                              VertexBuffers const & vertexBuffers)
+                              VertexBuffers const & vertexBuffers,
+                              SharedVertexBuffers & sharedVertexBuffers)
     {
         MINIRE_INVARIANT(!source.empty(), "source path is empty");
 
@@ -72,7 +74,7 @@ namespace minire::rasterizer
 
         return lease->visit(utils::Overloaded
         {
-            [this, &source, &defaultMaterial, &materials]
+            [this, &source, &defaultMaterial, &materials, &sharedVertexBuffers]
             (formats::Obj const & obj)
             {
                 MINIRE_INVARIANT(defaultMaterial, "no default material found (required for OBJ): {}", source);
@@ -82,20 +84,19 @@ namespace minire::rasterizer
                 auto brush = materials.getBrush(meshFeatures, defaultMaterial);
                 assert(brush);
 
-                material::Locations const & locations = materials.locations();
-                opengl::VertexBuffer vertexBuffer = utils::createVertexBuffer(
-                    obj,
-                    locations.vertexAttribute(),
-                    locations.uvAttribute(),
-                    locations.normalAttribute());
+                opengl::SharedVertexBuffer::Sptr const & svb = sharedVertexBuffers.get(meshFeatures,
+                                                                                       GL_TRIANGLES);
 
-                _aabb.extend(vertexBuffer._aabb);
+                std::unique_ptr<opengl::SharedVertexSubBuffer> subBuffer =
+                    utils::createVertexBuffer(obj, materials.locations(), *svb);
 
-                _primitives.emplace_back(std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)),
+                _aabb.extend(subBuffer->aabb());
+
+                _primitives.emplace_back(std::shared_ptr<opengl::SharedVertexSubBuffer>(std::move(subBuffer)),
                                          meshFeatures, defaultMaterial, brush);
             },
 
-            [this, &source, &defaultMaterial, &materials, &contentManager]
+            [this, &source, &defaultMaterial, &materials, &contentManager, &sharedVertexBuffers]
             (formats::GltfModelSptr const & gltf)
             {
                 // Check preconditions
@@ -170,20 +171,25 @@ namespace minire::rasterizer
                     matBrushesForPrims.emplace_back(matBrushPair.first, matBrushPair.second);
                 }
 
-                // fetch vertex buffers
-                std::vector<opengl::VertexBuffer> vertexBuffers = utils::createVertexBuffers(
-                    *gltf, meshIndex, materials.locations());
-
-                // build Mesh::Primitive objects
-                assert(vertexBuffers.size() == prefetched._primitives.size());
-                assert(vertexBuffers.size() == matBrushesForPrims.size());
-                _primitives.reserve(vertexBuffers.size());
-                for(size_t i = 0; i < vertexBuffers.size(); ++i)
+                // fetch vertex sub buffers
+                assert(gltf->meshes[meshIndex].primitives.size() == prefetched._primitives.size());
+                assert(prefetched._primitives.size() == matBrushesForPrims.size());
+                _primitives.reserve(prefetched._primitives.size());
+                for(size_t i = 0; i < prefetched._primitives.size(); ++i)
                 {
-                    opengl::VertexBuffer & vertexBuffer = vertexBuffers[i];
-                    _aabb.extend(vertexBuffer._aabb);
-                    _primitives.emplace_back(std::make_shared<opengl::VertexBuffer>(std::move(vertexBuffer)),
-                                             prefetched._primitives[i]._meshFeatures, matBrushesForPrims[i].first,
+                    auto const & primMeshFeatures = prefetched._primitives[i]._meshFeatures;
+                    auto const & gltfPrimitive = gltf->meshes[meshIndex].primitives[i];
+                    GLenum const drawMode = utils::gltfModeToGlMode(gltfPrimitive.mode);
+
+                    opengl::SharedVertexBuffer::Sptr const & svb =
+                        sharedVertexBuffers.get(primMeshFeatures, drawMode);
+
+                    std::unique_ptr<opengl::SharedVertexSubBuffer> subBuffer =
+                        utils::createVertexSubBuffer(*gltf, meshIndex, i, primMeshFeatures, *svb);
+
+                    _aabb.extend(subBuffer->aabb());
+                    _primitives.emplace_back(std::shared_ptr<opengl::SharedVertexSubBuffer>(std::move(subBuffer)),
+                                             primMeshFeatures, matBrushesForPrims[i].first,
                                              matBrushesForPrims[i].second);
                 }
             },
@@ -199,9 +205,11 @@ namespace minire::rasterizer
                Material::Sptr const & defaultMaterial,
                content::Manager & contentManager,
                Materials const & materials,
-               VertexBuffers const & vertexBuffers)
+               VertexBuffers const & vertexBuffers,
+               SharedVertexBuffers & sharedVertexBuffers)
     {
-        loadPrimitives(source, defaultMaterial, contentManager, materials, vertexBuffers);
+        loadPrimitives(source, defaultMaterial, contentManager,
+                       materials, vertexBuffers, sharedVertexBuffers);
     }
 
     size_t Mesh::issueConsumerKey()

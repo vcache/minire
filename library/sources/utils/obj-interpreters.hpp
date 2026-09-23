@@ -1,16 +1,19 @@
 #pragma once
 
 #include <minire/models/mesh-features.hpp>
-#include <opengl/vertex-buffer.hpp>
+#include <opengl/shared-vertex-buffer.hpp>
+
+#include <memory>
 
 namespace minire::formats { struct Obj; }
+namespace minire::material { class Locations; }
 
 namespace minire::utils
 {
     models::MeshFeatures getMeshFeatures(formats::Obj const &);
 
-    opengl::VertexBuffer createVertexBuffer(formats::Obj const &,
-                                            int vtxAttribIndex,
-                                            int uvAttribIndx,
-                                            int normAttrib);
+    std::unique_ptr<opengl::SharedVertexSubBuffer>
+    createVertexBuffer(formats::Obj const &,
+                       material::Locations const &,
+                       opengl::SharedVertexBuffer &);
 }

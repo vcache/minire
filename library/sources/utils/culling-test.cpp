@@ -99,6 +99,6 @@ namespace minire::utils
             }
         }
 
-        return true; 
+        return true;
     }
 }

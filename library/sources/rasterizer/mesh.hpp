@@ -7,6 +7,7 @@
 #include <minire/utils/std-pair-hash.hpp>
 
 #include <material/types.hpp>
+#include <opengl/shared-vertex-buffer.hpp>
 #include <opengl/vertex-buffer.hpp>
 #include <rasterizer/materials.hpp>
 
@@ -24,6 +25,7 @@ namespace minire::rasterizer
 {
     class Materials;
     class VertexBuffers;
+    class SharedVertexBuffers;
 
     class Mesh final
     {
@@ -34,7 +36,8 @@ namespace minire::rasterizer
                       Material::Sptr const & defaultMaterial,
                       content::Manager &,
                       Materials const &,
-                      VertexBuffers const &);
+                      VertexBuffers const &,
+                      SharedVertexBuffers &);
 
         utils::Aabb const & aabb() const { return _aabb; }
 
@@ -52,6 +55,18 @@ namespace minire::rasterizer
             assert(primitiveIndex < _primitives.size());
             assert(_primitives[primitiveIndex]._buffer);
             return *_primitives[primitiveIndex]._buffer;
+        }
+
+        opengl::SharedVertexSubBuffer const * subBuffer(size_t primitiveIndex) const
+        {
+            assert(primitiveIndex < _primitives.size());
+            return _primitives[primitiveIndex]._subBuffer.get();
+        }
+
+        bool hasSubBuffer(size_t primitiveIndex) const
+        {
+            assert(primitiveIndex < _primitives.size());
+            return _primitives[primitiveIndex]._subBuffer != nullptr;
         }
 
         // Primary material are Mesh-specific material for color pass
@@ -87,16 +102,29 @@ namespace minire::rasterizer
             // that some other owners may change the contents of a buffer.
             // For example, it might be used to implement dynamically changable meshes,
             //              or UV-based animations.
-            std::shared_ptr<opengl::VertexBuffer> _buffer;
-            models::MeshFeatures const            _meshFeatures;
-            Material::Sptr                        _material;
-            Materials::Brush::Sptr                _brush;
+            std::shared_ptr<opengl::VertexBuffer>          _buffer;
+            std::shared_ptr<opengl::SharedVertexSubBuffer> _subBuffer;
+            models::MeshFeatures const                     _meshFeatures;
+            Material::Sptr                                 _material;
+            Materials::Brush::Sptr                         _brush;
 
             explicit Primitive(std::shared_ptr<opengl::VertexBuffer> buffer,
                                models::MeshFeatures const & meshFeatures,
                                Material::Sptr const & material,
                                Materials::Brush::Sptr const & brush)
                 : _buffer(std::move(buffer))
+                , _subBuffer(nullptr)
+                , _meshFeatures(meshFeatures)
+                , _material(material)
+                , _brush(brush)
+            {}
+
+            explicit Primitive(std::shared_ptr<opengl::SharedVertexSubBuffer> subBuffer,
+                               models::MeshFeatures const & meshFeatures,
+                               Material::Sptr const & material,
+                               Materials::Brush::Sptr const & brush)
+                : _buffer(nullptr)
+                , _subBuffer(std::move(subBuffer))
                 , _meshFeatures(meshFeatures)
                 , _material(material)
                 , _brush(brush)
@@ -112,7 +140,8 @@ namespace minire::rasterizer
                             Material::Sptr const & defaultMaterial,
                             content::Manager & contentManager,
                             Materials const & materials,
-                            VertexBuffers const &);
+                            VertexBuffers const &,
+                            SharedVertexBuffers &);
 
     private:
         std::vector<Primitive> _primitives;

@@ -1,5 +1,6 @@
 #include <rasterizer/cube-shadow-map.hpp>
 
+#include <rasterizer/draw-batcher.hpp>
 #include <rasterizer/mesh.hpp>
 #include <scene-impl.hpp>
 
@@ -485,24 +486,26 @@ namespace minire::rasterizer
         }, _shadowParams._method);
 
         // perform the drawing
-        for(auto const & [uniquePrimitive, primitiveInstances] : _culledPrimitives)
-        {
-            Materials::Brush::Sptr & brush = uniquePrimitive._mesh.extraBrush(
-                uniquePrimitive._primitiveIndex, _meshConsumerKey);
-            if (!brush)
-            {
-                models::MeshFeatures const & meshFeatures =
-                    uniquePrimitive._mesh.meshFeatures(uniquePrimitive._primitiveIndex);
-                brush = _materials.getBrush(meshFeatures, _material);
-            }
+        DrawBatcher batcher;
+        batcher.collect(_culledPrimitives,
+            [this](UniquePrimitive const & prim) -> Materials::Brush const & {
+                Materials::Brush::Sptr & brush = prim._mesh.extraBrush(
+                    prim._primitiveIndex, _meshConsumerKey);
+                if (!brush)
+                {
+                    models::MeshFeatures const & meshFeatures =
+                        prim._mesh.meshFeatures(prim._primitiveIndex);
+                    brush = _materials.getBrush(meshFeatures, _material);
+                }
+                assert(brush);
+                return *brush;
+            },
+            _material);
 
-            assert(brush);
-            brush->draw(uniquePrimitive, primitiveInstances,
-                        glm::vec3() /* ambientLight */,
-                        {} /* directionalLightsShadowMaps */,
-                        {} /* pointLightsShadowMaps */,
-                        _material);
-        }
+        batcher.draw(glm::vec3() /* ambientLight */,
+                     {} /* directionalLightsShadowMaps */,
+                     {} /* pointLightsShadowMaps */,
+                     _material);
 
         // tidy up
         _fbo.unbind();

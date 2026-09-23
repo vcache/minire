@@ -1,4 +1,5 @@
-.misfits
+.*
+!.gitignore
 build
 *.swp
 *.swo

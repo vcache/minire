@@ -92,7 +92,7 @@ namespace minire::scene::spatial_index::test
         spatialHandler.update(utils::Aabb{-0.5, -0.5, -0.5, 0.5, 0.5, 0.5});
 
         std::vector<IndexPayload *> output;
-        
+
         // intersects initially
         planarGrid.cull(kTrivialFrustum, 0, output);
         ASSERT_EQ(output.size(), 1);
@@ -130,7 +130,7 @@ namespace minire::scene::spatial_index::test
     TEST(PlanarIndex, MultipleElementsLifecycle)
     {
         PlanarGrid planarGrid(glm::vec2(1, 1));
-        
+
         // is inside
         std::optional<SpatialHandler> h0(std::in_place, planarGrid, mockPayload(kPayload0), 0);
         h0->update(utils::Aabb{-1, -1, -1, 1, 1, 1});
@@ -140,7 +140,7 @@ namespace minire::scene::spatial_index::test
         h1->update(utils::Aabb{10, 10, 10, 12, 12, 12});
 
         std::vector<IndexPayload *> output;
-        
+
         // initial intersection
         planarGrid.cull(kTrivialFrustum, 0, output);
         ASSERT_EQ(output.size(), 1);
@@ -156,7 +156,7 @@ namespace minire::scene::spatial_index::test
         EXPECT_EQ(output[0], mockPayload(kPayload1));
 
         // erase the remaining visible element
-        h1.reset(); 
+        h1.reset();
 
         output.clear();
         planarGrid.cull(kTrivialFrustum, 0, output);
@@ -168,13 +168,13 @@ namespace minire::scene::spatial_index::test
         // NOTES: tiles must be huge enough, otherwise
         //        linear searches will kill the performance
         PlanarGrid planarGrid(glm::vec2(50, 50));
-        
+
         SpatialHandler giantElement(planarGrid, mockPayload(kPayload0), 0);
         giantElement.update(utils::Aabb{-500, -500, -500, 500, 500, 500});
 
         std::vector<IndexPayload *> output;
         planarGrid.cull(kLargeFrustum, 0, output);
-        
+
         ASSERT_EQ(output.size(), 1);
         EXPECT_EQ(output[0], mockPayload(kPayload0));
     }
@@ -184,7 +184,7 @@ namespace minire::scene::spatial_index::test
         // NOTES: tiles must be huge enough, otherwise
         //        linear searches will kill the performance
         PlanarGrid planarGrid(glm::vec2(100, 100));
-        
+
         SpatialHandler farNegative(planarGrid, mockPayload(kPayload0), 0);
         farNegative.update(utils::Aabb{-100000, -100000, -100000, -99999, -99999, -99999});
 
@@ -193,14 +193,14 @@ namespace minire::scene::spatial_index::test
 
         std::vector<IndexPayload *> output;
         planarGrid.cull(kTrivialFrustum, 0, output);
-        
+
         EXPECT_TRUE(output.empty());
     }
 
     TEST(PlanarIndex, LayerSegregation)
     {
         PlanarGrid planarGrid;
-        
+
         SpatialHandler mesh(planarGrid, mockPayload(kPayload0), 0);
         mesh.update(utils::Aabb{-1, -1, -1, 1, 1, 1});
 

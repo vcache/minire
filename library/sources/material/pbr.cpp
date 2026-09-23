@@ -847,7 +847,7 @@ namespace minire::material
                                                                      _model._emissiveSampler);
                 }
 
-                assert(_indeces->_emissiveTexture < _values.size()); 
+                assert(_indeces->_emissiveTexture < _values.size());
                 _values[_indeces->_emissiveTexture] = _emissiveTextureHandle;
             }
 

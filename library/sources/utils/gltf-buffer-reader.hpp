@@ -13,7 +13,9 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <tinygltf/tiny_gltf.h>
 
 namespace minire::utils
@@ -30,7 +32,11 @@ namespace minire::utils
     };
 
     template<typename T>
-    struct DenormCast;
+    struct DenormCast
+    {
+        template<typename Src>
+        T operator()(Src src) const { return static_cast<T>(src); }
+    };
 
     template<>
     struct DenormCast<float>
@@ -53,6 +59,16 @@ namespace minire::utils
         float operator()(uint16_t c) const
         {
             return static_cast<float>(c) / 65535.0f;
+        }
+
+        float operator()(int32_t c) const
+        {
+            return std::max<float>(static_cast<float>(c) / 2147483647.0f, -1.0f);
+        }
+
+        float operator()(uint32_t c) const
+        {
+            return static_cast<float>(c) / 4294967295.0f;
         }
     };
 
@@ -111,15 +127,15 @@ namespace minire::utils
         }
     }
 
-    template<typename SrcType, bool kIsNormalized>
+    template<typename SrcType, bool kIsNormalized, int L, typename T, glm::qualifier Q>
     void readElements(::tinygltf::Accessor const & accessor,
                       ::tinygltf::BufferView const & bufferView,
                       ::tinygltf::Buffer const & buffer,
-                      std::vector<glm::vec3> & output)
+                      std::vector<glm::vec<L, T, Q>> & output)
     {
         assert(sizeof(SrcType) == ::tinygltf::GetComponentSizeInBytes(accessor.componentType));
 
-        using DstType = glm::vec3::value_type;
+        using DstType = T;
         using Converter = std::conditional_t<kIsNormalized, DenormCast<DstType>,
                                                             StaticCast<DstType>>;
         Converter converter{};
@@ -129,9 +145,9 @@ namespace minire::utils
         output.resize(accessor.count);
 
         size_t const byteStride = bufferView.byteStride > 0 ? bufferView.byteStride
-                                                            : sizeof(SrcType) * 3;
-        MINIRE_INVARIANT(byteStride >= sizeof(SrcType) * 3,
-                         "too short stride ({}) for VEC3 of {}", byteStride,
+                                                            : sizeof(SrcType) * L;
+        MINIRE_INVARIANT(byteStride >= sizeof(SrcType) * L,
+                         "too short stride ({}) for vec{} of {}", byteStride, L,
                          utils::demangle<SrcType>());
 
         for(size_t i = 0; i < accessor.count; ++i)
@@ -140,9 +156,12 @@ namespace minire::utils
                              i, accessor.name, bufferView.name, buffer.uri);
 
             SrcType const * srcPtr = reinterpret_cast<SrcType const *>(byteBuffer);
-            output[i] = glm::vec3(converter(srcPtr[0]),
-                                  converter(srcPtr[1]),
-                                  converter(srcPtr[2]));
+            glm::vec<L, T, Q> val;
+            for (int c = 0; c < L; ++c)
+            {
+                val[c] = converter(srcPtr[c]);
+            }
+            output[i] = val;
             byteBuffer += byteStride;
         }
     }
@@ -223,15 +242,21 @@ namespace minire::utils
     template<typename T>
     constexpr int expectedAccessType()
     {
-        if constexpr(std::is_same_v<T, float>)
+        if constexpr(std::is_same_v<T, float> || std::is_same_v<T, uint32_t>)
         {
             return TINYGLTF_TYPE_SCALAR;
+        }
+        else if constexpr(std::is_same_v<T, glm::vec2>)
+        {
+            return TINYGLTF_TYPE_VEC2;
         }
         else if constexpr(std::is_same_v<T, glm::vec3>)
         {
             return TINYGLTF_TYPE_VEC3;
         }
-        else if constexpr(std::is_same_v<T, glm::quat>)
+        else if constexpr(std::is_same_v<T, glm::quat> ||
+                          std::is_same_v<T, glm::vec4> ||
+                          std::is_same_v<T, glm::uvec4>)
         {
             return TINYGLTF_TYPE_VEC4;
         }
@@ -256,7 +281,11 @@ namespace minire::utils
                          accessor.type, utils::demangle<T>());
 
         if constexpr(std::is_same_v<T, float> ||
+                     std::is_same_v<T, uint32_t> ||
+                     std::is_same_v<T, glm::vec2> ||
                      std::is_same_v<T, glm::vec3> ||
+                     std::is_same_v<T, glm::vec4> ||
+                     std::is_same_v<T, glm::uvec4> ||
                      std::is_same_v<T, glm::quat>)
         {
             switch(accessor.componentType)
@@ -278,7 +307,10 @@ namespace minire::utils
                                                : readElements<uint16_t, false>(accessor, bufferView, buffer, output);
 
                 case TINYGLTF_COMPONENT_TYPE_INT:
-                    MINIRE_THROW("INT accessor component type isn't implemented for animation");
+                    MINIRE_INVARIANT(!accessor.normalized,
+                                     "INT accessor component type cannot be normalized");
+                    readElements<int32_t, false>(accessor, bufferView, buffer, output);
+                    break;
 
                 case TINYGLTF_COMPONENT_TYPE_FLOAT:
                     MINIRE_INVARIANT(!accessor.normalized,
@@ -287,14 +319,16 @@ namespace minire::utils
                     break;
 
                 case TINYGLTF_COMPONENT_TYPE_DOUBLE:
-                    MINIRE_THROW("DOUBLE accessor component type isn't implemented for animation");
+                    MINIRE_THROW("DOUBLE accessor component type isn't implemented");
 
                 case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-                    MINIRE_THROW("UNSIGNED_INT accessor component type cannot "
-                                 "be used for animation (see 5.1.3)");
+                    MINIRE_INVARIANT(!accessor.normalized,
+                                     "UNSIGNED_INT accessor component type cannot be normalized");
+                    readElements<uint32_t, false>(accessor, bufferView, buffer, output);
+                    break;
 
                 default:
-                    MINIRE_THROW("unknown animation accessor component type: {}, {}",
+                    MINIRE_THROW("unknown accessor component type: {}, {}",
                                  accessor.componentType, accessor.name);
             }
         }
@@ -333,10 +367,6 @@ namespace minire::utils
         MINIRE_INVARIANT(bufferViewIndex < model.bufferViews.size(), "bad bufferView: {} >= {}, {}",
                          bufferViewIndex, model.bufferViews.size(), accessor.name);
         ::tinygltf::BufferView const & bufferView = model.bufferViews[bufferViewIndex];
-
-        MINIRE_INVARIANT(bufferView.target == 0,
-                         "unexpected BufferView target ({}) of animation channel accessor: {}",
-                         bufferView.target, bufferView.name);
 
         // fetch an Buffer
         MINIRE_INVARIANT(bufferView.buffer >= 0, "bad buffer: {}, {}", bufferView.buffer, bufferView.name);

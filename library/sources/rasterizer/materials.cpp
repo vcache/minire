@@ -7,6 +7,7 @@
 #include <minire/utils/overloaded.hpp>
 
 #include <opengl/program.hpp>
+#include <opengl/shared-vertex-buffer.hpp>
 #include <opengl/vao.hpp>
 #include <opengl/vertex-buffer.hpp>
 #include <rasterizer/binding-points.hpp>
@@ -49,7 +50,7 @@ namespace minire::rasterizer
                 case material::ShaderType::kFragment:       return GL_FRAGMENT_SHADER;
                 case material::ShaderType::kGeometry:       return GL_GEOMETRY_SHADER;
                 case material::ShaderType::kTessControl:    return GL_TESS_CONTROL_SHADER;
-                case material::ShaderType::kTessEvaluation: return GL_TESS_EVALUATION_SHADER;        
+                case material::ShaderType::kTessEvaluation: return GL_TESS_EVALUATION_SHADER;
                 case material::ShaderType::kCompute:        return GL_COMPUTE_SHADER;
                 case material::ShaderType::__kCount__:      MINIRE_THROW("__kCount__ is illegal shader type");
             }
@@ -239,6 +240,7 @@ namespace minire::rasterizer
                 }
                 return result;
             }())
+        , _indirectVbo(GL_DRAW_INDIRECT_BUFFER)
     {
         assert(_templateParams); // a bit late, but still
 
@@ -347,7 +349,7 @@ namespace minire::rasterizer
                 {
                     using T = std::decay_t<decltype(v)>;
                     MINIRE_THROW("unsupported type: {}", utils::demangle<T>());
-                } 
+                }
             }, uniformValues[i]);
         }
     }
@@ -359,6 +361,20 @@ namespace minire::rasterizer
                                 material::TextureRefs const & pointLightsShadowMaps,
                                 Material::Sptr const & materialOverride) const
     {
+        if (uniquePrimitive._mesh.hasSubBuffer(uniquePrimitive._primitiveIndex))
+        {
+            auto const * subBuffer = uniquePrimitive._mesh.subBuffer(uniquePrimitive._primitiveIndex);
+            assert(subBuffer);
+            auto svb = subBuffer->sharedVertexBuffer();
+            assert(svb);
+            drawMultiIndirect({MultiDrawItem{subBuffer, &primitiveInstances}},
+                              *svb, ambientLight, directionalLightsShadowMaps,
+                              pointLightsShadowMaps,
+                              materialOverride ? *materialOverride
+                                               : uniquePrimitive._mesh.material(uniquePrimitive._primitiveIndex));
+            return;
+        }
+
         _program.use();
 
         TextureUnitHelper textureUnitHelper(_program);
@@ -385,15 +401,25 @@ namespace minire::rasterizer
         // upload VBO's contents
         vbo.bind();
         assert(primitiveInstances.size() == primitiveInstances._attribs.size());
-        if (GLsizeiptr const requiredSize = static_cast<GLsizeiptr>(
-                primitiveInstances.size() * sizeof(PrimitiveInstances::Attribs));
-            vbo.size() < requiredSize)
+        GLsizeiptr const requiredSize = static_cast<GLsizeiptr>(
+            primitiveInstances.size() * sizeof(PrimitiveInstances::Attribs));
+
+        std::vector<PrimitiveInstances::Attribs> flatAttribs = primitiveInstances._attribs;
+        if (_meshFeatures.hasSkin())
         {
-            vbo.bufferData(requiredSize, primitiveInstances._attribs.data(), GL_DYNAMIC_DRAW);
+            for (size_t i = 0; i < flatAttribs.size(); ++i)
+            {
+                *reinterpret_cast<uint32_t *>(&flatAttribs[i]._transform[0][0]) = static_cast<uint32_t>(i);
+            }
+        }
+
+        if (vbo.size() < requiredSize)
+        {
+            vbo.bufferData(requiredSize, flatAttribs.data(), GL_DYNAMIC_DRAW);
         }
         else
         {
-            vbo.bufferSubData(0, requiredSize, primitiveInstances._attribs.data());
+            vbo.bufferSubData(0, requiredSize, flatAttribs.data());
         }
 
         // setup attributes in the VAO
@@ -401,15 +427,26 @@ namespace minire::rasterizer
 
         if (_materials._modelAttrib != -1)
         {
-           for (int i = 0; i < 4; ++i)
-           {
-                GLint const location = _materials._modelAttrib + i;
+            if (_meshFeatures.hasSkin())
+            {
+                GLint const location = _materials._modelAttrib;
                 vao.enableAttrib(location);
-                size_t const offset = offsetof(PrimitiveInstances::Attribs, _transform) +
-                                      (i * sizeof(glm::vec4)); // NOTE: mat4 = 4 * vec4
-                vao.attribPointer(location, 4, GL_FLOAT, GL_FALSE, stride, offset);
+                size_t const offset = offsetof(PrimitiveInstances::Attribs, _transform);
+                vao.attribIPointer(location, 1, GL_UNSIGNED_INT, stride, offset);
                 vao.attribDivisor(location, 1);
-           }
+            }
+            else
+            {
+                for (int i = 0; i < 4; ++i)
+                {
+                    GLint const location = _materials._modelAttrib + i;
+                    vao.enableAttrib(location);
+                    size_t const offset = offsetof(PrimitiveInstances::Attribs, _transform) +
+                                          (i * sizeof(glm::vec4)); // NOTE: mat4 = 4 * vec4
+                    vao.attribPointer(location, 4, GL_FLOAT, GL_FALSE, stride, offset);
+                    vao.attribDivisor(location, 1);
+                }
+            }
         }
 
         if (_materials._emissiveFactorAttrib != -1)
@@ -450,6 +487,201 @@ namespace minire::rasterizer
         // draw elements
         _program.validate();
         vertexBuffer.drawElementsInstanced(primitiveInstances.size());
+        opengl::VAO::unbind();
+
+        // create a fence
+        GLsync fence = ::glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        MINIRE_MAYBE_THROW_GL(glFenceSync);
+        fencedBuffers.setFence(fence);
+    }
+
+    namespace
+    {
+        struct alignas(4) DrawElementsIndirectCommand
+        {
+            GLuint count;
+            GLuint instanceCount;
+            GLuint firstIndex;
+            GLint  baseVertex;
+            GLuint baseInstance;
+        };
+    }
+
+    void Materials::Brush::drawMultiIndirect(std::vector<MultiDrawItem> const & items,
+                                            opengl::SharedVertexBuffer const & sharedVertexBuffer,
+                                            glm::vec3 const & ambientLight,
+                                            material::TextureRefs const & directionalLightsShadowMaps,
+                                            material::TextureRefs const & pointLightsShadowMaps,
+                                            Material const & material) const
+    {
+        size_t totalInstances = 0;
+        for (auto const & item : items)
+        {
+            assert(item._instances);
+            totalInstances += item._instances->size();
+        }
+        if (totalInstances == 0 || items.empty())
+        {
+            return;
+        }
+
+        _program.use();
+
+        TextureUnitHelper textureUnitHelper(_program);
+
+        // setup common uniforms
+        setupBuiltinUniforms(textureUnitHelper, ambientLight, directionalLightsShadowMaps,
+                             pointLightsShadowMaps);
+        setupCustomUniforms(material, textureUnitHelper);
+
+        // fetch VAO and instance buffers
+        opengl::VAO const & vao = sharedVertexBuffer.vao();
+        vao.bind();
+        sharedVertexBuffer.bindElements();
+
+        auto & fencedBuffers = _instancedBuffersPool.fetch();
+        opengl::VBO & vbo = fencedBuffers->_vbo;
+        opengl::SSBO & ssbo = fencedBuffers->_ssbo;
+
+        // upload VBO's contents
+        vbo.bind();
+        GLsizeiptr const requiredSize = static_cast<GLsizeiptr>(
+            totalInstances * sizeof(PrimitiveInstances::Attribs));
+
+        std::vector<PrimitiveInstances::Attribs> flatAttribs;
+        flatAttribs.reserve(totalInstances);
+
+        std::vector<DrawElementsIndirectCommand> commands;
+        commands.reserve(items.size());
+
+        uint32_t currentBaseInstance = 0;
+        for (auto const & item : items)
+        {
+            assert(item._subBuffer);
+            assert(item._instances);
+
+            flatAttribs.insert(flatAttribs.end(),
+                               item._instances->_attribs.begin(),
+                               item._instances->_attribs.end());
+
+            auto const & cmdData = item._subBuffer->commandData();
+            commands.push_back(DrawElementsIndirectCommand{
+                .count = static_cast<GLuint>(cmdData._elementCount),
+                .instanceCount = static_cast<GLuint>(item._instances->size()),
+                .firstIndex = static_cast<GLuint>(cmdData._elementOffset),
+                .baseVertex = cmdData._baseVertex,
+                .baseInstance = currentBaseInstance,
+            });
+
+            currentBaseInstance += static_cast<uint32_t>(item._instances->size());
+        }
+
+        if (_meshFeatures.hasSkin())
+        {
+            for (size_t i = 0; i < flatAttribs.size(); ++i)
+            {
+                *reinterpret_cast<uint32_t *>(&flatAttribs[i]._transform[0][0]) = static_cast<uint32_t>(i);
+            }
+        }
+
+        if (vbo.size() < requiredSize)
+        {
+            vbo.bufferData(requiredSize, flatAttribs.data(), GL_DYNAMIC_DRAW);
+        }
+        else
+        {
+            vbo.bufferSubData(0, requiredSize, flatAttribs.data());
+        }
+
+        // setup skinning vectors
+        if (_meshFeatures.hasSkin())
+        {
+            PrimitiveInstances::InstancedSkinningVectors allSkinningVectors;
+            allSkinningVectors.reserve(totalInstances);
+            for (auto const & item : items)
+            {
+                assert(item._instances);
+                assert(item._instances->size() == item._instances->_skinningVectors.size());
+                allSkinningVectors.insert(allSkinningVectors.end(),
+                                          item._instances->_skinningVectors.begin(),
+                                          item._instances->_skinningVectors.end());
+            }
+
+            std::vector<glm::vec4> skinningVectors = flattenSkinningVectors(allSkinningVectors,
+                                                                            rasterizer::Constants::kMaxBones);
+            if (GLsizeiptr const requiredSize = static_cast<GLsizeiptr>(
+                    skinningVectors.size() * sizeof(glm::vec4));
+                ssbo.size() < requiredSize)
+            {
+                ssbo.bufferData(requiredSize, skinningVectors.data(), GL_DYNAMIC_DRAW);
+            }
+            else
+            {
+                ssbo.bufferSubData(0, requiredSize, skinningVectors.data());
+            }
+            ssbo.bindBufferBase(kSkinningVectrorBindingPoint);
+        }
+
+        // setup attributes in the VAO
+        GLsizei const stride = static_cast<GLsizei>(sizeof(PrimitiveInstances::Attribs));
+
+        if (_materials._modelAttrib != -1)
+        {
+            if (_meshFeatures.hasSkin())
+            {
+                GLint const location = _materials._modelAttrib;
+                vao.enableAttrib(location);
+                size_t const offset = offsetof(PrimitiveInstances::Attribs, _transform);
+                vao.attribIPointer(location, 1, GL_UNSIGNED_INT, stride, offset);
+                vao.attribDivisor(location, 1);
+            }
+            else
+            {
+                for (int i = 0; i < 4; ++i)
+                {
+                    GLint const location = _materials._modelAttrib + i;
+                    vao.enableAttrib(location);
+                    size_t const offset = offsetof(PrimitiveInstances::Attribs, _transform) +
+                                          (i * sizeof(glm::vec4));
+                    vao.attribPointer(location, 4, GL_FLOAT, GL_FALSE, stride, offset);
+                    vao.attribDivisor(location, 1);
+                }
+            }
+        }
+
+        if (_materials._emissiveFactorAttrib != -1)
+        {
+            vao.enableAttrib(_materials._emissiveFactorAttrib);
+            vao.attribPointer(_materials._emissiveFactorAttrib, 3, GL_FLOAT, GL_FALSE, stride,
+                              offsetof(PrimitiveInstances::Attribs, _emissiveFactor));
+            vao.attribDivisor(_materials._emissiveFactorAttrib, 1);
+        }
+
+        if (_materials._meshIdAttrib != -1)
+        {
+            vao.enableAttrib(_materials._meshIdAttrib);
+            vao.attribIPointer(_materials._meshIdAttrib, 1, GL_UNSIGNED_INT, stride,
+                               offsetof(PrimitiveInstances::Attribs, _opbId));
+            vao.attribDivisor(_materials._meshIdAttrib, 1);
+        }
+
+        // upload indirect commands buffer
+        _indirectVbo.bind();
+        _indirectVbo.bufferData(static_cast<GLsizeiptr>(commands.size() * sizeof(DrawElementsIndirectCommand)),
+                                commands.data(),
+                                GL_DYNAMIC_DRAW);
+
+        _program.validate();
+        MINIRE_GL(glEnable, GL_CULL_FACE);
+        MINIRE_GL(glMultiDrawElementsIndirect,
+                  sharedVertexBuffer.drawMode(),
+                  GL_UNSIGNED_INT,
+                  nullptr,
+                  static_cast<GLsizei>(commands.size()),
+                  0);
+
+        MINIRE_GL(glBindBuffer, GL_DRAW_INDIRECT_BUFFER, 0);
+        opengl::VAO::unbind();
 
         // create a fence
         GLsync fence = ::glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -532,7 +764,7 @@ namespace minire::rasterizer
     // IMPORTANT NOTE: for attribs and uniforms the increment of location MAY be more than 1 slot,
     //                 more specifically: matrixes, arrays, doubles (double, dvec).
     //                 Safe types are: float, int, uint, bool,
-    //                                 (i/b/u)vec2, (i/b/u)vec3, (i/b/u)vec4 
+    //                                 (i/b/u)vec2, (i/b/u)vec3, (i/b/u)vec4
 
     // NOTE: since decision to enable instanced rendering is currently depends only on
     //       meshFeatures, it is not required to add instancing flag into Materials::Key.
