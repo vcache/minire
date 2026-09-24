@@ -106,13 +106,9 @@ namespace minire::gui::components
             _contentPadding.isInvalidated())
         {
             rebuildLayout();
-            updateArrangers();
         }
 
-        if (_pressOffset.isInvalidated())
-        {
-            updateArrangers();
-        }
+        updateArrangers();
 
         _iconLocation.revalidate();
         _iconSpacing.revalidate();
