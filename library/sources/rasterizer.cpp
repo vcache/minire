@@ -690,7 +690,10 @@ namespace minire
         MINIRE_GL(glBlendFunc, GL_ONE, GL_ZERO);
 
         // draw coordinates
-        _coordinates.draw();
+        if (_drawCoordinates)
+        {
+            _coordinates.draw();
+        }
 
         // draw debug lines
         _lines.draw();

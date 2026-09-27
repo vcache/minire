@@ -70,6 +70,9 @@ namespace minire
         void disposeResourceLayer(rasterizer::Resources::LayerId const & layerId) { _resources.disposeLayer(layerId); }
         rasterizer::Resources::LayerId const & currentResourceLayer() const { return _resources.current(); }
 
+    public:
+        bool drawCoordinates() const { return _drawCoordinates; }
+        void setDrawCoordinates(bool v) { _drawCoordinates = v; }
 
     private:
         void cullDirectionalLights(SceneImpl const &);
@@ -147,5 +150,7 @@ namespace minire
 
         size_t                              _screenWidth;
         size_t                              _screenHeight;
+
+        bool                                _drawCoordinates = true;
     };
 }

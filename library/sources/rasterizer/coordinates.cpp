@@ -110,8 +110,7 @@ namespace minire::rasterizer
         opengl::Program _program;
         opengl::VAO     _vao;
         opengl::VBO     _vbo;
-
-        GLint             _bznkLengthUniform;
+        GLint           _bznkLengthUniform;
     };
 
     Coordinates::Coordinates(Ubo const & ubo,

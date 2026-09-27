@@ -106,6 +106,9 @@ namespace minire
         double frameTime() const { return _frameTime; }
         double absoluteTime() const { return _absoluteTime; }
 
+        bool drawCoordinates() const;
+        void setDrawCoordinates(bool v);
+
     private:
         void startEpoch(); // for lerping
 

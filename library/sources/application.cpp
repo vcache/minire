@@ -253,6 +253,18 @@ namespace minire
         return *_scene;
     }
 
+    bool Application::drawCoordinates() const
+    {
+        assert(_rasterizer);
+        return _rasterizer->drawCoordinates();
+    }
+
+    void Application::setDrawCoordinates(bool v)
+    {
+        assert(_rasterizer);
+        _rasterizer->setDrawCoordinates(v);
+    }
+
     void Application::setRayCaster(bool enabled)
     {
         _rayCasterEnabled = enabled;
