@@ -106,6 +106,7 @@ namespace minire
         opengl::Program                     _screenQuadProgram;
         GLint const                         _screenTextureUniform;
         GLint const                         _idTextureUniform;
+        GLint const                         _texelSizeUniform;
         GLint const                         _outlineIdsUniform;
         GLint const                         _outlineIdsCountUniform;
         opengl::PBO::Uptr                   _hotFragmentPbo; // PBO for ID under the cursor (a hot fragment)

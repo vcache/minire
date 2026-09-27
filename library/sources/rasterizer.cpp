@@ -83,6 +83,7 @@ namespace minire
 
             uniform sampler2D screenTexture;
             uniform usampler2D idTexture;
+            uniform vec2 texelSize;
 
             bool isSelected(uint id, out uint outlineIndex)
             {
@@ -99,6 +100,7 @@ namespace minire
 
             bool edgeTest(out vec4 color)
             {
+                color = vec4(0.0);
                 uint currentId = texture(idTexture, TexCoords).r;
                 uint outlineIndex;
                 if (!isSelected(currentId, outlineIndex))
@@ -107,7 +109,8 @@ namespace minire
                     {
                         for(int y = -1; y <= 1; y++)
                         {
-                            uint offsetObjId = textureOffset(idTexture, TexCoords, ivec2(x, y)).r;
+                            vec2 offsetCoords = TexCoords + vec2(x, y) * texelSize;
+                            uint offsetObjId = texture(idTexture, offsetCoords).r;
                             if(isSelected(offsetObjId, outlineIndex))
                             {
                                 color = _pixelOutlines[outlineIndex]._color;
@@ -184,6 +187,7 @@ namespace minire
         })
         , _screenTextureUniform(_screenQuadProgram.getUniformLocation("screenTexture"))
         , _idTextureUniform(_screenQuadProgram.getUniformLocation("idTexture"))
+        , _texelSizeUniform(_screenQuadProgram.getUniformLocation("texelSize"))
         , _outlineIdsUniform(_screenQuadProgram.getUniformLocation("outlineIds"))
         , _outlineIdsCountUniform(_screenQuadProgram.getUniformLocation("outlineIdsCount"))
         , _screenPassUbo(std::make_unique<ScreenPassUbo>(_screenQuadProgram))
@@ -636,6 +640,9 @@ namespace minire
         MINIRE_GL(glActiveTexture, GL_TEXTURE1);
         _screenQuadProgram.setUniform(_idTextureUniform, GLint(1));
         _idBuffer->bind();
+
+        _screenQuadProgram.setUniform(_texelSizeUniform,
+                                      1.0f / glm::vec2(_screenWidth, _screenHeight));
 
         // setup screen-pass UBO
         MINIRE_INVARIANT(scene.pixelEdgeOutlines().size() <= kMaxPixelOutlines,

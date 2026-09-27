@@ -128,7 +128,7 @@ target_link_libraries(minire
 )
 
 if(WIN32)
-    target_link_libraries(minire PRIVATE shell32 ole32 bcrypt)
+    target_link_libraries(minire shell32 ole32 bcrypt)
 endif()
 
 target_compile_features(minire PUBLIC "${MINIRE_CXX_STD}")
