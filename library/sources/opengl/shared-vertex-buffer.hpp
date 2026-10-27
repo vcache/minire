@@ -53,9 +53,6 @@ namespace minire::opengl
             size_t size() const { assert(!_sharedVbo.expired()); return _block._size; }
 
         private:
-            void release();
-
-        private:
             struct Block
             {
                 size_t _offset = 0; // bytes
@@ -125,6 +122,7 @@ namespace minire::opengl
         size_t stride() const { return _verticesStride / sizeof(float); }
         size_t indecesStride() const { return _indecesStride; }
         size_t verticesStride() const { return _verticesStride; }
+        models::MeshFeatures const & meshFeatures() const { return _meshFeatures; }
 
         void bindElements() const { _elements->bind(); }
 
@@ -139,6 +137,11 @@ namespace minire::opengl
         create(size_t const elementsCount, utils::Aabb const &,
                size_t const eboBytes, void const * eboData,
                size_t const vboBytes, void const * vboData);
+
+        void update(SharedVertexSubBuffer & subBuffer,
+                    size_t const elementsCount, utils::Aabb const &,
+                    size_t const eboBytes, void const * eboData,
+                    size_t const vboBytes, void const * vboData);
 
     private:
         MultiBlock allocate(size_t eboBytes, size_t vboBytes, size_t elementsCount);
@@ -199,11 +202,14 @@ namespace minire::opengl
             return _sharedVertexBuffer.lock();
         }
 
+        void update(SharedVertexBuffer::MultiBlock && multiBlock,
+                    utils::Aabb const & aabb);
+
     private:
-        SharedVertexBuffer::Wptr             _sharedVertexBuffer;
-        SharedVertexBuffer::MultiBlock const _multiBlock;
-        utils::Aabb const                    _aabb;
-        CommandData const                    _commandData;
+        SharedVertexBuffer::Wptr       _sharedVertexBuffer;
+        SharedVertexBuffer::MultiBlock _multiBlock;
+        utils::Aabb                    _aabb;
+        CommandData                    _commandData;
 
         friend class SharedVertexBuffer;
     };

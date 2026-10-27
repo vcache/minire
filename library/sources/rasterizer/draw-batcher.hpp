@@ -9,6 +9,7 @@
 #include <glm/vec3.hpp>
 
 #include <cassert>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -49,7 +50,7 @@ namespace minire::rasterizer
                         ? overrideMaterial.get()
                         : &uniquePrimitive._mesh.material(uniquePrimitive._primitiveIndex);
 
-                    Key key{&brush, svb.get()};
+                    Key key{&brush, svb.get(), material->stateSlug()};
                     auto & batch = _batches[key];
                     batch._items.push_back(Materials::Brush::MultiDrawItem{
                         subBuffer,
@@ -102,10 +103,11 @@ namespace minire::rasterizer
         {
             Materials::Brush const *           _brush;
             opengl::SharedVertexBuffer const * _svb;
+            std::string_view                   _stateSlug;
 
             bool operator==(Key const & o) const
             {
-                return _brush == o._brush && _svb == o._svb;
+                return _brush == o._brush && _svb == o._svb && _stateSlug == o._stateSlug;
             }
         };
 
@@ -122,6 +124,7 @@ namespace minire::rasterizer
                 size_t result = 0;
                 boost::hash_combine(result, k._brush);
                 boost::hash_combine(result, k._svb);
+                boost::hash_combine(result, std::hash<std::string_view>{}(k._stateSlug));
                 return result;
             }
         };

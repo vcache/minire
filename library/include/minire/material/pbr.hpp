@@ -24,6 +24,7 @@ namespace minire::material
 
     protected:
         std::string slugImpl() const override;
+        std::string stateSlugImpl() const override;
 
     protected:
         models::PbrMaterial const       _model;

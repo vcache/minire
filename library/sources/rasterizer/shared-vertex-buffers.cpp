@@ -10,10 +10,18 @@ namespace minire::rasterizer
         {
             switch (drawMode)
             {
-                case GL_POINTS:    return 1;
-                case GL_LINES:     return 2;
-                case GL_TRIANGLES: return 3;
-                default:           return 3;
+                case GL_POINTS:
+                    return 1;
+                case GL_LINES:
+                case GL_LINE_STRIP:
+                case GL_LINE_LOOP:
+                    return 2;
+                case GL_TRIANGLES:
+                case GL_TRIANGLE_STRIP:
+                case GL_TRIANGLE_FAN:
+                    return 3;
+                default:
+                    return 3;
             }
         }
     }

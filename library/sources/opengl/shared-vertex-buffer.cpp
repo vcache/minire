@@ -33,11 +33,6 @@ namespace minire::opengl
 
     SharedVBO::BlockHolder::~BlockHolder()
     {
-        release();
-    }
-
-    void SharedVBO::BlockHolder::release()
-    {
         if (auto sharedVbo = _sharedVbo.lock(); sharedVbo && _block._size > 0)
         {
             sharedVbo->free(_block);
@@ -132,11 +127,19 @@ namespace minire::opengl
         {
             switch(drawMode)
             {
-                case GL_POINTS:    return 1; // (A)
-                case GL_LINES:     return 2; // (A, B)
-                case GL_TRIANGLES: return 3; // (A, B, C)
-                default:           MINIRE_THROW("unsupported draw mode: {}",
-                                                static_cast<int>(drawMode));
+                case GL_POINTS:
+                    return 1;
+                case GL_LINES:
+                case GL_LINE_STRIP:
+                case GL_LINE_LOOP:
+                    return 2;
+                case GL_TRIANGLES:
+                case GL_TRIANGLE_STRIP:
+                case GL_TRIANGLE_FAN:
+                    return 3;
+                default:
+                    MINIRE_THROW("unsupported draw mode: {}",
+                                 static_cast<int>(drawMode));
             }
         }
     }
@@ -228,6 +231,36 @@ namespace minire::opengl
             new SharedVertexSubBuffer(*this, std::move(multiBlock), aabb));
     }
 
+    void SharedVertexBuffer::update(SharedVertexSubBuffer & subBuffer,
+                                    size_t const elementsCount, utils::Aabb const & aabb,
+                                    size_t const eboBytes, void const * eboData,
+                                    size_t const vboBytes, void const * vboData)
+    {
+        VAO::unbind();
+
+        assert(eboData);
+        assert(eboBytes % sizeof(uint32_t) == 0);
+        assert(vboData);
+        assert(vboBytes % _verticesStride == 0);
+
+        if (subBuffer._multiBlock._elements.size() == eboBytes &&
+            subBuffer._multiBlock._vertices.size() == vboBytes)
+        {
+            subBuffer._multiBlock._elements.bufferSubData(eboBytes, eboData);
+            subBuffer._multiBlock._vertices.bufferSubData(vboBytes, vboData);
+            subBuffer._multiBlock._elementsCount = elementsCount;
+            subBuffer._aabb = aabb;
+            subBuffer._commandData._elementCount = elementsCount;
+            return;
+        }
+
+        auto multiBlock = allocate(eboBytes, vboBytes, elementsCount);
+        multiBlock._elements.bufferSubData(eboBytes, eboData);
+        multiBlock._vertices.bufferSubData(vboBytes, vboData);
+
+        subBuffer.update(std::move(multiBlock), aabb);
+    }
+
     SharedVertexBuffer::MultiBlock
     SharedVertexBuffer::allocate(size_t eboBytes, size_t vboBytes, size_t elementsCount)
     {
@@ -257,4 +290,20 @@ namespace minire::opengl
                 ._baseVertex = static_cast<int32_t>(_multiBlock._vertices.offset() / sharedVertexBuffer.verticesStride()),
             }
     {}
+
+    void SharedVertexSubBuffer::update(SharedVertexBuffer::MultiBlock && multiBlock,
+                                       utils::Aabb const & aabb)
+    {
+        auto svb = _sharedVertexBuffer.lock();
+        MINIRE_INVARIANT(svb, "SharedVertexBuffer is expired");
+        _multiBlock = std::move(multiBlock);
+        _aabb = aabb;
+        _commandData = CommandData
+            {
+                ._mode = svb->drawMode(),
+                ._elementCount = _multiBlock._elementsCount,
+                ._elementOffset = _multiBlock._elements.offset() / sizeof(uint32_t),
+                ._baseVertex = static_cast<int32_t>(_multiBlock._vertices.offset() / svb->verticesStride()),
+            };
+    }
 }

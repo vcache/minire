@@ -2,6 +2,7 @@
 
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
+#include <minire/models/sampler.hpp>
 
 #include <fmt/format.h>
 #include <inja/inja.hpp>
@@ -881,6 +882,55 @@ namespace minire::material
         result += _model._emissiveTexture ? "E:T/" : "E:0/";
 
         result += "!";
+        return result;
+    }
+
+    std::string Pbr::stateSlugImpl() const
+    {
+        std::string result;
+
+        result += fmt::format("af:{:.4f},{:.4f},{:.4f}/",
+                              _model._albedoFactor.x, _model._albedoFactor.y, _model._albedoFactor.z);
+        if (_model._albedoTexture)
+        {
+            result += fmt::format("at:{}:{}/", *_model._albedoTexture,
+                                  std::hash<models::Sampler>{}(_model._albedoSampler));
+        }
+
+        result += fmt::format("mf:{:.4f}/", _model._metallicFactor);
+        if (_model._metallicTexture)
+        {
+            result += fmt::format("mt:{}:{}/", *_model._metallicTexture,
+                                  std::hash<models::Sampler>{}(_model._metallicSampler));
+        }
+
+        result += fmt::format("rf:{:.4f}/", _model._roughnessFactor);
+        if (_model._roughnessTexture)
+        {
+            result += fmt::format("rt:{}:{}/", *_model._roughnessTexture,
+                                  std::hash<models::Sampler>{}(_model._roughnessSampler));
+        }
+
+        if (_model._normalTexture)
+        {
+            result += fmt::format("nt:{}:{}:{:.4f}/", *_model._normalTexture,
+                                  std::hash<models::Sampler>{}(_model._normalSampler),
+                                  _model._normalScale);
+        }
+
+        result += fmt::format("as:{:.4f}/", _model._aoStrength);
+        if (_model._aoTexture)
+        {
+            result += fmt::format("ot:{}:{}/", *_model._aoTexture,
+                                  std::hash<models::Sampler>{}(_model._aoSampler));
+        }
+
+        if (_model._emissiveTexture)
+        {
+            result += fmt::format("et:{}:{}/", *_model._emissiveTexture,
+                                  std::hash<models::Sampler>{}(_model._emissiveSampler));
+        }
+
         return result;
     }
 }

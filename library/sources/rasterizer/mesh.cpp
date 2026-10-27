@@ -44,19 +44,26 @@ namespace minire::rasterizer
             // Build material instance and fetch a program
             models::MeshFeatures const & meshFeatures = vertexBuffers.meshFeatures(vertexBufferId);
 
-            MINIRE_INVARIANT(defaultMaterial, "no default material found (required for OBJ): {}", source);
+            MINIRE_INVARIANT(defaultMaterial, "no default material found: {}", source);
             auto brush = materials.getBrush(meshFeatures, defaultMaterial);
             assert(brush);
 
-            // Create or make opengl::VertexBuffer for a given Locations
-            auto openglVertexBuffer = vertexBuffers.build(vertexBufferId, materials.locations());
-            assert(openglVertexBuffer);
+            // Create or make opengl::SharedVertexSubBuffer
+            auto subBuffer = vertexBuffers.build(vertexBufferId, sharedVertexBuffers);
+            assert(subBuffer);
 
             // extend aabb
-            _aabb.extend(openglVertexBuffer->_aabb);
+            if (_primitives.empty())
+            {
+                _aabb = subBuffer->aabb();
+            }
+            else
+            {
+                _aabb.extend(subBuffer->aabb());
+            }
 
             // setup _primitives and _materials
-            _primitives.emplace_back(std::move(openglVertexBuffer), meshFeatures, defaultMaterial, brush);
+            _primitives.emplace_back(std::move(subBuffer), meshFeatures, defaultMaterial, brush);
 
             // quit the function, since it is a special case
             return;

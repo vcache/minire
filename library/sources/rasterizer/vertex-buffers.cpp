@@ -5,12 +5,12 @@
 #include <minire/models/mesh-features.hpp>
 #include <minire/models/vertex-buffer.hpp>
 
-#include <opengl/vertex-buffer.hpp>
+#include <opengl/shared-vertex-buffer.hpp>
 #include <rasterizer/resources.hpp>
+#include <rasterizer/shared-vertex-buffers.hpp>
 #include <utils/vertex-buffer-builder.hpp>
 
 #include <cassert>
-#include <unordered_map>
 
 namespace minire::rasterizer
 {
@@ -26,12 +26,9 @@ namespace minire::rasterizer
 
         struct VertexBufferData
         {
-            using GpuInstances = std::unordered_map<material::Locations,
-                                                    std::shared_ptr<opengl::VertexBuffer>>;
-
-            models::VertexBuffer _vertexBuffer;
-            models::MeshFeatures _meshFeatures;
-            GpuInstances         _gpuInstances;
+            models::VertexBuffer                           _vertexBuffer;
+            models::MeshFeatures                           _meshFeatures;
+            std::shared_ptr<opengl::SharedVertexSubBuffer> _subBuffer;
 
             using Sptr = std::shared_ptr<VertexBufferData>;
 
@@ -47,28 +44,24 @@ namespace minire::rasterizer
                                  "mesh features of a new vertex-buffer differs from existing");
                 _vertexBuffer = vertexBuffer;
                 _meshFeatures = newMeshFeatures;
-                for(auto & [locations, instance] : _gpuInstances)
+                if (_subBuffer)
                 {
-                    assert(instance);
-                    auto newInstance = utils::createVertexBuffer(_vertexBuffer, locations);
-                    assert(newInstance);
-                    *instance = std::move(*newInstance);
+                    utils::updateVertexSubBuffer(_vertexBuffer, *_subBuffer);
                 }
             }
 
-            std::shared_ptr<opengl::VertexBuffer>
-            build(material::Locations const & locations)
+            std::shared_ptr<opengl::SharedVertexSubBuffer>
+            build(SharedVertexBuffers & sharedVertexBuffers)
             {
-                auto it = _gpuInstances.find(locations);
-                if(it == _gpuInstances.end())
+                if (!_subBuffer)
                 {
-                    auto gpuVertexBuffer = utils::createVertexBuffer(_vertexBuffer, locations);
-                    auto [newIt, inserted] = _gpuInstances.emplace(locations, gpuVertexBuffer);
-                    MINIRE_INVARIANT(inserted, "failed to insert new vertex-buffer");
-                    it = newIt;
+                    GLenum const drawMode = utils::convertDrawMode(_vertexBuffer._drawMode);
+                    opengl::SharedVertexBuffer::Sptr const & svb =
+                        sharedVertexBuffers.get(_meshFeatures, drawMode);
+                    assert(svb);
+                    _subBuffer = utils::createVertexSubBuffer(_vertexBuffer, *svb);
                 }
-                assert(it != _gpuInstances.end());
-                return it->second;
+                return _subBuffer;
             }
         };
 
@@ -129,11 +122,11 @@ namespace minire::rasterizer
         return tmp->_meshFeatures;
     }
 
-    std::shared_ptr<opengl::VertexBuffer>
+    std::shared_ptr<opengl::SharedVertexSubBuffer>
     VertexBuffers::build(content::Id const & id,
-                         material::Locations const & locations) const
+                         SharedVertexBuffers & sharedVertexBuffers) const
     {
         auto tmp = find(id, _resources);
-        return tmp->build(locations);
+        return tmp->build(sharedVertexBuffers);
     }
 }

@@ -122,13 +122,28 @@ namespace minire
             return _materialSlug;
         }
 
+        std::string const & stateSlug() const
+        {
+            if (_stateSlug.empty())
+            {
+                _stateSlug = fmt::format("{}:{}", slug(), stateSlugImpl());
+            }
+            return _stateSlug;
+        }
+
     protected:
         // Should contain material-specific unique features.
         // It should reflect possible changes in shaders due to
         // differences in _extra and userUniforms.
         virtual std::string slugImpl() const = 0;
 
+        virtual std::string stateSlugImpl() const
+        {
+            return "";
+        }
+
     private:
         mutable std::string _materialSlug;
+        mutable std::string _stateSlug;
     };
 }
