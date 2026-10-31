@@ -109,6 +109,10 @@ namespace minire
                     {
                         for(int y = -1; y <= 1; y++)
                         {
+                            if (x == 0 && y == 0)
+                            {
+                                continue;
+                            }
                             vec2 offsetCoords = TexCoords + vec2(x, y) * texelSize;
                             uint offsetObjId = texture(idTexture, offsetCoords).r;
                             if(isSelected(offsetObjId, outlineIndex))

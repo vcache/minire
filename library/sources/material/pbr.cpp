@@ -64,10 +64,8 @@ namespace minire::material
                 return nom / denom;
             }
 
-            float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+            float GeometrySmith(float NdotV, float NdotL, float roughness)
             {
-                float NdotV = max(dot(N, V), 0.0);
-                float NdotL = max(dot(N, L), 0.0);
                 float ggx2 = GeometrySchlickGGX(NdotV, roughness);
                 float ggx1 = GeometrySchlickGGX(NdotL, roughness);
 
@@ -83,6 +81,8 @@ namespace minire::material
                         const vec3 V,
                         const vec3 L,
                         const vec3 H,
+                        const float NdotV,
+                        const float NdotL,
                         const vec3 F0,
                         const vec3 radiance,
                         const vec3 albedo,
@@ -91,11 +91,11 @@ namespace minire::material
             {
                 // Cook-Torrance BRDF
                 float NDF = DistributionGGX(N, H, roughness);
-                float G   = GeometrySmith(N, V, L, roughness);
+                float G   = GeometrySmith(NdotV, NdotL, roughness);
                 vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
 
                 vec3 nominator    = NDF * G * F;
-                float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
+                float denominator = 4.0 * NdotV * NdotL;
                 // prevent divide by zero for NdotV=0.0 or NdotL=0.0
                 vec3 specular = nominator / max(denominator, 0.001);
 
@@ -111,8 +111,6 @@ namespace minire::material
                 kD *= 1.0 - metallic;
 
                 // scale light by NdotL
-                float NdotL = max(dot(N, L), 0.0);
-
                 // add to outgoing radiance Lo
                 // note that we already multiplied the BRDF by the Fresnel (kS)
                 // so we won't multiply by kS again
@@ -209,21 +207,21 @@ namespace minire::material
                 return currentDepth - bias > closestDepth ? 1.0 : 0.0;
             }
 
+            const vec3 kSampleOffsetDirections[20] = vec3[]
+            (
+               vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
+               vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+               vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+               vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+               vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+            );
+
             float shadowFactorPoint_Std_PCF(const vec3 fragmentPos,
                                             const vec3 lightPos,
                                             const samplerCube shadowMap,
                                             const float shadowMapFarPlane,
                                             const float bias)
             {
-                const vec3 kSampleOffsetDirections[20] = vec3[]
-                (
-                   vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
-                   vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
-                   vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
-                   vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
-                   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
-                );
-
                 vec3 fragToLight = fragmentPos - lightPos;
                 float currentDepth = length(fragToLight);
 
@@ -286,6 +284,7 @@ namespace minire::material
                 // calc vectors
                 vec3 N = normalize(normal);
                 vec3 V = normalize(_viewPosition.xyz - bznkWorldPos.xyz);
+                float NdotV = max(dot(N, V), 0.0);
 
                 // calculate reflectance at normal incidence;
                 // if dia-electric (like plastic) use F0 of 0.04 and
@@ -300,6 +299,12 @@ namespace minire::material
                 for(uint i = 0U; i < _directionalLightsCount; ++i)
                 {
                     vec3 L = -normalize(_directionalLights[i]._direction);
+                    float NdotL = max(dot(N, L), 0.0);
+                    if (NdotL <= 0.0)
+                    {
+                        continue;
+                    }
+
                     vec3 H = normalize(V + L);
                     vec3 radiance = _directionalLights[i]._color;
 
@@ -371,16 +376,28 @@ namespace minire::material
                                         _directionalLights[i]._smoothStepRight,
                                         shadow);
 
-                    Lo += shadow * calcLo(N, V, L, H, F0, radiance, albedo, roughness, metallic);
+                    Lo += shadow * calcLo(N, V, L, H, NdotV, NdotL, F0, radiance, albedo, roughness, metallic);
                 }
 
                 // ... for point lights
                 for(uint i = 0U; i < _pointLightsCount; ++i)
                 {
+                    vec3 lightVec = _pointLights[i]._position.xyz - bznkWorldPos.xyz;
+                    float dist = length(lightVec);
+                    if (dist <= 0.0001)
+                    {
+                        continue;
+                    }
+
+                    vec3 L = lightVec / dist;
+                    float NdotL = max(dot(N, L), 0.0);
+                    if (NdotL <= 0.0)
+                    {
+                        continue;
+                    }
+
                     // calculate per-light radiance
-                    vec3 L = normalize(_pointLights[i]._position - bznkWorldPos).xyz;
                     vec3 H = normalize(V + L);
-                    float dist = length(_pointLights[i]._position - bznkWorldPos);
                     float attenuation = 1.0 / (
                         _pointLights[i]._attenuation.x +
                         _pointLights[i]._attenuation.y * dist +
@@ -463,7 +480,7 @@ namespace minire::material
                                         _pointLights[i]._smoothStepRight,
                                         shadow);
 
-                    Lo += shadow * calcLo(N, V, L, H, F0, radiance, albedo, roughness, metallic);
+                    Lo += shadow * calcLo(N, V, L, H, NdotV, NdotL, F0, radiance, albedo, roughness, metallic);
                 }
 
                 // ambient lighting (note that the next IBL tutorial will replace
