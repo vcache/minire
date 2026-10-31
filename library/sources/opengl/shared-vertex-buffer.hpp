@@ -8,6 +8,7 @@
 #include <minire/models/mesh-features.hpp>
 
 #include <cassert>
+#include <map>
 #include <memory>
 #include <set>
 #include <tuple>
@@ -38,6 +39,7 @@ namespace minire::opengl
             BlockHolder & operator=(BlockHolder const &) = delete;
 
         public:
+            BlockHolder() = default;
             explicit BlockHolder(SharedVBO & sharedVbo, size_t size);
 
             BlockHolder(BlockHolder && other) noexcept;
@@ -80,9 +82,10 @@ namespace minire::opengl
         void free(Block block);
 
     private:
-        VBO             _vbo;
-        size_t          _nextOffset = 0; // in bytes
-        std::set<Block> _freeBlocks;
+        VBO                      _vbo;
+        size_t                   _nextOffset = 0; // in bytes
+        std::map<size_t, size_t> _freeBlocksByOffset;
+        std::set<Block>          _freeBlocksBySize;
 
         friend class BlockHolder;
     };

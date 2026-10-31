@@ -63,20 +63,23 @@ namespace minire::opengl
 
     SharedVBO::Block SharedVBO::allocate(size_t const size)
     {
-        // look up in an empty elements
-        for(auto it = _freeBlocks.begin(); it != _freeBlocks.end(); ++it)
+        // Best-fit search: find smallest block with _size >= size
+        Block query{._offset = 0, ._size = size};
+        auto it = _freeBlocksBySize.lower_bound(query);
+        if (it != _freeBlocksBySize.end())
         {
-            if (it->_size >= size)
+            Block found = *it;
+            _freeBlocksBySize.erase(it);
+            _freeBlocksByOffset.erase(found._offset);
+
+            if (found._size > size)
             {
-                Block result{it->_offset, size};
-                Block remaining{it->_offset + size, it->_size - size};
-                _freeBlocks.erase(it);
-                if (remaining._size > 0)
-                {
-                    _freeBlocks.insert(remaining);
-                }
-                return result;
+                Block remaining{._offset = found._offset + size, ._size = found._size - size};
+                _freeBlocksByOffset.emplace(remaining._offset, remaining._size);
+                _freeBlocksBySize.insert(remaining);
             }
+
+            return Block{._offset = found._offset, ._size = size};
         }
 
         // ensure VBO's capacity won't be exceeded
@@ -97,15 +100,41 @@ namespace minire::opengl
     {
         if (block._size == 0) return;
 
-        if (block._offset + block._size == _nextOffset)
+        size_t offset = block._offset;
+        size_t size = block._size;
+
+        // Try coalescing with predecessor
+        auto nextIt = _freeBlocksByOffset.lower_bound(offset);
+        if (nextIt != _freeBlocksByOffset.begin())
         {
-            // special case: freeing the last block
-            assert(_nextOffset >= block._size);
-            _nextOffset -= block._size;
+            auto prevIt = std::prev(nextIt);
+            if (prevIt->first + prevIt->second == offset)
+            {
+                offset = prevIt->first;
+                size += prevIt->second;
+                _freeBlocksBySize.erase(Block{._offset = prevIt->first, ._size = prevIt->second});
+                _freeBlocksByOffset.erase(prevIt);
+            }
+        }
+
+        // Try coalescing with successor
+        auto succIt = _freeBlocksByOffset.lower_bound(offset);
+        if (succIt != _freeBlocksByOffset.end() && offset + size == succIt->first)
+        {
+            size += succIt->second;
+            _freeBlocksBySize.erase(Block{._offset = succIt->first, ._size = succIt->second});
+            _freeBlocksByOffset.erase(succIt);
+        }
+
+        // If the free block touches the end of allocated memory, reclaim it
+        if (offset + size == _nextOffset)
+        {
+            _nextOffset = offset;
         }
         else
         {
-            _freeBlocks.insert(block);
+            _freeBlocksByOffset.emplace(offset, size);
+            _freeBlocksBySize.insert(Block{._offset = offset, ._size = size});
         }
     }
 
@@ -253,6 +282,9 @@ namespace minire::opengl
             subBuffer._commandData._elementCount = elementsCount;
             return;
         }
+
+        // Release old blocks before allocating new ones so they can be merged/reused
+        subBuffer._multiBlock = MultiBlock{};
 
         auto multiBlock = allocate(eboBytes, vboBytes, elementsCount);
         multiBlock._elements.bufferSubData(eboBytes, eboData);
