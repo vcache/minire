@@ -2,6 +2,7 @@
 
 #include <material/types.hpp>
 #include <opengl/program.hpp>
+#include <opengl/vbo.hpp>
 #include <rasterizer/culled-objects.hpp>
 #include <rasterizer/instanced-buffers.hpp>
 #include <rasterizer/locations-allocator.hpp>
@@ -19,6 +20,8 @@
 #include <unordered_set>
 #include <vector>
 
+namespace minire::opengl { class SharedVertexBuffer; }
+namespace minire::opengl { class SharedVertexSubBuffer; }
 namespace minire::rasterizer { class Ubo; }
 
 namespace minire::rasterizer
@@ -60,6 +63,19 @@ namespace minire::rasterizer
                       material::TextureRefs const & pointLightsShadowMaps,
                       Material::Sptr const & materialOverride = {}) const;
 
+            struct MultiDrawItem
+            {
+                opengl::SharedVertexSubBuffer const * _subBuffer;
+                PrimitiveInstances const            * _instances;
+            };
+
+            void drawMultiIndirect(std::vector<MultiDrawItem> const & items,
+                                   opengl::SharedVertexBuffer const & sharedVertexBuffer,
+                                   glm::vec3 const & ambientLight,
+                                   material::TextureRefs const & directionalLightsShadowMaps,
+                                   material::TextureRefs const & pointLightsShadowMaps,
+                                   Material const & material) const;
+
             class TextureUnitHelper;
 
         private:
@@ -91,6 +107,7 @@ namespace minire::rasterizer
 
             material::UniformNames const    _userUniformNames;
             std::vector<GLint> const        _userUniformLocations;
+            mutable opengl::VBO             _indirectVbo;
         };
 
         Brush::Sptr getBrush(models::MeshFeatures const &,

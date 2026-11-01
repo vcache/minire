@@ -9,8 +9,12 @@
 #include <minire/models/pbr-material.hpp>
 #include <minire/models/sampler.hpp>
 #include <minire/utils/uuid.hpp>
+#include <utils/gltf-buffer-reader.hpp>
+
+#include <opengl/shared-vertex-buffer.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <initializer_list>
 #include <optional>
 #include <tuple>
@@ -38,21 +42,6 @@ namespace minire::utils
         constexpr static std::string kWeights1 = "WEIGHTS_1";
 
         //  TODO: support TEXCOORD_n, COLOR_n, JOINTS_n, WEIGHTS_n for n > 0
-
-        GLenum gltfModeToGlMode(int gltfMode)
-        {
-            switch(gltfMode)
-            {
-                case TINYGLTF_MODE_POINTS:          return GL_POINTS;
-                case TINYGLTF_MODE_LINE:            return GL_LINES;
-                case TINYGLTF_MODE_LINE_LOOP:       return GL_LINE_LOOP;
-                case TINYGLTF_MODE_LINE_STRIP:      return GL_LINE_STRIP;
-                case TINYGLTF_MODE_TRIANGLES:       return GL_TRIANGLES;
-                case TINYGLTF_MODE_TRIANGLE_STRIP:  return GL_TRIANGLE_STRIP;
-                case TINYGLTF_MODE_TRIANGLE_FAN:    return GL_TRIANGLE_FAN;
-                default: MINIRE_THROW("gltf draw mode isn't supported: {}", gltfMode);
-            }
-        }
 
         GLenum gltfComponentTypeToGlType(uint32_t componentType)
         {
@@ -481,6 +470,143 @@ namespace minire::utils
     }
 
     // Publicly visible functions
+
+    GLenum gltfModeToGlMode(int gltfMode)
+    {
+        switch(gltfMode)
+        {
+            case -1:
+            case TINYGLTF_MODE_TRIANGLES:       return GL_TRIANGLES;
+            case TINYGLTF_MODE_POINTS:          return GL_POINTS;
+            case TINYGLTF_MODE_LINE:            return GL_LINES;
+            case TINYGLTF_MODE_LINE_LOOP:       return GL_LINE_LOOP;
+            case TINYGLTF_MODE_LINE_STRIP:      return GL_LINE_STRIP;
+            case TINYGLTF_MODE_TRIANGLE_STRIP:  return GL_TRIANGLE_STRIP;
+            case TINYGLTF_MODE_TRIANGLE_FAN:    return GL_TRIANGLE_FAN;
+            default: MINIRE_THROW("gltf draw mode isn't supported: {}", gltfMode);
+        }
+    }
+
+    std::unique_ptr<opengl::SharedVertexSubBuffer>
+    createVertexSubBuffer(::tinygltf::Model const & model,
+                          size_t const meshIndex,
+                          size_t const primitiveIndex,
+                          models::MeshFeatures const & meshFeatures,
+                          opengl::SharedVertexBuffer & svb)
+    {
+        MINIRE_INVARIANT(meshIndex < model.meshes.size(),
+                         "mesh doesn't exist: {} >= {}", meshIndex, model.meshes.size());
+        ::tinygltf::Mesh const & mesh = model.meshes[meshIndex];
+        MINIRE_INVARIANT(primitiveIndex < mesh.primitives.size(),
+                         "primitive doesn't exist: {} >= {}", primitiveIndex, mesh.primitives.size());
+        ::tinygltf::Primitive const & primitive = mesh.primitives[primitiveIndex];
+
+        std::optional<size_t> const posAttrIndex = findAttr(mesh, primitive, kPosition);
+        MINIRE_INVARIANT(posAttrIndex.has_value(), "POSITION attribute not found in primitive {}", primitiveIndex);
+        Aabb const aabb = calcAabb(getAccessor(*posAttrIndex, model), mesh.name);
+
+        auto const positions = readAccessor<glm::vec3>(static_cast<int>(*posAttrIndex), model);
+        size_t const vertexCount = positions->size();
+
+        std::shared_ptr<std::vector<glm::vec2>> uvs;
+        if (meshFeatures.hasUv())
+        {
+            std::optional<size_t> const uvAttrIndex = findAttr(mesh, primitive, kTexCoord0);
+            MINIRE_INVARIANT(uvAttrIndex.has_value(), "TEXCOORD_0 attribute not found");
+            uvs = readAccessor<glm::vec2>(static_cast<int>(*uvAttrIndex), model);
+        }
+
+        std::shared_ptr<std::vector<glm::vec3>> normals;
+        if (meshFeatures.hasNormal())
+        {
+            std::optional<size_t> const normAttrIndex = findAttr(mesh, primitive, kNormal);
+            MINIRE_INVARIANT(normAttrIndex.has_value(), "NORMAL attribute not found");
+            normals = readAccessor<glm::vec3>(static_cast<int>(*normAttrIndex), model);
+        }
+
+        std::shared_ptr<std::vector<glm::vec4>> tangents;
+        if (meshFeatures.hasTangent())
+        {
+            std::optional<size_t> const tangentAttrIndex = findAttr(mesh, primitive, kTangent);
+            MINIRE_INVARIANT(tangentAttrIndex.has_value(), "TANGENT attribute not found");
+            tangents = readAccessor<glm::vec4>(static_cast<int>(*tangentAttrIndex), model);
+        }
+
+        std::shared_ptr<std::vector<glm::uvec4>> joints;
+        std::shared_ptr<std::vector<glm::vec4>> weights;
+        if (meshFeatures.hasSkin())
+        {
+            std::optional<size_t> const jointsAttrIndex = findAttr(mesh, primitive, kJoints0);
+            MINIRE_INVARIANT(jointsAttrIndex.has_value(), "JOINTS_0 attribute not found");
+            joints = readAccessor<glm::uvec4>(static_cast<int>(*jointsAttrIndex), model);
+
+            std::optional<size_t> const weightsAttrIndex = findAttr(mesh, primitive, kWeights0);
+            MINIRE_INVARIANT(weightsAttrIndex.has_value(), "WEIGHTS_0 attribute not found");
+            weights = readAccessor<glm::vec4>(static_cast<int>(*weightsAttrIndex), model);
+        }
+
+        size_t const vboStride = svb.verticesStride();
+        std::vector<uint8_t> attribBytes(vertexCount * vboStride);
+
+        for (size_t v = 0; v < vertexCount; ++v)
+        {
+            uint8_t * dst = attribBytes.data() + v * vboStride;
+
+            std::memcpy(dst, &(*positions)[v], sizeof(glm::vec3));
+            dst += sizeof(glm::vec3);
+
+            if (meshFeatures.hasUv())
+            {
+                std::memcpy(dst, &(*uvs)[v], sizeof(glm::vec2));
+                dst += sizeof(glm::vec2);
+            }
+
+            if (meshFeatures.hasNormal())
+            {
+                std::memcpy(dst, &(*normals)[v], sizeof(glm::vec3));
+                dst += sizeof(glm::vec3);
+            }
+
+            if (meshFeatures.hasTangent())
+            {
+                std::memcpy(dst, &(*tangents)[v], sizeof(glm::vec3));
+                dst += sizeof(glm::vec3);
+            }
+
+            if (meshFeatures.hasSkin())
+            {
+                std::memcpy(dst, &(*joints)[v], sizeof(glm::uvec4));
+                dst += sizeof(glm::uvec4);
+
+                std::memcpy(dst, &(*weights)[v], sizeof(glm::vec4));
+                dst += sizeof(glm::vec4);
+            }
+
+            assert(dst == attribBytes.data() + (v + 1) * vboStride);
+        }
+
+        std::vector<uint32_t> elements;
+        if (primitive.indices >= 0)
+        {
+            auto const readIndices = readAccessor<uint32_t>(primitive.indices, model);
+            elements = std::move(*readIndices);
+        }
+        else
+        {
+            elements.resize(vertexCount);
+            for (size_t i = 0; i < vertexCount; ++i)
+            {
+                elements[i] = static_cast<uint32_t>(i);
+            }
+        }
+
+        assert(svb.elementsType() == GL_UNSIGNED_INT);
+        return svb.create(
+            elements.size(), aabb,
+            elements.size() * sizeof(uint32_t), elements.data(),
+            attribBytes.size(), attribBytes.data()
+        );
+    }
 
     GltfMeshFeatures prefetchGltfFeatures(std::shared_ptr<::tinygltf::Model> const & model,
                                          size_t const meshIndex, content::Manager & contentManager)

@@ -11,7 +11,7 @@ namespace minire::opengl
     {
         SSBO(SSBO const &) = delete;
         SSBO& operator=(SSBO const &) = delete;
- 
+
     public:
         SSBO()
             : _ssbo(0)

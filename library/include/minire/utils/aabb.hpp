@@ -37,6 +37,8 @@ namespace minire::utils
 
         glm::vec3 dims() const { return _max - _min; }
 
+        bool empty() const { return _min == _max; }
+
         void extend(glm::vec3 const & v)
         {
             _min = glm::min(_min, v);

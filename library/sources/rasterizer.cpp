@@ -109,6 +109,10 @@ namespace minire
                     {
                         for(int y = -1; y <= 1; y++)
                         {
+                            if (x == 0 && y == 0)
+                            {
+                                continue;
+                            }
                             vec2 offsetCoords = TexCoords + vec2(x, y) * texelSize;
                             uint offsetObjId = texture(idTexture, offsetCoords).r;
                             if(isSelected(offsetObjId, outlineIndex))
@@ -176,6 +180,8 @@ namespace minire
 
     // Rasterizer //
 
+    static const size_t kBytesPerGB = 1024 * 1024 * 1024;
+
     Rasterizer::Rasterizer(content::Manager & contentManager,
                            int width, int height,
                            content::Ids const & fontsPreload)
@@ -197,8 +203,10 @@ namespace minire
         , _lines(_ubo)
         , _textures(_contentManager, _resources)
         , _materials(_textures, _ubo, _instancedBuffersPool)
+        , _sharedVertexBuffers(_materials,
+                               rasterizer::SharedVertexBuffers::elementsForBytes(1ULL * kBytesPerGB))
         , _vertexBuffers(_resources)
-        , _meshes(_materials, _vertexBuffers, _contentManager, _resources)
+        , _meshes(_materials, _vertexBuffers, _sharedVertexBuffers, _contentManager, _resources)
         , _fonts(_contentManager, fontsPreload)
         , _labels(_fonts, _contentManager)
         , _sprites(_textures)

@@ -3,16 +3,15 @@
 #include <minire/content/id.hpp>
 #include <minire/models/mesh-features.hpp>
 
-#include <material/types.hpp>
-
 #include <memory>
 
 namespace minire::models { struct VertexBuffer; }
-namespace minire::opengl { struct VertexBuffer; }
+namespace minire::opengl { class SharedVertexSubBuffer; }
 
 namespace minire::rasterizer
 {
     class Resources;
+    class SharedVertexBuffers;
 
     // TODO: support skinning for vertex buffers
     class VertexBuffers
@@ -28,8 +27,8 @@ namespace minire::rasterizer
 
         models::MeshFeatures meshFeatures(content::Id const &) const;
 
-        std::shared_ptr<opengl::VertexBuffer> build(content::Id const &,
-                                                    material::Locations const &) const;
+        std::shared_ptr<opengl::SharedVertexSubBuffer> build(content::Id const &,
+                                                             SharedVertexBuffers &) const;
 
     private:
         Resources & _resources;

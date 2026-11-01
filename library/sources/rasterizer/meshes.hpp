@@ -17,12 +17,14 @@ namespace minire::rasterizer
     class Materials;
     class Resources;
     class VertexBuffers;
+    class SharedVertexBuffers;
 
     class Meshes
     {
     public:
         explicit Meshes(Materials const &,
                         VertexBuffers const &,
+                        SharedVertexBuffers &,
                         content::Manager &,
                         Resources &);
 
@@ -48,5 +50,6 @@ namespace minire::rasterizer
         Resources &           _resources;
         Materials const &     _materials;
         VertexBuffers const & _vertexBuffers;
+        SharedVertexBuffers & _sharedVertexBuffers;
     };
 }

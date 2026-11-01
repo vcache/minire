@@ -25,14 +25,14 @@ namespace minire::utils
         {
             _userData.emplace<T>(std::forward<Args>(args)...);
         }
- 
+
         template<typename T, typename U, typename ... Args>
         void emplaceUserData(std::initializer_list<U> il,
                              Args && ... args)
         {
             _userData.emplace<T>(il, std::forward<Args>(args)...);
         }
- 
+
     public:
         std::any const & userData() const { return _userData; }
         std::any & userData() { return _userData; }

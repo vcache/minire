@@ -4,6 +4,7 @@
 #include <minire/errors.hpp>
 #include <minire/logging.hpp>
 
+#include <rasterizer/draw-batcher.hpp>
 #include <rasterizer/resources.hpp>
 #include <scene-impl.hpp>
 
@@ -14,12 +15,14 @@ namespace minire::rasterizer
 {
     Meshes::Meshes(Materials const & materials,
                    VertexBuffers const & vertexBuffers,
+                   SharedVertexBuffers & sharedVertexBuffers,
                    content::Manager & contentManager,
                    Resources & resources)
         : _contentManager(contentManager)
         , _resources(resources)
         , _materials(materials)
         , _vertexBuffers(vertexBuffers)
+        , _sharedVertexBuffers(sharedVertexBuffers)
     {}
 
     std::shared_ptr<Mesh> Meshes::getMesh(meshes::Id const & key)
@@ -42,7 +45,7 @@ namespace minire::rasterizer
                                        Material::Sptr const & defaultMaterial)
     {
         return std::make_shared<Mesh>(source, defaultMaterial, _contentManager, _materials,
-                                      _vertexBuffers);
+                                      _vertexBuffers, _sharedVertexBuffers);
     }
 
     void Meshes::draw(SceneImpl const & scene,
@@ -50,15 +53,12 @@ namespace minire::rasterizer
                       material::TextureRefs const & directionalLightsShadowMaps,
                       material::TextureRefs const & pointLightsShadowMaps) const
     {
-        // TODO: group models by brush signatures (to avoid frequent program switch)
         glm::vec3 const ambientLight = scene.ambientLight();
-        for(auto const & [uniquePrimitive, primitiveInstances] : culledPrimitives)
-        {
-            Materials::Brush const & brush =
-                uniquePrimitive._mesh.brush(uniquePrimitive._primitiveIndex);
-            brush.draw(uniquePrimitive, primitiveInstances, ambientLight,
-                       directionalLightsShadowMaps, pointLightsShadowMaps);
 
-        }
+        DrawBatcher batcher;
+        batcher.collect(culledPrimitives, [](UniquePrimitive const & prim) -> Materials::Brush const & {
+            return prim._mesh.brush(prim._primitiveIndex);
+        });
+        batcher.draw(ambientLight, directionalLightsShadowMaps, pointLightsShadowMaps);
     }
 }

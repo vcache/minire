@@ -4,6 +4,8 @@
 #include <minire/logging.hpp>
 #include <utils/raii-malloc.hpp>
 
+#include <opengl/shared-vertex-buffer.hpp>
+
 #include <boost/container_hash/hash.hpp> // for hash
 
 #include <unordered_map>
@@ -20,21 +22,13 @@ namespace minire::utils
         {
             size_t operator()(FaceKey const & k) const
             {
-                size_t result = 0x825734fB40AEC515ULL;
+                size_t result = 0;
                 boost::hash_combine(result, std::hash<uint32_t>{}(std::get<0>(k)));
                 boost::hash_combine(result, std::hash<uint32_t>{}(std::get<1>(k)));
                 boost::hash_combine(result, std::hash<uint32_t>{}(std::get<2>(k)));
                 return result;
             }
         };
-
-        size_t strideOf(formats::Obj const & mesh)
-        {
-            size_t result = 3;
-            if (mesh.haveUvs()) result += 2;
-            if (mesh.haveNormals()) result += 3;
-            return result;
-        }
     }
 
     models::MeshFeatures getMeshFeatures(formats::Obj const & obj)
@@ -42,13 +36,13 @@ namespace minire::utils
         return models::MeshFeatures(obj.haveUvs(), obj.haveNormals(), false, false);
     }
 
-    opengl::VertexBuffer createVertexBuffer(formats::Obj const & mesh,
-                                            int vtxAttribIndex,
-                                            int uvAttribIndx,
-                                            int normAttrib)
+    std::unique_ptr<opengl::SharedVertexSubBuffer>
+    createVertexBuffer(formats::Obj const & mesh,
+                       material::Locations const & /*locations*/,
+                       opengl::SharedVertexBuffer & svb)
     {
         Aabb aabb;
-        size_t const stride = strideOf(mesh);
+        size_t const stride = svb.stride();
         RaiiMalloc<uint32_t> elements(mesh._faceVertices.size());
 
         std::unordered_map<FaceKey, uint32_t, FaceKeyHash> allocCache;
@@ -104,48 +98,14 @@ namespace minire::utils
         MINIRE_DEBUG("OBJ to VertexBuffer cache hit rate: {}%",
                      static_cast<float>(hits) / static_cast<float>(elements.size()) * 100.0f);
 
-        // Create the  buffers
-        opengl::VertexBuffer result;
-        result._elementsCount = elements.size();
-        result._aabb = aabb;
-        result._drawMode = GL_TRIANGLES;
-        result._elementsType = GL_UNSIGNED_INT;
+        // Create the buffers
+        assert(svb.drawMode() == GL_TRIANGLES);
+        assert(svb.elementsType() == GL_UNSIGNED_INT);
 
-        // load EBO and VBO
-        opengl::VBO & ebo = result.createVbo(0, GL_ELEMENT_ARRAY_BUFFER);
-        ebo.bufferData(elements.bytesCount(), elements.bytesPointer(), GL_STATIC_DRAW);
-
-        opengl::VBO & vbo = result.createVbo(1, GL_ARRAY_BUFFER);
-        vbo.bufferData(attribs.size() * sizeof(float), attribs.data(), GL_STATIC_DRAW);
-
-        size_t pointer = 0;
-        size_t const bstride = stride * sizeof(float);
-
-        // setup VAO
-        result._vao.enableAttrib(vtxAttribIndex);
-        result._vao.attribPointer(vtxAttribIndex, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
-        pointer += (3 * sizeof(float));
-
-        if (mesh.haveUvs())
-        {
-            if (uvAttribIndx != -1)
-            {
-                result._vao.enableAttrib(uvAttribIndx);
-                result._vao.attribPointer(uvAttribIndx, 2, GL_FLOAT, GL_FALSE, bstride, pointer);
-            }
-            pointer += (2 * sizeof(float));
-        }
-
-        if (mesh.haveNormals())
-        {
-            if (normAttrib != -1)
-            {
-                result._vao.enableAttrib(normAttrib);
-                result._vao.attribPointer(normAttrib, 3, GL_FLOAT, GL_FALSE, bstride, pointer);
-            }
-            pointer += (3 * sizeof(float)); // TODO: useless
-        }
-
-        return result;
+        return svb.create(
+            elements.size(), aabb,                          // general data
+            elements.bytesCount(), elements.bytesPointer(), // EBO
+            attribs.size() * sizeof(float), attribs.data()  // VBO
+        );
     }
 }

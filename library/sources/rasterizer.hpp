@@ -20,6 +20,7 @@
 #include <rasterizer/materials.hpp>
 #include <rasterizer/meshes.hpp>
 #include <rasterizer/resources.hpp>
+#include <rasterizer/shared-vertex-buffers.hpp>
 #include <rasterizer/sprites.hpp>
 #include <rasterizer/textures.hpp>
 #include <rasterizer/ubo.hpp>
@@ -125,6 +126,7 @@ namespace minire
         rasterizer::Lines                   _lines;
         rasterizer::Textures                _textures;
         rasterizer::Materials               _materials;
+        rasterizer::SharedVertexBuffers     _sharedVertexBuffers;
         rasterizer::VertexBuffers           _vertexBuffers;
         rasterizer::Meshes                  _meshes;
         rasterizer::Fonts                   _fonts;

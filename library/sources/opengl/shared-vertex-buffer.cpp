@@ -1,0 +1,341 @@
+#include <opengl/shared-vertex-buffer.hpp>
+
+#include <material/types.hpp>
+#include <minire/errors.hpp>
+
+#include <algorithm>
+#include <cassert>
+
+namespace minire::opengl
+{
+    // SharedVBO::BlockHolder
+
+    SharedVBO::BlockHolder::BlockHolder(SharedVBO & sharedVbo, size_t size)
+        : _sharedVbo(sharedVbo.weak_from_this())
+        , _block(sharedVbo.allocate(size))
+    {}
+
+    SharedVBO::BlockHolder::BlockHolder(BlockHolder && other) noexcept
+        : _sharedVbo(std::move(other._sharedVbo))
+        , _block(other._block)
+    {
+        other._sharedVbo.reset();
+        other._block = Block{};
+    }
+
+    SharedVBO::BlockHolder & SharedVBO::BlockHolder::operator=(BlockHolder && other) noexcept
+    {
+        BlockHolder tmp(std::move(other));
+        std::swap(_sharedVbo, tmp._sharedVbo);
+        std::swap(_block, tmp._block);
+        return *this;
+    }
+
+    SharedVBO::BlockHolder::~BlockHolder()
+    {
+        if (auto sharedVbo = _sharedVbo.lock(); sharedVbo && _block._size > 0)
+        {
+            sharedVbo->free(_block);
+            _block = Block{};
+        }
+    }
+
+    void SharedVBO::BlockHolder::bufferSubData(GLsizeiptr size,
+                                              const void * data)
+    {
+        assert(!_sharedVbo.expired());
+        assert(static_cast<size_t>(size) <= _block._size);
+        if (auto sharedVbo = _sharedVbo.lock(); sharedVbo)
+        {
+            sharedVbo->_vbo.bufferSubData(_block._offset, size, data);
+        }
+    }
+
+    // SharedVBO
+
+    SharedVBO::SharedVBO(GLenum const target,
+                         size_t const maxSize,
+                         GLenum const usage)
+        : _vbo(target)
+    {
+        _vbo.bufferData(maxSize, nullptr /* allocate only */, usage);
+    }
+
+    SharedVBO::Block SharedVBO::allocate(size_t const size)
+    {
+        // Best-fit search: find smallest block with _size >= size
+        Block query{._offset = 0, ._size = size};
+        auto it = _freeBlocksBySize.lower_bound(query);
+        if (it != _freeBlocksBySize.end())
+        {
+            Block found = *it;
+            _freeBlocksBySize.erase(it);
+            _freeBlocksByOffset.erase(found._offset);
+
+            if (found._size > size)
+            {
+                Block remaining{._offset = found._offset + size, ._size = found._size - size};
+                _freeBlocksByOffset.emplace(remaining._offset, remaining._size);
+                _freeBlocksBySize.insert(remaining);
+            }
+
+            return Block{._offset = found._offset, ._size = size};
+        }
+
+        // ensure VBO's capacity won't be exceeded
+        MINIRE_INVARIANT(_nextOffset + size <= static_cast<size_t>(_vbo.size()),
+                         "not enough SharedVBO size: {} bytes", _vbo.size());
+
+        // allocate a new block
+        Block result
+        {
+            ._offset = _nextOffset,
+            ._size = size,
+        };
+        _nextOffset += size;
+        return result;
+    }
+
+    void SharedVBO::free(SharedVBO::Block block)
+    {
+        if (block._size == 0) return;
+
+        size_t offset = block._offset;
+        size_t size = block._size;
+
+        // Try coalescing with predecessor
+        auto nextIt = _freeBlocksByOffset.lower_bound(offset);
+        if (nextIt != _freeBlocksByOffset.begin())
+        {
+            auto prevIt = std::prev(nextIt);
+            if (prevIt->first + prevIt->second == offset)
+            {
+                offset = prevIt->first;
+                size += prevIt->second;
+                _freeBlocksBySize.erase(Block{._offset = prevIt->first, ._size = prevIt->second});
+                _freeBlocksByOffset.erase(prevIt);
+            }
+        }
+
+        // Try coalescing with successor
+        auto succIt = _freeBlocksByOffset.lower_bound(offset);
+        if (succIt != _freeBlocksByOffset.end() && offset + size == succIt->first)
+        {
+            size += succIt->second;
+            _freeBlocksBySize.erase(Block{._offset = succIt->first, ._size = succIt->second});
+            _freeBlocksByOffset.erase(succIt);
+        }
+
+        // If the free block touches the end of allocated memory, reclaim it
+        if (offset + size == _nextOffset)
+        {
+            _nextOffset = offset;
+        }
+        else
+        {
+            _freeBlocksByOffset.emplace(offset, size);
+            _freeBlocksBySize.insert(Block{._offset = offset, ._size = size});
+        }
+    }
+
+    // SharedVertexBuffer
+
+    namespace
+    {
+        size_t vboSize(models::MeshFeatures const & meshFeatures)
+        {
+            size_t values = 3; // (x, y, z)
+            if (meshFeatures.hasUv()) values += 2; // [u, v]
+            if (meshFeatures.hasNormal()) values += 3; // [nx, ny, nz]
+            if (meshFeatures.hasTangent()) values += 3; // [tx, ty, tz]
+            if (meshFeatures.hasSkin()) values += 4 + 4; // joints (uvec4), weights (vec4)
+            return values;
+        }
+
+        size_t eboSize(GLenum drawMode)
+        {
+            switch(drawMode)
+            {
+                case GL_POINTS:
+                    return 1;
+                case GL_LINES:
+                case GL_LINE_STRIP:
+                case GL_LINE_LOOP:
+                    return 2;
+                case GL_TRIANGLES:
+                case GL_TRIANGLE_STRIP:
+                case GL_TRIANGLE_FAN:
+                    return 3;
+                default:
+                    MINIRE_THROW("unsupported draw mode: {}",
+                                 static_cast<int>(drawMode));
+            }
+        }
+    }
+
+    size_t SharedVertexBuffer::calculateVerticesStride(models::MeshFeatures const & meshFeatures)
+    {
+        return vboSize(meshFeatures) * sizeof(float);
+    }
+
+    SharedVertexBuffer::SharedVertexBuffer(GLenum const drawMode,
+                                           material::Locations const & locations,
+                                           models::MeshFeatures const & meshFeatures,
+                                           size_t const maxElements,
+                                           GLenum const target)
+        : _drawMode(drawMode)
+        , _meshFeatures(meshFeatures)
+        , _maxElements(maxElements)
+        , _indecesStride(eboSize(drawMode) * sizeof(uint32_t))
+        , _verticesStride(calculateVerticesStride(_meshFeatures))
+        , _vao()
+        , _elements(std::make_shared<SharedVBO>(GL_ELEMENT_ARRAY_BUFFER, _maxElements * _indecesStride, target))
+        , _vertices(std::make_shared<SharedVBO>(GL_ARRAY_BUFFER, _maxElements * eboSize(drawMode) * _verticesStride, target))
+    {
+        _vao.bind();
+        _elements->bind(); // ensures VAO associates with element array buffer
+        _vertices->bind();
+
+        // attributes helper
+        size_t pointer = 0;
+        auto setupAttrib = [&pointer, this](int const attribIndex,
+                                            size_t const components,
+                                            bool const isPresent)
+        {
+            if (isPresent)
+            {
+                if (attribIndex != -1)
+                {
+                    _vao.enableAttrib(attribIndex);
+                    _vao.attribPointer(attribIndex, components, GL_FLOAT, GL_FALSE, _verticesStride, pointer);
+                }
+                pointer += (components * sizeof(float));
+            }
+        };
+
+        // setup attribs
+        setupAttrib(locations.vertexAttribute(), 3, true);
+        setupAttrib(locations.uvAttribute(), 2, meshFeatures.hasUv());
+        setupAttrib(locations.normalAttribute(), 3, meshFeatures.hasNormal());
+        setupAttrib(locations.tangentAttribute(), 3, meshFeatures.hasTangent());
+        if (meshFeatures.hasSkin())
+        {
+            if (locations.jointsAttribute() != -1)
+            {
+                _vao.enableAttrib(locations.jointsAttribute());
+                _vao.attribIPointer(locations.jointsAttribute(), 4, GL_UNSIGNED_INT, _verticesStride, pointer);
+            }
+            pointer += (4 * sizeof(uint32_t));
+
+            if (locations.weightsAttribute() != -1)
+            {
+                _vao.enableAttrib(locations.weightsAttribute());
+                _vao.attribPointer(locations.weightsAttribute(), 4, GL_FLOAT, GL_FALSE, _verticesStride, pointer);
+            }
+            pointer += (4 * sizeof(float));
+        }
+        assert(pointer == _verticesStride);
+
+        VAO::unbind();
+    }
+
+    std::unique_ptr<SharedVertexSubBuffer>
+    SharedVertexBuffer::create(size_t const elementsCount, utils::Aabb const & aabb,
+                               size_t const eboBytes, void const * eboData,
+                               size_t const vboBytes, void const * vboData)
+    {
+        VAO::unbind();
+
+        auto multiBlock = allocate(eboBytes, vboBytes, elementsCount);
+
+        assert(eboData);
+        assert(eboBytes % sizeof(uint32_t) == 0);
+        multiBlock._elements.bufferSubData(eboBytes, eboData);
+
+        assert(vboData);
+        assert(vboBytes % _verticesStride == 0);
+        multiBlock._vertices.bufferSubData(vboBytes, vboData);
+
+        return std::unique_ptr<SharedVertexSubBuffer>(
+            new SharedVertexSubBuffer(*this, std::move(multiBlock), aabb));
+    }
+
+    void SharedVertexBuffer::update(SharedVertexSubBuffer & subBuffer,
+                                    size_t const elementsCount, utils::Aabb const & aabb,
+                                    size_t const eboBytes, void const * eboData,
+                                    size_t const vboBytes, void const * vboData)
+    {
+        VAO::unbind();
+
+        assert(eboData);
+        assert(eboBytes % sizeof(uint32_t) == 0);
+        assert(vboData);
+        assert(vboBytes % _verticesStride == 0);
+
+        if (subBuffer._multiBlock._elements.size() == eboBytes &&
+            subBuffer._multiBlock._vertices.size() == vboBytes)
+        {
+            subBuffer._multiBlock._elements.bufferSubData(eboBytes, eboData);
+            subBuffer._multiBlock._vertices.bufferSubData(vboBytes, vboData);
+            subBuffer._multiBlock._elementsCount = elementsCount;
+            subBuffer._aabb = aabb;
+            subBuffer._commandData._elementCount = elementsCount;
+            return;
+        }
+
+        // Release old blocks before allocating new ones so they can be merged/reused
+        subBuffer._multiBlock = MultiBlock{};
+
+        auto multiBlock = allocate(eboBytes, vboBytes, elementsCount);
+        multiBlock._elements.bufferSubData(eboBytes, eboData);
+        multiBlock._vertices.bufferSubData(vboBytes, vboData);
+
+        subBuffer.update(std::move(multiBlock), aabb);
+    }
+
+    SharedVertexBuffer::MultiBlock
+    SharedVertexBuffer::allocate(size_t eboBytes, size_t vboBytes, size_t elementsCount)
+    {
+        assert(_vertices);
+        assert(_elements);
+        return MultiBlock
+        {
+            ._elements = SharedVBO::BlockHolder(*_elements, eboBytes),
+            ._vertices = SharedVBO::BlockHolder(*_vertices, vboBytes),
+            ._elementsCount = elementsCount,
+        };
+    }
+
+    // SharedVertexSubBuffer
+
+    SharedVertexSubBuffer::SharedVertexSubBuffer(SharedVertexBuffer & sharedVertexBuffer,
+                                                 SharedVertexBuffer::MultiBlock && multiBlock,
+                                                 utils::Aabb const & aabb)
+        : _sharedVertexBuffer(sharedVertexBuffer.weak_from_this())
+        , _multiBlock(std::move(multiBlock))
+        , _aabb(aabb)
+        , _commandData
+            {
+                ._mode = sharedVertexBuffer.drawMode(),
+                ._elementCount = _multiBlock._elementsCount,
+                ._elementOffset = _multiBlock._elements.offset() / sizeof(uint32_t),
+                ._baseVertex = static_cast<int32_t>(_multiBlock._vertices.offset() / sharedVertexBuffer.verticesStride()),
+            }
+    {}
+
+    void SharedVertexSubBuffer::update(SharedVertexBuffer::MultiBlock && multiBlock,
+                                       utils::Aabb const & aabb)
+    {
+        auto svb = _sharedVertexBuffer.lock();
+        MINIRE_INVARIANT(svb, "SharedVertexBuffer is expired");
+        _multiBlock = std::move(multiBlock);
+        _aabb = aabb;
+        _commandData = CommandData
+            {
+                ._mode = svb->drawMode(),
+                ._elementCount = _multiBlock._elementsCount,
+                ._elementOffset = _multiBlock._elements.offset() / sizeof(uint32_t),
+                ._baseVertex = static_cast<int32_t>(_multiBlock._vertices.offset() / svb->verticesStride()),
+            };
+    }
+}

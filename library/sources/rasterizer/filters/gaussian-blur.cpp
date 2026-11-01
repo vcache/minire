@@ -34,7 +34,7 @@ namespace minire::rasterizer::filters
                 ivec2 dims = imageSize(inputImage);
                 ivec2 gID = ivec2(gl_GlobalInvocationID.xy);
                 uint lID = gl_LocalInvocationID.x;
-                
+
                 ivec2 coord = horizontal ? gID : gID.yx;
 
                 cache[lID + kRadius] = imageLoad(inputImage, clamp(coord, ivec2(0), dims - 1)).r;

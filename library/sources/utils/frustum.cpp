@@ -67,7 +67,7 @@ namespace minire::utils
                              worldVertex.y / worldVertex.w,
                              worldVertex.z / worldVertex.w);
         };
- 
+
         // NOTE: some code is relying on this specific order of vertices,
         //       they must be changed. See cullingTest() function.
         return utils::ViewFrustum
@@ -79,7 +79,7 @@ namespace minire::utils
                 invProject(glm::vec4(-1.0f,  1.0f, -1.0f, 1.0f)),   // top-left
                 invProject(glm::vec4( 1.0f,  1.0f, -1.0f, 1.0f)),   // top-right
                 invProject(glm::vec4( 1.0f, -1.0f, -1.0f, 1.0f)),   // bottom-right
- 
+
                 // Far
                 invProject(glm::vec4(-1.0f, -1.0f,  1.0f, 1.0f)),   // bottom-left
                 invProject(glm::vec4(-1.0f,  1.0f,  1.0f, 1.0f)),   // top-left
