@@ -272,6 +272,247 @@ namespace minire::material
                 return clamp(shadow, 0.0, 1.0);
             }
 
+            {% if minire_clustered_forward %}
+            float shadowFactorPointArray_Std(const vec3 fragmentPos,
+                                             const vec3 lightPos,
+                                             const float shadowMapIndex,
+                                             const float shadowMapFarPlane,
+                                             const float bias)
+            {
+                vec3 fragToLight = fragmentPos - lightPos;
+                float closestDepth = texture(minirePointLightsShadowMapArray, vec4(fragToLight, shadowMapIndex)).r;
+                closestDepth *= shadowMapFarPlane;
+                float currentDepth = length(fragToLight);
+                return currentDepth - bias > closestDepth ? 1.0 : 0.0;
+            }
+
+            float shadowFactorPointArray_Std_PCF(const vec3 fragmentPos,
+                                                 const vec3 lightPos,
+                                                 const float shadowMapIndex,
+                                                 const float shadowMapFarPlane,
+                                                 const float bias)
+            {
+                vec3 fragToLight = fragmentPos - lightPos;
+                float currentDepth = length(fragToLight);
+
+                float viewDistance = length(_viewPosition.xyz - fragmentPos);
+                float diskRadius = (1.0 + (viewDistance / shadowMapFarPlane)) / 25.0;
+
+                float shadow = 0.0;
+                for(int i = 0; i < kSampleOffsetDirections.length(); ++i)
+                {
+                    float closestDepth = texture(minirePointLightsShadowMapArray,
+                                                 vec4(fragToLight + kSampleOffsetDirections[i] * diskRadius, shadowMapIndex)).r;
+                    closestDepth *= shadowMapFarPlane;
+                    if(currentDepth - bias > closestDepth)
+                    {
+                        shadow += 1.0;
+                    }
+                }
+                shadow /= float(kSampleOffsetDirections.length());
+
+                return shadow;
+            }
+
+            float shadowFactorPointArray_ESM(const vec3 fragmentPos,
+                                             const vec3 lightPos,
+                                             const float shadowMapIndex,
+                                             const float shadowMapFarPlane,
+                                             const float bias,
+                                             const float kFactor)
+            {
+                vec3 fragToLight = fragmentPos - lightPos;
+                float currentDepth = (length(fragToLight) / shadowMapFarPlane) - bias;
+                float occluder = texture(minirePointLightsShadowMapArray, vec4(fragToLight, shadowMapIndex)).r;
+                float shadow = occluder * exp(-kFactor * currentDepth);
+                return clamp(shadow, 0.0, 1.0);
+            }
+
+            float shadowFactorPointArray_LogESM(const vec3 fragmentPos,
+                                                const vec3 lightPos,
+                                                const float shadowMapIndex,
+                                                const float shadowMapFarPlane,
+                                                const float bias,
+                                                const float kFactor)
+            {
+                vec3 fragToLight = fragmentPos - lightPos;
+                float currentDepth = (length(fragToLight) / shadowMapFarPlane) - bias;
+                float occluder = texture(minirePointLightsShadowMapArray, vec4(fragToLight, shadowMapIndex)).r;
+                float shadow = exp(occluder - (kFactor * currentDepth));
+                return clamp(shadow, 0.0, 1.0);
+            }
+            {% endif %}
+
+            vec3 evalPointLight(const BznkPointLight light,
+                                const uint shadowMapIndex,
+                                const vec3 N,
+                                const vec3 V,
+                                const float NdotV,
+                                const vec3 F0,
+                                const vec3 albedo,
+                                const float roughness,
+                                const float metallic)
+            {
+                vec3 lightVec = light._position.xyz - bznkWorldPos.xyz;
+                float dist = length(lightVec);
+                if (dist <= 0.0001)
+                {
+                    return vec3(0.0);
+                }
+
+                vec3 L = lightVec / dist;
+                float NdotL = max(dot(N, L), 0.0);
+                if (NdotL <= 0.0)
+                {
+                    return vec3(0.0);
+                }
+
+                vec3 H = normalize(V + L);
+                float attenuation = 1.0 / (
+                    light._attenuation.x +
+                    light._attenuation.y * dist +
+                    light._attenuation.z * dist * dist
+                );
+
+                vec3 radiance = light._color.xyz *
+                                light._color.w *
+                                attenuation;
+
+                float shadow = 1.0;
+
+                {% if minire_clustered_forward %}
+                if (0u != light._method && light._shadowMapIndex != 4294967295u)
+                {
+                    float offsetScale = 0.0;
+                    if (0u == light._normalBiasMode)
+                    {
+                        offsetScale = light._normalBiasBase;
+                    }
+                    else if (1u == light._normalBiasMode)
+                    {
+                        offsetScale = max(light._normalBiasBase * (1.0 - dot(N, -L)),
+                                          light._normalBiasMax);
+                    }
+
+                    float depthBias = 0.0;
+                    if (0u == light._depthBiasMode)
+                    {
+                        depthBias = light._depthBiasBase;
+                    }
+                    else if (1u == light._depthBiasMode)
+                    {
+                        depthBias = max(light._depthBiasBase * (1.0 - dot(N, -L)),
+                                        light._depthBiasMax);
+                    }
+
+                    if (1u == light._method)
+                    {
+                        shadow = 1.0 - shadowFactorPointArray_Std(bznkWorldPos.xyz + N * offsetScale,
+                                                                  light._position.xyz,
+                                                                  float(light._shadowMapIndex),
+                                                                  light._shadowMapFarPlane,
+                                                                  depthBias);
+                    }
+                    else if (2u == light._method)
+                    {
+                        shadow = 1.0 - shadowFactorPointArray_Std_PCF(bznkWorldPos.xyz + N * offsetScale,
+                                                                      light._position.xyz,
+                                                                      float(light._shadowMapIndex),
+                                                                      light._shadowMapFarPlane,
+                                                                      depthBias);
+                    }
+                    else if (3u == light._method)
+                    {
+                        shadow = shadowFactorPointArray_ESM(bznkWorldPos.xyz + N * offsetScale,
+                                                            light._position.xyz,
+                                                            float(light._shadowMapIndex),
+                                                            light._shadowMapFarPlane,
+                                                            depthBias,
+                                                            light._methodArg);
+                    }
+                    else if (4u == light._method)
+                    {
+                        shadow = shadowFactorPointArray_LogESM(bznkWorldPos.xyz + N * offsetScale,
+                                                               light._position.xyz,
+                                                               float(light._shadowMapIndex),
+                                                               light._shadowMapFarPlane,
+                                                               depthBias,
+                                                               light._methodArg);
+                    }
+
+                    shadow = smoothstep(light._smoothStepLeft,
+                                        light._smoothStepRight,
+                                        shadow);
+                }
+                {% else %}
+                if (0u != light._method && shadowMapIndex < {{ minire_max_points_lights }}u)
+                {
+                    float offsetScale = 0.0;
+                    if (0u == light._normalBiasMode)
+                    {
+                        offsetScale = light._normalBiasBase;
+                    }
+                    else if (1u == light._normalBiasMode)
+                    {
+                        offsetScale = max(light._normalBiasBase * (1.0 - dot(N, -L)),
+                                          light._normalBiasMax);
+                    }
+
+                    float depthBias = 0.0;
+                    if (0u == light._depthBiasMode)
+                    {
+                        depthBias = light._depthBiasBase;
+                    }
+                    else if (1u == light._depthBiasMode)
+                    {
+                        depthBias = max(light._depthBiasBase * (1.0 - dot(N, -L)),
+                                        light._depthBiasMax);
+                    }
+
+                    if (1u == light._method)
+                    {
+                        shadow = 1.0 - shadowFactorPoint_Std(bznkWorldPos.xyz + N * offsetScale,
+                                                             light._position.xyz,
+                                                             minirePointLightsShadowMaps[shadowMapIndex],
+                                                             light._shadowMapFarPlane,
+                                                             depthBias);
+                    }
+                    else if (2u == light._method)
+                    {
+                        shadow = 1.0 - shadowFactorPoint_Std_PCF(bznkWorldPos.xyz + N * offsetScale,
+                                                                 light._position.xyz,
+                                                                 minirePointLightsShadowMaps[shadowMapIndex],
+                                                                 light._shadowMapFarPlane,
+                                                                 depthBias);
+                    }
+                    else if (3u == light._method)
+                    {
+                        shadow = shadowFactorPoint_ESM(bznkWorldPos.xyz + N * offsetScale,
+                                                       light._position.xyz,
+                                                       minirePointLightsShadowMaps[shadowMapIndex],
+                                                       light._shadowMapFarPlane,
+                                                       depthBias,
+                                                       light._methodArg);
+                    }
+                    else if (4u == light._method)
+                    {
+                        shadow = shadowFactorPoint_LogESM(bznkWorldPos.xyz + N * offsetScale,
+                                                          light._position.xyz,
+                                                          minirePointLightsShadowMaps[shadowMapIndex],
+                                                          light._shadowMapFarPlane,
+                                                          depthBias,
+                                                          light._methodArg);
+                    }
+
+                    shadow = smoothstep(light._smoothStepLeft,
+                                        light._smoothStepRight,
+                                        shadow);
+                }
+                {% endif %}
+
+                return shadow * calcLo(N, V, L, H, NdotV, NdotL, F0, radiance, albedo, roughness, metallic);
+            }
+
             vec3 pbrFragColor(const vec3 albedo,
                               const float metallic,
                               const float roughness,
@@ -380,108 +621,38 @@ namespace minire::material
                 }
 
                 // ... for point lights
+                {% if minire_clustered_forward %}
+                uint tileX = min(uint(gl_FragCoord.x * float(minireClusterGridDim.x) / minireClusterScreenDim.x), minireClusterGridDim.x - 1u);
+                uint tileY = min(uint(gl_FragCoord.y * float(minireClusterGridDim.y) / minireClusterScreenDim.y), minireClusterGridDim.y - 1u);
+
+                vec4 viewPos = minireClusterViewMatrix * bznkWorldPos;
+                float viewZ = -viewPos.z;
+
+                uint tileZ;
+                if (minireClusterIsPerspective > 0.5)
+                {
+                    viewZ = max(viewZ, minireClusterNearK);
+                    tileZ = uint(clamp(floor(log(viewZ / minireClusterNearK) * minireClusterLogScale), 0.0, float(minireClusterGridDim.z - 1u)));
+                }
+                else
+                {
+                    tileZ = uint(clamp(floor((viewZ - minireClusterNearK) * minireClusterLinearScale), 0.0, float(minireClusterGridDim.z - 1u)));
+                }
+
+                uint clusterIndex = tileX + tileY * minireClusterGridDim.x + tileZ * (minireClusterGridDim.x * minireClusterGridDim.y);
+                MinireClusterCell cell = minireClusterCells[clusterIndex];
+
+                for(uint k = 0U; k < cell._count; ++k)
+                {
+                    uint lightIdx = minireClusterLightIndices[cell._offset + k];
+                    Lo += evalPointLight(minireClusterPointLights[lightIdx], lightIdx, N, V, NdotV, F0, albedo, roughness, metallic);
+                }
+                {% else %}
                 for(uint i = 0U; i < _pointLightsCount; ++i)
                 {
-                    vec3 lightVec = _pointLights[i]._position.xyz - bznkWorldPos.xyz;
-                    float dist = length(lightVec);
-                    if (dist <= 0.0001)
-                    {
-                        continue;
-                    }
-
-                    vec3 L = lightVec / dist;
-                    float NdotL = max(dot(N, L), 0.0);
-                    if (NdotL <= 0.0)
-                    {
-                        continue;
-                    }
-
-                    // calculate per-light radiance
-                    vec3 H = normalize(V + L);
-                    float attenuation = 1.0 / (
-                        _pointLights[i]._attenuation.x +
-                        _pointLights[i]._attenuation.y * dist +
-                        _pointLights[i]._attenuation.z * dist * dist
-                    );
-
-                    vec3 radiance = _pointLights[i]._color.xyz *
-                                    _pointLights[i]._color.w * // TODO: multiply to intensity statically
-                                    attenuation;
-
-                    float shadow = 1.0; // "inverted shadow" actually: 0.0 - shadow, 1.0 - light
-
-                    if (0u != _pointLights[i]._method)
-                    {
-                        // normal bias (TODO: move it into a vertex shader)
-
-                        float offsetScale = 0;
-                        if (0u == _pointLights[i]._normalBiasMode)
-                        {
-                            offsetScale = _pointLights[i]._normalBiasBase;
-                        }
-                        else if (1u == _pointLights[i]._normalBiasMode)
-                        {
-                            offsetScale = max(_pointLights[i]._normalBiasBase * (1.0 - dot(N, -L)),
-                                              _pointLights[i]._normalBiasMax);
-                        }
-
-                        // depth bias (TODO: consider using opengl's polygon offset)
-
-                        float depthBias = 0;
-                        if (0u == _pointLights[i]._depthBiasMode)
-                        {
-                            depthBias = _pointLights[i]._depthBiasBase;
-                        }
-                        else if (1u == _pointLights[i]._depthBiasMode)
-                        {
-                            depthBias = max(_pointLights[i]._depthBiasBase * (1.0 - dot(N, -L)),
-                                            _pointLights[i]._depthBiasMax);
-                        }
-
-                        // shadow calculation
-
-                        if (1u == _pointLights[i]._method)
-                        {
-                            shadow = 1.0 - shadowFactorPoint_Std(bznkWorldPos.xyz + N * offsetScale,
-                                                                 _pointLights[i]._position.xyz,
-                                                                 minirePointLightsShadowMaps[i],
-                                                                 _pointLights[i]._shadowMapFarPlane,
-                                                                 depthBias);
-                        }
-                        else if (2u == _pointLights[i]._method)
-                        {
-                            shadow = 1.0 - shadowFactorPoint_Std_PCF(bznkWorldPos.xyz + N * offsetScale,
-                                                                     _pointLights[i]._position.xyz,
-                                                                     minirePointLightsShadowMaps[i],
-                                                                     _pointLights[i]._shadowMapFarPlane,
-                                                                     depthBias);
-                        }
-                        else if (3u == _pointLights[i]._method)
-                        {
-                            shadow = shadowFactorPoint_ESM(bznkWorldPos.xyz + N * offsetScale,
-                                                           _pointLights[i]._position.xyz,
-                                                           minirePointLightsShadowMaps[i],
-                                                           _pointLights[i]._shadowMapFarPlane,
-                                                           depthBias,
-                                                           _pointLights[i]._methodArg);
-                        }
-                        else if (4u == _pointLights[i]._method)
-                        {
-                            shadow = shadowFactorPoint_LogESM(bznkWorldPos.xyz + N * offsetScale,
-                                                              _pointLights[i]._position.xyz,
-                                                              minirePointLightsShadowMaps[i],
-                                                              _pointLights[i]._shadowMapFarPlane,
-                                                              depthBias,
-                                                              _pointLights[i]._methodArg);
-                        }
-                    }
-
-                    shadow = smoothstep(_pointLights[i]._smoothStepLeft,
-                                        _pointLights[i]._smoothStepRight,
-                                        shadow);
-
-                    Lo += shadow * calcLo(N, V, L, H, NdotV, NdotL, F0, radiance, albedo, roughness, metallic);
+                    Lo += evalPointLight(_pointLights[i], i, N, V, NdotV, F0, albedo, roughness, metallic);
                 }
+                {% endif %}
 
                 // ambient lighting (note that the next IBL tutorial will replace
                 // this ambient lighting with environment lighting).

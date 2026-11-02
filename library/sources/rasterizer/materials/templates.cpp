@@ -137,11 +137,50 @@ namespace minire::rasterizer::materials
             uniform sampler2D minireDirectionalLightsShadowMaps[{{ minire_max_directional_lights }}];
             {{ minire_set_directional_lights_shadow_maps_uniform_name("minireDirectionalLightsShadowMaps") }}
 
+            {% if not minire_clustered_forward %}
             uniform samplerCube minirePointLightsShadowMaps[{{ minire_max_points_lights }}];
             {{ minire_set_point_lights_shadow_maps_uniform_name("minirePointLightsShadowMaps") }}
+            {% endif %}
 
             uniform vec3 minireAmbientLight = vec3(0.03);
             {{ minire_set_ambient_light_uniform_name("minireAmbientLight") }}
+
+            {% if minire_clustered_forward %}
+            uniform samplerCubeArray minirePointLightsShadowMapArray;
+            {{ minire_set_point_lights_shadow_map_array_uniform_name("minirePointLightsShadowMapArray") }}
+
+            struct MinireClusterCell
+            {
+                uint _offset;
+                uint _count;
+            };
+
+            layout(std140, binding = {{ minire_cluster_point_lights_ssbo_binding_point }}) readonly buffer MinireClusterPointLightsBuffer
+            {
+                BznkPointLight minireClusterPointLights[];
+            };
+
+            layout(std430, binding = {{ minire_cluster_grid_ssbo_binding_point }}) readonly buffer MinireClusterGridBuffer
+            {
+                MinireClusterCell minireClusterCells[];
+            };
+
+            layout(std430, binding = {{ minire_cluster_indices_ssbo_binding_point }}) readonly buffer MinireClusterIndicesBuffer
+            {
+                uint minireClusterLightIndices[];
+            };
+
+            layout(std140, binding = {{ minire_cluster_config_ubo_binding_point }}) uniform MinireClusterParams
+            {
+                uvec4 minireClusterGridDim;
+                vec4  minireClusterScreenDim;
+                mat4  minireClusterViewMatrix;
+                float minireClusterNearK;
+                float minireClusterLogScale;
+                float minireClusterLinearScale;
+                float minireClusterIsPerspective;
+            };
+            {% endif %}
         )";
         return kValue;
     }

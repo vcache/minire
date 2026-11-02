@@ -92,6 +92,24 @@ namespace minire::examples
             , _outlineHotObj(false)
         {}
 
+        explicit BasicTestbedApplication(int width, int height,
+                                         std::string const & title,
+                                         content::Manager & contentManager,
+                                         models::RenderingMode const & renderingMode,
+                                         bool const defaultLights = true)
+            : BaseApplication(width, height, title,
+                              contentManager, renderingMode)
+            , _target(0.0f, 0.0f, 0.0f)
+            , _orbiting(_target, 10)
+            , _isDirectLightEnabled(false)
+            , _isPointLightEnabled(true)
+            , _isFloorPlaneEnabled(true)
+            , _isPerspective(true)
+            , _defaultLights(defaultLights)
+            , _printOpbData(false)
+            , _outlineHotObj(false)
+        {}
+
         void onStart() override
         {
             BaseApplication::onStart();
@@ -423,7 +441,7 @@ namespace minire::examples
 
             // Create and run the Application and its Controller
             ApplicationType application(1280, 720, title, manager);
-            application.setVsync(true);
+            application.setVsync(false);
             application.setGlDebug(false);
 
             // Main loop

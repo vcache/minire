@@ -37,6 +37,7 @@ namespace minire::rasterizer
             std::optional<std::string> _bones;
             std::optional<std::string> _directionalLightsShadowMaps;
             std::optional<std::string> _pointLightsShadowMaps;
+            std::optional<std::string> _pointLightsShadowMapArray;
             std::optional<std::string> _ambientLight;
             std::optional<std::string> _emissiveFactor;
             std::optional<std::string> _meshId;
@@ -225,6 +226,7 @@ namespace minire::rasterizer
         , _program(makeShaders(_sources, *_templateParams))
         , _directionalLightsShadowMapsUniform(_program.getUniformLocation(tro._builtinUniforms._directionalLightsShadowMaps))
         , _pointLightsShadowMapsUniform(_program.getUniformLocation(tro._builtinUniforms._pointLightsShadowMaps))
+        , _pointLightsShadowMapArrayUniform(_program.getUniformLocation(tro._builtinUniforms._pointLightsShadowMapArray))
         , _ambientLightUniform(_program.getUniformLocation(tro._builtinUniforms._ambientLight))
         , _userUniformNames(tro._userUniforms.cbegin(), tro._userUniforms.cend())
         , _userUniformLocations([this] // NOTE: must be initialized AFTER _userUniformNames and _program
@@ -303,6 +305,21 @@ namespace minire::rasterizer
                 }
             }
             _program.setUniform(_pointLightsShadowMapsUniform, pointLightsSamplers);
+        }
+
+        // point lights shadow map array (clustered forward)
+        if (_pointLightsShadowMapArrayUniform != -1)
+        {
+            GLint const texUnit = textureUnitHelper.activateNextUnit();
+            if (_materials.pointLightsShadowMapArray())
+            {
+                _materials.pointLightsShadowMapArray()->bind();
+            }
+            else
+            {
+                MINIRE_GL(glBindTexture, GL_TEXTURE_CUBE_MAP_ARRAY, 0);
+            }
+            _program.setUniform(_pointLightsShadowMapArrayUniform, texUnit);
         }
     }
 
@@ -693,10 +710,12 @@ namespace minire::rasterizer
 
     Materials::Materials(Textures const & textures,
                          Ubo const & ubo,
-                         InstancedBuffersPool & instancedBuffersPool)
+                         InstancedBuffersPool & instancedBuffersPool,
+                         models::RenderingMode const & renderingMode)
         : _textures(textures)
         , _ubo(ubo)
         , _instancedBuffersPool(instancedBuffersPool)
+        , _renderingMode(renderingMode)
         , _locationsAllocator()
         , _attribLocations(_locationsAllocator.allocate(1), // vertex, vec3
                            _locationsAllocator.allocate(1), // uv, vec2
@@ -729,6 +748,13 @@ namespace minire::rasterizer
 
             // SSBOs
             {"minire_skinning_ssbo_binding_point", kSkinningVectrorBindingPoint},
+
+            // Clustered Forward Rendering
+            {"minire_clustered_forward",                       std::holds_alternative<models::rendering_mode::ClusteredForward>(_renderingMode)},
+            {"minire_cluster_point_lights_ssbo_binding_point", kClusterPointLightsBindingPoint},
+            {"minire_cluster_grid_ssbo_binding_point",         kClusterGridBindingPoint},
+            {"minire_cluster_indices_ssbo_binding_point",      kClusterLightIndicesBindingPoint},
+            {"minire_cluster_config_ubo_binding_point",        kClusterConfigBindingPoint},
 
             // fragment output locations
             {"minire_color_output_location",    0},    // vec3, +1
@@ -830,6 +856,10 @@ namespace minire::rasterizer
         env.add_void_callback("minire_set_point_lights_shadow_maps_uniform_name", 1,
             [&outputs](inja::Arguments const & args)
             { setSetOnce(args, outputs._builtinUniforms._pointLightsShadowMaps); });
+
+        env.add_void_callback("minire_set_point_lights_shadow_map_array_uniform_name", 1,
+            [&outputs](inja::Arguments const & args)
+            { setSetOnce(args, outputs._builtinUniforms._pointLightsShadowMapArray); });
 
         env.add_void_callback("minire_set_ambient_light_uniform_name", 1,
             [&outputs](inja::Arguments const & args)

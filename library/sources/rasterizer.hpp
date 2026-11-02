@@ -23,10 +23,12 @@
 #include <rasterizer/shared-vertex-buffers.hpp>
 #include <rasterizer/sprites.hpp>
 #include <rasterizer/textures.hpp>
+#include <rasterizer/cluster-grid.hpp>
 #include <rasterizer/ubo.hpp>
 #include <rasterizer/vertex-buffers.hpp>
 
 #include <minire/material.hpp>
+#include <minire/models/rendering-mode.hpp>
 
 #include <glm/mat4x4.hpp>
 
@@ -42,6 +44,7 @@ namespace minire
     public:
         explicit Rasterizer(content::Manager &,
                             int width, int height,
+                            models::RenderingMode const & renderingMode = models::rendering_mode::Forward{},
                             content::Ids const & fontsPreload = {});
 
         ~Rasterizer();
@@ -75,11 +78,15 @@ namespace minire
         bool drawCoordinates() const { return _drawCoordinates; }
         void setDrawCoordinates(bool v) { _drawCoordinates = v; }
 
+        models::RenderingMode const & renderingMode() const { return _renderingMode; }
+
     private:
+        size_t maxPointLights() const;
         void cullDirectionalLights(SceneImpl const &);
         void cullPointLights(SceneImpl const &, utils::FrustumPlanes const &);
         void cullPrimitives(SceneImpl const &, utils::FrustumPlanes const &,
                             rasterizer::CulledPrimitives & out);
+        void updatePointLightsShadowMapArray(size_t shadowCount);
 
     private:
         void shadowPass(SceneImpl const &, utils::ViewFrustum const &);
@@ -97,8 +104,12 @@ namespace minire
 
         class ScreenPassUbo;
 
+        using ClusterGridUptr = std::unique_ptr<rasterizer::ClusterGrid>;
+
     private:
         content::Manager                  & _contentManager;
+        models::RenderingMode const         _renderingMode;
+        ClusterGridUptr                     _clusterGrid;
 
         // Object required fo Multi-Render Target (MRT)
         opengl::FBO                         _primaryFbo;
@@ -139,6 +150,12 @@ namespace minire
 
         CubeShadowMaps                      _cubeShadowMaps;
         material::TextureRefs               _pointLightsShadowMaps;
+        opengl::Texture::Uptr               _pointLightsShadowMapArray;
+        size_t                              _pointLightsShadowMapArrayLayers = 0;
+        GLsizei                             _pointLightsShadowMapArraySize = 0;
+        bool                                _pointLightsShadowMapArrayIsEsm = false;
+        bool                                _pointLightsShadowMapArrayZBuffer32 = false;
+        size_t                              _pointLightsShadowCount = 0;
 
         rasterizer::CulledPrimitives        _culledPrimitives; // for color pass
         rasterizer::CulledDirectionalLights _culledDirectionalLights;

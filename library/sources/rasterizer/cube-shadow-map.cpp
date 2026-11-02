@@ -306,7 +306,7 @@ namespace minire::rasterizer
             {
                 MINIRE_GL(glTexImage2D, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0,
                           _shadowParams._zBuffer32 ? GL_DEPTH_COMPONENT32F
-                                                   : GL_DEPTH_COMPONENT,
+                                                   : GL_DEPTH_COMPONENT24,
                           _shadowParams._mapSize, _shadowParams._mapSize, 0,
                           GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
             }

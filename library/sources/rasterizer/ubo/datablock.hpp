@@ -81,6 +81,9 @@ namespace minire::rasterizer::ubo
         // far plane used in a projection matrix of a light map
         alignas(1 * kStd140N) float     _shadowMapFarPlane = 0;
 
+        // layer in cubemap array (or sampler index)
+        alignas(1 * kStd140N) uint32_t  _shadowMapIndex = 0;
+
         // which method to use:
         // 0 - no shadows,  1 - std; 2 - std w/ pcf; 3 - ESM; 4 - LogESM
         alignas(1 * kStd140N) uint32_t  _method = 0;
@@ -162,6 +165,7 @@ namespace minire::rasterizer::ubo
             vec4  _color;
             vec4  _attenuation;
             float _shadowMapFarPlane;
+            uint  _shadowMapIndex;
             uint  _method;
             float _methodArg;
             uint  _normalBiasMode;

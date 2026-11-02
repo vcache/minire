@@ -184,8 +184,10 @@ namespace minire
 
     Rasterizer::Rasterizer(content::Manager & contentManager,
                            int width, int height,
+                           models::RenderingMode const & renderingMode,
                            content::Ids const & fontsPreload)
         : _contentManager(contentManager)
+        , _renderingMode(renderingMode)
         , _screenQuadVbo(GL_ARRAY_BUFFER)
         , _screenQuadProgram({
             std::make_shared<opengl::Shader>(GL_VERTEX_SHADER, kVertShader),
@@ -202,7 +204,7 @@ namespace minire
         , _coordinates(_ubo)
         , _lines(_ubo)
         , _textures(_contentManager, _resources)
-        , _materials(_textures, _ubo, _instancedBuffersPool)
+        , _materials(_textures, _ubo, _instancedBuffersPool, _renderingMode)
         , _sharedVertexBuffers(_materials,
                                rasterizer::SharedVertexBuffers::elementsForBytes(1ULL * kBytesPerGB))
         , _vertexBuffers(_resources)
@@ -217,6 +219,12 @@ namespace minire
         , _screenWidth(static_cast<size_t>(width))
         , _screenHeight(static_cast<size_t>(height))
     {
+        if (auto const * clusteredForward = std::get_if<models::rendering_mode::ClusteredForward>(&_renderingMode);
+            clusteredForward)
+        {
+            _clusterGrid = std::make_unique<rasterizer::ClusterGrid>(*clusteredForward);
+        }
+
         // TODO: preload textures for sprites
 
         MINIRE_INVARIANT(width >= 0 && height >= 0, "bad window size: {}x{}", width, height);
@@ -367,6 +375,16 @@ namespace minire
         return id;
     }
 
+    size_t Rasterizer::maxPointLights() const
+    {
+        if (auto const * clusteredForward = std::get_if<models::rendering_mode::ClusteredForward>(&_renderingMode);
+            clusteredForward)
+        {
+            return clusteredForward->_maxPointLights;
+        }
+        return rasterizer::Ubo::maxPointLights();
+    }
+
     void Rasterizer::cullDirectionalLights(SceneImpl const & scene)
     {
         _culledDirectionalLights.clear();
@@ -420,41 +438,50 @@ namespace minire
     void Rasterizer::cullPointLights(SceneImpl const & scene,
                                      utils::FrustumPlanes const & frustumPlanes)
     {
+        size_t const limit = maxPointLights();
         _culledPointLights.clear();
-        _culledPointLights.reserve(rasterizer::Ubo::maxPointLights());
+        _culledPointLights.reserve(limit);
         size_t shadowMapIndex = 0;
+        size_t const maxShadows = [this, limit]() -> size_t
+        {
+            if (auto const * clustered = std::get_if<models::rendering_mode::ClusteredForward>(&_renderingMode))
+            {
+                return std::min(limit, static_cast<size_t>(clustered->_maxShadowLights));
+            }
+            return rasterizer::Ubo::maxPointLights();
+        }();
+
         scene.cullPointLights(frustumPlanes,
-            rasterizer::Ubo::maxPointLights(),
-            [this, &shadowMapIndex](size_t const /*index*/,
-                                    glm::vec3 const & position,
-                                    glm::vec4 const & color,
-                                    glm::vec4 const & attenuation,
-                                    models::MaybeShadowParams const & shadowParams)
+            limit,
+            [this, &shadowMapIndex, maxShadows](size_t const /*index*/,
+                                                glm::vec3 const & position,
+                                                glm::vec4 const & color,
+                                                glm::vec4 const & attenuation,
+                                                models::MaybeShadowParams const & shadowParams)
             {
                 rasterizer::CubeShadowMap::Sptr shadowMap;
 
                 if (shadowParams)
                 {
-                    if (shadowMapIndex >= _cubeShadowMaps.size())
+                    if (shadowMapIndex < maxShadows)
                     {
-                        _cubeShadowMaps.push_back(
-                            std::make_shared<rasterizer::CubeShadowMap>(_materials, *shadowParams));
+                        if (shadowMapIndex >= _cubeShadowMaps.size())
+                        {
+                            _cubeShadowMaps.push_back(
+                                std::make_shared<rasterizer::CubeShadowMap>(_materials, *shadowParams));
+                        }
+
+                        assert(_cubeShadowMaps[shadowMapIndex]);
+                        if (_cubeShadowMaps[shadowMapIndex]->shadowParams() != *shadowParams)
+                        {
+                            MINIRE_WARNING("cube shadow map have to be rebuild");
+                            _cubeShadowMaps[shadowMapIndex] =
+                                std::make_shared<rasterizer::CubeShadowMap>(_materials, *shadowParams);
+                        }
+
+                        shadowMap = _cubeShadowMaps[shadowMapIndex];
+                        shadowMapIndex++;
                     }
-
-                    assert(_cubeShadowMaps[shadowMapIndex]);
-                    if (_cubeShadowMaps[shadowMapIndex]->shadowParams() != *shadowParams)
-                    {
-                        // TODO: should try to lookup for an existing map with a compatible parameters
-                        // TODO: maybe "hard-attach" maps to lights so that very customized shaders
-                        //       can be generated (i.e. shaders without branching)
-                        MINIRE_WARNING("cube shadow map have to be rebuild");
-                        _cubeShadowMaps[shadowMapIndex] =
-                            std::make_shared<rasterizer::CubeShadowMap>(_materials, *shadowParams);
-                    }
-
-                    shadowMap = _cubeShadowMaps[shadowMapIndex];
-
-                    shadowMapIndex++;
                 }
 
                 _culledPointLights.emplace_back(rasterizer::CulledPointLight
@@ -533,6 +560,7 @@ namespace minire
         }
 
         // build shadow maps for point lights (if any)
+        size_t shadowMapCount = 0;
         for(rasterizer::CulledPointLight & light : _culledPointLights)
         {
             if (light._shadowMap)
@@ -542,12 +570,102 @@ namespace minire
                     [this, &scene](utils::FrustumPlanes const & frustumPlanes,
                                    rasterizer::CulledPrimitives & output)
                     { return cullPrimitives(scene, frustumPlanes, output); });
+                shadowMapCount++;
             }
             else
             {
                 light._shadowMapFarPlane = 0;
             }
         }
+
+        if (std::holds_alternative<models::rendering_mode::ClusteredForward>(_renderingMode))
+        {
+            _pointLightsShadowCount = shadowMapCount;
+            updatePointLightsShadowMapArray(shadowMapCount);
+        }
+    }
+
+    void Rasterizer::updatePointLightsShadowMapArray(size_t const shadowCount)
+    {
+        if (shadowCount == 0 || _culledPointLights.empty())
+        {
+            return;
+        }
+
+        GLsizei mapSize = 512;
+        bool isEsm = false;
+        bool zBuffer32 = false;
+        for (auto const & light : _culledPointLights)
+        {
+            if (light._shadowMap)
+            {
+                mapSize = static_cast<GLsizei>(light._shadowMap->shadowParams()._mapSize);
+                isEsm = std::holds_alternative<models::shadow_params::method::ESM>(light._shadowMap->shadowParams()._method) ||
+                        std::holds_alternative<models::shadow_params::method::LogESM>(light._shadowMap->shadowParams()._method);
+                zBuffer32 = light._shadowMap->shadowParams()._zBuffer32;
+                break;
+            }
+        }
+
+        size_t const neededLayers = shadowCount;
+
+        if (!_pointLightsShadowMapArray ||
+            _pointLightsShadowMapArrayLayers < neededLayers ||
+            _pointLightsShadowMapArraySize != mapSize ||
+            _pointLightsShadowMapArrayIsEsm != isEsm ||
+            _pointLightsShadowMapArrayZBuffer32 != zBuffer32)
+        {
+            _pointLightsShadowMapArray = std::make_unique<opengl::Texture>(GL_TEXTURE_CUBE_MAP_ARRAY);
+            _pointLightsShadowMapArray->bind();
+            GLsizei const depthLayers = static_cast<GLsizei>(neededLayers * 6);
+            if (isEsm)
+            {
+                MINIRE_GL(glTexStorage3D, GL_TEXTURE_CUBE_MAP_ARRAY, 1,
+                          GL_R32F, mapSize, mapSize, depthLayers);
+            }
+            else
+            {
+                MINIRE_GL(glTexStorage3D, GL_TEXTURE_CUBE_MAP_ARRAY, 1,
+                          zBuffer32 ? GL_DEPTH_COMPONENT32F : GL_DEPTH_COMPONENT24,
+                          mapSize, mapSize, depthLayers);
+            }
+
+            _pointLightsShadowMapArray->parameteri(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            _pointLightsShadowMapArray->parameteri(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            _pointLightsShadowMapArray->parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            _pointLightsShadowMapArray->parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            _pointLightsShadowMapArray->parameteri(GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+            _pointLightsShadowMapArrayLayers = neededLayers;
+            _pointLightsShadowMapArraySize = mapSize;
+            _pointLightsShadowMapArrayIsEsm = isEsm;
+            _pointLightsShadowMapArrayZBuffer32 = zBuffer32;
+        }
+
+        MINIRE_GL(glMemoryBarrier, GL_FRAMEBUFFER_BARRIER_BIT);
+
+        uint32_t currentLayer = 0;
+        for (auto const & light : _culledPointLights)
+        {
+            if (light._shadowMap)
+            {
+                if (currentLayer >= neededLayers)
+                {
+                    break;
+                }
+
+                GLuint const srcId = light._shadowMap->texture().id();
+                GLuint const dstId = _pointLightsShadowMapArray->id();
+                GLint const dstZ = static_cast<GLint>(currentLayer * 6);
+                MINIRE_GL(glCopyImageSubData,
+                          srcId, GL_TEXTURE_CUBE_MAP, 0, 0, 0, 0,
+                          dstId, GL_TEXTURE_CUBE_MAP_ARRAY, 0, 0, 0, dstZ,
+                          mapSize, mapSize, 6);
+                currentLayer++;
+            }
+        }
+
+        MINIRE_GL(glMemoryBarrier, GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
 
     void Rasterizer::colorPass(SceneImpl const & scene,
@@ -588,17 +706,15 @@ namespace minire
         }
 
         // actualize shadow maps vector for point lights
-        _pointLightsShadowMaps.resize(_culledPointLights.size());
-        for(size_t i = 0; i < _pointLightsShadowMaps.size(); i++)
+        size_t const shadowMapsCount = std::min(_culledPointLights.size(),
+                                                rasterizer::Ubo::maxPointLights());
+        _pointLightsShadowMaps.assign(rasterizer::Ubo::maxPointLights(), nullptr);
+        for(size_t i = 0; i < shadowMapsCount; i++)
         {
             if (_culledPointLights[i]._shadowMap)
             {
                 auto const & cubeShadowMap = *_culledPointLights[i]._shadowMap;
                 _pointLightsShadowMaps[i] = &cubeShadowMap.texture();
-            }
-            else
-            {
-                _pointLightsShadowMaps[i] = nullptr;
             }
         }
 
@@ -614,6 +730,22 @@ namespace minire
             _ubo.setViewPosition(glm::vec4(viewpoint.position(), 1.0f));
             _ubo.setLights(_culledDirectionalLights, _culledPointLights);
             _ubo.bind();
+
+            if (_pointLightsShadowMapArray && _pointLightsShadowCount > 0)
+            {
+                _materials.setPointLightsShadowMapArray(_pointLightsShadowMapArray.get());
+            }
+            else
+            {
+                _materials.setPointLightsShadowMapArray(nullptr);
+            }
+
+            if (_clusterGrid)
+            {
+                _clusterGrid->update(viewpoint, _culledPointLights);
+                _clusterGrid->bind();
+            }
+
             draw3d(scene, _culledPrimitives, _directionalLightsShadowMaps,
                    _pointLightsShadowMaps);
         }
