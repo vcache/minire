@@ -36,11 +36,12 @@ namespace minire
     Application::Application(int width, int height,
                              std::string const & title,
                              content::Manager & contentManager,
+                             models::RenderingMode const & renderingMode,
                              models::MsaaParams const & msaaParams,
                              models::MixerParams const & mixerParams)
         : sdl::GlApplication(width, height, title, msaaParams, mixerParams)
         , _contentManager(contentManager)
-        , _rasterizer(std::make_unique<Rasterizer>(contentManager, width, height))
+        , _rasterizer(std::make_unique<Rasterizer>(contentManager, width, height, renderingMode))
         , _scene(std::make_unique<SceneImpl>(*_rasterizer))
     {
         setVsync(true); // TODO: into parameters
@@ -71,6 +72,15 @@ namespace minire
             opengl::setGlErrorCheckMode(false);
         }
     }
+
+    Application::Application(int width, int height,
+                             std::string const & title,
+                             content::Manager & contentManager,
+                             models::MsaaParams const & msaaParams,
+                             models::MixerParams const & mixerParams,
+                             models::RenderingMode const & renderingMode)
+        : Application(width, height, title, contentManager, renderingMode, msaaParams, mixerParams)
+    {}
 
     Application::~Application()
     {

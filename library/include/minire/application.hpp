@@ -5,6 +5,7 @@
 #include <minire/content/id.hpp>
 #include <minire/errors.hpp>
 #include <minire/label.hpp>
+#include <minire/models/rendering-mode.hpp>
 #include <minire/models/vertex-buffer.hpp>
 #include <minire/scene.hpp>
 #include <minire/sdl/gl-application.hpp>
@@ -35,8 +36,16 @@ namespace minire
         Application(int width, int height,
                     std::string const & title,
                     content::Manager & contentManager,
+                    models::RenderingMode const & renderingMode,
                     models::MsaaParams const & = {},
                     models::MixerParams const & = {});
+
+        Application(int width, int height,
+                    std::string const & title,
+                    content::Manager & contentManager,
+                    models::MsaaParams const & = {},
+                    models::MixerParams const & = {},
+                    models::RenderingMode const & = models::rendering_mode::Forward{});
         ~Application() override;
 
     protected:

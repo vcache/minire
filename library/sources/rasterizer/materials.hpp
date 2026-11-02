@@ -10,6 +10,7 @@
 
 #include <minire/material.hpp>
 #include <minire/models/mesh-features.hpp>
+#include <minire/models/rendering-mode.hpp>
 #include <minire/utils/std-pair-hash.hpp>
 
 #include <nlohmann/json_fwd.hpp>
@@ -35,9 +36,13 @@ namespace minire::rasterizer
     public:
         explicit Materials(Textures const & textures,
                            Ubo const & ubo,
-                           InstancedBuffersPool & instancedBuffersPool);
+                           InstancedBuffersPool & instancedBuffersPool,
+                           models::RenderingMode const & renderingMode = models::rendering_mode::Forward{});
 
         material::Locations const & locations() const { return _attribLocations; }
+
+        opengl::Texture const * pointLightsShadowMapArray() const { return _pointLightsShadowMapArray; }
+        void setPointLightsShadowMapArray(opengl::Texture const * tex) { _pointLightsShadowMapArray = tex; }
 
     public:
         class Brush
@@ -101,6 +106,7 @@ namespace minire::rasterizer
 
             GLint const                     _directionalLightsShadowMapsUniform;
             GLint const                     _pointLightsShadowMapsUniform;
+            GLint const                     _pointLightsShadowMapArrayUniform;
             GLint const                     _ambientLightUniform;
 
             // Custom Uniforms
@@ -133,6 +139,8 @@ namespace minire::rasterizer
         Textures const          & _textures;
         Ubo const               & _ubo;
         InstancedBuffersPool    & _instancedBuffersPool;
+        models::RenderingMode     _renderingMode;
+        opengl::Texture const   * _pointLightsShadowMapArray = nullptr;
 
         // Vertex Attributes locations,
         // must be the same for all brushes
