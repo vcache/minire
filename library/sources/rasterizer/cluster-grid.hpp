@@ -54,7 +54,8 @@ namespace minire::rasterizer
             : _config(config)
         {
             uint32_t const totalClusters = _config._clustersX * _config._clustersY * _config._clustersZ;
-            _clusterLights.resize(totalClusters);
+            _clusterLightCounts.resize(totalClusters, 0);
+            _tempClusterLights.resize(totalClusters * _config._maxLightsPerCluster);
             _clusterCells.resize(totalClusters);
         }
 
@@ -211,17 +212,25 @@ namespace minire::rasterizer
                 if (maxIntensity > 0.0001f)
                 {
                     float const c = attC - (maxIntensity / threshold);
-                    if (attQ > 0.00001f)
+                    if (c < 0.0f)
                     {
-                        float const disc = attL * attL - 4.0f * attQ * c;
-                        if (disc > 0.0f)
+                        if (attQ > 0.00001f)
                         {
-                            radius = (-attL + std::sqrt(disc)) / (2.0f * attQ);
+                            float const disc = attL * attL - 4.0f * attQ * c;
+                            if (disc > 0.0f)
+                            {
+                                radius = (-attL + std::sqrt(disc)) / (2.0f * attQ);
+                            }
+                        }
+                        else if (attL > 0.00001f)
+                        {
+                            radius = -c / attL;
                         }
                     }
-                    else if (attL > 0.00001f)
+                    else
                     {
-                        radius = -c / attL;
+                        // Intensity at distance 0 is already below threshold
+                        radius = 0.1f;
                     }
                 }
                 if (radius <= 0.1f) radius = 0.1f;
@@ -235,11 +244,9 @@ namespace minire::rasterizer
                 });
             }
 
-            _clusterLights.resize(totalClusters);
-            for (auto & cl : _clusterLights)
-            {
-                cl.clear();
-            }
+            _clusterLightCounts.assign(totalClusters, 0);
+            _tempClusterLights.clear();
+            _tempClusterLights.resize(totalClusters * _config._maxLightsPerCluster);
 
             auto sliceForDepth = [&](float depth) -> uint32_t
             {
@@ -256,6 +263,9 @@ namespace minire::rasterizer
                 }
             };
 
+            float const P00 = proj[0][0];
+            float const P11 = proj[1][1];
+
             for (auto const & light : _activeLights)
             {
                 float const depth = -light._viewPos.z;
@@ -269,16 +279,60 @@ namespace minire::rasterizer
 
                 float const rSq = light._radius * light._radius;
 
+                // Compute conservative cluster tile bounds in X and Y
+                uint32_t minX = 0, maxX = cx - 1;
+                uint32_t minY = 0, maxY = cy - 1;
+
+                if (isPerspective)
+                {
+                    float const zClosest = std::max(zNear, depth - light._radius);
+                    if (zClosest > 0.0f)
+                    {
+                        float const xNdcMin = (light._viewPos.x - light._radius) * P00 / zClosest;
+                        float const xNdcMax = (light._viewPos.x + light._radius) * P00 / zClosest;
+                        float const yNdcMin = (light._viewPos.y - light._radius) * P11 / zClosest;
+                        float const yNdcMax = (light._viewPos.y + light._radius) * P11 / zClosest;
+
+                        float const cXMin = (xNdcMin * 0.5f + 0.5f) * cx;
+                        float const cXMax = (xNdcMax * 0.5f + 0.5f) * cx;
+                        float const cYMin = (yNdcMin * 0.5f + 0.5f) * cy;
+                        float const cYMax = (yNdcMax * 0.5f + 0.5f) * cy;
+
+                        minX = std::clamp(static_cast<uint32_t>(std::max(0.0f, std::floor(cXMin))), 0u, cx - 1);
+                        maxX = std::clamp(static_cast<uint32_t>(std::max(0.0f, std::ceil(cXMax))), 0u, cx - 1);
+                        minY = std::clamp(static_cast<uint32_t>(std::max(0.0f, std::floor(cYMin))), 0u, cy - 1);
+                        maxY = std::clamp(static_cast<uint32_t>(std::max(0.0f, std::ceil(cYMax))), 0u, cy - 1);
+                    }
+                }
+                else
+                {
+                    float const xNdcMin = (light._viewPos.x - light._radius) * P00;
+                    float const xNdcMax = (light._viewPos.x + light._radius) * P00;
+                    float const yNdcMin = (light._viewPos.y - light._radius) * P11;
+                    float const yNdcMax = (light._viewPos.y + light._radius) * P11;
+
+                    float const cXMin = (xNdcMin * 0.5f + 0.5f) * cx;
+                    float const cXMax = (xNdcMax * 0.5f + 0.5f) * cx;
+                    float const cYMin = (yNdcMin * 0.5f + 0.5f) * cy;
+                    float const cYMax = (yNdcMax * 0.5f + 0.5f) * cy;
+
+                    minX = std::clamp(static_cast<uint32_t>(std::max(0.0f, std::floor(cXMin))), 0u, cx - 1);
+                    maxX = std::clamp(static_cast<uint32_t>(std::max(0.0f, std::ceil(cXMax))), 0u, cx - 1);
+                    minY = std::clamp(static_cast<uint32_t>(std::max(0.0f, std::floor(cYMin))), 0u, cy - 1);
+                    maxY = std::clamp(static_cast<uint32_t>(std::max(0.0f, std::ceil(cYMax))), 0u, cy - 1);
+                }
+
                 for (uint32_t iz = minSlice; iz <= maxSlice; ++iz)
                 {
                     uint32_t const sliceBase = iz * (cx * cy);
-                    for (uint32_t iy = 0; iy < cy; ++iy)
+                    for (uint32_t iy = minY; iy <= maxY; ++iy)
                     {
                         uint32_t const rowBase = sliceBase + iy * cx;
-                        for (uint32_t ix = 0; ix < cx; ++ix)
+                        for (uint32_t ix = minX; ix <= maxX; ++ix)
                         {
                             uint32_t const clusterIdx = rowBase + ix;
-                            if (_clusterLights[clusterIdx].size() >= _config._maxLightsPerCluster)
+                            uint32_t const currentCount = _clusterLightCounts[clusterIdx];
+                            if (currentCount >= _config._maxLightsPerCluster)
                             {
                                 continue;
                             }
@@ -321,7 +375,8 @@ namespace minire::rasterizer
 
                             if (distSq <= rSq)
                             {
-                                _clusterLights[clusterIdx].push_back(light._index);
+                                _tempClusterLights[clusterIdx * _config._maxLightsPerCluster + currentCount] = light._index;
+                                _clusterLightCounts[clusterIdx] = currentCount + 1;
                             }
                         }
                     }
@@ -334,9 +389,14 @@ namespace minire::rasterizer
 
             for (uint32_t c = 0; c < totalClusters; ++c)
             {
+                uint32_t const count = _clusterLightCounts[c];
                 _clusterCells[c]._offset = static_cast<uint32_t>(_lightIndices.size());
-                _clusterCells[c]._count = static_cast<uint32_t>(_clusterLights[c].size());
-                _lightIndices.insert(_lightIndices.end(), _clusterLights[c].begin(), _clusterLights[c].end());
+                _clusterCells[c]._count = count;
+                if (count > 0)
+                {
+                    auto const * start = &_tempClusterLights[c * _config._maxLightsPerCluster];
+                    _lightIndices.insert(_lightIndices.end(), start, start + count);
+                }
             }
 
             if (_lightIndices.empty())
@@ -419,7 +479,8 @@ namespace minire::rasterizer
 
         std::vector<LightInfo>                   _activeLights;
         std::vector<ubo::PointLight>             _pointLightsBuffer;
-        std::vector<std::vector<uint32_t>>       _clusterLights;
+        std::vector<uint32_t>                    _clusterLightCounts;
+        std::vector<uint32_t>                    _tempClusterLights;
         std::vector<ClusterCell>                 _clusterCells;
         std::vector<uint32_t>                    _lightIndices;
     };
