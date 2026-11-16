@@ -154,13 +154,16 @@ namespace minire::gui::components
                 bool const isReallyHovered = isHovered();
 
                 assert(_normalBackground);
-                _normalBackground->visible() = !_isSelected.get() && !isReallyHovered;
+                _normalBackground->visible() = (!_isSelected.get() && !isReallyHovered) ||
+                                               !_listview.selectableItems().get();
 
                 assert(_hoverBackground);
-                _hoverBackground->visible() = !_isSelected.get() && isReallyHovered;
+                _hoverBackground->visible() = !_isSelected.get() && isReallyHovered &&
+                                              _listview.selectableItems().get();
 
                 assert(_selectedBackground);
-                _selectedBackground->visible() = _isSelected.get();
+                _selectedBackground->visible() = _isSelected.get() &&
+                                                 _listview.selectableItems().get();
             }
 
             void initialize() override
@@ -182,7 +185,7 @@ namespace minire::gui::components
                 if (_contents)
                 {
                     _contents->setParent(sharedFromThis);
-                    _contents->setEventTransparent(true);
+                    _contents->setEventTransparent(!_listview.activeItems().get());
                 }
 
                 updateBackground();
@@ -230,6 +233,8 @@ namespace minire::gui::components
         , _contents(*this)
         , _offset(*this, 0)
         , _lineHeight(*this, 0)
+        , _activeItems(*this, false)
+        , _selectableItems(*this, true)
         , _scrollbar(std::make_shared<VerticalScrollbar>("__scrollbar__", theme, concat(style, kName),
                                                          overlayController))
         , _contentLayout(std::make_shared<ListViewLayout>())
@@ -276,6 +281,11 @@ namespace minire::gui::components
 
     ListView::Selected ListView::actualSelected() const
     {
+        if (!_selectableItems.get())
+        {
+            return std::nullopt;
+        }
+
         if (_selected && *_selected >= _contents.get().size())
         {
             return std::nullopt;
@@ -305,7 +315,8 @@ namespace minire::gui::components
         float const heightLimit = contentArea._height - contentPadding;
 
         if (_contents.isInvalidated() || _offset.isInvalidated() ||
-            _lineHeight.isInvalidated() || _heightLimit != heightLimit)
+            _lineHeight.isInvalidated() || _heightLimit != heightLimit ||
+            _activeItems.isInvalidated() || _selectableItems.isInvalidated())
         {
             _contentContainer->clear();
 
@@ -375,12 +386,20 @@ namespace minire::gui::components
 
         _contents.revalidate();
         _lineHeight.revalidate();
+        _activeItems.revalidate();
+        _selectableItems.revalidate();
 
         return zOffset;
     }
 
     void ListView::select(Selected selected)
     {
+        if (!_selectableItems.get())
+        {
+            _selected = std::nullopt;
+            return;
+        }
+
         if (selected && *selected >= _contents.get().size())
         {
             selected = std::nullopt;
@@ -465,10 +484,13 @@ namespace minire::gui::components
 
     void ListView::scrollToSelected()
     {
-        if (_scrollbar && _selected &&
-            (*_selected < _offset.get() || *_selected > _offset.get() + _showLines))
+        if (_selectableItems.get())
         {
-            _scrollbar->setValue(static_cast<float>(*_selected) * _scrollbar->step().get());
+            if (_scrollbar && _selected &&
+                (*_selected < _offset.get() || *_selected > _offset.get() + _showLines))
+            {
+                _scrollbar->setValue(static_cast<float>(*_selected) * _scrollbar->step().get());
+            }
         }
     }
 }

@@ -94,6 +94,12 @@ namespace minire::gui::components
         Property<float> const & lineHeight() const { return _lineHeight; }
         Property<float> & lineHeight() { return _lineHeight; }
 
+        Property<bool> const & activeItems() const { return _activeItems; }
+        Property<bool> & activeItems() { return _activeItems; }
+
+        Property<bool> const & selectableItems() const { return _selectableItems; }
+        Property<bool> & selectableItems() { return _selectableItems; }
+
         void select(Selected);
         Selected selected() const;
         std::any const * current() const;
@@ -143,6 +149,8 @@ namespace minire::gui::components
         Property<Contents>              _contents;
         Property<size_t>                _offset;
         Property<float>                 _lineHeight;
+        Property<bool>                  _activeItems;
+        Property<bool>                  _selectableItems;
 
         VerticalScrollbar::Sptr         _scrollbar;
         Component::Sptr                 _contentContainer;
